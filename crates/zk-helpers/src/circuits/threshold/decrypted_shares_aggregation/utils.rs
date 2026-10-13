@@ -6,21 +6,12 @@
 
 //! Utilities for Decryption Share Aggregation TRBFV circuit.
 //!
-//! **Generic BFV math** lives in [`crate::math`] and is re-exported here for convenience.
-//! **This module** adds only Shamir + scalar CRT helpers: [`lagrange_recover_at_zero`] and
-//! [`crt_reconstruct`]. Coefficient reduction uses [`num_integer::Integer::mod_floor`] in
-//! [`Inputs::compute`](super::computation::Inputs).
+//! Shamir recovery and scalar CRT reconstruction for decryption-share aggregation.
 
-use crate::math;
 use crate::CircuitsErrors;
-use num_bigint::{BigInt, BigUint};
+use num_bigint::BigInt;
+use num_bigint::BigUint;
 use num_traits::{ToPrimitive, Zero};
-
-// Re-export so callers can use decrypted_shares_aggregation::utils for one-stop.
-pub use math::{
-    compute_delta, compute_delta_half, compute_q_inverse_mod_t, compute_q_mod_t, compute_q_product,
-    compute_t_inv_mod_q,
-};
 
 /// Lagrange interpolation at 0: given shares (party_id, value) mod modulus, returns the recovered secret.
 /// Party IDs are 1-based (1, 2, ..., T+1). Formula: f(0) = sum_i y_i * L_i(0) with
@@ -81,7 +72,7 @@ pub fn crt_reconstruct(residues: &[u64], moduli: &[u64]) -> Result<BigUint, Circ
             moduli.len()
         )));
     }
-    let q: BigUint = crate::math::compute_q_product(moduli);
+    let q: BigUint = moduli.iter().map(|&m| BigUint::from(m)).product();
     let mut result = BigUint::zero();
     for (i, &r_i) in residues.iter().enumerate() {
         let m_i = BigUint::from(moduli[i]);
@@ -115,6 +106,11 @@ mod tests {
         let residues = [2u64, 4, 3]; // x ≡ 2 mod 3, ≡ 4 mod 5, ≡ 3 mod 7
         let x = crt_reconstruct(&residues, &moduli).unwrap();
         assert_eq!(x, BigUint::from(59u64)); // 59 mod 3=2, mod 5=4, mod 7=3
+        assert_eq!(crt_reconstruct(&[], &[]).unwrap(), BigUint::from(0u32));
+        assert_eq!(
+            crt_reconstruct(&[u64::MAX - 1, u64::MAX - 2], &[u64::MAX, u64::MAX - 1]).unwrap(),
+            BigUint::parse_bytes(b"340282366920938463408034375210639556609", 10).unwrap(),
+        );
         let error = crt_reconstruct(&[1, 1], &[3, 6]).unwrap_err();
         assert_eq!(
             error.to_string(),

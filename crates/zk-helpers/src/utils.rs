@@ -10,7 +10,6 @@
 //! - String conversion of BigInt vectors
 //! - SAFE sponge hash computation
 //! - BigInt to Field element conversion
-//! - Bit width calculation from bounds
 //! - ZKP modulus constants
 
 use ark_bn254::Fr as Field;
@@ -20,7 +19,6 @@ use ark_ff::PrimeField;
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use e3_polynomial_fhe::{FromFhePolynomial as _, ToPowerBasisPoly};
 use e3_safe::SafeSponge;
-use fhe::bfv::BfvParameters;
 use num_bigint::BigInt;
 use num_bigint::Sign;
 use num_traits::{ToPrimitive, Zero};
@@ -163,71 +161,6 @@ pub fn bigint_to_field(value: &BigInt) -> FieldElement {
     FieldElement::from_le_bytes_mod_order(&bytes)
 }
 
-/// Calculate bit width from a bound.
-///
-/// # Arguments
-/// * `bound` - Bound value
-///
-/// # Returns
-/// The calculated bit width
-pub fn calculate_bit_width(bound: BigInt) -> u32 {
-    if bound <= BigInt::from(0) {
-        return 1; // Minimum 1 bit
-    }
-
-    bound.bits() as u32
-}
-
-/// Computes the bit width of ring elements (coefficients bounded by the coefficient modulus).
-///
-/// # Arguments
-/// * `params` - BFV parameters
-///
-/// # Returns
-/// The bit width of ring elements (coefficients bounded by the coefficient modulus)
-pub fn compute_modulus_bit(params: &BfvParameters) -> u32 {
-    let moduli = params.moduli();
-    let modulus = BigInt::from(compute_max_modulus(moduli));
-    let bound = (modulus - BigInt::from(1)) / BigInt::from(2);
-
-    calculate_bit_width(bound)
-}
-
-/// Computes the maximum modulus from a vector of moduli.
-///
-/// # Arguments
-/// * `moduli` - Vector of moduli
-///
-/// # Returns
-/// The maximum modulus
-pub fn compute_max_modulus(moduli: &[u64]) -> u64 {
-    moduli.iter().copied().max().unwrap()
-}
-
-/// Bit width to pack/hash native CRT coefficients in \([0, q)\) (per-limb), for commitment I/O.
-///
-/// Uses `max_l bits(q_l - 1)`, strictly wider than centered bounds `(q_l-1)/2` when needed.
-pub fn compute_native_crt_coeff_bit(moduli: &[u64]) -> u32 {
-    moduli
-        .iter()
-        .map(|&q| calculate_bit_width(BigInt::from(q) - 1))
-        .max()
-        .unwrap_or(1)
-}
-
-/// Computes the bit width of the message.
-///
-/// # Arguments
-/// * `params` - BFV parameters
-///
-/// # Returns
-/// The bit width of the message
-pub fn compute_msg_bit(params: &BfvParameters) -> u32 {
-    let t = BigInt::from(params.plaintext());
-    let bound = t.clone() - BigInt::from(1);
-    calculate_bit_width(bound)
-}
-
 /// Get the ZKP modulus as a BigInt.
 ///
 /// The ZKP modulus is the BN254 scalar field modulus:
@@ -309,22 +242,6 @@ pub fn polynomial_to_toml_json(polynomial: &Polynomial) -> serde_json::Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn calculate_bit_width_handles_zero_and_positive_bounds() {
-        assert_eq!(calculate_bit_width(BigInt::from(0)), 1);
-        assert_eq!(calculate_bit_width(BigInt::from(1)), 1);
-        assert_eq!(calculate_bit_width(BigInt::from(2)), 2);
-        assert_eq!(calculate_bit_width(BigInt::from(3)), 2);
-        assert_eq!(calculate_bit_width(BigInt::from(4)), 3);
-        assert_eq!(calculate_bit_width(BigInt::from(7)), 3);
-        assert_eq!(calculate_bit_width(BigInt::from(8)), 4);
-    }
-
-    #[test]
-    fn calculate_bit_width_handles_negative_bounds() {
-        assert_eq!(calculate_bit_width(BigInt::from(-1)), 1);
-    }
 
     #[test]
     fn bigint_to_field_reduces_modulus() {

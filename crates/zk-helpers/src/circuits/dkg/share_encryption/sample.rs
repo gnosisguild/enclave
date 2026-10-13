@@ -123,6 +123,8 @@ mod tests {
     use crate::computation::DkgInputType;
     use e3_committee::CiphernodesCommitteeSize;
     use e3_fhe_params::BfvPreset;
+    use fhe::bfv::Encoding;
+    use fhe_traits::FheDecoder;
 
     #[test]
     fn test_generate_secret_key_sample() {
@@ -138,7 +140,7 @@ mod tests {
 
         assert_eq!(sample.public_key.c.len(), 2);
         assert_eq!(
-            crate::math::plaintext_poly_u64(&sample.plaintext)
+            Vec::<u64>::try_decode(&sample.plaintext, Encoding::poly())
                 .unwrap()
                 .len(),
             BfvPreset::InsecureThreshold512.metadata().degree

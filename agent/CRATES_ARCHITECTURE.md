@@ -146,7 +146,6 @@ flowchart TD
     Fhe --> BfvClient
     Trbfv --> BfvClient
     BfvClient --> FheParams
-    BfvClient --> Poly
     BfvClient --> ZkHelpers
 
     Evm --> Config
@@ -172,6 +171,7 @@ flowchart TD
     Events --> Trbfv
     Events --> ZkHelpers
     Events --> Committee
+    ZkHelpers --> FheParams
     ZkHelpers --> Poly
     ZkHelpers --> PolyFhe
     ZkHelpers --> Matrix

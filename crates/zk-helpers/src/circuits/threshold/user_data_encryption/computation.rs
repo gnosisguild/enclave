@@ -9,11 +9,13 @@
 //! [`Configs`], [`Bounds`], [`Bits`], and [`Inputs`] are produced from BFV parameters
 //! and (for input) a public key. They implement [`Computation`] and are used by codegen.
 
-use crate::calculate_bit_width;
 use crate::get_zkp_modulus;
-use crate::math::compute_k0is;
-use crate::math::plaintext_poly_u64;
 use crate::negacyclic::fold_negacyclic;
+use e3_fhe_params::utils::calculate_bit_width;
+use e3_fhe_params::utils::compute_k0is;
+use fhe::bfv::Encoding;
+use fhe_traits::FheDecoder;
+
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitData;
 use crate::CircuitsErrors;
@@ -152,26 +154,26 @@ impl Computation for Bits {
     fn compute(_: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let max_pk_bound = data.pk_bounds.iter().max().unwrap();
 
-        let pk_bit = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
+        let pk_bit = calculate_bit_width(max_pk_bound);
         // We can safely assume that the ct bound is the same as the pk bound.
-        let ct_bit = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
-        let u_bit = calculate_bit_width(BigInt::from(data.u_bound.clone()));
-        let e0_bit = calculate_bit_width(BigInt::from(data.e0_bound.clone()));
-        let e1_bit = calculate_bit_width(BigInt::from(data.e1_bound.clone()));
+        let ct_bit = calculate_bit_width(max_pk_bound);
+        let u_bit = calculate_bit_width(&data.u_bound);
+        let e0_bit = calculate_bit_width(&data.e0_bound);
+        let e1_bit = calculate_bit_width(&data.e1_bound);
 
         // For k1, use the maximum of low and up bounds
-        let k1_low_bit = calculate_bit_width(BigInt::from(data.k1_low_bound.clone()));
-        let k1_up_bit = calculate_bit_width(BigInt::from(data.k1_up_bound.clone()));
+        let k1_low_bit = calculate_bit_width(&data.k1_low_bound);
+        let k1_up_bit = calculate_bit_width(&data.k1_up_bound);
         let k_bit = k1_low_bit.max(k1_up_bit);
 
         // Each `r` is two-sided, so take the widest bound across the CRT bases.
         let mut ct0_r_bit = 0;
         for bound in &data.ct0_r_bounds {
-            ct0_r_bit = ct0_r_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
+            ct0_r_bit = ct0_r_bit.max(calculate_bit_width(bound));
         }
         let mut ct1_r_bit = 0;
         for bound in &data.ct1_r_bounds {
-            ct1_r_bit = ct1_r_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
+            ct1_r_bit = ct1_r_bit.max(calculate_bit_width(bound));
         }
 
         Ok(Bits {
@@ -323,7 +325,7 @@ impl Computation for Inputs {
         e0_mod_q.center(&modulus_q);
 
         // Reconstruct k1 from plaintext polynomial.
-        let mut k1_u64 = plaintext_poly_u64(&pt)?; // m
+        let mut k1_u64 = Vec::<u64>::try_decode(&pt, Encoding::poly())?; // m
 
         Modulus::new(t)
             .map_err(|e| CircuitsErrors::Fhe(fhe::Error::from(e)))?
@@ -562,7 +564,7 @@ mod tests {
         let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
 
         let max_pk_bound = bounds.pk_bounds.iter().max().unwrap();
-        let expected_bits = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
+        let expected_bits = calculate_bit_width(max_pk_bound);
 
         assert_eq!(max_pk_bound.clone(), BigUint::from(34359701504u64));
         assert_eq!(bits.pk_bit, expected_bits);

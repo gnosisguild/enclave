@@ -11,23 +11,25 @@
 //! field so the Noir circuit's range checks and commitment checks succeed.
 //!
 //! Bit widths:
-//! - **`msg_bit`** — [`crate::compute_msg_bit`] on the **DKG** BFV params: coefficients in
+//! - **`msg_bit`** — [`e3_fhe_params::utils::compute_msg_bit`] on the **DKG** BFV params: coefficients in
 //!   `[0, t)` so the bound is `t − 1`. Matches C2 share-encryption
 //!   `compute_share_encryption_commitment_from_message` on per-share plaintexts. Emitted as
 //!   `SHARE_DECRYPTION_BIT_MSG` in codegen.
-//! - **`agg_bit`** — [`crate::compute_modulus_bit`] on the **threshold** BFV params: same as C6
+//! - **`agg_bit`** — [`e3_fhe_params::utils::compute_modulus_bit`] on the **threshold** BFV params: same as C6
 //!   aggregate hashing. Emitted as `SHARE_DECRYPTION_BIT_AGG`; the Noir C4 circuit uses it for
 //!   `compute_aggregated_shares_commitment` on the sum (per-share verification still uses `BIT_MSG`).
 
 use crate::circuits::commitments::compute_share_encryption_commitment_from_message;
 use crate::dkg::share_decryption::ShareDecryptionCircuit;
 use crate::dkg::share_decryption::ShareDecryptionCircuitData;
-use crate::math::plaintext_poly_u64;
+use fhe::bfv::Encoding;
+use fhe_traits::FheDecoder;
+
 use crate::CircuitsErrors;
 use crate::{bigint_2d_to_json_values, poly_coefficients_to_toml_json};
-use crate::{compute_modulus_bit, compute_msg_bit};
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
+use e3_fhe_params::utils::{compute_modulus_bit, compute_msg_bit};
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::Polynomial;
 use fhe_traits::FheDecrypter;
@@ -84,7 +86,7 @@ pub struct Bits {
     /// (`compute_msg_bit` on DKG params).
     pub msg_bit: u32,
     /// CRT aggregate polynomials (same ring semantics as C6 `sk` / `e_sm`);
-    /// matches [`crate::compute_modulus_bit`] on threshold params.
+    /// matches [`e3_fhe_params::utils::compute_modulus_bit`] on threshold params.
     pub agg_bit: u32,
 }
 
@@ -204,7 +206,7 @@ impl Computation for Inputs {
                                 mod_idx, e
                             ))
                         })?;
-                        let share_coeffs = plaintext_poly_u64(&decrypted_pt)?;
+                        let share_coeffs = Vec::<u64>::try_decode(&decrypted_pt, Encoding::poly())?;
                         // Reverse to match C3's reversed commitment convention.
                         let mut reversed_coeffs = share_coeffs.clone();
                         reversed_coeffs.reverse();
@@ -386,7 +388,7 @@ mod tests {
                     Some(party_cts) => {
                         let decrypted_pt =
                             sample.secret_key.try_decrypt(&party_cts[mod_idx]).unwrap();
-                        plaintext_poly_u64(&decrypted_pt).unwrap()
+                        Vec::<u64>::try_decode(&decrypted_pt, Encoding::poly()).unwrap()
                     }
                     None => sample.own_plaintext_share[mod_idx].clone(),
                 };

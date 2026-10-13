@@ -9,7 +9,6 @@
 //! [`Configs`], [`Bounds`], [`Bits`], and [`Inputs`] are produced from BFV parameters
 //! and (for input) a public key. They implement [`Computation`] and are used by codegen.
 
-use crate::calculate_bit_width;
 use crate::crt_polynomial_to_toml_json;
 use crate::negacyclic::fold_negacyclic;
 use crate::polynomial_to_toml_json;
@@ -20,6 +19,7 @@ use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_committee::CiphernodesCommittee;
 use e3_fhe_params::build_pair_for_preset;
+use e3_fhe_params::utils::calculate_bit_width;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;
@@ -135,31 +135,30 @@ impl Computation for Bits {
 
     fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         // Calculate bit widths for each bound type
-        let eek_bit = calculate_bit_width(BigInt::from(data.eek_bound.clone()));
-        let sk_bit = calculate_bit_width(BigInt::from(data.sk_bound.clone()));
+        let eek_bit = calculate_bit_width(&data.eek_bound);
+        let sk_bit = calculate_bit_width(&data.sk_bound);
         // e_sm limbs are centered residues, so they share the pk/modulus width. The lifted value
         // carries the smudging bound and needs its own, much wider, window.
-        let e_sm_lifted_bit = calculate_bit_width(BigInt::from(data.e_sm_bound.clone()));
+        let e_sm_lifted_bit = calculate_bit_width(&data.e_sm_bound);
         let mut e_sm_bit = 0;
         for bound in &data.e_sm_limb_bounds {
-            e_sm_bit = e_sm_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
+            e_sm_bit = e_sm_bit.max(calculate_bit_width(bound));
         }
         let mut e_sm_quotient_bit = 0;
         for bound in &data.e_sm_quotient_bounds {
-            e_sm_quotient_bit =
-                e_sm_quotient_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
+            e_sm_quotient_bit = e_sm_quotient_bit.max(calculate_bit_width(bound));
         }
 
         // pk_bit: centered representation uses (max(qi) - 1) / 2 as the bound,
         // matching compute_modulus_bit() used in C5 (pk_aggregation).
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
-        let pk_bit = crate::compute_modulus_bit(&threshold_params);
+        let pk_bit = e3_fhe_params::utils::compute_modulus_bit(&threshold_params);
 
         // One width covers every limb's `r`, so take the widest bound.
         let mut r_bit = 0;
         for bound in &data.r_bounds {
-            r_bit = r_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
+            r_bit = r_bit.max(calculate_bit_width(bound));
         }
 
         Ok(Bits {
@@ -471,7 +470,7 @@ mod tests {
 
         // pk_bit uses compute_modulus_bit: (max(qi) - 1) / 2 for centered representation
         let (threshold_params, _) = build_pair_for_preset(preset).unwrap();
-        let expected_bit = crate::compute_modulus_bit(&threshold_params);
+        let expected_bit = e3_fhe_params::utils::compute_modulus_bit(&threshold_params);
 
         assert_eq!(bits.pk_bit, expected_bit);
     }

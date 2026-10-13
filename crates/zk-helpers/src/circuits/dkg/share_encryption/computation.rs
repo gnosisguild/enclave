@@ -15,15 +15,18 @@ use crate::circuits::commitments::{
 };
 use crate::dkg::share_encryption::ShareEncryptionCircuit;
 use crate::dkg::share_encryption::ShareEncryptionCircuitData;
-use crate::math::{compute_k0is, compute_q_mod_t_centered, plaintext_poly_u64};
 use crate::negacyclic::fold_negacyclic;
+use e3_fhe_params::utils::{compute_k0is, compute_q_mod_t_centered};
+use fhe::bfv::Encoding;
+use fhe_traits::FheDecoder;
+
+use crate::crt_polynomial_to_toml_json;
 use crate::polynomial_to_toml_json;
-use crate::utils::{compute_modulus_bit, compute_msg_bit};
 use crate::CircuitsErrors;
-use crate::{calculate_bit_width, crt_polynomial_to_toml_json};
-use crate::{compute_q_mod_t, compute_q_product};
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
+use e3_fhe_params::utils::calculate_bit_width;
+use e3_fhe_params::utils::{compute_modulus_bit, compute_msg_bit};
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;
@@ -369,9 +372,9 @@ impl Computation for Configs {
 
         let moduli = dkg_params.moduli().to_vec();
         let t = dkg_params.plaintext();
-        let q = compute_q_product(&moduli);
-        let q_mod_t = compute_q_mod_t(&q, t);
-        let q_mod_t_centered = compute_q_mod_t_centered(&moduli, t);
+        let q = dkg_params.context_at_level(0)?.modulus();
+        let q_mod_t = q % t;
+        let q_mod_t_centered = compute_q_mod_t_centered(&q_mod_t, t);
         let k0is = compute_k0is(&moduli, t)?;
 
         let bounds = Bounds::compute(preset, data)?;
@@ -419,19 +422,15 @@ impl Computation for Bits {
     fn compute(_: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let max_pk_bound = data.pk_bounds.iter().max().unwrap();
 
-        let pk_bit = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
-        let ct_bit = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
-        let u_bit = calculate_bit_width(BigInt::from(data.u_bound.clone()));
-        let e0_bit = calculate_bit_width(BigInt::from(data.e0_bound.clone()));
-        let e1_bit = calculate_bit_width(BigInt::from(data.e1_bound.clone()));
-        let msg_bit = calculate_bit_width(BigInt::from(data.msg_bound.clone()));
+        let pk_bit = calculate_bit_width(max_pk_bound);
+        let ct_bit = calculate_bit_width(max_pk_bound);
+        let u_bit = calculate_bit_width(&data.u_bound);
+        let e0_bit = calculate_bit_width(&data.e0_bound);
+        let e1_bit = calculate_bit_width(&data.e1_bound);
+        let msg_bit = calculate_bit_width(&data.msg_bound);
         // Each `r` is two-sided, so take the widest bound across the CRT bases.
-        let ct0_r_bit = calculate_bit_width(BigInt::from(
-            data.ct0_r_bounds.iter().max().unwrap().clone(),
-        ));
-        let ct1_r_bit = calculate_bit_width(BigInt::from(
-            data.ct1_r_bounds.iter().max().unwrap().clone(),
-        ));
+        let ct0_r_bit = calculate_bit_width(data.ct0_r_bounds.iter().max().unwrap());
+        let ct1_r_bit = calculate_bit_width(data.ct1_r_bounds.iter().max().unwrap());
 
         Ok(Bits {
             pk_bit,
@@ -574,7 +573,7 @@ impl Computation for Inputs {
         e0_mod_q.reverse();
         e0_mod_q.center(&modulus_q);
 
-        let mut k1_u64 = plaintext_poly_u64(&pt)?;
+        let mut k1_u64 = Vec::<u64>::try_decode(&pt, Encoding::poly())?;
         Modulus::new(t)
             .map_err(|e| CircuitsErrors::Fhe(fhe::Error::from(e)))?
             .scalar_mul_vec(&mut k1_u64, q_mod_t);
@@ -582,7 +581,8 @@ impl Computation for Inputs {
         let mut k1 = Polynomial::from_u64_vector(k1_u64);
         k1.reverse();
 
-        let mut message = Polynomial::from_u64_vector(plaintext_poly_u64(&pt)?);
+        let mut message =
+            Polynomial::from_u64_vector(Vec::<u64>::try_decode(&pt, Encoding::poly())?);
         message.reverse();
 
         let mut u = CrtPolynomial::from_fhe_polynomial(u).limb(0).clone();
@@ -733,10 +733,8 @@ impl Computation for Inputs {
         // `[0, t)`. The circuit pins it by asserting that window, so an off-by-one here fails there
         // rather than passing silently.
         let t_big = BigInt::from(dkg_params.plaintext());
-        let scale_big = BigInt::from(compute_q_mod_t(
-            &compute_q_product(dkg_params.moduli()),
-            dkg_params.plaintext(),
-        ));
+        let scale_big =
+            BigInt::from(dkg_params.context_at_level(0)?.modulus() % dkg_params.plaintext());
         let z_coeffs: Vec<BigInt> = message
             .coefficients()
             .iter()
@@ -826,7 +824,7 @@ mod tests {
         let bits = Bits::compute(BfvPreset::InsecureThreshold512, &bounds).unwrap();
 
         let max_pk_bound = bounds.pk_bounds.iter().max().unwrap();
-        let expected_bits = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
+        let expected_bits = calculate_bit_width(max_pk_bound);
 
         assert_eq!(max_pk_bound.clone(), BigUint::from(1125899906777088u128));
         assert_eq!(bits.pk_bit, expected_bits);
@@ -856,8 +854,9 @@ mod tests {
         let inputs = Inputs::compute(BfvPreset::InsecureThreshold512, &sample).unwrap();
 
         // inputs.message is plaintext coefficients (reversed, as used in circuit)
-        let expected_message =
-            Polynomial::from_u64_vector(plaintext_poly_u64(&sample.plaintext).unwrap());
+        let expected_message = Polynomial::from_u64_vector(
+            Vec::<u64>::try_decode(&sample.plaintext, Encoding::poly()).unwrap(),
+        );
         let mut expected = expected_message;
         expected.reverse();
 
@@ -893,15 +892,15 @@ mod tests {
 mod scaled_quotient_tests {
     use super::*;
     use crate::computation::DkgInputType;
-    use crate::{compute_k0is, compute_q_mod_t, compute_q_product};
     use e3_committee::CiphernodesCommitteeSize;
+    use e3_fhe_params::utils::compute_k0is;
     use e3_fhe_params::{build_pair_for_preset, BfvPreset};
 
     fn derive_for(preset: BfvPreset) -> (ScaledQuotient, Vec<u64>, u64) {
         let (_, dkg) = build_pair_for_preset(preset).unwrap();
         let moduli = dkg.moduli().to_vec();
         let t = dkg.plaintext();
-        let scale = compute_q_mod_t(&compute_q_product(&moduli), t);
+        let scale = dkg.context_at_level(0).unwrap().modulus() % t;
         let k0is = compute_k0is(&moduli, t).unwrap();
         // `Bounds::compute` ignores its data argument, but still needs one.
         let sd = preset.search_defaults().unwrap();
@@ -942,11 +941,10 @@ mod scaled_quotient_tests {
         );
 
         let (_, dkg) = build_pair_for_preset(BfvPreset::SecureThreshold8192).unwrap();
-        let scale = compute_q_mod_t(&compute_q_product(&moduli), t)
+        let scale = (dkg.context_at_level(0).unwrap().modulus() % t)
             .to_u64()
             .unwrap();
         let k0is = compute_k0is(&moduli, t).unwrap();
-        let _ = dkg;
 
         let t_big = BigInt::from(t);
         let mut q_prod = BigInt::from(1u32);

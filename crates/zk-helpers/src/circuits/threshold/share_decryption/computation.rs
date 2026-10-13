@@ -10,13 +10,10 @@
 //! and (for input) ciphertext plus aggregated shares (s, e, d_share). They implement
 //! [`Computation`] and are used by codegen.
 
-use crate::calculate_bit_width;
 use crate::circuits::commitments::{
     compute_aggregated_shares_commitment, compute_ciphertext_commitment,
 };
 use crate::circuits::threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_COEFFS;
-use crate::compute_modulus_bit;
-use crate::compute_native_crt_coeff_bit;
 use crate::crt_polynomial_to_toml_json;
 use crate::negacyclic::fold_negacyclic;
 use crate::threshold::share_decryption::circuit::ShareDecryptionCircuit;
@@ -24,6 +21,9 @@ use crate::threshold::share_decryption::circuit::ShareDecryptionCircuitData;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
+use e3_fhe_params::utils::calculate_bit_width;
+use e3_fhe_params::utils::compute_modulus_bit;
+use e3_fhe_params::utils::compute_native_crt_coeff_bit;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;
@@ -167,7 +167,7 @@ impl Computation for Bits {
         // One width covers every limb's `r`, so take the widest bound.
         let mut r_bit = 0;
         for bound in data.r_bounds.iter() {
-            r_bit = r_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
+            r_bit = r_bit.max(calculate_bit_width(bound));
         }
 
         let (threshold_params, _) =
@@ -177,7 +177,7 @@ impl Computation for Bits {
         // `ct`, `sk`, `e_sm` and `d` are centered residues, so they share the modulus width. This
         // used to piggyback on the `r2` bound, which was `(max(q) - 1) / 2` for exactly that reason;
         // with `r2` gone the width comes from the moduli directly.
-        let modulus_bit = crate::compute_modulus_bit(&threshold_params);
+        let modulus_bit = e3_fhe_params::utils::compute_modulus_bit(&threshold_params);
 
         Ok(Bits {
             ct_bit: modulus_bit,
@@ -435,7 +435,7 @@ mod tests {
         let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
 
         let max_q = *threshold_params.moduli().iter().max().unwrap();
-        let expected_bit = calculate_bit_width((BigInt::from(max_q) - BigInt::from(1)) / 2);
+        let expected_bit = calculate_bit_width(&((BigUint::from(max_q) - 1u32) / 2u32));
 
         assert_eq!(bits.d_bit, expected_bit);
         assert_eq!(bits.ct_bit, expected_bit);
@@ -450,7 +450,7 @@ mod tests {
         let bits = Bits::compute(DEFAULT_BFV_PRESET, &bounds).unwrap();
         assert_eq!(
             bits.d_native_bit,
-            crate::compute_native_crt_coeff_bit(threshold_params.moduli())
+            e3_fhe_params::utils::compute_native_crt_coeff_bit(threshold_params.moduli())
         );
         assert!(bits.d_native_bit >= bits.d_bit);
     }
