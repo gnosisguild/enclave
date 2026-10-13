@@ -1,0 +1,693 @@
+{
+  "group": "events-data-config",
+  "units": [
+    {
+      "id": "e3-events",
+      "kind": "crate",
+      "path": "crates/events",
+      "one_line": "Typed event vocabulary and in-process bus: sequences every protocol event, stores it, and fans it out to actor subscribers.",
+      "explain": "Each protocol step is an InterfoldEvent: an InterfoldEventData payload plus an EventContext holding its id, causation, HLC timestamp, aggregate and source. A BusHandle stamps a new event with a hybrid logical clock and sends it to the Sequencer, which hands it to the EventStore router; the router passes it to the EventStore of the event's aggregate, which appends and flushes it before the sequenced copy reaches the EventBus, which fans it out by event type. Without this persisted, ordered history a restarted node would have no authoritative record to rebuild its actors from.",
+      "analogy": "Like a notary's register: each document gets the next number and is filed before the mail room hands copies to the offices that asked for that kind of document.",
+      "actors": [
+        {
+          "name": "EventBus",
+          "role": "Actix actor that drops duplicate deliveries, runs pre-fanout recipients, then delivers each event to subscribers of its type and to '*' subscribers",
+          "ref": "crates/events/src/eventbus.rs@115@pub struct EventBus<E: Event> {"
+        },
+        {
+          "name": "Sequencer",
+          "role": "Actix actor that hands each unsequenced event to the EventStore router and forwards the stored, sequenced copy to the EventBus",
+          "ref": "crates/events/src/sequencer.rs@16@pub struct Sequencer {"
+        },
+        {
+          "name": "EventStore",
+          "role": "One per aggregate (chain): appends each event to its log, flushes the log, then inserts the event timestamp into the sequence index",
+          "ref": "crates/events/src/eventstore.rs@23@pub struct EventStore<I: SequenceIndex, L: EventLog> {"
+        },
+        {
+          "name": "EventStoreRouter",
+          "role": "Routes each store request to the EventStore of the event's aggregate and panics when no store is configured for it",
+          "ref": "crates/events/src/eventstore_router.rs@154@pub struct EventStoreRouter<I: SequenceIndex, L: EventLog> {"
+        },
+        {
+          "name": "SnapshotBuffer",
+          "role": "Pre-fanout recipient; its BatchRouter groups actor snapshot writes by aggregate and sequence and sends each batch to the store as InsertBatch",
+          "ref": "crates/events/src/snapshot_buffer/snapshot_buffer.rs@44@pub struct SnapshotBuffer {"
+        }
+      ],
+      "consumes": [
+        {
+          "name": "InterfoldEvent<Unsequenced>",
+          "by": "Sequencer",
+          "ref": "crates/events/src/sequencer.rs@54@impl Handler<InterfoldEvent<Unsequenced>> for Sequencer {"
+        },
+        {
+          "name": "StoreEventRequested",
+          "by": "EventStore",
+          "ref": "crates/events/src/eventstore.rs@447@impl<I: SequenceIndex, L: EventLog> Handler<StoreEventRequested> for EventStore<I, L> {"
+        },
+        {
+          "name": "InterfoldEvent<Sequenced>",
+          "by": "EventBus",
+          "ref": "crates/events/src/eventbus.rs@276@impl<E: Event> Handler<E> for EventBus<E> {"
+        }
+      ],
+      "emits": [
+        {
+          "name": "StoreEventResponse",
+          "by": "EventStore",
+          "ref": "crates/events/src/eventstore.rs@452@msg.sender.do_send(StoreEventResponse(sequenced));"
+        },
+        {
+          "name": "InterfoldEvent<Sequenced>",
+          "by": "Sequencer",
+          "ref": "crates/events/src/sequencer.rs@69@self.bus.do_send(msg.into_event());"
+        },
+        {
+          "name": "Shutdown",
+          "by": "BusHandle",
+          "ref": "crates/events/src/bus_handle.rs@283@let event = self.event_from(Shutdown, None)?;"
+        },
+        {
+          "name": "InterfoldError",
+          "by": "BusHandle",
+          "ref": "crates/events/src/bus_handle.rs@336@match self.event_from_error(err_type, error, self.get_ctx()) {"
+        }
+      ],
+      "state": [
+        {
+          "name": "Subscriber table: event type string to live recipients, with '*' for all events",
+          "where": "memory",
+          "ref": "crates/events/src/eventbus.rs@119@listeners: HashMap<String, Vec<Recipient<E>>>,"
+        },
+        {
+          "name": "Dedup window of recent delivery ids, capped at 250,000 and evicted in first-observed order",
+          "where": "memory",
+          "ref": "crates/events/src/eventbus.rs@38@const DEFAULT_DEDUP_CAPACITY: usize = 250_000;"
+        },
+        {
+          "name": "Durable sequenced log and timestamp index, written by the EventStore through the data crate",
+          "where": "disk",
+          "ref": "crates/events/src/eventstore.rs@75@let seq = self.log.append(&event)?;"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "InterfoldEventData",
+          "what": "the enum of all 99 protocol event payloads, one variant per event type",
+          "ref": "crates/events/src/interfold_event/mod.rs@283@pub enum InterfoldEventData {"
+        },
+        {
+          "name": "InterfoldEvent<S>",
+          "what": "payload plus EventContext; S is Unsequenced until stored, then Sequenced with a u64 sequence number",
+          "ref": "crates/events/src/interfold_event/mod.rs@427@pub struct InterfoldEvent<S: SeqState = Sequenced> {"
+        },
+        {
+          "name": "EventType",
+          "what": "string-keyed enum generated by impl_event_types!; subscribers name the type they want, and All is the '*' wildcard",
+          "ref": "crates/events/src/interfold_event/mod.rs@206@pub enum EventType {"
+        },
+        {
+          "name": "EventContext<S>",
+          "what": "per-event metadata: id, causation id, origin id, seq, HLC ts, aggregate id, block and source",
+          "ref": "crates/events/src/event_context.rs@77@pub struct EventContext<S: SeqState> {"
+        },
+        {
+          "name": "E3id",
+          "what": "E3 round identifier: a decimal id string plus the chain id it belongs to; displays as chain:id",
+          "ref": "crates/events/src/e3id.rs@13@pub struct E3id {"
+        },
+        {
+          "name": "CircuitName",
+          "what": "names of the ZK circuits (PkBfv, PkGeneration, ThresholdShareDecryption, DecryptedSharesAggregation, fold circuits) with as_str",
+          "ref": "crates/events/src/interfold_event/proof.rs@108@pub enum CircuitName {"
+        },
+        {
+          "name": "ProofType",
+          "what": "#[repr(u8)] identifier of node-generated proofs C0 to C7, aggregates included, with explicit discriminants",
+          "ref": "crates/events/src/interfold_event/signed_proof.rs@29@pub enum ProofType {"
+        },
+        {
+          "name": "E3Requested",
+          "what": "a new E3 request: E3id, threshold m of n, seed, request block, BFV preset and error size",
+          "ref": "crates/events/src/interfold_event/mod.rs@291@E3Requested(E3Requested),"
+        },
+        {
+          "name": "CiphernodeSelected",
+          "what": "this node was selected for an E3 committee, with thresholds, seed and BFV preset",
+          "ref": "crates/events/src/interfold_event/mod.rs@298@CiphernodeSelected(CiphernodeSelected),"
+        },
+        {
+          "name": "CommitteeFinalized",
+          "what": "an E3 committee is final: E3id, member list, scores and chain id",
+          "ref": "crates/events/src/interfold_event/mod.rs@307@CommitteeFinalized(CommitteeFinalized),"
+        },
+        {
+          "name": "PublicKeyAggregated",
+          "what": "the aggregated threshold public key for an E3, with its node set; forwarded to peers",
+          "ref": "crates/events/src/interfold_event/mod.rs@292@PublicKeyAggregated(PublicKeyAggregated),"
+        },
+        {
+          "name": "CiphertextOutputPublished",
+          "what": "a ciphertext output for an E3, with its commitment",
+          "ref": "crates/events/src/interfold_event/mod.rs@293@CiphertextOutputPublished(CiphertextOutputPublished),"
+        },
+        {
+          "name": "DecryptionshareCreated",
+          "what": "this node's decryption share for an E3, with its party id and C6 proofs",
+          "ref": "crates/events/src/interfold_event/mod.rs@295@DecryptionshareCreated(DecryptionshareCreated),"
+        },
+        {
+          "name": "PlaintextAggregated",
+          "what": "the aggregated plaintext output of an E3 with its final proofs; not forwarded to peers",
+          "ref": "crates/events/src/interfold_event/mod.rs@296@PlaintextAggregated(PlaintextAggregated),"
+        },
+        {
+          "name": "ProofVerificationPassed",
+          "what": "a node's proof verified: E3id, party id, recovered address and proof type",
+          "ref": "crates/events/src/interfold_event/mod.rs@289@ProofVerificationPassed(ProofVerificationPassed),"
+        },
+        {
+          "name": "E3Failed",
+          "what": "an E3 failed at a stage, with the failed stage and a reason",
+          "ref": "crates/events/src/interfold_event/mod.rs@315@E3Failed(E3Failed),"
+        },
+        {
+          "name": "Shutdown",
+          "what": "shutdown signal from SIGTERM; publish_shutdown_and_wait returns only after the subscribers handled it",
+          "ref": "crates/events/src/interfold_event/mod.rs@317@Shutdown(Shutdown),"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "crate surface: the module list and re-exports; start from the bus",
+          "ref": "crates/events/src/lib.rs@47@pub use eventbus::*;"
+        },
+        {
+          "why": "publishing: BusHandle stamps a local event with the HLC and hands it to the Sequencer",
+          "ref": "crates/events/src/bus_handle.rs@325@self.sequencer.do_send(evt);"
+        },
+        {
+          "why": "sequencing: the Sequencer receives each unsequenced event and asks the store router to persist it",
+          "ref": "crates/events/src/sequencer.rs@54@impl Handler<InterfoldEvent<Unsequenced>> for Sequencer {"
+        },
+        {
+          "why": "persistence: the EventStore appends and flushes the event before it is indexed and dispatched",
+          "ref": "crates/events/src/eventstore.rs@75@let seq = self.log.append(&event)?;"
+        },
+        {
+          "why": "fan-out: the EventBus delivers each sequenced event to the subscribers of its type",
+          "ref": "crates/events/src/eventbus.rs@276@impl<E: Event> Handler<E> for EventBus<E> {"
+        }
+      ],
+      "rust_patterns": [
+        {
+          "pattern": "actix-actor",
+          "note": "EventBus is an actix actor; started() raises its mailbox capacity to MAILBOX_LIMIT_LARGE",
+          "ref": "crates/events/src/eventbus.rs@127@impl<E: Event> Actor for EventBus<E> {"
+        },
+        {
+          "pattern": "actix-message",
+          "note": "Subscribe derives Message and carries an event type string plus a Recipient",
+          "ref": "crates/events/src/eventbus.rs@370@pub struct Subscribe<E: Event> {"
+        },
+        {
+          "pattern": "actix-recipient",
+          "note": "a subscriber passes its actor as a type-erased Recipient<E>",
+          "ref": "crates/events/src/traits.rs@148@fn subscribe(&self, event_type: EventType, recipient: Recipient<E>);"
+        },
+        {
+          "pattern": "anyhow-context",
+          "note": "a failed log sync becomes a contextual error before the event is dispatched",
+          "ref": "crates/events/src/eventstore.rs@81@.context(\"failed to sync event before dispatch\")"
+        },
+        {
+          "pattern": "enum-match",
+          "note": "CircuitName::as_str maps each circuit to its name string",
+          "ref": "crates/events/src/interfold_event/proof.rs@156@CircuitName::PkBfv => \"pk\","
+        },
+        {
+          "pattern": "newtype",
+          "note": "AggregateId wraps one usize and is the routing key for the EventStores",
+          "ref": "crates/events/src/event_context.rs@24@pub struct AggregateId(usize);"
+        }
+      ],
+      "depends_on": ["e3-crypto", "e3-committee-hash", "e3-trbfv", "e3-utils", "e3-fhe-params", "e3-zk-helpers"],
+      "tests": "Unit tests sit in #[cfg(test)] modules in eventbus.rs, eventstore.rs and sequencer.rs. Run: cargo test -p e3-events",
+      "unverified": [
+        "The replay path that feeds stored events back into the EventBus after a restart lives outside these four crates and was not traced here."
+      ]
+    },
+    {
+      "id": "e3-data",
+      "kind": "crate",
+      "path": "crates/data",
+      "one_line": "Persistence layer on sled and commitlog: keyed snapshot storage with Repository and Persistable, plus the durable append-only event log.",
+      "explain": "Actors persist their state as typed snapshots: Persistable and Repository bincode-serialize a value into an Insert message, which the DataStore's recipient delivers to the SledStore actor. A sled batch that carries a snapshot revision is rejected as a whole when its sequence is older than the cursor already stored. The events themselves live in an append-only commitlog, which the code calls the durable source of truth; snapshots are read back through Persistable::load or Repository::read.",
+      "analogy": "Like a row of labelled lockers: each actor keeps its latest belongings in its own locker, and a batch is refused whole if its sequence number is older than the one the aggregate's cursor already records.",
+      "actors": [
+        {
+          "name": "SledStore",
+          "role": "Actix actor that owns the sled 'datastore' tree and applies Insert, InsertBatch, Get, Remove and Flush messages",
+          "ref": "crates/data/src/sled_store.rs@18@pub struct SledStore {"
+        },
+        {
+          "name": "InMemStore",
+          "role": "In-memory counterpart with the same message set, used by Repositories::in_mem and tests",
+          "ref": "crates/data/src/in_mem.rs@28@pub struct InMemStore {"
+        }
+      ],
+      "consumes": [
+        { "name": "Insert", "by": "SledStore", "ref": "crates/data/src/sled_store.rs@61@impl Handler<Insert> for SledStore {" },
+        { "name": "InsertBatch", "by": "SledStore", "ref": "crates/data/src/sled_store.rs@75@impl Handler<InsertBatch> for SledStore {" },
+        { "name": "Get", "by": "SledStore", "ref": "crates/data/src/sled_store.rs@141@impl Handler<Get> for SledStore {" }
+      ],
+      "emits": [
+        {
+          "name": "InterfoldError (EType::Data) for a failed sled write",
+          "by": "SledStore",
+          "ref": "crates/data/src/sled_store.rs@57@.err(EType::Data"
+        }
+      ],
+      "state": [
+        {
+          "name": "Actor snapshots, one value per scope key, in the sled tree 'datastore'",
+          "where": "disk",
+          "ref": "crates/data/src/sled_store.rs@36@SledDb::new(path, \"datastore\")?;"
+        },
+        {
+          "name": "Per-aggregate timestamp-to-sequence index, one sled tree per aggregate",
+          "where": "disk",
+          "ref": "crates/ciphernode-builder/src/event_system.rs@306@let tree_name = format!(\"sequence_index.{}\", index);"
+        },
+        {
+          "name": "Event log: commitlog segments per aggregate, with blob files for large local events",
+          "where": "disk",
+          "ref": "crates/data/src/commit_log_event_log.rs@126@let log = CommitLog::new(opts)?;"
+        },
+        {
+          "name": "In-memory event log and key-value store used by tests and in-memory repositories",
+          "where": "memory",
+          "ref": "crates/data/src/in_mem_event_log.rs@10@pub struct InMemEventLog {"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "PersistableData",
+          "what": "bound for any value a Persistable holds: Serialize, DeserializeOwned, Clone, Send and Sync",
+          "ref": "crates/data/src/persistable.rs@13@pub trait PersistableData:"
+        },
+        {
+          "name": "Persistable<T>",
+          "what": "auto-saving container: holds Option<T> and writes each mutation to the store before exposing it",
+          "ref": "crates/data/src/persistable.rs@112@pub struct Persistable<T> {"
+        },
+        {
+          "name": "StoreConnector",
+          "what": "scope key plus Get, Insert and Remove recipients that a Persistable uses",
+          "ref": "crates/data/src/persistable.rs@62@pub struct StoreConnector {"
+        },
+        {
+          "name": "Repository<S>",
+          "what": "typed view over one DataStore scope with read, write, write_sync and clear",
+          "ref": "crates/data/src/repository.rs@15@pub struct Repository<S> {"
+        },
+        {
+          "name": "Snapshot",
+          "what": "trait for actor state capture: snapshot() returns the value; Checkpoint writes it; FromSnapshotWithParams rebuilds the actor",
+          "ref": "crates/data/src/snapshot.rs@14@pub trait Snapshot"
+        },
+        {
+          "name": "DataStore",
+          "what": "scopable handle whose messages go to SledStore or InMemStore; write bincode-serializes the value",
+          "ref": "crates/data/src/data_store.rs@101@pub struct DataStore {"
+        },
+        {
+          "name": "SledDb",
+          "what": "wrapper over one sled Tree; insert_batch applies a batch in one transaction and checks the stored cursor",
+          "ref": "crates/data/src/sled_db.rs@16@pub struct SledDb {"
+        },
+        {
+          "name": "CommitLogEventLog",
+          "what": "append-only event log on the commitlog crate; implements the events crate EventLog trait",
+          "ref": "crates/data/src/commit_log_event_log.rs@64@pub struct CommitLogEventLog {"
+        },
+        {
+          "name": "SledSequenceIndex",
+          "what": "sled tree mapping an event timestamp (u128) to a sequence number (u64); implements SequenceIndex",
+          "ref": "crates/data/src/sled_sequence_index.rs@15@pub struct SledSequenceIndex {"
+        },
+        {
+          "name": "DurableIntent<T>",
+          "what": "value an actor records before it dispatches work and settles later; flushed directly, so snapshot batches cannot overwrite it",
+          "ref": "crates/data/src/durable_intent.rs@19@pub struct DurableIntent<T> {"
+        },
+        {
+          "name": "SCHEMA_VERSION",
+          "what": "u32 = 8, defined in e3-sync: the on-disk format guard that the node checks before the EventStores open",
+          "ref": "crates/sync/src/sync/schema_version.rs@20@pub const SCHEMA_VERSION: u32 = 8;"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "crate surface: persistable is re-exported first; Persistable and its connector are the main entry points",
+          "ref": "crates/data/src/lib.rs@32@pub use persistable::*;"
+        },
+        {
+          "why": "snapshot write order: try_mutate writes the new state before it becomes visible in memory",
+          "ref": "crates/data/src/persistable.rs@226@// Accept the snapshot write before exposing the new state in memory."
+        },
+        {
+          "why": "store entry point: SledStore applies Insert messages",
+          "ref": "crates/data/src/sled_store.rs@61@impl Handler<Insert> for SledStore {"
+        },
+        {
+          "why": "atomic batch: a batch with a stale snapshot revision is rejected as a whole",
+          "ref": "crates/data/src/sled_db.rs@48@pub fn insert_batch(&mut self, batch: &InsertBatch) -> Result<bool> {"
+        },
+        {
+          "why": "real use: E3Context implements Checkpoint over its repository",
+          "ref": "crates/request/src/context.rs@183@impl Checkpoint for E3Context {"
+        }
+      ],
+      "rust_patterns": [
+        {
+          "pattern": "actix-actor",
+          "note": "SledStore is an actix actor; started() sets its mailbox capacity",
+          "ref": "crates/data/src/sled_store.rs@24@impl Actor for SledStore {"
+        },
+        {
+          "pattern": "trait-object-dyn",
+          "note": "the store keeps its error sink as Box<dyn ErrorDispatcher<...>>",
+          "ref": "crates/data/src/sled_store.rs@20@bus: Box<dyn ErrorDispatcher<InterfoldEvent<Unsequenced>>>,"
+        },
+        {
+          "pattern": "arc-shared",
+          "note": "one process-wide cache of open sled databases behind Arc<Mutex<...>>",
+          "ref": "crates/data/src/sled_utils.rs@18@pub static SLED_CACHE: Lazy<Arc<Mutex<HashMap<String, Db>>>> ="
+        },
+        {
+          "pattern": "enum-match",
+          "note": "a stale-batch abort is matched and turned into Ok(false), so the batch is skipped",
+          "ref": "crates/data/src/sled_db.rs@76@Err(TransactionError::Abort(SnapshotBatchAbort::Stale)) => Ok(false),"
+        },
+        {
+          "pattern": "trait-impl",
+          "note": "AutoPersist is implemented for Repository<T>, so a repository can load or create a Persistable",
+          "ref": "crates/data/src/persistable.rs@36@impl<T> AutoPersist<T> for Repository<T>"
+        }
+      ],
+      "depends_on": ["e3-events", "e3-utils", "e3-config", "e3-hamt"],
+      "tests": "Unit tests sit in #[cfg(test)] modules in persistable.rs and commit_log_event_log.rs. Run: cargo test -p e3-data",
+      "unverified": [
+        "Startup replay of events after snapshot cursors is implemented outside this crate; it was not traced here.",
+        "Commitlog segment and index file formats were read only at the open and tail-recovery entry points."
+      ]
+    },
+    {
+      "id": "e3-config",
+      "kind": "crate",
+      "path": "crates/config",
+      "one_line": "Loads and validates node configuration from interfold.config.yaml, merging environment and CLI overrides, and exposes chains, contracts and release numbers.",
+      "explain": "A node is picked by name from the nodes map in interfold.config.yaml, found by searching parent folders or taken from the CLI path. Environment references in the YAML are expanded, E3_-prefixed variables and CLI overrides are merged on top with Figment, and the result is scoped to the chosen node, which resolves its network and checks its limits. protocol-release.toml is compiled in and supplies protocol_version and node_generation; the net crate reads protocol_version. Without this layering a node would not know its chains, contracts, ports or network.",
+      "analogy": "Like house rules with stacked overrides: the printed defaults are overlaid by the operator's notebook, then by sticky notes (environment variables), then by a note handed in at the desk (command-line flags).",
+      "actors": [],
+      "consumes": [
+        { "name": "interfold.config.yaml", "by": "load_config", "ref": "crates/config/src/app_config.rs@558@pub fn load_config(" },
+        {
+          "name": "E3_-prefixed environment variables",
+          "by": "load_config",
+          "ref": "crates/config/src/app_config.rs@578@.merge(Env::prefixed(\"E3_\").split(\"__\"))"
+        }
+      ],
+      "emits": [],
+      "state": [
+        {
+          "name": "interfold.config.yaml on disk: node, nodes and chain settings",
+          "where": "disk",
+          "ref": "crates/config/src/paths_engine.rs@43@pub const DEFAULT_CONFIG_NAME: &str = \"interfold.config.yaml\";"
+        },
+        {
+          "name": "Resolved AppConfig for the chosen node: paths, chains, network and limits",
+          "where": "memory",
+          "ref": "crates/config/src/app_config.rs@162@pub struct AppConfig {"
+        },
+        {
+          "name": "Protocol and node generation numbers, compiled into the binary",
+          "where": "memory",
+          "ref": "crates/config/src/node_release.rs@32@include_str!(\"../protocol-release.toml\")"
+        },
+        {
+          "name": "Node key, db and log files under the node data directory",
+          "where": "disk",
+          "ref": "crates/config/src/paths_engine.rs@45@pub const DEFAULT_DB_NAME: &str = \"db\";"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "UnscopedAppConfig",
+          "what": "the whole YAML document before a node is chosen: node defaults, nodes map, chains, otel and custom bb",
+          "ref": "crates/config/src/app_config.rs@498@pub struct UnscopedAppConfig {"
+        },
+        {
+          "name": "NodeDefinition",
+          "what": "one node's settings: address, peers, network, ports, file names and buffer limits; unknown keys are rejected",
+          "ref": "crates/config/src/app_config.rs@31@pub struct NodeDefinition {"
+        },
+        {
+          "name": "ChainConfig",
+          "what": "one chain: name, rpc_url, rpc_auth, contract addresses, finalization and ingestion settings",
+          "ref": "crates/config/src/chain_config.rs@45@pub struct ChainConfig {"
+        },
+        {
+          "name": "ContractAddresses",
+          "what": "named contract addresses for a chain: interfold, ciphernode_registry, bonding_registry and optional others",
+          "ref": "crates/config/src/contract.rs@45@pub struct ContractAddresses {"
+        },
+        {
+          "name": "Contract",
+          "what": "untagged enum: a bare address string, or a table with address and deploy_block",
+          "ref": "crates/config/src/contract.rs@13@pub enum Contract {"
+        },
+        {
+          "name": "NetworkProfile",
+          "what": "resolved P2P network: built-in mainnet, sepolia or local, or a custom network with a 32-byte id",
+          "ref": "crates/config/src/network.rs@86@pub struct NetworkProfile {"
+        },
+        {
+          "name": "NodeRelease",
+          "what": "protocol_version and node_generation; release_id hashes the crate version under a fixed domain string",
+          "ref": "crates/config/src/node_release.rs@14@pub struct NodeRelease {"
+        },
+        {
+          "name": "PathsEngine",
+          "what": "resolves the config, key, db, log and work paths for a node",
+          "ref": "crates/config/src/paths_engine.rs@12@pub struct PathsEngine {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "crate surface: re-exports app_config, which holds the main configuration types",
+          "ref": "crates/config/src/lib.rs@19@pub use app_config::*;"
+        },
+        {
+          "why": "entry point: load_config resolves the file, expands env, merges the layers and scopes to the named node",
+          "ref": "crates/config/src/app_config.rs@558@pub fn load_config("
+        },
+        {
+          "why": "layer order: the YAML is merged over the defaults; E3_ variables and CLI overrides follow",
+          "ref": "crates/config/src/app_config.rs@577@.merge(Yaml::string(&loaded_yaml))"
+        },
+        {
+          "why": "per-node resolution: limits are checked and the network profile is resolved",
+          "ref": "crates/config/src/app_config.rs@260@NetworkProfile::resolve(node.network.as_deref(), node.network_id, &config.chains)?;"
+        },
+        {
+          "why": "release numbers: protocol-release.toml is compiled in and parsed once",
+          "ref": "crates/config/src/node_release.rs@29@pub fn current_node_release() -> &'static NodeRelease {"
+        }
+      ],
+      "rust_patterns": [
+        {
+          "pattern": "serde-derive",
+          "note": "untagged serde lets a contract be written as a bare address or as a table with deploy_block",
+          "ref": "crates/config/src/contract.rs@12@#[serde(untagged)]"
+        },
+        {
+          "pattern": "enum-match",
+          "note": "Contract::address_str returns the address from either variant",
+          "ref": "crates/config/src/contract.rs@25@Full { address, .. } => address,"
+        },
+        {
+          "pattern": "newtype",
+          "note": "NetworkId wraps a 32-byte array and is compared with the built-in network IDs",
+          "ref": "crates/config/src/network.rs@34@pub struct NetworkId([u8; 32]);"
+        },
+        {
+          "pattern": "closure",
+          "note": "the release is parsed once, inside OnceLock::get_or_init",
+          "ref": "crates/config/src/node_release.rs@31@RELEASE.get_or_init(|| {"
+        },
+        {
+          "pattern": "anyhow-context",
+          "note": "a missing YAML file is reported with a context message",
+          "ref": "crates/config/src/app_config.rs@573@.context(\"Configuration file not found\")"
+        }
+      ],
+      "depends_on": ["e3-events", "e3-fhe-params"],
+      "tests": "Unit tests sit in #[cfg(test)] modules, mainly app_config.rs (uses figment::Jail and the CRISP example config). Run: cargo test -p e3-config",
+      "unverified": [
+        "Which node code reads each ChainConfig and NodeDefinition field was not traced; only the loaders and NetworkProfile were read.",
+        "The validation rules in validation.rs and chain_config.rs were only sampled."
+      ]
+    },
+    {
+      "id": "e3-logger",
+      "kind": "crate",
+      "path": "crates/logger",
+      "one_line": "Passive protocol-event logger plus a bounded, redacting operational log of tracing output for the dashboard.",
+      "explain": "attach_protocol_logger subscribes a SimpleLogger to the node's EventBus for every event type, and each event becomes one structured tracing line with a severity chosen by its type; the observer never publishes or changes event ordering. OperationalLogLayer copies tracing events and span fields into LogCollector, which keeps the newest 20,000 entries in memory and, when a path is configured, writes JSON lines to a file that rotates at 25 MiB. Field names such as password, seed, keyshare or plaintext are replaced with [REDACTED] before they are stored. Without it, operators would have no compact, redacted trail of what the node did.",
+      "analogy": "Like a ship's logbook: the newest pages stay in the wheelhouse for quick reading, the full book is copied into numbered volumes that roll over when full, and private names are blacked out before an entry is written.",
+      "actors": [
+        {
+          "name": "SimpleLogger",
+          "role": "Actix actor subscribed to every event type on the node EventBus; it calls EventLogging::log for each event",
+          "ref": "crates/logger/src/logger.rs@33@pub struct SimpleLogger<E: EventLogging> {"
+        }
+      ],
+      "consumes": [
+        { "name": "All protocol events (EventType::All)", "by": "SimpleLogger", "ref": "crates/logger/src/logger.rs@46@EventType::All," },
+        {
+          "name": "tracing events and their span fields",
+          "by": "OperationalLogLayer",
+          "ref": "crates/logger/src/tracing_layer.rs@146@fn on_event(&self, event: &tracing::Event<'_>, ctx: Context<'_, S>) {"
+        }
+      ],
+      "emits": [
+        {
+          "name": "structured tracing line per protocol event, at error, warn, info or debug",
+          "by": "SimpleLogger",
+          "ref": "crates/logger/src/logger.rs@281@fn log(&self, logger_name: &str) {"
+        },
+        {
+          "name": "JSON line in the rotating operational log file",
+          "by": "RollingJsonWriter",
+          "ref": "crates/logger/src/log_collector.rs@236@fn write(&mut self, entry: &LogEntry) -> std::io::Result<()> {"
+        }
+      ],
+      "state": [
+        {
+          "name": "Newest operational entries: a ring of at most 20,000 in memory",
+          "where": "memory",
+          "ref": "crates/logger/src/log_collector.rs@27@const DEFAULT_CAPACITY: usize = 20_000;"
+        },
+        {
+          "name": "Rotating JSON lines file, 25 MiB per file, with up to 4 rotated files",
+          "where": "disk",
+          "ref": "crates/logger/src/log_collector.rs@30@const MAX_FILE_BYTES: u64 = 25 * 1024 * 1024;"
+        },
+        {
+          "name": "Next sequence number for entries, which query cursors use",
+          "where": "memory",
+          "ref": "crates/logger/src/log_collector.rs@57@next_seq: AtomicU64,"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "EventLogging",
+          "what": "trait an event implements to be logged: log(logger_name)",
+          "ref": "crates/logger/src/logger.rs@15@pub trait EventLogging: Event {"
+        },
+        {
+          "name": "attach_protocol_logger",
+          "what": "function that attaches the standard observer to a BusHandle; the ciphernode builder calls it",
+          "ref": "crates/logger/src/logger.rs@24@pub fn attach_protocol_logger(name: &str, bus: &BusHandle)"
+        },
+        {
+          "name": "severity",
+          "what": "maps each InterfoldEventData to Error, Warn, Info or Debug",
+          "ref": "crates/logger/src/logger.rs@74@fn severity(data: &InterfoldEventData) -> Severity {"
+        },
+        {
+          "name": "LogCollector",
+          "what": "process-wide bounded store and rotating writer; init returns the first instance it creates",
+          "ref": "crates/logger/src/log_collector.rs@53@pub struct LogCollector {"
+        },
+        {
+          "name": "LogEntry",
+          "what": "one stored line: seq, timestamp_ms, level, target, message, node and structured fields",
+          "ref": "crates/logger/src/log_collector.rs@34@pub struct LogEntry {"
+        },
+        {
+          "name": "LogQueryResult",
+          "what": "query page with entries, next_cursor, oldest_cursor and total_stored",
+          "ref": "crates/logger/src/log_collector.rs@46@pub struct LogQueryResult {"
+        },
+        {
+          "name": "OperationalLogLayer",
+          "what": "tracing Layer that copies span and event fields into LogCollector",
+          "ref": "crates/logger/src/tracing_layer.rs@118@pub struct OperationalLogLayer;"
+        },
+        {
+          "name": "is_sensitive_field",
+          "what": "name-based redaction rule: exact names such as password and seed, plus substrings such as secret, keyshare and plaintext",
+          "ref": "crates/logger/src/tracing_layer.rs@29@pub fn is_sensitive_field(name: &str) -> bool {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "crate surface: re-exports the protocol logger, the collector and the tracing layer",
+          "ref": "crates/logger/src/lib.rs@12@pub use logger::*;"
+        },
+        {
+          "why": "wiring: attach_protocol_logger subscribes the observer to the node's bus",
+          "ref": "crates/logger/src/logger.rs@24@pub fn attach_protocol_logger(name: &str, bus: &BusHandle)"
+        },
+        {
+          "why": "observer: each event that reaches the SimpleLogger is passed to EventLogging::log",
+          "ref": "crates/logger/src/logger.rs@58@impl<E: EventLogging> Handler<E> for SimpleLogger<E> {"
+        },
+        {
+          "why": "operational path: the tracing layer captures each event and hands it to the collector",
+          "ref": "crates/logger/src/tracing_layer.rs@146@fn on_event(&self, event: &tracing::Event<'_>, ctx: Context<'_, S>) {"
+        },
+        {
+          "why": "storage: LogCollector.record keeps the ring and writes each entry to the rotating file",
+          "ref": "crates/logger/src/log_collector.rs@89@pub fn record(&self, level: &str, target: &str, message: String, fields: Map<String, Value>) {"
+        }
+      ],
+      "rust_patterns": [
+        {
+          "pattern": "trait-def",
+          "note": "EventLogging is a trait with the events crate Event as a supertrait",
+          "ref": "crates/logger/src/logger.rs@15@pub trait EventLogging: Event {"
+        },
+        {
+          "pattern": "actix-handler",
+          "note": "SimpleLogger handles any event type that implements EventLogging",
+          "ref": "crates/logger/src/logger.rs@58@impl<E: EventLogging> Handler<E> for SimpleLogger<E> {"
+        },
+        {
+          "pattern": "trait-impl",
+          "note": "OperationalLogLayer implements tracing_subscriber's Layer for any subscriber S",
+          "ref": "crates/logger/src/tracing_layer.rs@120@impl<S> Layer<S> for OperationalLogLayer"
+        },
+        {
+          "pattern": "let-else",
+          "note": "returns early when no global collector has been initialized",
+          "ref": "crates/logger/src/tracing_layer.rs@147@let Some(collector) = LogCollector::global() else {"
+        },
+        {
+          "pattern": "closure",
+          "note": "the collector is created lazily inside OnceLock::get_or_init",
+          "ref": "crates/logger/src/log_collector.rs@65@INSTANCE.get_or_init(|| Self::new(node, path, DEFAULT_CAPACITY))"
+        }
+      ],
+      "depends_on": ["e3-events"],
+      "tests": "Unit tests sit in #[cfg(test)] modules in tracing_layer.rs, log_collector.rs and logger.rs. Run: cargo test -p e3-logger",
+      "unverified": [
+        "The OpenTelemetry exporter that uses telemetry_metadata_is_safe lives in crates/cli, not in this crate; only its import was checked."
+      ]
+    }
+  ]
+}

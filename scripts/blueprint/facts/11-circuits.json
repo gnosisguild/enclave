@@ -1,0 +1,1048 @@
+{
+  "group": "circuits",
+  "units": [
+    {
+      "id": "C0 pk",
+      "kind": "circuit",
+      "path": "circuits/bin/dkg/pk",
+      "one_line": "Commits to a ciphernode's DKG BFV public key so later share encryptions can be checked against it.",
+      "explain": "It convinces a verifier that a ciphernode's published DKG key commitment is the hash of the public key it actually uses, both components for every CRT modulus. Each member generates it for its own key, peers verify it on receipt, and node_fold folds it, while C3 checks its share encryption key against this commitment (agent/flow-trace/04). Without it, a member could encrypt shares under a key that nobody committed to.",
+      "analogy": "Like a sealed fingerprint of a public key, published before anyone encrypts to it, so the key cannot be swapped later.",
+      "actors": [],
+      "consumes": [
+        { "name": "private: pk0is", "by": "Pk::execute", "ref": "circuits/bin/dkg/pk/src/main.nr@12@pk0is: [Polynomial<N>; L]" },
+        { "name": "private: pk1is", "by": "Pk::execute", "ref": "circuits/bin/dkg/pk/src/main.nr@12@pk1is: [Polynomial<N>; L]" }
+      ],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "Pk",
+          "what": "holds pk0 and pk1, one polynomial per CRT modulus each; execute() returns the commitment",
+          "ref": "circuits/lib/src/core/dkg/pk.nr@16@pub struct Pk<"
+        },
+        {
+          "name": "Polynomial",
+          "what": "a degree N-1 polynomial stored as a coefficient array",
+          "ref": "circuits/lib/src/math/polynomial.nr@14@pub struct Polynomial<"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "entry point: main takes both key components and returns the commitment",
+          "ref": "circuits/bin/dkg/pk/src/main.nr@12@fn main("
+        },
+        { "why": "Pk::execute, the whole circuit body", "ref": "circuits/lib/src/core/dkg/pk.nr@37@pub fn execute(self) -> Field" },
+        {
+          "why": "the commitment: hashes pk0 then pk1 under the DS_PK domain separator",
+          "ref": "circuits/lib/src/math/commitments.nr@190@pub fn compute_dkg_pk_commitment"
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": [],
+      "tests": "No #[test] in this package or in lib core/dkg/pk.nr. Lib tests run with nargo test in circuits/lib (see circuits/README.md).",
+      "unverified": [
+        "Generator and verifier roles (each member generates; peers verify on receipt) come from agent/flow-trace/04_DKG_AND_COMPUTATION.md, not from the circuit code."
+      ]
+    },
+    {
+      "id": "C1 pk_generation",
+      "kind": "circuit",
+      "path": "circuits/bin/threshold/pk_generation",
+      "one_line": "Proves a member's threshold public-key contribution was built from its secret key and noise, within bounds.",
+      "explain": "It convinces a verifier that one member's share pk0 of the threshold public key is built from its secret sk, error eek and smudging noise e_sm, all inside their bounds, through pk0 = -(a*sk) + eek + q*r modulo X^N+1 (a is the fixed common reference polynomial), checked at a random challenge point. Each member generates it for itself, the active aggregator verifies the H selected contributions, and node_fold folds them; its three commitments (sk, pk, e_sm) feed C2a, C5 and C2b. Without it, the aggregate public key could not be tied to the members' secrets.",
+      "analogy": "Like a locksmith cutting a key from a secret blank and proving, with a sealed measurement, that the cut fits the lock pattern without showing the blank.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "private: eek",
+          "by": "PkGeneration::execute",
+          "ref": "circuits/bin/threshold/pk_generation/src/main.nr@16@eek: Polynomial<N>"
+        },
+        {
+          "name": "private: sk",
+          "by": "PkGeneration::execute",
+          "ref": "circuits/bin/threshold/pk_generation/src/main.nr@17@sk: Polynomial<N>"
+        },
+        {
+          "name": "private: e_sm",
+          "by": "PkGeneration::execute",
+          "ref": "circuits/bin/threshold/pk_generation/src/main.nr@18@e_sm: [Polynomial<N>; L]"
+        },
+        {
+          "name": "private: e_sm_lifted",
+          "by": "PkGeneration::execute",
+          "ref": "circuits/bin/threshold/pk_generation/src/main.nr@19@e_sm_lifted: Polynomial<N>"
+        },
+        {
+          "name": "private: e_sm_quotients",
+          "by": "PkGeneration::execute",
+          "ref": "circuits/bin/threshold/pk_generation/src/main.nr@20@e_sm_quotients: [Polynomial<N>; L]"
+        },
+        {
+          "name": "private: ris",
+          "by": "PkGeneration::execute",
+          "ref": "circuits/bin/threshold/pk_generation/src/main.nr@21@ris: [Polynomial<N>; L]"
+        },
+        {
+          "name": "private: pk0is",
+          "by": "PkGeneration::execute",
+          "ref": "circuits/bin/threshold/pk_generation/src/main.nr@22@pk0is: [Polynomial<N>; L]"
+        }
+      ],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "PkGeneration",
+          "what": "the C1 statement: secret witnesses plus the public common reference polynomial",
+          "ref": "circuits/lib/src/core/threshold/pk_generation.nr@67@pub struct PkGeneration<"
+        },
+        {
+          "name": "Configs",
+          "what": "moduli and bounds for the C1 range checks",
+          "ref": "circuits/lib/src/core/threshold/pk_generation.nr@15@pub struct Configs<"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "entry point: main takes seven private witnesses and returns three commitments",
+          "ref": "circuits/bin/threshold/pk_generation/src/main.nr@15@fn main("
+        },
+        {
+          "why": "PkGeneration::execute: range checks, CRT consistency, commitments, then the evaluation check",
+          "ref": "circuits/lib/src/core/threshold/pk_generation.nr@149@pub fn execute(self) -> (Field, Field, Field)"
+        },
+        {
+          "why": "the key equation, checked at the Fiat-Shamir point",
+          "ref": "circuits/lib/src/core/threshold/pk_generation.nr@279@Public key equation 1 failed"
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": [],
+      "tests": "lib/src/core/threshold/pk_generation.nr has 2 #[test] functions; run nargo test in circuits/lib. This package has none.",
+      "unverified": [
+        "Generator and verifier roles (each member generates; the active aggregator verifies the H selected contributions) come from agent/flow-trace/04_DKG_AND_COMPUTATION.md, not from the circuit code."
+      ]
+    },
+    {
+      "id": "C2a sk_share_computation",
+      "kind": "circuit",
+      "path": "circuits/bin/dkg/sk_share_computation",
+      "one_line": "Proves a member's secret-key Shamir shares form a valid degree-T sharing of the secret that C1 committed to.",
+      "explain": "It convinces a verifier that the N_PARTIES Shamir shares of the secret key form a valid degree-T sharing of the committed secret: the share at point zero equals sk, every share is in range, and the parity check holds, so any T+1 shares reconstruct sk. Each member generates it for its own sk, recipients verify it on receipt, and node_fold folds it; C3 proves its encrypted messages match the per-party commitments it returns, and C4 opens them (agent/flow-trace/04). Without it, a dealer could hand out shares that do not reconstruct the key it committed to.",
+      "analogy": "Like a set of marked points that must all lie on one smooth curve, whose height at zero is the secret.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "public: expected_secret_commitment",
+          "by": "SecretKeyShareComputation::execute",
+          "ref": "circuits/bin/dkg/sk_share_computation/src/main.nr@16@expected_secret_commitment: pub Field"
+        },
+        {
+          "name": "private: sk_secret",
+          "by": "SecretKeyShareComputation::execute",
+          "ref": "circuits/bin/dkg/sk_share_computation/src/main.nr@17@sk_secret: Polynomial<N>"
+        },
+        {
+          "name": "private: y",
+          "by": "SecretKeyShareComputation::execute",
+          "ref": "circuits/bin/dkg/sk_share_computation/src/main.nr@18@y: [[[Field; N_PARTIES + 1]; L_THRESHOLD]; N]"
+        }
+      ],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "SecretKeyShareComputation",
+          "what": "the C2a statement: secret commitment, secret, the share grid and the parity matrix",
+          "ref": "circuits/lib/src/core/dkg/share_computation.nr@36@pub struct SecretKeyShareComputation<"
+        },
+        {
+          "name": "Configs",
+          "what": "the CRT moduli used by the range and parity checks",
+          "ref": "circuits/lib/src/core/dkg/share_computation.nr@16@pub struct Configs<"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "entry point: main takes sk and the share grid y, and returns per-party commitments",
+          "ref": "circuits/bin/dkg/sk_share_computation/src/main.nr@15@fn main("
+        },
+        {
+          "why": "execute: secret commitment, consistency, range, parity, then commit to shares",
+          "ref": "circuits/lib/src/core/dkg/share_computation.nr@95@pub fn execute(self) -> [[Field; L]; N_PARTIES]"
+        },
+        {
+          "why": "the share-at-zero check: y at point 0 equals the secret coefficient",
+          "ref": "circuits/lib/src/core/dkg/share_computation.nr@154@assert(self.y[coeff_idx][mod_idx][0] == secret_coeff)"
+        },
+        {
+          "why": "the parity check: the parity matrix times the shares is zero modulo each prime",
+          "ref": "circuits/lib/src/core/dkg/share_computation.nr@309@ModU64::new(q_j as u64).assert_zero_mod(sum)"
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": [],
+      "tests": "No #[test] in this package or in lib core/dkg/share_computation.nr; no C2a test found.",
+      "unverified": [
+        "Generator and verifier roles (each dealer proves; recipients verify) come from agent/flow-trace/04_DKG_AND_COMPUTATION.md, not from the circuit code."
+      ]
+    },
+    {
+      "id": "C2b e_sm_share_computation",
+      "kind": "circuit",
+      "path": "circuits/bin/dkg/e_sm_share_computation",
+      "one_line": "Proves a member's smudging-noise Shamir shares form a valid degree-T sharing of the noise that C1 committed to.",
+      "explain": "It convinces a verifier that the shares of the smudging noise e_sm, centered per modulus, form a valid degree-T sharing whose value at zero is the noise C1 committed to. The same statement as C2a runs on the noise track, and the aggregated noise is what C6 adds to every decryption share. Each member generates it for its own noise, recipients verify it on receipt, and node_fold folds it (agent/flow-trace/04). Without it, the noise added to decryption shares would not be the one that was committed.",
+      "analogy": "Like a second set of marked points that must lie on one curve, here for a blurring value added to every decryption share.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "public: expected_secret_commitment",
+          "by": "SmudgingNoiseShareComputation::execute",
+          "ref": "circuits/bin/dkg/e_sm_share_computation/src/main.nr@16@expected_secret_commitment: pub Field"
+        },
+        {
+          "name": "private: e_sm_secret",
+          "by": "SmudgingNoiseShareComputation::execute",
+          "ref": "circuits/bin/dkg/e_sm_share_computation/src/main.nr@17@e_sm_secret: [Polynomial<N>; L_THRESHOLD]"
+        },
+        {
+          "name": "private: y",
+          "by": "SmudgingNoiseShareComputation::execute",
+          "ref": "circuits/bin/dkg/e_sm_share_computation/src/main.nr@18@y: [[[Field; N_PARTIES + 1]; L_THRESHOLD]; N]"
+        }
+      ],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "SmudgingNoiseShareComputation",
+          "what": "the C2b statement: the same shape as C2a, with the centered noise as the secret",
+          "ref": "circuits/lib/src/core/dkg/share_computation.nr@65@pub struct SmudgingNoiseShareComputation<"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "entry point: main takes the noise polynomials and the share grid",
+          "ref": "circuits/bin/dkg/e_sm_share_computation/src/main.nr@15@fn main("
+        },
+        {
+          "why": "execute: the same body shape as C2a",
+          "ref": "circuits/lib/src/core/dkg/share_computation.nr@172@pub fn execute(self) -> [[Field; L]; N_PARTIES]"
+        },
+        {
+          "why": "the noise commitment check, after centering each modulus",
+          "ref": "circuits/lib/src/core/dkg/share_computation.nr@217@compute_share_computation_e_sm_commitment_checked::<N, L, BIT_SECRET>(normalized)"
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": [],
+      "tests": "No #[test] in this package or in lib core/dkg/share_computation.nr; no C2b test found.",
+      "unverified": [
+        "Generator and verifier roles (each dealer proves; recipients verify) come from agent/flow-trace/04_DKG_AND_COMPUTATION.md, not from the circuit code."
+      ]
+    },
+    {
+      "id": "C3 share_encryption",
+      "kind": "circuit",
+      "path": "circuits/bin/dkg/share_encryption",
+      "one_line": "Proves a share ciphertext is a valid BFV encryption, under the recipient's DKG key, of the share committed in C2.",
+      "explain": "It convinces a verifier that the two ciphertext polynomials ct0 and ct1 encrypt exactly the share the sender committed to in C2, under the recipient's DKG public key that C0 committed, using the BFV relations with small noise u, e0 and e1. The sender generates one proof per recipient and track (C3a for sk shares, C3b for e_sm shares, same binary), recipients verify it on receipt, and c3_fold chains the proofs into node_fold (agent/flow-trace/04). Without it, a sender could send a recipient a share that differs from the one it certified in C2.",
+      "analogy": "Like sealing a share in a box only one recipient can open, with a notarised note that the box holds exactly the share already certified.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "public: expected_pk_commitment",
+          "by": "ShareEncryption::execute",
+          "ref": "circuits/bin/dkg/share_encryption/src/main.nr@18@expected_pk_commitment: pub Field"
+        },
+        {
+          "name": "public: expected_message_commitment",
+          "by": "ShareEncryption::execute",
+          "ref": "circuits/bin/dkg/share_encryption/src/main.nr@19@expected_message_commitment: pub Field"
+        },
+        {
+          "name": "private: pk0is",
+          "by": "ShareEncryption::execute",
+          "ref": "circuits/bin/dkg/share_encryption/src/main.nr@20@pk0is: [Polynomial<N>; L]"
+        },
+        {
+          "name": "private: pk1is",
+          "by": "ShareEncryption::execute",
+          "ref": "circuits/bin/dkg/share_encryption/src/main.nr@21@pk1is: [Polynomial<N>; L]"
+        },
+        {
+          "name": "private: ct0is",
+          "by": "ShareEncryption::execute",
+          "ref": "circuits/bin/dkg/share_encryption/src/main.nr@22@ct0is: [Polynomial<N>; L]"
+        },
+        {
+          "name": "private: ct1is",
+          "by": "ShareEncryption::execute",
+          "ref": "circuits/bin/dkg/share_encryption/src/main.nr@23@ct1is: [Polynomial<N>; L]"
+        },
+        {
+          "name": "private: u",
+          "by": "ShareEncryption::execute",
+          "ref": "circuits/bin/dkg/share_encryption/src/main.nr@24@u: Polynomial<N>"
+        },
+        {
+          "name": "private: e0",
+          "by": "ShareEncryption::execute",
+          "ref": "circuits/bin/dkg/share_encryption/src/main.nr@25@e0: Polynomial<N>"
+        },
+        {
+          "name": "private: e1",
+          "by": "ShareEncryption::execute",
+          "ref": "circuits/bin/dkg/share_encryption/src/main.nr@26@e1: Polynomial<N>"
+        },
+        {
+          "name": "private: message",
+          "by": "ShareEncryption::execute",
+          "ref": "circuits/bin/dkg/share_encryption/src/main.nr@27@message: Polynomial<N>"
+        },
+        {
+          "name": "private: ct0_r",
+          "by": "ShareEncryption::execute",
+          "ref": "circuits/bin/dkg/share_encryption/src/main.nr@28@ct0_r: [Polynomial<N>; L]"
+        },
+        {
+          "name": "private: ct1_r",
+          "by": "ShareEncryption::execute",
+          "ref": "circuits/bin/dkg/share_encryption/src/main.nr@29@ct1_r: [Polynomial<N>; L]"
+        },
+        {
+          "name": "private: z",
+          "by": "ShareEncryption::execute",
+          "ref": "circuits/bin/dkg/share_encryption/src/main.nr@30@z: [Polynomial<N>; 1]"
+        }
+      ],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "ShareEncryption",
+          "what": "the C3 statement: keys, ciphertext, noise and reduction quotients as witnesses",
+          "ref": "circuits/lib/src/core/dkg/share_encryption.nr@110@pub struct ShareEncryption<"
+        },
+        {
+          "name": "Configs",
+          "what": "bounds and scaling constants for the encryption check",
+          "ref": "circuits/lib/src/core/dkg/share_encryption.nr@17@pub struct Configs<"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "entry point: main takes the key, ciphertext and noise witnesses and returns the ciphertext commitment",
+          "ref": "circuits/bin/dkg/share_encryption/src/main.nr@17@fn main("
+        },
+        {
+          "why": "execute: key and message commitment checks, range bounds, then the encryption identity",
+          "ref": "circuits/lib/src/core/dkg/share_encryption.nr@409@pub fn execute(self) -> Field"
+        },
+        {
+          "why": "the binding of the encrypted message to the C2 share commitment",
+          "ref": "circuits/lib/src/core/dkg/share_encryption.nr@207@compute_share_encryption_commitment_from_message::<N, BIT_MSG>(self.message)"
+        },
+        {
+          "why": "the BFV encryption identity, checked at a Fiat-Shamir point",
+          "ref": "circuits/lib/src/core/dkg/share_encryption.nr@507@fn verify_evaluations(self, gammas: [Field], k1: Polynomial<N>)"
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": [],
+      "tests": "lib/src/core/dkg/share_encryption.nr has 12 #[test] functions; run nargo test in circuits/lib. This package has none.",
+      "unverified": [
+        "Generator and verifier roles (the sender proves per recipient; recipients verify) come from agent/flow-trace/04_DKG_AND_COMPUTATION.md, not from the circuit code."
+      ]
+    },
+    {
+      "id": "C4 share_decryption (dkg)",
+      "kind": "circuit",
+      "path": "circuits/bin/dkg/share_decryption",
+      "one_line": "Proves a member's aggregated key share is the sum of the verified shares from the H honest dealers.",
+      "explain": "It convinces a verifier that the H decrypted shares a member received match the commitments C2 published for those dealers, and that their sum over the honest set, centered per modulus, is the member's aggregate share. Each selected member generates it, once for sk and once for e_sm with the same binary, and c4ab_fold folds the two into node_fold; C6 later opens the aggregate commitment (agent/flow-trace/04). Without it, a member's aggregate key share could be a value no dealer ever committed to.",
+      "analogy": "Like adding up sealed envelopes whose contents were already checked against receipts from earlier, then sealing only the total.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "public: expected_commitments",
+          "by": "ShareDecryption::execute",
+          "ref": "circuits/bin/dkg/share_decryption/src/main.nr@15@expected_commitments: pub [[Field; L_THRESHOLD]; H]"
+        },
+        {
+          "name": "private: decrypted_shares",
+          "by": "ShareDecryption::execute",
+          "ref": "circuits/bin/dkg/share_decryption/src/main.nr@16@decrypted_shares: [[Polynomial<N>; L_THRESHOLD]; H]"
+        }
+      ],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "ShareDecryption",
+          "what": "H decrypted shares and their C2 commitments, aggregated per CRT limb",
+          "ref": "circuits/lib/src/core/dkg/share_decryption.nr@35@pub struct ShareDecryption<"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "entry point: main takes the C2 commitments and the H decrypted shares and returns the aggregate commitment",
+          "ref": "circuits/bin/dkg/share_decryption/src/main.nr@14@fn main("
+        },
+        {
+          "why": "execute: check each share, sum, normalize, then commit",
+          "ref": "circuits/lib/src/core/dkg/share_decryption.nr@130@pub fn execute(self, moduli: [Field; L]) -> Field"
+        },
+        {
+          "why": "the per-share check against its C2 commitment",
+          "ref": "circuits/lib/src/core/dkg/share_decryption.nr@78@compute_share_encryption_commitment_from_message_checked::<N, BIT_MSG>("
+        },
+        {
+          "why": "the output commitment that C6 later opens",
+          "ref": "circuits/lib/src/core/dkg/share_decryption.nr@151@compute_aggregated_shares_commitment::<N, L, BIT_AGG>(normalized)"
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": [],
+      "tests": "lib/src/core/dkg/share_decryption.nr has 2 #[test] functions; run nargo test in circuits/lib. This package has none.",
+      "unverified": [
+        "Generator role (each selected member proves its own aggregate) comes from agent/flow-trace/04_DKG_AND_COMPUTATION.md, not from the circuit code."
+      ]
+    },
+    {
+      "id": "C5 pk_aggregation",
+      "kind": "circuit",
+      "path": "circuits/bin/threshold/pk_aggregation",
+      "one_line": "Proves the committee's aggregate threshold public key is the sum, modulo each prime, of the H honest contributions.",
+      "explain": "It convinces a verifier that the aggregate pk0 is, for each CRT modulus and coefficient, the sum of the H honest parties' pk0 contributions reduced modulo that modulus, and that each contribution opens to the commitment C1 published. The active aggregator generates it over the H selected contributions; dkg_aggregator verifies it in-circuit, and the final DKG proof is checked on-chain (agent/flow-trace/04). Without it, the public key used for encryption would not be the sum of the committee's contributions.",
+      "analogy": "Like a clerk totalling sealed receipts from H members, where the posted total must equal the sum after removing whole multiples of a fixed unit.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "public: expected_threshold_pk_commitments",
+          "by": "PkAggregation::execute",
+          "ref": "circuits/bin/threshold/pk_aggregation/src/main.nr@13@expected_threshold_pk_commitments: pub [Field; H]"
+        },
+        {
+          "name": "private: pk0",
+          "by": "PkAggregation::execute",
+          "ref": "circuits/bin/threshold/pk_aggregation/src/main.nr@14@pk0: [[Polynomial<N>; L]; H]"
+        },
+        {
+          "name": "private: pk0_agg",
+          "by": "PkAggregation::execute",
+          "ref": "circuits/bin/threshold/pk_aggregation/src/main.nr@15@pk0_agg: [Polynomial<N>; L]"
+        }
+      ],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "PkAggregation",
+          "what": "the H party pk0 polynomials and the aggregate, checked per CRT basis",
+          "ref": "circuits/lib/src/core/threshold/pk_aggregation.nr@50@pub struct PkAggregation<"
+        },
+        {
+          "name": "Configs",
+          "what": "the CRT moduli used by the modular sum checks",
+          "ref": "circuits/lib/src/core/threshold/pk_aggregation.nr@26@pub struct Configs<"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "entry point: main takes the H party contributions and the aggregate and returns the aggregate commitment",
+          "ref": "circuits/bin/threshold/pk_aggregation/src/main.nr@12@fn main("
+        },
+        {
+          "why": "execute: range checks, per-party commitment checks, per-basis sum, then commit",
+          "ref": "circuits/lib/src/core/threshold/pk_aggregation.nr@160@pub fn execute(self) -> Field"
+        },
+        {
+          "why": "the modular sum check per CRT basis, with a bounded quotient",
+          "ref": "circuits/lib/src/core/threshold/pk_aggregation.nr@153@mod_q_l.assert_zero_mod_bounded::<SUM_BIT_CARRY>("
+        },
+        {
+          "why": "binds each party contribution to its C1 commitment",
+          "ref": "circuits/lib/src/core/threshold/pk_aggregation.nr@112@compute_threshold_pk_commitment_checked::<N, L, BIT_PK>(self.pk0[i])"
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": [],
+      "tests": "lib/src/core/threshold/pk_aggregation.nr has 4 #[test] functions; run nargo test in circuits/lib. This package has none.",
+      "unverified": [
+        "The generator (active aggregator) and the on-chain check of the final DKG proof come from agent/flow-trace/04_DKG_AND_COMPUTATION.md; no Solidity source was read."
+      ]
+    },
+    {
+      "id": "P3 user_data_encryption",
+      "kind": "circuit",
+      "path": "circuits/bin/threshold/user_data_encryption",
+      "one_line": "Proves a user's two-leg BFV ciphertext is valid under the aggregated committee key, with one shared randomness u.",
+      "explain": "The ct0 and ct1 folders each prove one leg of a user's BFV encryption under the aggregated key from C5: ct0 ties pk0, its ciphertext, the scaled message k1 and u, and ct1 ties pk1, its ciphertext and the same u. The wrapper (user_data_encryption) verifies both leg proofs in-circuit and asserts their u commitments match, so one randomness encrypts both legs; the data provider generates the proofs, and the E3 program checks the Noir proof when the input is published (agent/flow-trace/04). Without the shared u check, the two legs could use different randomness and would not form one ciphertext.",
+      "analogy": "Two sealed halves that must carry the same hidden random number: each half is sealed alone, and the check confirms both seals used one number.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "private: ct0_verification_key",
+          "by": "verify_honk_proof_non_zk",
+          "ref": "circuits/bin/threshold/user_data_encryption/src/main.nr@12@ct0_verification_key: UltraHonkVerificationKey"
+        },
+        {
+          "name": "private: ct0_proof",
+          "by": "verify_honk_proof_non_zk",
+          "ref": "circuits/bin/threshold/user_data_encryption/src/main.nr@13@ct0_proof: UltraHonkProof"
+        },
+        {
+          "name": "private: ct0_public_inputs",
+          "by": "verify_honk_proof_non_zk",
+          "ref": "circuits/bin/threshold/user_data_encryption/src/main.nr@14@ct0_public_inputs: [Field; 4]"
+        },
+        {
+          "name": "public: ct0_key_hash",
+          "by": "verify_honk_proof_non_zk",
+          "ref": "circuits/bin/threshold/user_data_encryption/src/main.nr@15@ct0_key_hash: pub Field"
+        },
+        {
+          "name": "private: ct1_verification_key",
+          "by": "verify_honk_proof_non_zk",
+          "ref": "circuits/bin/threshold/user_data_encryption/src/main.nr@17@ct1_verification_key: UltraHonkVerificationKey"
+        },
+        {
+          "name": "private: ct1_proof",
+          "by": "verify_honk_proof_non_zk",
+          "ref": "circuits/bin/threshold/user_data_encryption/src/main.nr@18@ct1_proof: UltraHonkProof"
+        },
+        {
+          "name": "private: ct1_public_inputs",
+          "by": "verify_honk_proof_non_zk",
+          "ref": "circuits/bin/threshold/user_data_encryption/src/main.nr@19@ct1_public_inputs: [Field; 3]"
+        },
+        {
+          "name": "public: ct1_key_hash",
+          "by": "verify_honk_proof_non_zk",
+          "ref": "circuits/bin/threshold/user_data_encryption/src/main.nr@20@ct1_key_hash: pub Field"
+        },
+        {
+          "name": "private: pk0is (ct0 leg)",
+          "by": "UserDataEncryptionCt0::execute",
+          "ref": "circuits/bin/threshold/user_data_encryption_ct0/src/main.nr@16@pk0is: [Polynomial<N>; L]"
+        },
+        {
+          "name": "private: ct0is (ct0 leg)",
+          "by": "UserDataEncryptionCt0::execute",
+          "ref": "circuits/bin/threshold/user_data_encryption_ct0/src/main.nr@17@ct0is: [Polynomial<N>; L]"
+        },
+        {
+          "name": "private: k1 (ct0 leg)",
+          "by": "UserDataEncryptionCt0::execute",
+          "ref": "circuits/bin/threshold/user_data_encryption_ct0/src/main.nr@20@k1: Polynomial<N>"
+        },
+        {
+          "name": "private: pk1is (ct1 leg)",
+          "by": "UserDataEncryptionCt1::execute",
+          "ref": "circuits/bin/threshold/user_data_encryption_ct1/src/main.nr@15@pk1is: [Polynomial<N>; L]"
+        },
+        {
+          "name": "private: ct1is (ct1 leg)",
+          "by": "UserDataEncryptionCt1::execute",
+          "ref": "circuits/bin/threshold/user_data_encryption_ct1/src/main.nr@16@ct1is: [Polynomial<N>; L]"
+        }
+      ],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "UserDataEncryptionCt0",
+          "what": "the ct0 leg statement: pk0, ciphertext, k1, u and the reduction quotient",
+          "ref": "circuits/lib/src/core/threshold/user_data_encryption_ct0.nr@55@pub struct UserDataEncryptionCt0<"
+        },
+        {
+          "name": "UserDataEncryptionCt1",
+          "what": "the ct1 leg statement: pk1, ciphertext, u and the reduction quotient",
+          "ref": "circuits/lib/src/core/threshold/user_data_encryption_ct1.nr@39@pub struct UserDataEncryptionCt1<"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "entry point: the wrapper that verifies both leg proofs",
+          "ref": "circuits/bin/threshold/user_data_encryption/src/main.nr@10@fn main("
+        },
+        {
+          "why": "the shared-randomness check between the two legs",
+          "ref": "circuits/bin/threshold/user_data_encryption/src/main.nr@36@assert(ct0_public_inputs[3] == ct1_public_inputs[2]);"
+        },
+        {
+          "why": "the ct0 leg body: range bounds, commitments, then the ciphertext identity",
+          "ref": "circuits/lib/src/core/threshold/user_data_encryption_ct0.nr@164@pub fn execute(self) -> (Field, Field, Field, Field)"
+        },
+        {
+          "why": "the ct1 leg body",
+          "ref": "circuits/lib/src/core/threshold/user_data_encryption_ct1.nr@139@pub fn execute(self) -> (Field, Field, Field)"
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": [],
+      "tests": "lib ct0 module has 1 #[test] and ct1 has 2 (lib/src/core/threshold/). Run nargo test in circuits/lib. The wrapper has none.",
+      "unverified": [
+        "The generator (data provider) and the E3 program's publishInput check come from agent/flow-trace/04_DKG_AND_COMPUTATION.md (Phase 3); no Solidity source was read."
+      ]
+    },
+    {
+      "id": "C6 share_decryption (threshold)",
+      "kind": "circuit",
+      "path": "circuits/bin/threshold/share_decryption",
+      "one_line": "Proves a member's threshold decryption share is computed from the ciphertext, its key share and its smudging share.",
+      "explain": "It convinces a verifier that a member's decryption share d equals ct0 plus ct1 times sk plus the aggregated smudging noise e_sm, modulo q and X^N+1 (checked at a random point), with sk and e_sm the values C4 committed and the ciphertext matching its public commitment. The E3 domain is a public input, which the circuit comments say authorizes this exact E3 context. Each committee member generates its share, the active aggregator verifies the shares, and decryption_aggregator folds the C6 proofs (agent/flow-trace/04).",
+      "analogy": "Like each trustee producing a sealed partial unlock token from their own key piece, with a proof that the token matches both the locked box and that piece.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "public: expected_sk_commitment",
+          "by": "ShareDecryption::execute",
+          "ref": "circuits/bin/threshold/share_decryption/src/main.nr@18@expected_sk_commitment: pub Field"
+        },
+        {
+          "name": "public: expected_e_sm_commitment",
+          "by": "ShareDecryption::execute",
+          "ref": "circuits/bin/threshold/share_decryption/src/main.nr@19@expected_e_sm_commitment: pub Field"
+        },
+        {
+          "name": "public: ct_commitment",
+          "by": "ShareDecryption::execute",
+          "ref": "circuits/bin/threshold/share_decryption/src/main.nr@20@ct_commitment: pub Field"
+        },
+        {
+          "name": "public: domain_hi",
+          "by": "ShareDecryption::execute",
+          "ref": "circuits/bin/threshold/share_decryption/src/main.nr@21@domain_hi: pub Field"
+        },
+        {
+          "name": "public: domain_lo",
+          "by": "ShareDecryption::execute",
+          "ref": "circuits/bin/threshold/share_decryption/src/main.nr@22@domain_lo: pub Field"
+        },
+        {
+          "name": "private: ct0",
+          "by": "ShareDecryption::execute",
+          "ref": "circuits/bin/threshold/share_decryption/src/main.nr@23@ct0: [Polynomial<N>; L]"
+        },
+        {
+          "name": "private: ct1",
+          "by": "ShareDecryption::execute",
+          "ref": "circuits/bin/threshold/share_decryption/src/main.nr@24@ct1: [Polynomial<N>; L]"
+        },
+        {
+          "name": "private: sk",
+          "by": "ShareDecryption::execute",
+          "ref": "circuits/bin/threshold/share_decryption/src/main.nr@25@sk: [Polynomial<N>; L]"
+        },
+        {
+          "name": "private: e_sm",
+          "by": "ShareDecryption::execute",
+          "ref": "circuits/bin/threshold/share_decryption/src/main.nr@26@e_sm: [Polynomial<N>; L]"
+        },
+        {
+          "name": "private: r",
+          "by": "ShareDecryption::execute",
+          "ref": "circuits/bin/threshold/share_decryption/src/main.nr@27@r: [Polynomial<N>; L]"
+        },
+        {
+          "name": "private: d",
+          "by": "ShareDecryption::execute",
+          "ref": "circuits/bin/threshold/share_decryption/src/main.nr@28@d: [Polynomial<N>; L]"
+        },
+        {
+          "name": "private: d_native_trunc",
+          "by": "ShareDecryption::execute",
+          "ref": "circuits/bin/threshold/share_decryption/src/main.nr@29@d_native_trunc: [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L]"
+        }
+      ],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "ShareDecryption",
+          "what": "one member's sk and e_sm aggregates, the ciphertext, the share d and the E3 domain",
+          "ref": "circuits/lib/src/core/threshold/share_decryption.nr@39@pub struct ShareDecryption<"
+        },
+        {
+          "name": "Configs",
+          "what": "the CRT moduli and bounds for the decryption-share check",
+          "ref": "circuits/lib/src/core/threshold/share_decryption.nr@15@pub struct Configs<"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "entry point: main takes the commitments, the domain, the ciphertext and the witnesses",
+          "ref": "circuits/bin/threshold/share_decryption/src/main.nr@17@fn main("
+        },
+        {
+          "why": "why the domain is a public input: it authorizes this exact E3 context",
+          "ref": "circuits/bin/threshold/share_decryption/src/main.nr@31@The domain is intentionally not part of the BFV arithmetic"
+        },
+        {
+          "why": "execute: commitment checks, bounds, then the share identity for each CRT limb",
+          "ref": "circuits/lib/src/core/threshold/share_decryption.nr@209@pub fn execute(self) -> Field"
+        },
+        {
+          "why": "the decryption-share identity, checked at the Fiat-Shamir point",
+          "ref": "circuits/lib/src/core/threshold/share_decryption.nr@314@fn verify_decryption_share_computation(self, basis_idx: u32, gamma: Field)"
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": [],
+      "tests": "lib/src/core/threshold/share_decryption.nr has 7 #[test] functions; run nargo test in circuits/lib. This package has none.",
+      "unverified": [
+        "The generator (each committee member) and the verifier (the active aggregator, per share) come from agent/flow-trace/04_DKG_AND_COMPUTATION.md, not from the circuit code."
+      ]
+    },
+    {
+      "id": "C7 decrypted_shares_aggregation",
+      "kind": "circuit",
+      "path": "circuits/bin/threshold/decrypted_shares_aggregation",
+      "one_line": "Proves the public message is what T+1 verified decryption shares reconstruct by interpolation, CRT recombination and decoding.",
+      "explain": "It convinces a verifier that the public message is exactly what T+1 verified decryption shares reconstruct: each share matches its C6 commitment, the shares are Lagrange-interpolated at zero per CRT modulus, recombined and rounded to the plaintext modulus t, and party IDs are strictly increasing and inside the committee. The active aggregator generates it over the verified shares, and decryption_aggregator checks it together with the folded C6 proofs for the final on-chain check of publishPlaintextOutput (agent/flow-trace/04). Without it, a plaintext could be published that the decryption shares do not produce.",
+      "analogy": "Like reconstructing a value at zero from T+1 marked points on one curve, then reading the result back as text.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "public: expected_d_commitments",
+          "by": "DecryptedSharesAggregation::execute",
+          "ref": "circuits/bin/threshold/decrypted_shares_aggregation/src/main.nr@17@expected_d_commitments: pub [Field; T + 1]"
+        },
+        {
+          "name": "public: party_ids",
+          "by": "DecryptedSharesAggregation::execute",
+          "ref": "circuits/bin/threshold/decrypted_shares_aggregation/src/main.nr@18@party_ids: pub [Field; T + 1]"
+        },
+        {
+          "name": "public: message",
+          "by": "DecryptedSharesAggregation::execute",
+          "ref": "circuits/bin/threshold/decrypted_shares_aggregation/src/main.nr@19@message: pub Polynomial<MAX_MSG_NON_ZERO_COEFFS>"
+        },
+        {
+          "name": "private: decryption_shares",
+          "by": "DecryptedSharesAggregation::execute",
+          "ref": "circuits/bin/threshold/decrypted_shares_aggregation/src/main.nr@20@decryption_shares: [[Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L]; T + 1]"
+        }
+      ],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "DecryptedSharesAggregation",
+          "what": "the T+1 shares, their C6 commitments, the party IDs and the claimed message",
+          "ref": "circuits/lib/src/core/threshold/decrypted_shares_aggregation.nr@39@pub struct DecryptedSharesAggregation<"
+        },
+        {
+          "name": "Configs",
+          "what": "the CRT moduli and the plaintext modulus t",
+          "ref": "circuits/lib/src/core/threshold/decrypted_shares_aggregation.nr@16@pub struct Configs<"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "entry point: main takes the commitments, party IDs and message as public inputs",
+          "ref": "circuits/bin/threshold/decrypted_shares_aggregation/src/main.nr@16@fn main("
+        },
+        {
+          "why": "execute: commitment check per share, interpolation, CRT recombination, decode",
+          "ref": "circuits/lib/src/core/threshold/decrypted_shares_aggregation.nr@75@pub fn execute(self) {"
+        },
+        {
+          "why": "each share must open to its C6 commitment",
+          "ref": "circuits/lib/src/core/threshold/decrypted_shares_aggregation.nr@96@assert(computed == self.expected_d_commitments[party_idx]"
+        },
+        {
+          "why": "the final check: each decoded coefficient equals the claimed message",
+          "ref": "circuits/lib/src/core/threshold/decrypted_shares_aggregation.nr@122@assert_decoded_coefficient(decoded, self.message.coefficients[j]);"
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": [],
+      "tests": "lib/src/core/threshold/decrypted_shares_aggregation.nr has 5 #[test] functions; run nargo test in circuits/lib. This package has none.",
+      "unverified": [
+        "The generator (the active aggregator) and the on-chain publishPlaintextOutput check come from agent/flow-trace/04_DKG_AND_COMPUTATION.md; no Solidity source was read."
+      ]
+    },
+    {
+      "id": "Recursive aggregation",
+      "kind": "circuit",
+      "path": "circuits/bin/recursive_aggregation",
+      "one_line": "Folds the per-member proofs into two final proofs: one for the DKG committee key and one for each decryption.",
+      "explain": "node_fold checks one member's C0 and C1 proofs, its folded C2, C3 and C4 proofs, and the same-party links between them; nodes_fold chains the H node proofs, c2ab_fold, c3_fold, c3ab_fold, c4ab_fold and c6_fold combine the inner proofs of one kind, and each *_kernel mints the genesis proof that starts its chain. dkg_aggregator verifies nodes_fold and C5, checks the roster order and the C5 links, and exposes the committee key proof; decryption_aggregator verifies c6_fold and C7, checks the E3 domain and the shared ciphertext, and exposes the plaintext proof. The circuit comments say the final EVM proof of each aggregator is what the contract verifies on-chain.",
+      "analogy": "Like a relay of notarised tally sheets: each sheet is checked and stamped into a running total, and only the final total goes to the registry.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "private: nodes_fold_vk",
+          "by": "dkg_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/dkg_aggregator/src/main.nr@52@nodes_fold_vk: UltraHonkVerificationKey"
+        },
+        {
+          "name": "private: nodes_fold_proof",
+          "by": "dkg_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/dkg_aggregator/src/main.nr@53@nodes_fold_proof: UltraHonkProof"
+        },
+        {
+          "name": "private: nodes_fold_public",
+          "by": "dkg_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/dkg_aggregator/src/main.nr@54@nodes_fold_public: [Field; NODES_FOLD_PUBLIC_LEN]"
+        },
+        {
+          "name": "private: nodes_fold_vk_hash",
+          "by": "dkg_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/dkg_aggregator/src/main.nr@55@nodes_fold_vk_hash: Field"
+        },
+        {
+          "name": "private: c5_vk",
+          "by": "dkg_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/dkg_aggregator/src/main.nr@56@c5_vk: UltraHonkVerificationKey"
+        },
+        {
+          "name": "private: c5_proof",
+          "by": "dkg_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/dkg_aggregator/src/main.nr@57@c5_proof: UltraHonkProof"
+        },
+        {
+          "name": "private: c5_public",
+          "by": "dkg_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/dkg_aggregator/src/main.nr@58@c5_public: [Field; H + 1]"
+        },
+        {
+          "name": "public: nodes_fold_key_hash",
+          "by": "dkg_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/dkg_aggregator/src/main.nr@59@nodes_fold_key_hash: pub Field"
+        },
+        {
+          "name": "public: c5_key_hash",
+          "by": "dkg_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/dkg_aggregator/src/main.nr@60@c5_key_hash: pub Field"
+        },
+        {
+          "name": "public: party_ids",
+          "by": "dkg_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/dkg_aggregator/src/main.nr@61@party_ids: pub [Field; H]"
+        },
+        {
+          "name": "private: committee_members",
+          "by": "dkg_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/dkg_aggregator/src/main.nr@62@committee_members: [Field; N_PARTIES]"
+        },
+        {
+          "name": "public: committee_hash_hi",
+          "by": "dkg_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/dkg_aggregator/src/main.nr@63@committee_hash_hi: pub Field"
+        },
+        {
+          "name": "public: committee_hash_lo",
+          "by": "dkg_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/dkg_aggregator/src/main.nr@64@committee_hash_lo: pub Field"
+        },
+        {
+          "name": "private: c6_fold_vk",
+          "by": "decryption_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/decryption_aggregator/src/main.nr@69@c6_fold_vk: UltraHonkVerificationKey"
+        },
+        {
+          "name": "private: c6_fold_proof",
+          "by": "decryption_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/decryption_aggregator/src/main.nr@70@c6_fold_proof: UltraHonkProof"
+        },
+        {
+          "name": "private: c6_fold_public",
+          "by": "decryption_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/decryption_aggregator/src/main.nr@71@c6_fold_public: [Field; C6_FOLD_PUBLIC_LEN]"
+        },
+        {
+          "name": "private: c6_fold_vk_hash",
+          "by": "decryption_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/decryption_aggregator/src/main.nr@72@c6_fold_vk_hash: Field"
+        },
+        {
+          "name": "private: c7_vk",
+          "by": "decryption_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/decryption_aggregator/src/main.nr@73@c7_vk: UltraHonkVerificationKey"
+        },
+        {
+          "name": "private: c7_proof",
+          "by": "decryption_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/decryption_aggregator/src/main.nr@74@c7_proof: UltraHonkProof"
+        },
+        {
+          "name": "private: c7_public",
+          "by": "decryption_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/decryption_aggregator/src/main.nr@75@c7_public: [Field; C7_PUBLIC_LEN]"
+        },
+        {
+          "name": "public: c6_fold_key_hash",
+          "by": "decryption_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/decryption_aggregator/src/main.nr@76@c6_fold_key_hash: pub Field"
+        },
+        {
+          "name": "public: c7_key_hash",
+          "by": "decryption_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/decryption_aggregator/src/main.nr@77@c7_key_hash: pub Field"
+        },
+        {
+          "name": "private: committee_members",
+          "by": "decryption_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/decryption_aggregator/src/main.nr@78@committee_members: [Field; N_PARTIES]"
+        },
+        {
+          "name": "public: committee_hash_hi",
+          "by": "decryption_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/decryption_aggregator/src/main.nr@79@committee_hash_hi: pub Field"
+        },
+        {
+          "name": "public: committee_hash_lo",
+          "by": "decryption_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/decryption_aggregator/src/main.nr@80@committee_hash_lo: pub Field"
+        },
+        {
+          "name": "public: domain_hi",
+          "by": "decryption_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/decryption_aggregator/src/main.nr@81@domain_hi: pub Field"
+        },
+        {
+          "name": "public: domain_lo",
+          "by": "decryption_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/decryption_aggregator/src/main.nr@82@domain_lo: pub Field"
+        },
+        {
+          "name": "public: ciphertext_commitment",
+          "by": "decryption_aggregator",
+          "ref": "circuits/bin/recursive_aggregation/decryption_aggregator/src/main.nr@83@ciphertext_commitment: pub Field"
+        }
+      ],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "UltraHonkProof and UltraHonkVerificationKey",
+          "what": "the proof and verification-key types that every fold verifies in-circuit",
+          "ref": "circuits/bin/recursive_aggregation/dkg_aggregator/src/main.nr@17@UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk"
+        },
+        {
+          "name": "predecessor_key_hash",
+          "what": "checks the prior keys are the leaf, fold and genesis keys, then returns the genesis key on step one and the fold key after",
+          "ref": "circuits/lib/src/math/recursive_vk.nr@10@pub fn predecessor_key_hash("
+        }
+      ],
+      "read_first": [
+        {
+          "why": "dkg_aggregator entry point: the committee-key proof the contract verifies",
+          "ref": "circuits/bin/recursive_aggregation/dkg_aggregator/src/main.nr@51@fn main("
+        },
+        {
+          "why": "dkg_aggregator folds the C5 proof in-circuit",
+          "ref": "circuits/bin/recursive_aggregation/dkg_aggregator/src/main.nr@78@verify_honk_proof_non_zk(c5_vk, c5_proof, c5_public, c5_key_hash);"
+        },
+        {
+          "why": "decryption_aggregator entry point: the plaintext proof the contract verifies",
+          "ref": "circuits/bin/recursive_aggregation/decryption_aggregator/src/main.nr@68@fn main("
+        },
+        {
+          "why": "decryption_aggregator checks the C6 fold proof and the C7 proof in-circuit",
+          "ref": "circuits/bin/recursive_aggregation/decryption_aggregator/src/main.nr@89@verify_honk_proof_non_zk(c6_fold_vk, c6_fold_proof, c6_fold_public, c6_fold_vk_hash);"
+        },
+        {
+          "why": "node_fold entry point: one member's C0 to C4 proofs and their same-party links",
+          "ref": "circuits/bin/recursive_aggregation/node_fold/src/main.nr@83@fn main("
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": [],
+      "tests": "dkg_aggregator has 7 #[test] functions, decryption_aggregator 7 and node_fold 3, all in their main.nr; the other folds have none. circuits/README.md runs nargo test on these packages through scripts/test-circuits.sh.",
+      "unverified": [
+        "On-chain verification of the final aggregator proofs is stated in the circuit doc comments and in agent/flow-trace/04_DKG_AND_COMPUTATION.md; no Solidity source was read.",
+        "agent/flow-trace/04 says C7 is checked with ZK, but decryption_aggregator calls verify_honk_proof_non_zk for it (decryption_aggregator/src/main.nr@90).",
+        "circuits/README.md lists recursive_aggregation/fold and wrapper paths that are not in this snapshot; this unit follows the directory listing."
+      ]
+    },
+    {
+      "id": "config",
+      "kind": "circuit",
+      "path": "circuits/bin/config",
+      "one_line": "Pre-deployment check that the secure DKG and threshold preset constants are internally consistent.",
+      "explain": "This circuit takes no inputs and proves nothing about a round: its main asserts the secure presets' CRT products, bound constants, Reed-Solomon parity matrix (zero modulo each prime) and the N and L agreement between the DKG and threshold presets. It is run once per deployment (nargo execute, per circuits/README.md), and its comment says a failed assert panics, which blocks deployment with wrong parameters. It checks the secure presets, not the generated default preset in configs/default.",
+      "analogy": "Like a pre-flight checklist: every reading is recomputed from the spec, and one failed check keeps the aircraft on the ground.",
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [],
+      "key_types": [],
+      "read_first": [
+        {
+          "why": "entry point: main takes no inputs and runs the verification functions in order",
+          "ref": "circuits/bin/config/src/main.nr@88@fn main() {"
+        },
+        {
+          "why": "the CRT product check against the secure DKG preset",
+          "ref": "circuits/bin/config/src/main.nr@128@assert(product == DKG_Q_MOD_T"
+        },
+        {
+          "why": "the parity matrix check: the parity matrix times the generator is zero modulo each prime",
+          "ref": "circuits/bin/config/src/main.nr@179@Parity matrix verification failed"
+        },
+        {
+          "why": "the cross-preset check that the DKG and threshold configs agree on N",
+          "ref": "circuits/bin/config/src/main.nr@603@assert(DKG_N == THRESHOLD_N"
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": [],
+      "tests": "No #[test] in this package. circuits/README.md runs it with nargo execute, through scripts/test-circuits.sh.",
+      "unverified": ["The claim that a failed check blocks deployment depends on the build scripts, which are not in this snapshot."]
+    },
+    {
+      "id": "Circuit library",
+      "kind": "circuit",
+      "path": "circuits/lib",
+      "one_line": "Shared Noir package with the math, commitments, presets and core circuit bodies that every bin package imports.",
+      "explain": "Every package under bin/ depends on this library, so field and polynomial arithmetic, the SAFE sponge hash, domain-separated commitments and checked packing are written once. The core modules hold the body of each DKG and threshold circuit, and configs/default selects the preset (this snapshot's generated default is insecure-512). Without it, each binary would repeat these checks and could drift apart.",
+      "analogy": "A shared toolbox of calibrated instruments: each inspector has its own checklist, but the rulers, scales and seals all come from one box.",
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "Polynomial",
+          "what": "a degree N-1 polynomial as a coefficient array, highest degree first",
+          "ref": "circuits/lib/src/math/polynomial.nr@14@pub struct Polynomial<"
+        },
+        {
+          "name": "SafeSponge",
+          "what": "the SAFE sponge state (absorb, squeeze, finish) behind the commitments",
+          "ref": "circuits/lib/src/math/safe.nr@70@pub struct SafeSponge<"
+        }
+      ],
+      "read_first": [
+        { "why": "module tree: math, core and configs are the three public modules", "ref": "circuits/lib/src/lib.nr@16@pub mod core;" },
+        {
+          "why": "preset wiring: the default preset re-exports the insecure DKG preset",
+          "ref": "circuits/lib/src/configs/default/mod.nr@12@pub use super::insecure::dkg;"
+        },
+        {
+          "why": "the commitment wrapper that every commitment goes through",
+          "ref": "circuits/lib/src/math/commitments.nr@122@pub fn compute_commitment("
+        },
+        {
+          "why": "the negacyclic evaluation kernel used by the BFV identity checks",
+          "ref": "circuits/lib/src/math/polynomial.nr@254@pub fn negacyclic_kernel<"
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": [],
+      "tests": "Unit tests sit beside the code: safe.nr 13, helpers.nr 9, polynomial.nr 12, recursive_vk.nr 4, plus the modulo files and the core modules. Run nargo test in circuits/lib (circuits/README.md).",
+      "unverified": [
+        "scripts/build-circuits.ts, which generates configs/default and committee/active, is named in the generated headers but is not in this snapshot.",
+        "The Poseidon2 permutation body in safe.nr was not read; the Poseidon2 and Keccak256 description comes from the module comments."
+      ]
+    }
+  ]
+}

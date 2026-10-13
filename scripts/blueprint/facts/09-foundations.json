@@ -1,0 +1,1134 @@
+{
+  "group": "foundations",
+  "units": [
+    {
+      "id": "e3-fhe-params",
+      "kind": "crate",
+      "path": "crates/fhe-params",
+      "one_line": "BFV parameter presets (insecure 512 and secure 8192, threshold and DKG variants) and the committee sizes they assume.",
+      "explain": "Threshold encryption needs every node to build the same BFV ring degree, moduli and plaintext modulus, so this crate keeps them as named presets. Each preset is a threshold pair plus a DKG pair; the 512 presets are marked insecure and not for production, and the default preset for local development and tests is the insecure threshold one. The on-chain parameter index 0 maps to the insecure 512 threshold preset and index 2 to the secure 8192 threshold preset. Keyshare, aggregator, config, sdk and the CLI depend on it.",
+      "analogy": "A price list with two sizes, each sold as a matched pair: one for the shared public key and one for the temporary setup key.",
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "BfvPreset",
+          "what": "the four named presets: insecure or secure, threshold or DKG",
+          "ref": "crates/fhe-params/src/presets.rs@40@pub enum BfvPreset"
+        },
+        {
+          "name": "BfvParamSet",
+          "what": "one preset's degree, plaintext modulus and moduli, ready to build BFV parameters",
+          "ref": "crates/fhe-params/src/presets.rs@249@pub struct BfvParamSet {"
+        },
+        {
+          "name": "PresetError",
+          "what": "error type: unknown preset, missing threshold or DKG pair, or an insecure lambda",
+          "ref": "crates/fhe-params/src/presets.rs@206@pub enum PresetError {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "crate entry: the public re-exports of presets, builders and CRP helpers",
+          "ref": "crates/fhe-params/src/lib.rs@24@pub use presets::{"
+        },
+        {
+          "why": "the preset enum and the default preset constant",
+          "ref": "crates/fhe-params/src/presets.rs@40@pub enum BfvPreset"
+        },
+        {
+          "why": "the insecure 512 constants: degree, moduli and party count per threshold or DKG set",
+          "ref": "crates/fhe-params/src/constants.rs@13@pub mod insecure_512 {"
+        },
+        {
+          "why": "turns a preset into its threshold and DKG BFV parameter pair",
+          "ref": "crates/fhe-params/src/builder.rs@13@pub fn build_pair_for_preset("
+        }
+      ],
+      "rust_patterns": [
+        {
+          "pattern": "enum-match",
+          "note": "metadata() maps each preset to its degree, modulus count, party count and security tier",
+          "ref": "crates/fhe-params/src/presets.rs@388@match self {"
+        },
+        {
+          "pattern": "thiserror-enum",
+          "note": "PresetError derives Debug and the thiserror Error impl through the ThisError alias",
+          "ref": "crates/fhe-params/src/presets.rs@205@#[derive(ThisError, Debug)]"
+        },
+        {
+          "pattern": "impl-from",
+          "note": "a preset converts into its BfvParamSet with From",
+          "ref": "crates/fhe-params/src/presets.rs@497@impl From<BfvPreset> for BfvParamSet {"
+        },
+        {
+          "pattern": "builder-pattern",
+          "note": "BfvParametersBuilder is chained with set_degree and set_plaintext_modulus",
+          "ref": "crates/fhe-params/src/builder.rs@18@let params_threshold = BfvParametersBuilder::new()"
+        },
+        {
+          "pattern": "serde-derive",
+          "note": "presets derive Serialize and Deserialize",
+          "ref": "crates/fhe-params/src/presets.rs@39@#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]"
+        }
+      ],
+      "depends_on": [],
+      "tests": "Unit tests in src/presets.rs, src/builder.rs and src/search/bfv.rs. Run: cargo test -p e3-fhe-params.",
+      "unverified": []
+    },
+    {
+      "id": "e3-committee-hash",
+      "kind": "crate",
+      "path": "crates/committee-hash",
+      "one_line": "Canonical keccak256 hashes of the ordered committee and of the E3 decryption domain, matching the Solidity contracts.",
+      "explain": "A decryption-share proof has to name the committee and the E3 it belongs to, so the node and the on-chain contract must compute the same hash. This crate hashes the ordered 20-byte committee addresses with keccak256, and hashes the decryption domain over the chain id, Interfold address, E3 id, committee hash, ciphertext output hash and committee key. Each hash is split into two 128-bit limbs for the Noir public inputs. The module comments say the results must match CommitteeHashLib.sol and InterfoldPricing.decryptionDomain.",
+      "analogy": "A fingerprint taken over a guest list in a fixed order: the same list always gives the same fingerprint, whether the node or the contract takes it.",
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "CommitteeHashLimbs",
+          "what": "the committee hash split into hi and lo 128-bit halves, each as a bytes32 word",
+          "ref": "crates/committee-hash/src/lib.rs@20@pub struct CommitteeHashLimbs {"
+        },
+        {
+          "name": "DecryptionDomainContext",
+          "what": "the Interfold address, committee hash and committee public key that a domain hash binds",
+          "ref": "crates/committee-hash/src/lib.rs@28@pub struct DecryptionDomainContext {"
+        },
+        {
+          "name": "DecryptionDomainLimbs",
+          "what": "the decryption-domain hash split into two u128 values",
+          "ref": "crates/committee-hash/src/lib.rs@36@pub struct DecryptionDomainLimbs {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "the committee hash: keccak256 over the raw addresses in order",
+          "ref": "crates/committee-hash/src/lib.rs@42@pub fn hash_committee_addresses"
+        },
+        {
+          "why": "the E3 decryption domain: the ABI-encoded fields hashed together",
+          "ref": "crates/committee-hash/src/lib.rs@82@pub fn hash_decryption_domain("
+        },
+        {
+          "why": "the limb split that feeds the Noir public inputs",
+          "ref": "crates/committee-hash/src/lib.rs@52@pub fn split_committee_hash"
+        },
+        {
+          "why": "the Solidity library the committee hash must match",
+          "ref": "packages/interfold-contracts/contracts/lib/CommitteeHashLib.sol@14@library CommitteeHashLib {"
+        }
+      ],
+      "rust_patterns": [
+        {
+          "pattern": "iterator-chain",
+          "note": "the addresses are flattened into one byte buffer before hashing",
+          "ref": "crates/committee-hash/src/lib.rs@45@.flat_map(|addr| addr.into_array())"
+        },
+        {
+          "pattern": "serde-derive",
+          "note": "the domain context and the limbs derive Serialize and Deserialize",
+          "ref": "crates/committee-hash/src/lib.rs@27@#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]"
+        },
+        {
+          "pattern": "unit-test",
+          "note": "unit tests sit in the same file",
+          "ref": "crates/committee-hash/src/lib.rs@133@#[test]"
+        }
+      ],
+      "depends_on": [],
+      "tests": "Three unit tests in src/lib.rs. Run: cargo test -p e3-committee-hash.",
+      "unverified": []
+    },
+    {
+      "id": "e3-crypto",
+      "kind": "crate",
+      "path": "crates/crypto",
+      "one_line": "Local encryption of node secrets at rest: an Argon2id-derived AES-256-GCM key, a password manager and sensitive-byte containers.",
+      "explain": "Values that must not sit in plaintext are wrapped as SensitiveBytes, which hold ciphertext produced by a Cipher. A Cipher derives a 32-byte key from a password with Argon2id and a fixed application salt, then seals data with AES-256-GCM and writes a random 12-byte nonce in front of the ciphertext. The password comes from an environment variable, a file or memory through the PasswordManager trait. Plaintext input is zeroized after encryption, and SensitiveBytes::access returns the decrypted value in a Zeroizing buffer.",
+      "analogy": "A safe-deposit box whose key is cut from a password: what goes in is sealed, and only the holder of that password can open it.",
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [
+        {
+          "name": "AES key derived from the password, held in a Zeroizing buffer",
+          "where": "memory",
+          "ref": "crates/crypto/src/cipher.rs@108@key: Zeroizing<Vec<u8>>,"
+        },
+        {
+          "name": "password file read by FilePasswordManager",
+          "where": "disk",
+          "ref": "crates/crypto/src/password_manager.rs@94@pub struct FilePasswordManager {"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "Cipher",
+          "what": "the AES-256-GCM key holder with encrypt_data and decrypt_data",
+          "ref": "crates/crypto/src/cipher.rs@107@pub struct Cipher {"
+        },
+        {
+          "name": "SensitiveBytes",
+          "what": "serializable container that holds ciphertext and decrypts on access",
+          "ref": "crates/crypto/src/sensitive.rs@16@pub struct SensitiveBytes {"
+        },
+        {
+          "name": "PasswordManager",
+          "what": "trait that supplies the password bytes from memory, an environment variable or a file",
+          "ref": "crates/crypto/src/password_manager.rs@19@pub trait PasswordManager {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "crate entry: re-exports Cipher, the password managers and SensitiveBytes",
+          "ref": "crates/crypto/src/lib.rs@10@pub use cipher::Cipher;"
+        },
+        {
+          "why": "Cipher::new: fetches the password and derives the key",
+          "ref": "crates/crypto/src/cipher.rs@112@pub async fn new<P>(pm: P) -> Result<Self>"
+        },
+        {
+          "why": "encrypt_data: random nonce, AES-256-GCM seal, then the input is zeroized",
+          "ref": "crates/crypto/src/cipher.rs@136@pub fn encrypt_data(&self, data: &mut Vec<u8>)"
+        },
+        {
+          "why": "SensitiveBytes::new: encrypts a value into the container",
+          "ref": "crates/crypto/src/sensitive.rs@23@pub fn new(input: impl Into<Vec<u8>>, cipher: &Cipher)"
+        }
+      ],
+      "rust_patterns": [
+        {
+          "pattern": "trait-def",
+          "note": "PasswordManager is an async trait with get_key, set_key, delete_key and is_set",
+          "ref": "crates/crypto/src/password_manager.rs@19@pub trait PasswordManager {"
+        },
+        {
+          "pattern": "async-await",
+          "note": "Cipher::new awaits the password manager before deriving the key",
+          "ref": "crates/crypto/src/cipher.rs@112@pub async fn new<P>(pm: P) -> Result<Self>"
+        },
+        {
+          "pattern": "newtype",
+          "note": "InMemPasswordManager wraps an optional zeroizing buffer",
+          "ref": "crates/crypto/src/password_manager.rs@26@pub struct InMemPasswordManager("
+        },
+        {
+          "pattern": "serde-derive",
+          "note": "SensitiveBytes derives serde's Serialize and Deserialize",
+          "ref": "crates/crypto/src/sensitive.rs@15@#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]"
+        }
+      ],
+      "depends_on": ["e3-utils"],
+      "tests": "Unit tests in src/cipher.rs and src/sensitive.rs. Run: cargo test -p e3-crypto.",
+      "unverified": []
+    },
+    {
+      "id": "e3-polynomial",
+      "kind": "crate",
+      "path": "crates/polynomial",
+      "one_line": "Polynomial arithmetic over big-integer coefficients, with CRT limbs and range checks, for the circuit input math.",
+      "explain": "The zk-helpers circuit code works with ring arithmetic on exact integers, so each coefficient is a num-bigint BigInt. Polynomial covers add, subtract, negate, multiply, exact division by an integer, scalar multiplication, centering and reduction, and CrtPolynomial keeps one such polynomial per modulus. The conversions from fhe.rs polynomials are in e3-polynomial-fhe, and the aggregator, multithread and zk-prover crates use this crate too.",
+      "analogy": "A string of numbered beads, one bead per power of x: adding or multiplying polynomials means combining the strings bead by bead.",
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "Polynomial",
+          "what": "a coefficient vector of BigInt values with the arithmetic and reduction methods",
+          "ref": "crates/polynomial/src/polynomial.rs@30@pub struct Polynomial {"
+        },
+        {
+          "name": "CrtPolynomial",
+          "what": "one Polynomial per modulus (RNS limbs), with conversions from fhe.rs polynomials",
+          "ref": "crates/polynomial/src/crt_polynomial.rs@25@pub struct CrtPolynomial {"
+        },
+        {
+          "name": "PolynomialError",
+          "what": "error type for polynomial operations, such as division by the zero polynomial",
+          "ref": "crates/polynomial/src/polynomial.rs@21@pub enum PolynomialError {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "crate entry: the modules and the re-exports",
+          "ref": "crates/polynomial/src/lib.rs@16@pub use crt_polynomial::{CrtPolynomial, CrtPolynomialError};"
+        },
+        {
+          "why": "the core Polynomial type",
+          "ref": "crates/polynomial/src/polynomial.rs@30@pub struct Polynomial {"
+        },
+        {
+          "why": "exact division of every coefficient by an integer",
+          "ref": "crates/polynomial/src/polynomial.rs@127@pub fn div_exact(&self, divisor: &BigInt)"
+        },
+        {
+          "why": "the RNS form: one polynomial per modulus",
+          "ref": "crates/polynomial/src/crt_polynomial.rs@25@pub struct CrtPolynomial {"
+        }
+      ],
+      "rust_patterns": [
+        {
+          "pattern": "thiserror-enum",
+          "note": "PolynomialError derives Error through thiserror",
+          "ref": "crates/polynomial/src/polynomial.rs@17@#[derive(Debug, Error)]"
+        },
+        {
+          "pattern": "iterator-chain",
+          "note": "negation maps every coefficient and collects a new vector",
+          "ref": "crates/polynomial/src/polynomial.rs@74@Self::new(self.coefficients.iter().map(|x| -x).collect())"
+        }
+      ],
+      "depends_on": [],
+      "tests": "Unit tests in src/polynomial.rs and src/crt_polynomial.rs. Run: cargo test -p e3-polynomial.",
+      "unverified": []
+    },
+    {
+      "id": "e3-parity-matrix",
+      "kind": "crate",
+      "path": "crates/parity-matrix",
+      "one_line": "Generates and checks parity matrices for polynomial evaluations mod q, used by the DKG share-computation circuit inputs.",
+      "explain": "The crate docs take a polynomial of degree t evaluated at n+1 points mod q, build the generator matrix G for those evaluations, and compute a parity matrix H with H * G^T = 0 mod q. Any valid evaluation vector v then satisfies H * v = 0 mod q, so the check catches vectors that do not come from a degree-t polynomial. zk-helpers' DKG share-computation utilities call build_generator_matrix and null_space.",
+      "analogy": "A checksum that comes out zero only for lists drawn from a low-degree curve.",
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "ParityMatrix",
+          "what": "a rectangular matrix of BigUint entries, used for both G and H",
+          "ref": "crates/parity-matrix/src/matrix.rs@39@pub struct ParityMatrix {"
+        },
+        {
+          "name": "ParityMatrixConfig",
+          "what": "the configuration that build_generator_matrix takes",
+          "ref": "crates/parity-matrix/src/matrix.rs@157@pub struct ParityMatrixConfig {"
+        },
+        {
+          "name": "MatrixLike",
+          "what": "trait for reading a matrix, implemented for ParityMatrix",
+          "ref": "crates/parity-matrix/src/matrix.rs@125@pub trait MatrixLike {"
+        },
+        {
+          "name": "ParityMatrixError",
+          "what": "error type with constraint, math, matrix, verification and generic variants",
+          "ref": "crates/parity-matrix/src/errors.rs@19@pub enum ParityMatrixError {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "crate entry: re-exports the functions and types",
+          "ref": "crates/parity-matrix/src/lib.rs@33@pub use matrix::{"
+        },
+        {
+          "why": "builds the generator matrix G from a config",
+          "ref": "crates/parity-matrix/src/matrix.rs@196@pub fn build_generator_matrix"
+        },
+        {
+          "why": "computes the null space H of G mod q",
+          "ref": "crates/parity-matrix/src/matrix.rs@254@pub fn null_space"
+        },
+        {
+          "why": "checks a parity matrix H against a matrix G mod q",
+          "ref": "crates/parity-matrix/src/matrix.rs@367@pub fn verify_parity_matrix"
+        }
+      ],
+      "rust_patterns": [
+        {
+          "pattern": "thiserror-enum",
+          "note": "ParityMatrixError derives Error through thiserror",
+          "ref": "crates/parity-matrix/src/errors.rs@18@#[derive(Error, Debug)]"
+        },
+        {
+          "pattern": "trait-def",
+          "note": "MatrixLike abstracts read access to a matrix",
+          "ref": "crates/parity-matrix/src/matrix.rs@125@pub trait MatrixLike {"
+        },
+        {
+          "pattern": "trait-impl",
+          "note": "MatrixLike is implemented for ParityMatrix",
+          "ref": "crates/parity-matrix/src/matrix.rs@136@impl MatrixLike for ParityMatrix {"
+        },
+        {
+          "pattern": "impl-from",
+          "note": "a ParityMatrix converts into nested Vec<Vec<BigUint>>",
+          "ref": "crates/parity-matrix/src/matrix.rs@118@impl From<ParityMatrix> for Vec<Vec<BigUint>> {"
+        }
+      ],
+      "depends_on": [],
+      "tests": "Unit tests in src/matrix.rs and src/math.rs. Run: cargo test -p e3-parity-matrix.",
+      "unverified": []
+    },
+    {
+      "id": "e3-safe",
+      "kind": "crate",
+      "path": "crates/safe",
+      "one_line": "SAFE sponge (Sponge API for Field Elements) over BN254 with a Poseidon2 permutation, for zero-knowledge hashing.",
+      "explain": "The name is the SAFE acronym, Sponge API for Field Elements, not Gnosis Safe: this crate contains no transaction code. It implements the start, absorb, squeeze and finish operations of a sponge over the BN254 scalar field, with rate 3 and capacity 1, and the permutation is Poseidon2 (a zkVM build uses poseidon2_accel). The IO pattern and a 64-byte domain separator are hashed into a tag that initializes the state, which the crate docs describe as domain separation.",
+      "analogy": "A kitchen sponge with a fixed recipe: field elements are soaked up and wrung out in an order fixed before the first drop.",
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "SafeSponge",
+          "what": "the sponge state: permutation state, positions and the IO pattern it checks",
+          "ref": "crates/safe/src/lib.rs@77@pub struct SafeSponge<const L: usize> {"
+        },
+        {
+          "name": "Field",
+          "what": "the BN254 scalar field element type used throughout",
+          "ref": "crates/safe/src/lib.rs@38@pub type Field = Fr;"
+        },
+        {
+          "name": "RATE",
+          "what": "field elements absorbed per permutation call (3)",
+          "ref": "crates/safe/src/lib.rs@41@pub const RATE: usize = 3;"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "module docs: what SAFE is and which spec it follows",
+          "ref": "crates/safe/src/lib.rs@7@SAFE (Sponge API for Field Elements)"
+        },
+        {
+          "why": "the sponge type, parameterised by the IO pattern length",
+          "ref": "crates/safe/src/lib.rs@77@pub struct SafeSponge<const L: usize> {"
+        },
+        {
+          "why": "start: computes the tag and initializes the state",
+          "ref": "crates/safe/src/lib.rs@103@pub fn start(io_pattern"
+        },
+        {
+          "why": "compute_tag: the IO pattern and domain separator folded into one field element",
+          "ref": "crates/safe/src/lib.rs@266@pub fn compute_tag<const L: usize>"
+        }
+      ],
+      "rust_patterns": [
+        {
+          "pattern": "const-generic",
+          "note": "the IO pattern length is a const generic L",
+          "ref": "crates/safe/src/lib.rs@77@pub struct SafeSponge<const L: usize> {"
+        },
+        {
+          "pattern": "iterator-chain",
+          "note": "compute_tag walks the IO pattern with iter().take(L)",
+          "ref": "crates/safe/src/lib.rs@274@for item in io_pattern.iter().take(L) {"
+        },
+        {
+          "pattern": "unit-test",
+          "note": "tests sit in a cfg(test) module in the same file",
+          "ref": "crates/safe/src/lib.rs@388@#[test]"
+        }
+      ],
+      "depends_on": [],
+      "tests": "Unit tests in src/lib.rs and src/poseidon2_accel.rs (16 test attributes). Run: cargo test -p e3-safe.",
+      "unverified": []
+    },
+    {
+      "id": "e3-hamt",
+      "kind": "crate",
+      "path": "crates/hamt",
+      "one_line": "A persistent hash array mapped trie: insert and remove return a new map that shares unchanged nodes through Arc.",
+      "explain": "The data crate's live key-value map is backed by this trie, so an older version of the map stays readable after a write. Keys are hashed with the standard DefaultHasher, and each level uses 5 bits of the hash to pick one of 32 slots, with a bitmap recording which slots are filled. insert and remove build new nodes only along the changed path and reuse the rest, so cloning a map is cheap.",
+      "analogy": "A tree of mailboxes: each level reads five bits of the key's hash to choose one of 32 boxes, and a changed box gets a fresh copy while the rest stay shared.",
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [
+        {
+          "name": "the trie of nodes, held in memory behind the root Arc",
+          "where": "memory",
+          "ref": "crates/hamt/src/lib.rs@34@root: Arc<Node<K, V>>,"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "Hamt",
+          "what": "the persistent map: a root node and an entry count",
+          "ref": "crates/hamt/src/lib.rs@33@pub struct Hamt<K, V> {"
+        },
+        {
+          "name": "Node",
+          "what": "Empty, Leaf, Internal with a 32-bit bitmap and children, or Collision",
+          "ref": "crates/hamt/src/lib.rs@16@enum Node<K, V> {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "the chunk size: 5 bits per level, so 32 slots per node",
+          "ref": "crates/hamt/src/lib.rs@11@const BITS_PER_LEVEL: u32 = 5;"
+        },
+        {
+          "why": "the node types",
+          "ref": "crates/hamt/src/lib.rs@16@enum Node<K, V> {"
+        },
+        {
+          "why": "the public insert, which returns a new map",
+          "ref": "crates/hamt/src/lib.rs@83@pub fn insert(&self, key: K, value: V) -> Self"
+        },
+        {
+          "why": "the recursive insert that rebuilds only the changed path",
+          "ref": "crates/hamt/src/lib.rs@93@fn insert_rec("
+        }
+      ],
+      "rust_patterns": [
+        {
+          "pattern": "enum-match",
+          "note": "insert matches on the node kind and rebuilds the matched variant",
+          "ref": "crates/hamt/src/lib.rs@139@Node::Internal { bitmap, children } => {"
+        },
+        {
+          "pattern": "arc-shared",
+          "note": "nodes are shared through Arc, so versions reuse subtrees",
+          "ref": "crates/hamt/src/lib.rs@34@root: Arc<Node<K, V>>,"
+        },
+        {
+          "pattern": "ownership-clone",
+          "note": "Clone copies only the Arc to the root",
+          "ref": "crates/hamt/src/lib.rs@41@root: self.root.clone(),"
+        },
+        {
+          "pattern": "generic-where",
+          "note": "the Default impl bounds K and V in a where clause",
+          "ref": "crates/hamt/src/lib.rs@47@impl<K, V> Default for Hamt<K, V>"
+        }
+      ],
+      "depends_on": [],
+      "tests": "Four unit tests in src/lib.rs. Run: cargo test -p e3-hamt.",
+      "unverified": []
+    },
+    {
+      "id": "e3-utils",
+      "kind": "crate",
+      "path": "crates/utils",
+      "one_line": "Shared helpers: actix channel adapters, size-bounded bincode, retry with backoff, random Ethereum addresses and byte newtypes.",
+      "explain": "Several crates need the same small pieces, such as retrying a flaky call, decoding bincode with a size limit, and feeding actix messages into tokio channels, so these live here instead of being copied. transaction::require_successful_receipt turns a reverted transaction into an error, and the BytesSerde derive from e3-utils-derive is re-exported here. Crypto, net and data are among the crates that depend on this one.",
+      "analogy": "A shared toolbox of standard fittings: a retry wrench, a size gauge for bincode, and adapters that plug an actor into a channel.",
+      "actors": [
+        {
+          "name": "Oneshot<M>",
+          "role": "actix actor that forwards its first message into a tokio oneshot channel",
+          "ref": "crates/utils/src/actix/channel.rs@14@pub struct Oneshot<M>"
+        },
+        {
+          "name": "Mpsc<M>",
+          "role": "actix actor that forwards each message into a tokio mpsc channel",
+          "ref": "crates/utils/src/actix/channel.rs@46@pub struct Mpsc<M>"
+        },
+        {
+          "name": "OneShotRunner<F, M>",
+          "role": "actor that runs its closure once on the first message and logs any error",
+          "ref": "crates/utils/src/actix/oneshot_runner.rs@13@pub struct OneShotRunner<F, M>"
+        }
+      ],
+      "consumes": [],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "ArcBytes",
+          "what": "a byte buffer behind an Arc, so clones share the bytes",
+          "ref": "crates/utils/src/utility_types.rs@22@pub struct ArcBytes(Arc<Vec<u8>>);"
+        },
+        {
+          "name": "AsBytesSerde",
+          "what": "trait that converts a newtype to and from bytes for the BytesSerde derive",
+          "ref": "crates/utils/src/serde_bytes.rs@38@pub trait AsBytesSerde: Sized {"
+        },
+        {
+          "name": "RevertedTransaction",
+          "what": "details of a transaction receipt that reverted",
+          "ref": "crates/utils/src/transaction.rs@12@pub struct RevertedTransaction {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "crate entry: module list and re-exports, including the BytesSerde derive",
+          "ref": "crates/utils/src/lib.rs@24@pub use e3_utils_derive::BytesSerde;"
+        },
+        {
+          "why": "ArcBytes, the shared byte buffer",
+          "ref": "crates/utils/src/utility_types.rs@22@pub struct ArcBytes(Arc<Vec<u8>>);"
+        },
+        {
+          "why": "the oneshot adapter from actix to tokio",
+          "ref": "crates/utils/src/actix/channel.rs@36@pub fn oneshot<M>()"
+        },
+        {
+          "why": "retry_with_backoff: retries an operation with a delay between attempts",
+          "ref": "crates/utils/src/retry.rs@34@pub async fn retry_with_backoff<F, Fut, T>("
+        }
+      ],
+      "rust_patterns": [
+        {
+          "pattern": "newtype",
+          "note": "ArcBytes wraps Arc<Vec<u8>>",
+          "ref": "crates/utils/src/utility_types.rs@22@pub struct ArcBytes(Arc<Vec<u8>>);"
+        },
+        {
+          "pattern": "actix-actor",
+          "note": "OneShotRunner implements actix::Actor and handles one message",
+          "ref": "crates/utils/src/actix/oneshot_runner.rs@38@impl<F, M> Actor for OneShotRunner<F, M>"
+        },
+        {
+          "pattern": "actix-recipient",
+          "note": "oneshot() returns an actix Recipient, so any actor can send into it",
+          "ref": "crates/utils/src/actix/channel.rs@36@pub fn oneshot<M>()"
+        },
+        {
+          "pattern": "async-await",
+          "note": "retry_with_backoff is an async function over a closure that returns a future",
+          "ref": "crates/utils/src/retry.rs@34@pub async fn retry_with_backoff<F, Fut, T>("
+        },
+        {
+          "pattern": "derive-macro",
+          "note": "ArcBytes derives BytesSerde, the custom derive from e3-utils-derive",
+          "ref": "crates/utils/src/utility_types.rs@21@#[derive(BytesSerde, Clone, Default, PartialEq, Eq, Hash)]"
+        }
+      ],
+      "depends_on": ["e3-utils-derive"],
+      "tests": "Unit tests in src/ (14 test attributes, for example test_one_shot_runner in src/actix/oneshot_runner.rs). Run: cargo test -p e3-utils.",
+      "unverified": []
+    },
+    {
+      "id": "e3-utils-derive",
+      "kind": "crate",
+      "path": "crates/utils-derive",
+      "one_line": "Proc-macro crate with one derive, BytesSerde, that gives a one-field newtype hex JSON and raw-byte bincode.",
+      "explain": "Byte newtypes such as event ids and seeds need one serde form for JSON and another for bincode, and the derive writes both. For human-readable formats it emits a 0x-prefixed hex string, and for binary formats raw bytes, decoding through the type's AsBytesSerde impl. The derive accepts only a struct with exactly one unnamed field and rejects anything else at compile time.",
+      "analogy": "A rubber stamp for one shape of box: the same mark makes the box read as hex on paper and as raw bytes on the wire.",
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "BytesSerde",
+          "what": "the derive macro; its generated impls are Serialize and Deserialize",
+          "ref": "crates/utils-derive/src/lib.rs@34@#[proc_macro_derive(BytesSerde)]"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "the derive function: the only public item in the crate",
+          "ref": "crates/utils-derive/src/lib.rs@35@pub fn derive_bytes_serde(input: TokenStream) -> TokenStream {"
+        },
+        {
+          "why": "the shape check: only one-field tuple structs pass",
+          "ref": "crates/utils-derive/src/lib.rs@43@Fields::Unnamed(fields) if fields.unnamed.len() == 1"
+        },
+        {
+          "why": "where e3-utils re-exports the derive for other crates",
+          "ref": "crates/utils/src/lib.rs@24@pub use e3_utils_derive::BytesSerde;"
+        }
+      ],
+      "rust_patterns": [
+        {
+          "pattern": "derive-macro",
+          "note": "a proc-macro derive that builds its impls with quote!",
+          "ref": "crates/utils-derive/src/lib.rs@34@#[proc_macro_derive(BytesSerde)]"
+        },
+        {
+          "pattern": "enum-match",
+          "note": "match on the input's data kind rejects anything but a struct",
+          "ref": "crates/utils-derive/src/lib.rs@41@match &input.data {"
+        },
+        {
+          "pattern": "serde-derive",
+          "note": "the generated code implements ::serde::Serialize and ::serde::Deserialize",
+          "ref": "crates/utils-derive/src/lib.rs@61@impl #impl_generics ::serde::Serialize for #name"
+        }
+      ],
+      "depends_on": [],
+      "tests": "No test attributes in this crate. Its output is used by e3-utils (ArcBytes) and e3-events (EventId, Seed).",
+      "unverified": ["Whether any test in e3-utils or e3-events checks the derived hex and raw-byte forms was not checked."]
+    },
+    {
+      "id": "e3-test-helpers",
+      "kind": "crate",
+      "path": "crates/test-helpers",
+      "one_line": "Shared test scaffolding: an in-process ciphernode system builder, a libp2p network mock, and setup helpers for tests.",
+      "explain": "Integration tests need several nodes that talk to each other without a real network, so CiphernodeSystemBuilder starts a group of ciphernode handles in one process. With simulate_libp2p(), Libp2pMock carries broadcast events and DHT records between the nodes, and restart_node shuts one node down, rebuilds it and tells the mock about the replacement. The crate also has helpers such as find_bb, get_common_setup and AddToCommittee, and ships two binaries, fake_encrypt and pack_e3_params.",
+      "analogy": "A film set: the builder seats the cast in one room and a radio mock carries their messages, so the scene runs with no outside network.",
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [
+        {
+          "name": "the mock's record store, held in memory",
+          "where": "memory",
+          "ref": "crates/test-helpers/src/libp2p_mock.rs@26@store: Arc<RwLock<HashMap<ContentHash, ArcBytes>>>,"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "CiphernodeSystemBuilder",
+          "what": "collects groups of node setups and builds them in order",
+          "ref": "crates/test-helpers/src/ciphernode_system.rs@36@pub struct CiphernodeSystemBuilder<'a> {"
+        },
+        {
+          "name": "CiphernodeSystem",
+          "what": "the built nodes and the optional network mock",
+          "ref": "crates/test-helpers/src/ciphernode_system.rs@102@pub struct CiphernodeSystem {"
+        },
+        {
+          "name": "Libp2pMock",
+          "what": "in-process stand-in for gossip and DHT between node network bridges",
+          "ref": "crates/test-helpers/src/libp2p_mock.rs@25@pub struct Libp2pMock {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "module list: the four helper modules",
+          "ref": "crates/test-helpers/src/lib.rs@8@pub mod ciphernode_system;"
+        },
+        {
+          "why": "the builder: add groups, simulate the network, build",
+          "ref": "crates/test-helpers/src/ciphernode_system.rs@36@pub struct CiphernodeSystemBuilder<'a> {"
+        },
+        {
+          "why": "turns on the simulated network for the built nodes",
+          "ref": "crates/test-helpers/src/ciphernode_system.rs@74@pub fn simulate_libp2p(mut self) -> Self {"
+        },
+        {
+          "why": "the in-process gossip and DHT mock",
+          "ref": "crates/test-helpers/src/libp2p_mock.rs@25@pub struct Libp2pMock {"
+        }
+      ],
+      "rust_patterns": [
+        {
+          "pattern": "builder-pattern",
+          "note": "CiphernodeSystemBuilder chains add_group and simulate_libp2p, then build",
+          "ref": "crates/test-helpers/src/ciphernode_system.rs@58@pub fn add_group<F, Fut>("
+        },
+        {
+          "pattern": "trait-object-dyn",
+          "note": "each group's setup is stored as a boxed Fn that returns a boxed future",
+          "ref": "crates/test-helpers/src/ciphernode_system.rs@21@Box<dyn Fn()"
+        },
+        {
+          "pattern": "async-await",
+          "note": "build awaits each group's setup in turn",
+          "ref": "crates/test-helpers/src/ciphernode_system.rs@80@pub async fn build(self)"
+        },
+        {
+          "pattern": "async-test",
+          "note": "the one test in ciphernode_system.rs runs under actix",
+          "ref": "crates/test-helpers/src/ciphernode_system.rs@404@#[actix::test]"
+        }
+      ],
+      "depends_on": [
+        "e3-aggregator",
+        "e3-crypto",
+        "e3-ciphernode-builder",
+        "e3-data",
+        "e3-bfv-client",
+        "e3-fhe-params",
+        "e3-events",
+        "e3-fhe",
+        "e3-keyshare",
+        "e3-multithread",
+        "e3-request",
+        "e3-sdk",
+        "e3-net",
+        "e3-trbfv",
+        "e3-utils",
+        "e3-sortition"
+      ],
+      "tests": "Six tests: five #[tokio::test] in src/libp2p_mock.rs and one #[actix::test] in src/ciphernode_system.rs. Run: cargo test -p e3-test-helpers.",
+      "unverified": []
+    },
+    {
+      "id": "e3-tests",
+      "kind": "crate",
+      "path": "crates/tests",
+      "one_line": "Integration test binaries for the workspace, which run several in-process ciphernodes over a simulated network.",
+      "explain": "This crate has no library code: src/main.rs is intentionally blank, and the tests live in tests/integration.rs, tests/large_work_plan_recovery.rs and tests/layout_lock.rs. The integration test builds its nodes with CiphernodeSystemBuilder and calls simulate_libp2p(), so each node is a full ciphernode actor system in one process, and events marked for broadcast reach the other nodes through the mock. setup_test_zk_backend uses a local bb binary when find_bb finds one, and otherwise calls ensure_installed to fetch bb and the circuits.",
+      "analogy": "A dress rehearsal: the real cast runs the full script in one theatre, with a radio mock standing in for the outside world.",
+      "actors": [
+        {
+          "name": "StoredEvents",
+          "role": "test-only actor that answers one event-store query by sending the events back on a oneshot channel",
+          "ref": "crates/tests/tests/integration.rs@3076@struct StoredEvents("
+        }
+      ],
+      "consumes": [],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "CiphernodeSystemBuilder",
+          "what": "builds the ciphernode groups each test uses (from e3-test-helpers)",
+          "ref": "crates/tests/tests/integration.rs@1506@let mut nodes = CiphernodeSystemBuilder::new()"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "a full multi-node test: test_trbfv_actor",
+          "ref": "crates/tests/tests/integration.rs@1328@async fn test_trbfv_actor()"
+        },
+        {
+          "why": "the simulated network is switched on for the node group",
+          "ref": "crates/tests/tests/integration.rs@1619@.simulate_libp2p()"
+        },
+        {
+          "why": "how the zk backend is chosen: a local bb binary or the CI install",
+          "ref": "crates/tests/tests/integration.rs@365@async fn setup_test_zk_backend("
+        },
+        {
+          "why": "the layout-lock test that compares the persisted layouts with the fixture",
+          "ref": "crates/tests/tests/layout_lock.rs@246@fn persisted_layouts_match_the_locked_fixture()"
+        }
+      ],
+      "rust_patterns": [
+        {
+          "pattern": "async-test",
+          "note": "integration tests run under actix::test and are serialized with serial_test",
+          "ref": "crates/tests/tests/integration.rs@1326@#[actix::test]"
+        },
+        {
+          "pattern": "builder-pattern",
+          "note": "the node groups are assembled with CiphernodeSystemBuilder",
+          "ref": "crates/tests/tests/integration.rs@1506@let mut nodes = CiphernodeSystemBuilder::new()"
+        },
+        {
+          "pattern": "actix-actor",
+          "note": "StoredEvents is a small actor that answers one query",
+          "ref": "crates/tests/tests/integration.rs@3078@impl actix::Actor for StoredEvents {"
+        },
+        {
+          "pattern": "unit-test",
+          "note": "the layout test is a plain #[test] that calls the fixture check",
+          "ref": "crates/tests/tests/layout_lock.rs@245@#[test]"
+        }
+      ],
+      "depends_on": [
+        "e3-aggregator",
+        "e3-config",
+        "e3-crypto",
+        "e3-ciphernode-builder",
+        "e3-data",
+        "e3-events",
+        "e3-evm",
+        "e3-fhe",
+        "e3-keyshare",
+        "e3-logger",
+        "e3-multithread",
+        "e3-net",
+        "e3-request",
+        "e3-sdk",
+        "e3-sortition",
+        "e3-test-helpers",
+        "e3-trbfv",
+        "e3-bfv-client",
+        "e3-fhe-params",
+        "e3-utils",
+        "e3-zk-prover",
+        "e3-zk-helpers",
+        "e3-polynomial"
+      ],
+      "tests": "cargo test -p e3-tests --test integration (5 tests), --test large_work_plan_recovery (1) and --test layout_lock (1). Regenerate the layout fixture locally with LAYOUT_LOCK_UPDATE=1 cargo test -p e3-tests --test layout_lock. tests/docker holds a shell test of the ciphernode entrypoint's state paths.",
+      "unverified": []
+    },
+    {
+      "id": "e3-layout-lock",
+      "kind": "crate",
+      "path": "crates/layout-lock",
+      "one_line": "Test helper that samples persisted and wire types from their serde layout and checks their bincode encoding against a fixture.",
+      "explain": "A node reads bytes that an older release wrote, and peers on two releases exchange messages, so the layout of persisted and wire types must not change silently. sample_rows builds sample values of a type from its serde layout, encodes each one with bincode, and returns digest rows per enum variant. assert_fixture compares those rows with a checked-in fixture, and the LAYOUT_LOCK_UPDATE variable rewrites it, which is refused when CI is set. e3-tests, net, zk-prover and slashing use this crate as a dev-dependency.",
+      "analogy": "A sealed sample book: each type gets pressed sample pages with digests, and any change to the press shows up when new pages are compared with the sealed book.",
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [
+        {
+          "name": "checked-in fixture file, read by assert_fixture and rewritten under LAYOUT_LOCK_UPDATE",
+          "where": "disk",
+          "ref": "crates/layout-lock/src/lib.rs@892@let fixture = std::fs::read_to_string(path)"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "Synth",
+          "what": "serde Deserializer that fills a type with samples built from its layout",
+          "ref": "crates/layout-lock/src/lib.rs@156@struct Synth<'a> {"
+        },
+        {
+          "name": "SynthError",
+          "what": "error type used while building samples",
+          "ref": "crates/layout-lock/src/lib.rs@82@struct SynthError(String);"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "module docs: how samples are built and the limits of the check",
+          "ref": "crates/layout-lock/src/lib.rs@7@Sample values built from serde layouts"
+        },
+        {
+          "why": "sample_rows: builds the rows for one root type",
+          "ref": "crates/layout-lock/src/lib.rs@724@pub fn sample_rows<T, F>"
+        },
+        {
+          "why": "assert_fixture: compares the rows with the checked-in file",
+          "ref": "crates/layout-lock/src/lib.rs@876@pub fn assert_fixture(path: &Path, rows: &[String]) {"
+        },
+        {
+          "why": "the update switch, which the CI check guards",
+          "ref": "crates/layout-lock/src/lib.rs@878@if std::env::var_os(UPDATE_ENV).is_some() {"
+        }
+      ],
+      "rust_patterns": [
+        {
+          "pattern": "trait-impl",
+          "note": "Synth implements serde's Deserializer, so serde drives the sample build",
+          "ref": "crates/layout-lock/src/lib.rs@360@impl<'de> de::Deserializer<'de> for Synth<'_> {"
+        },
+        {
+          "pattern": "newtype",
+          "note": "SynthError wraps a String",
+          "ref": "crates/layout-lock/src/lib.rs@82@struct SynthError(String);"
+        },
+        {
+          "pattern": "generic-where",
+          "note": "sample_rows bounds T in a where clause",
+          "ref": "crates/layout-lock/src/lib.rs@726@T: Serialize + DeserializeOwned,"
+        },
+        {
+          "pattern": "unit-test",
+          "note": "the crate's own tests sit in a cfg(test) module",
+          "ref": "crates/layout-lock/src/lib.rs@971@#[test]"
+        }
+      ],
+      "depends_on": ["e3-utils"],
+      "tests": "15 test attributes in src/lib.rs. Run: cargo test -p e3-layout-lock. The fixture check runs in e3-tests: cargo test -p e3-tests --test layout_lock.",
+      "unverified": []
+    },
+    {
+      "id": "e3-openvm-host",
+      "kind": "crate",
+      "path": "crates/openvm-host",
+      "one_line": "Runs an E3 program's secure process natively, writes the guest inputs, and hands them to the OpenVM prover worker.",
+      "explain": "The OpenVM guest proves the same program, so this crate runs the secure process natively, which yields the ComputeJournal, and writes the guest's input items. Prover::start checks the chosen worker, its keys and its verifier before it accepts work, and worker runs have a timeout. encode_compute_proof checks that the seal is 1856 bytes and returns abi.encode(bytes seal, bytes32 paramsHash, bytes32 inputRoot) for the receipt verifier.",
+      "analogy": "A courier desk: the host packs the parcel, a separate sealing worker signs it, and the desk checks the seal before the parcel leaves.",
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "Prover",
+          "what": "a started worker: its path, backend, configuration file and prove timeout",
+          "ref": "crates/openvm-host/src/lib.rs@237@pub struct Prover {"
+        },
+        {
+          "name": "Backend",
+          "what": "which worker proves: Cpu or Cuda",
+          "ref": "crates/openvm-host/src/lib.rs@42@pub enum Backend {"
+        },
+        {
+          "name": "BackendChoice",
+          "what": "the operator's choice: Auto, Cpu or Cuda",
+          "ref": "crates/openvm-host/src/lib.rs@49@pub enum BackendChoice {"
+        },
+        {
+          "name": "WorkerConfig",
+          "what": "worker settings read from the environment",
+          "ref": "crates/openvm-host/src/lib.rs@73@pub struct WorkerConfig {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "crate entry: re-exports ComputeDomain and JOURNAL_BYTES from e3-openvm-types",
+          "ref": "crates/openvm-host/src/lib.rs@23@pub use e3_openvm_types::{ComputeDomain, JOURNAL_BYTES};"
+        },
+        {
+          "why": "reads the worker settings from the environment",
+          "ref": "crates/openvm-host/src/lib.rs@113@pub fn from_env()"
+        },
+        {
+          "why": "starts the worker after checking it, its keys and its verifier",
+          "ref": "crates/openvm-host/src/lib.rs@246@pub async fn start(config: WorkerConfig)"
+        },
+        {
+          "why": "wraps the seal and journal for the receipt verifier",
+          "ref": "crates/openvm-host/src/lib.rs@376@pub fn encode_compute_proof("
+        }
+      ],
+      "rust_patterns": [
+        {
+          "pattern": "trait-impl",
+          "note": "BackendChoice parses the operator setting through FromStr",
+          "ref": "crates/openvm-host/src/lib.rs@58@impl FromStr for BackendChoice {"
+        },
+        {
+          "pattern": "enum-match",
+          "note": "the worker selection matches on the configured backend",
+          "ref": "crates/openvm-host/src/lib.rs@206@match config.backend {"
+        },
+        {
+          "pattern": "anyhow-context",
+          "note": "a missing worker configuration is reported with a context message",
+          "ref": "crates/openvm-host/src/lib.rs@116@OPENVM_PROVER_CONFIG to the worker configuration file"
+        },
+        {
+          "pattern": "async-await",
+          "note": "start is async and waits on worker processes under a tokio timeout",
+          "ref": "crates/openvm-host/src/lib.rs@246@pub async fn start(config: WorkerConfig)"
+        }
+      ],
+      "depends_on": ["e3-compute-provider", "e3-openvm-types"],
+      "tests": "Unit tests in src/lib.rs (6 test attributes). Run: cargo test -p e3-openvm-host.",
+      "unverified": []
+    },
+    {
+      "id": "e3-openvm-types",
+      "kind": "crate",
+      "path": "crates/openvm-types",
+      "one_line": "Types shared by the OpenVM host and guest: the guest header, the nine-word journal, and length-prefixed item framing.",
+      "explain": "The host and the OpenVM guest must read the same bytes for the round header, the journal and the input items, so these types live in one crate; the host and the CRISP program crate depend on it. GuestHeader carries the E3 domain, BFV parameters, input indices and published data, and ComputeJournal is the nine 32-byte words the verifier reads. write_items writes a u32 count and then a u64 length before each item, and ItemReader reads them back one at a time.",
+      "analogy": "A shipping manifest and numbered crates: the header lists the contents, each item goes in a length-marked crate, and the journal is the fixed nine-line receipt.",
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "ComputeDomain",
+          "what": "the chain id, verifying contract, E3 id, scheme id and committee key hash",
+          "ref": "crates/openvm-types/src/lib.rs@29@pub struct ComputeDomain {"
+        },
+        {
+          "name": "GuestHeader",
+          "what": "the first input item: domain, BFV parameters, input indices and published data",
+          "ref": "crates/openvm-types/src/lib.rs@39@pub struct GuestHeader {"
+        },
+        {
+          "name": "ComputeJournal",
+          "what": "the nine 32-byte words the guest reveals",
+          "ref": "crates/openvm-types/src/lib.rs@72@pub struct ComputeJournal {"
+        },
+        {
+          "name": "ItemReader",
+          "what": "reads length-prefixed items one at a time",
+          "ref": "crates/openvm-types/src/lib.rs@150@pub struct ItemReader<R> {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "the per-item size limit",
+          "ref": "crates/openvm-types/src/lib.rs@22@pub const MAX_ITEM_BYTES: usize"
+        },
+        {
+          "why": "the header the guest reads first",
+          "ref": "crates/openvm-types/src/lib.rs@39@pub struct GuestHeader {"
+        },
+        {
+          "why": "the journal the verifier reads",
+          "ref": "crates/openvm-types/src/lib.rs@72@pub struct ComputeJournal {"
+        },
+        {
+          "why": "write_items: the framing the host writes",
+          "ref": "crates/openvm-types/src/lib.rs@129@pub fn write_items<'a, W: Write>("
+        }
+      ],
+      "rust_patterns": [
+        {
+          "pattern": "serde-derive",
+          "note": "the domain and header types derive Serialize and Deserialize",
+          "ref": "crates/openvm-types/src/lib.rs@28@#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]"
+        },
+        {
+          "pattern": "impl-trait-arg",
+          "note": "write_items takes any exact-size iterator of byte slices",
+          "ref": "crates/openvm-types/src/lib.rs@131@items: impl ExactSizeIterator<Item = &'a [u8]>,"
+        },
+        {
+          "pattern": "result-question-mark",
+          "note": "a count that does not fit in u32 is reported with ? as an io error",
+          "ref": "crates/openvm-types/src/lib.rs@133@let count = u32::try_from(items.len())"
+        },
+        {
+          "pattern": "unit-test",
+          "note": "unit tests sit in the same file",
+          "ref": "crates/openvm-types/src/lib.rs@213@#[test]"
+        }
+      ],
+      "depends_on": ["e3-compute-provider"],
+      "tests": "Unit tests in src/lib.rs (5 test attributes). Run: cargo test -p e3-openvm-types.",
+      "unverified": []
+    },
+    {
+      "id": "e3-openvm-prover",
+      "kind": "crate",
+      "path": "crates/openvm-prover",
+      "one_line": "Separate OpenVM worker binary, CPU or CUDA, that prepares keys, executes, proves and verifies E3 rounds.",
+      "explain": "This crate builds the worker that proves OpenVM rounds; its package name is interfold-openvm-prover, and it is its own Cargo workspace that the root workspace excludes. Its subcommands are probe, write-config, prepare, check, execute, prove and verify, and prove and verify both check the EVM proof against the journal before they write the seal. This is the only manifest in the snapshot that declares openvm-sdk, and it holds the optional cuda feature.",
+      "analogy": "A notary at a separate desk who re-checks each sealed envelope against the official stamp before anything leaves the building.",
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [
+        {
+          "name": "prepared output directory holding aggregation.pk and identity.json",
+          "where": "disk",
+          "ref": "crates/openvm-prover/src/main.rs@356@fs::create_dir(&paths[2])?;"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "Config",
+          "what": "worker configuration loaded from a JSON file, with paths such as halo2_pk and halo2_params_dir",
+          "ref": "crates/openvm-prover/src/main.rs@45@struct Config {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "the entry point and the subcommand dispatch",
+          "ref": "crates/openvm-prover/src/main.rs@325@fn main() -> Result<()> {"
+        },
+        {
+          "why": "the configuration the worker loads",
+          "ref": "crates/openvm-prover/src/main.rs@45@struct Config {"
+        },
+        {
+          "why": "validation of the configuration, run whenever it is loaded",
+          "ref": "crates/openvm-prover/src/main.rs@66@fn validate(config: &Config) -> Result<()> {"
+        },
+        {
+          "why": "verify: checks the EVM proof against the journal",
+          "ref": "crates/openvm-prover/src/main.rs@151@fn verify(proof: &EvmProof"
+        }
+      ],
+      "rust_patterns": [
+        {
+          "pattern": "serde-derive",
+          "note": "Config derives Deserialize and Serialize",
+          "ref": "crates/openvm-prover/src/main.rs@43@#[derive(Deserialize, Serialize)]"
+        },
+        {
+          "pattern": "result-question-mark",
+          "note": "each step returns eyre::Result and propagates errors with ?",
+          "ref": "crates/openvm-prover/src/main.rs@378@read_halo2_pk_from_file(&config.halo2_pk)?"
+        },
+        {
+          "pattern": "unit-test",
+          "note": "the tests sit in a cfg(test) module near the end of the file",
+          "ref": "crates/openvm-prover/src/main.rs@445@#[test]"
+        }
+      ],
+      "depends_on": [],
+      "tests": "Five unit tests in src/main.rs (cfg(test) module). The package is excluded from the root workspace, so run: cargo test --manifest-path crates/openvm-prover/Cargo.toml.",
+      "unverified": ["That e3-openvm-host's Prover starts this binary was taken from the architecture doc and was not traced in code."]
+    }
+  ]
+}
