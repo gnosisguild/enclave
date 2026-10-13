@@ -139,6 +139,6 @@ if (fix && (moved.length || factsMoved.length)) {
   if (byHand.length) console.log(`Fix these by hand (built from a template string):\n  ${byHand.join('\n  ')}`)
   const after = tryBuild({})
   console.log(`Build after the fix: ${after.ok ? 'passes' : 'FAILS'}. ${after.text}`)
-  process.exit(after.ok && !broken.length ? 0 : 1)
+  process.exit(after.ok && !broken.length && !report.bad.length ? 0 : 1)
 }
-process.exit(broken.length || !build.ok ? 1 : 0)
+process.exit(broken.length || report.bad.length || !build.ok ? 1 : 0)
