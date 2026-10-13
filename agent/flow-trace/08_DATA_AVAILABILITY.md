@@ -415,6 +415,36 @@ minutes (`RELAY_FUNDING_GRACE_SECONDS`). The grace period also ends when the com
 less than five minutes away, so the wallet path always comes before the cutoff, also behind a stuck
 transaction.
 
+On Ethereum mainnet, `MAINNET_RELAY_MAX_BASE_FEE_GWEI` holds a relayed commitment while the base
+fee of the latest block is above that ceiling (`relay_waits_for_gas`). The check comes after the
+relay decision (`relays`), so a held job keeps its relay record and stays `Created`, and each worker
+pass asks again. Within `RELAY_GAS_HOLD_CUTOFF_SECONDS` (10 hours) of the commitment cutoff the
+relay sends at any base fee and reads no base fee. A relay that held commitments up to the cutoff
+would censor them, and a held commitment can lose its slot to an input that the server attested
+before it, so the voter needs time to send again. The ceiling does not hold a commitment that a
+reorganization removed, `finalizeInput`, or the aggregate ciphertext. Other chains ignore the
+ceiling.
+
+A hold must not hand the slot of a held input to a later one. The Secure Process selects the first
+entry that names a parent, and every `publishInput` needs an attestation from the server key, so the
+server orders the inputs that name the same parent. Each input job records its arrival
+(`JobKind::Input::arrival`, from `Db::generate_id`). A `Created` input job takes no commitment, on
+the relay path or the wallet path, while an earlier relayed job for the same round, slot, and parent
+is still `Created` (`earlier_sibling_unsent`, which reads the relay records of the slot). Arrival,
+then the job ID, rank the jobs, so two relayed jobs cannot each wait for the other. A later input
+that names another parent does not wait.
+
+A later input never makes the relay send above the ceiling: any account can stage a mask on a slot,
+so a send it could force would make the ceiling worthless. While the ceiling holds the earlier job,
+the later job waits behind it with no time limit, and the hold itself ends
+`RELAY_GAS_HOLD_CUTOFF_SECONDS` before the commitment cutoff. When the base fee falls, the earlier
+job is sent first and the later job follows. The cost is latency for the later input, also when its
+own wallet would pay, and that input names a parent that the earlier job then replaces, so its voter
+builds on the new slot head. An earlier job that no hold keeps but that the relay cannot send (its
+send fails again and again) keeps a later job waiting for at most `RELAY_SIBLING_WAIT_SECONDS` (five
+minutes), and not at all when the commitment cutoff is closer than that. The later job then takes
+its own path, so the wallet path still comes before the cutoff.
+
 A `POST /voting/broadcast` request with `send_from_wallet: true` takes the wallet path (`relays`,
 `JobKind::sends_from_wallet`). The server writes no relay record for it, reads no relay balance, and
 uses no relay allowance. The choice is stored on the job and is not part of the job ID, so a repeat

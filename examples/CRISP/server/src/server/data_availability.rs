@@ -38,7 +38,7 @@ use std::{
     time::Duration,
 };
 use tokio::{sync::Semaphore, task::JoinSet};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 const JOB_POLL_INTERVAL: Duration = Duration::from_secs(30);
 // An Avail submission can use 20 seconds to connect, 30 seconds to submit, 300 seconds to
@@ -63,6 +63,17 @@ const RELAY_LEDGER_EPOCH_KEY: &[u8] = b"ledger-epoch";
 /// blocks. A longer one, for example behind a stuck transaction, moves the job to the wallet path.
 /// Clients wait ten minutes for the choice of sender, so the grace period ends inside that wait.
 const RELAY_FUNDING_GRACE_SECONDS: u64 = 300;
+/// How long an input waits for an earlier relayed input that names the same parent and that the
+/// relay does not hold for gas (`earlier_sibling_unsent`). The relay sends such an input on its
+/// next worker pass, so a longer wait means that the relay cannot send it, and the later input then
+/// takes its own path. The wait also ends when the commitment cutoff is closer than this, inside
+/// the ten-minute client wait.
+const RELAY_SIBLING_WAIT_SECONDS: u64 = 300;
+/// Within this time of the commitment cutoff, the relay sends a commitment at any base fee
+/// (`MAINNET_RELAY_MAX_BASE_FEE_GWEI`). A relay that holds commitments until the cutoff would
+/// censor them. A held commitment can also lose its slot to an input that this service attested
+/// before it, and the voter needs time before the cutoff to see that and send again.
+const RELAY_GAS_HOLD_CUTOFF_SECONDS: u64 = 36_000;
 /// The deadline of a job on the mock backend, which has none.
 const NO_DEADLINE: u64 = u64::MAX;
 
@@ -286,6 +297,38 @@ fn holds_at_least(tree: &Tree, prefix: &str, limit: u32) -> sled::Result<bool> {
     Ok(held == limit)
 }
 
+/// The relay ledger prefix of one round. The E3 identifier is canonical decimal, so the separator
+/// makes each round prefix match only its own round: round 1 does not count the records of round 12.
+fn relay_round_prefix(e3_id: &str) -> String {
+    format!("{e3_id}/")
+}
+
+/// The relay ledger prefix of one slot in one round. A relay record key is this prefix and the job
+/// ID (`reserve_relay`).
+fn relay_slot_prefix(e3_id: &str, slot: Address) -> String {
+    format!("{}{}/", relay_round_prefix(e3_id), hex::encode(slot))
+}
+
+/// Whether the wait that `waits` records for job `id` has ended at chain time `now`: it started
+/// `period` or more ago, or the commitment cutoff is closer than `period`. The first call starts
+/// the wait. A start older than two periods belongs to a job that was not processed since then, and
+/// the wait starts again.
+fn wait_ended(
+    waits: &Mutex<HashMap<String, u64>>,
+    id: &str,
+    now: u64,
+    commitment_deadline: u64,
+    period: u64,
+) -> bool {
+    if now.saturating_add(period) >= commitment_deadline {
+        return true;
+    }
+    let mut waits = lock(waits);
+    waits.retain(|_, started| now.saturating_sub(*started) < 2 * period);
+    let started = *waits.entry(id.to_owned()).or_insert(now);
+    now.saturating_sub(started) >= period
+}
+
 /// The current wall-clock time in Unix seconds.
 fn wall_clock_seconds() -> u64 {
     std::time::SystemTime::now()
@@ -341,6 +384,11 @@ enum JobKind {
         /// relay path. Records without this field load as `false`.
         #[serde(default)]
         send_from_wallet: bool,
+        /// The order in which this service staged the input (`Db::generate_id`). Inputs that name
+        /// the same parent are committed in this order (`earlier_sibling_unsent`). Records without
+        /// this field load as zero and come first.
+        #[serde(default)]
+        arrival: u64,
     },
     Output {
         e3_id: String,
@@ -656,6 +704,9 @@ struct RelayPolicy {
     max_per_round: Option<u32>,
     /// The server key balance, in wei, below which the service stops relaying.
     min_balance: Option<U256>,
+    /// The base fee, in wei, above which a relayed commitment waits (`relay_waits_for_gas`).
+    /// Only on Ethereum mainnet; `None` on every other chain.
+    max_base_fee: Option<U256>,
 }
 
 impl RelayPolicy {
@@ -665,6 +716,7 @@ impl RelayPolicy {
         max_per_slot: u32,
         max_per_round: Option<u32>,
         min_balance: Option<U256>,
+        mainnet_max_base_fee: Option<U256>,
     ) -> Self {
         Self {
             enabled: (chain_id != 1 || mainnet_relay)
@@ -673,6 +725,7 @@ impl RelayPolicy {
             max_per_slot,
             max_per_round,
             min_balance,
+            max_base_fee: mainnet_max_base_fee.filter(|_| chain_id == 1),
         }
     }
 }
@@ -702,6 +755,12 @@ pub struct AvailabilityService {
     /// The chain time of the first funds refusal of each relayed job in its grace period
     /// (`relay_funding_grace_ended`). A restart clears it, which only starts the grace again.
     relay_funding_refusals: Arc<Mutex<HashMap<String, u64>>>,
+    /// The chain time at which each input started to wait for an earlier input that names the
+    /// same parent (`earlier_sibling_unsent`). A restart clears it, which only starts the wait
+    /// again.
+    relay_sibling_waits: Arc<Mutex<HashMap<String, u64>>>,
+    /// Hands out the arrival order of staged inputs (`JobKind::Input::arrival`).
+    ids: Db,
     relay: RelayPolicy,
     http_rpc_url: String,
     private_key: String,
@@ -760,12 +819,15 @@ impl AvailabilityService {
                 round_records: (**db).clone(),
                 relay_decisions: Arc::default(),
                 relay_funding_refusals: Arc::default(),
+                relay_sibling_waits: Arc::default(),
+                ids: db.clone(),
                 relay: RelayPolicy::new(
                     config.chain_id,
                     config.mainnet_relay,
                     config.relay_max_inputs_per_slot,
                     config.relay_max_inputs_per_round,
                     config.relay_min_balance()?,
+                    config.mainnet_relay_max_base_fee()?,
                 ),
                 http_rpc_url: config.http_rpc_url.clone(),
                 private_key: config.private_key.clone(),
@@ -1062,6 +1124,7 @@ impl AvailabilityService {
                 deadline,
                 commitment_deadline,
                 send_from_wallet,
+                arrival: self.ids.generate_id()?,
             },
         );
         if let Some(view) = self.admit_input(&job, &object, reservation)? {
@@ -1671,9 +1734,18 @@ impl AvailabilityService {
                             relayed_transaction_hash: Some("already-committed".to_owned()),
                         }
                     }
+                    // An earlier input to this slot that names the same parent and that the relay
+                    // holds goes first. Otherwise a later input could take the slot of a held vote.
+                    JobKind::Input { .. } if self.earlier_sibling_unsent(&job, now).await? => {
+                        return Ok(());
+                    }
                     // A receipt is a head observation, not finality. The job stays provisional
                     // and the `AwaitingCommitment` arm promotes it on finalized state.
                     JobKind::Input { .. } if self.relays(&job).await? => {
+                        // A held job stays `Created`, and the next worker pass asks again.
+                        if self.relay_waits_for_gas(&job, now).await? {
+                            return Ok(());
+                        }
                         self.relay_input_commitment(&job, now).await?
                     }
                     // The voter asked to send from its own wallet, the relay is off, the relay key
@@ -1681,6 +1753,7 @@ impl AvailabilityService {
                     // reached, or the round opened before the relay ledger started.
                     JobKind::Input { .. } => self.wallet_commitment(&job).await?,
                 };
+                lock(&self.relay_sibling_waits).remove(&job.id);
                 self.advance(&mut job, state)?;
             }
             JobState::AwaitingCommitment {
@@ -2059,6 +2132,134 @@ impl AvailabilityService {
         Ok(true)
     }
 
+    /// Whether a relayed commitment waits for a lower base fee: the base fee of the latest block
+    /// is above `MAINNET_RELAY_MAX_BASE_FEE_GWEI`, and the commitment cutoff is more than
+    /// `RELAY_GAS_HOLD_CUTOFF_SECONDS` away. Nothing else sends a held commitment above the
+    /// ceiling: a later input that names the same parent waits behind it (`earlier_sibling_unsent`).
+    /// Without a ceiling, and near the cutoff, this reads nothing, so a failed read cannot hold a
+    /// commitment into the cutoff.
+    async fn relay_waits_for_gas(&self, job: &AvailabilityJob, now: u64) -> anyhow::Result<bool> {
+        let Some(ceiling) = self.relay.max_base_fee else {
+            return Ok(false);
+        };
+        let JobKind::Input {
+            commitment_deadline,
+            ..
+        } = &job.kind
+        else {
+            return Ok(false);
+        };
+        if now.saturating_add(RELAY_GAS_HOLD_CUTOFF_SECONDS) >= *commitment_deadline {
+            return Ok(false);
+        }
+        let base_fee = rpc::latest_base_fee(&self.provider()?)
+            .await
+            .map_err(from_eyre)?;
+        if U256::from(base_fee) <= ceiling {
+            return Ok(false);
+        }
+        debug!(
+            job_id = job.id.as_str(),
+            base_fee,
+            "The base fee is above MAINNET_RELAY_MAX_BASE_FEE_GWEI; the relay holds the commitment"
+        );
+        Ok(true)
+    }
+
+    /// Whether this job waits for an earlier input to the same slot that names the same parent and
+    /// is still `Created` on the relay path. The Secure Process selects the first entry that names
+    /// a parent, so this job takes no commitment before that input has one. Otherwise an input sent
+    /// from a wallet could take the slot of a commitment that `relay_waits_for_gas` holds.
+    ///
+    /// A later input never makes the relay send above the base-fee ceiling, because any account can
+    /// stage a mask. It waits behind a held input for as long as the hold lasts, which ends
+    /// `RELAY_GAS_HOLD_CUTOFF_SECONDS` before the commitment cutoff. An earlier input that is not
+    /// held but that the relay cannot send keeps this job waiting for at most
+    /// `RELAY_SIBLING_WAIT_SECONDS`, and never that close to the commitment cutoff.
+    ///
+    /// Only a relayed input can be held, and the relay ledger keys relays by round and slot, so
+    /// this reads at most `RELAY_MAX_INPUTS_PER_SLOT` jobs. Arrival order, then the job ID, rank
+    /// the inputs, so two relayed inputs cannot each wait for the other.
+    async fn earlier_sibling_unsent(
+        &self,
+        job: &AvailabilityJob,
+        now: u64,
+    ) -> anyhow::Result<bool> {
+        let JobKind::Input {
+            e3_id,
+            arrival,
+            commitment_deadline,
+            ..
+        } = &job.kind
+        else {
+            return Ok(false);
+        };
+        let (_, envelope) = job.input()?;
+        let slot = relay_slot_prefix(e3_id, envelope.slotAddress);
+        let rank = (*arrival, job.id.as_str());
+        let relayed = self
+            .relayed_inputs
+            .scan_prefix(&slot)
+            .keys()
+            .map(|key| Ok(String::from_utf8_lossy(&key?[slot.len()..]).into_owned()))
+            .collect::<sled::Result<Vec<_>>>()?;
+        let mut unsent = None;
+        for id in relayed {
+            if id == job.id {
+                continue;
+            }
+            let Some(sibling) = self.load(&id)? else {
+                continue;
+            };
+            let JobKind::Input {
+                arrival: sibling_arrival,
+                ..
+            } = &sibling.kind
+            else {
+                continue;
+            };
+            if !matches!(sibling.state, JobState::Created)
+                || (*sibling_arrival, id.as_str()) >= rank
+                || sibling.input()?.1.parentIndexPlusOne != envelope.parentIndexPlusOne
+            {
+                continue;
+            }
+            if self.relay_waits_for_gas(&sibling, now).await? {
+                // The wait for an unsent input starts again once the hold ends.
+                lock(&self.relay_sibling_waits).remove(&job.id);
+                debug!(
+                    job_id = job.id.as_str(),
+                    sibling = id,
+                    "An earlier input that names the same parent is held for gas; the job waits behind it"
+                );
+                return Ok(true);
+            }
+            unsent = Some(id);
+        }
+        let Some(sibling) = unsent else {
+            return Ok(false);
+        };
+        if wait_ended(
+            &self.relay_sibling_waits,
+            &job.id,
+            now,
+            *commitment_deadline,
+            RELAY_SIBLING_WAIT_SECONDS,
+        ) {
+            warn!(
+                job_id = job.id.as_str(),
+                sibling,
+                "An earlier input that names the same parent is still unsent; the job stops waiting for it"
+            );
+            return Ok(false);
+        }
+        debug!(
+            job_id = job.id.as_str(),
+            sibling, "An earlier input names the same parent; the job waits for its relay send"
+        );
+        Ok(true)
+    }
+
     /// Sign a fresh commitment payload for the voter's wallet to send.
     async fn wallet_commitment(&self, job: &AvailabilityJob) -> anyhow::Result<JobState> {
         let (ethereum_payload, attestation_expires_at) = self.commitment_payload(job).await?;
@@ -2095,10 +2296,8 @@ impl AvailabilityService {
             anyhow::bail!("aggregate ciphertext jobs have no input commitment to relay");
         };
         let (_, envelope) = job.input()?;
-        // The E3 identifier is canonical decimal, so the separator makes each round prefix match
-        // only its own round: round 1 does not count the records of round 12.
-        let round = format!("{e3_id}/");
-        let slot = format!("{round}{}/", hex::encode(envelope.slotAddress));
+        let round = relay_round_prefix(e3_id);
+        let slot = relay_slot_prefix(e3_id, envelope.slotAddress);
         let key = format!("{slot}{}", job.id);
         // Read before the lock: the input window of a round never changes, and the read decodes
         // the complete round record.
@@ -2250,14 +2449,13 @@ impl AvailabilityService {
         else {
             return true;
         };
-        if now.saturating_add(RELAY_FUNDING_GRACE_SECONDS) >= *commitment_deadline {
-            return true;
-        }
-        let mut refusals = lock(&self.relay_funding_refusals);
-        refusals
-            .retain(|_, started| now.saturating_sub(*started) < 2 * RELAY_FUNDING_GRACE_SECONDS);
-        let started = *refusals.entry(job.id.clone()).or_insert(now);
-        now.saturating_sub(started) >= RELAY_FUNDING_GRACE_SECONDS
+        wait_ended(
+            &self.relay_funding_refusals,
+            &job.id,
+            now,
+            *commitment_deadline,
+            RELAY_FUNDING_GRACE_SECONDS,
+        )
     }
 
     /// Send `publishInput` for a relayed input after a dry run. A refusal for lack of funds comes
@@ -2537,7 +2735,7 @@ mod tests {
     }
 
     fn default_relay() -> RelayPolicy {
-        RelayPolicy::new(31_337, false, 3, None, None)
+        RelayPolicy::new(31_337, false, 3, None, None, None)
     }
 
     fn test_service(max_pending_bytes: u64) -> AvailabilityService {
@@ -2571,6 +2769,8 @@ mod tests {
             round_records: (**db).clone(),
             relay_decisions: Arc::default(),
             relay_funding_refusals: Arc::default(),
+            relay_sibling_waits: Arc::default(),
+            ids: db.clone(),
             relay,
             http_rpc_url: String::new(),
             private_key: String::new(),
@@ -2695,6 +2895,7 @@ mod tests {
                 deadline: 1_000,
                 commitment_deadline: 900,
                 send_from_wallet: false,
+                arrival: 0,
             },
         )
     }
@@ -3069,14 +3270,19 @@ mod tests {
         assert!(restarted.reserve_relay(&jobs[1]).unwrap());
 
         // A limit of zero turns the relay off, also for a job that was chosen for it earlier.
-        let off = test_service_on(&db, 1024, RelayPolicy::new(31_337, false, 0, None, None));
+        let off = test_service_on(
+            &db,
+            1024,
+            RelayPolicy::new(31_337, false, 0, None, None, None),
+        );
         assert!(!off.reserve_relay(&jobs[0]).unwrap());
     }
 
     /// A round gets a bounded number of relayed commitments across all of its slots.
     #[tokio::test]
     async fn a_round_is_relayed_up_to_its_limit_and_then_uses_the_wallet() {
-        let (db, service) = relay_service(RelayPolicy::new(31_337, false, 3, Some(2), None)).await;
+        let (db, service) =
+            relay_service(RelayPolicy::new(31_337, false, 3, Some(2), None, None)).await;
         index_round(&db, "12", service.relay_ledger_epoch + 1).await;
         let relays = |id: &str, e3_id: &str, slot: u8| {
             service
@@ -3096,9 +3302,12 @@ mod tests {
     #[tokio::test]
     async fn mainnet_relays_only_when_enabled() {
         for (policy, relayed) in [
-            (RelayPolicy::new(1, false, 3, Some(100), None), false),
-            (RelayPolicy::new(1, true, 3, Some(100), None), true),
-            (RelayPolicy::new(11_155_111, false, 3, None, None), true),
+            (RelayPolicy::new(1, false, 3, Some(100), None, None), false),
+            (RelayPolicy::new(1, true, 3, Some(100), None, None), true),
+            (
+                RelayPolicy::new(11_155_111, false, 3, None, None, None),
+                true,
+            ),
         ] {
             let (_db, service) = relay_service(policy).await;
             let job = round_input_job("mainnet-input", "1", SLOT);
@@ -3124,6 +3333,7 @@ mod tests {
                     3,
                     None,
                     Some(U256::from(floor)),
+                    None,
                 ))
                 .await;
                 service.http_rpc_url = rpc;
@@ -3241,7 +3451,7 @@ mod tests {
     #[tokio::test]
     async fn a_round_open_before_the_relay_ledger_started_is_not_relayed() {
         let db = temporary_db();
-        let policy = RelayPolicy::new(31_337, false, 1, None, None);
+        let policy = RelayPolicy::new(31_337, false, 1, None, None, None);
         let started = wall_clock_seconds();
         // The database of a server version without the ledger: round 1 is open, and it holds a
         // relayed job of the slot, but no relay record and no ledger start time.
@@ -3806,6 +4016,196 @@ mod tests {
         assert_ne!(hash, "0xorphaned");
         assert!(*attestation_expires_at > 1);
         assert!(mock.committed().call().await.unwrap());
+    }
+
+    /// On mainnet, a relayed commitment waits while the base fee is above
+    /// `MAINNET_RELAY_MAX_BASE_FEE_GWEI`, and the relay sends it at any base fee once the
+    /// commitment cutoff is `RELAY_GAS_HOLD_CUTOFF_SECONDS` away. Other chains ignore the ceiling.
+    #[tokio::test]
+    async fn a_relayed_commitment_waits_for_the_base_fee_until_the_cutoff_is_near() {
+        let gwei = U256::from(1_000_000_000_u64);
+        let hold = RELAY_GAS_HOLD_CUTOFF_SECONDS;
+        // The chain, the ceiling, the time to the commitment cutoff, and whether the relay sends.
+        // The base fee of Anvil is above zero, so every base fee exceeds a zero ceiling.
+        let cases = [
+            ("base fee above the ceiling", 1, U256::ZERO, hold + 1, false),
+            ("cutoff at the hold limit", 1, U256::ZERO, hold, true),
+            (
+                "base fee under the ceiling",
+                1,
+                gwei * U256::from(1_000),
+                hold + 1,
+                true,
+            ),
+            ("not mainnet", 11_155_111, U256::ZERO, hold + 1, true),
+        ];
+        for (case, chain_id, ceiling, to_cutoff, sent) in cases {
+            let db = temporary_db();
+            let (mut service, mock, _anvil) = chain_service(&db).await;
+            service.relay = RelayPolicy::new(chain_id, true, 3, Some(100), None, Some(ceiling));
+            index_round(&db, "1", service.relay_ledger_epoch + 1).await;
+            set_input(&mock, false, false, u64::MAX).await;
+            let object = b"gas-held-ciphertext";
+            let mut job = open_input_job("gas-held", object);
+            *input_fields(&mut job).2 = service.chain_timestamp().await.unwrap() + to_cutoff;
+            store_job_in_state(&service, &job, object, JobState::Created);
+
+            service.process(&job.id).await;
+
+            let state = pending_state(&service, &job);
+            let relayed = matches!(
+                state,
+                JobState::AwaitingCommitment {
+                    relayed_transaction_hash: Some(_),
+                    ..
+                }
+            );
+            assert_eq!(relayed, sent, "{case}: {state:?}");
+            if !sent {
+                assert!(matches!(state, JobState::Created), "{case}: {state:?}");
+            }
+            assert_eq!(mock.committed().call().await.unwrap(), sent, "{case}");
+        }
+    }
+
+    /// An input job for `SLOT` with the arrival `order` that names `parent`, built from `base`.
+    fn sibling(
+        mut base: AvailabilityJob,
+        order: u64,
+        parent: u64,
+        from_wallet: bool,
+    ) -> AvailabilityJob {
+        let JobKind::Input {
+            staged_envelope,
+            send_from_wallet,
+            arrival,
+            ..
+        } = &mut base.kind
+        else {
+            panic!("not an input job");
+        };
+        let mut envelope = InputEnvelope::abi_decode_params_validate(staged_envelope).unwrap();
+        envelope.parentIndexPlusOne = alloy::primitives::Uint::from(parent);
+        *staged_envelope = envelope.abi_encode_params();
+        (*arrival, *send_from_wallet) = (order, from_wallet);
+        base
+    }
+
+    /// A later input to the same slot that names the same parent waits behind a relayed input that
+    /// the base-fee ceiling holds, for as long as the hold lasts. It never makes the relay send
+    /// above the ceiling. An input that names another parent does not wait.
+    #[tokio::test]
+    async fn a_later_input_with_the_same_parent_waits_behind_a_gas_hold() {
+        // The parent of the later input, whether its own wallet sends it, and whether it waits.
+        let cases = [
+            ("same parent, wallet", 7, true, true),
+            ("same parent, relayed", 7, false, true),
+            ("other parent, wallet", 8, true, false),
+        ];
+        for (case, parent, from_wallet, waits) in cases {
+            let db = temporary_db();
+            let (mut service, mock, _anvil) = chain_service(&db).await;
+            // The base fee of Anvil is above zero, so a zero ceiling holds every relayed input.
+            service.relay = RelayPolicy::new(1, true, 3, Some(100), None, Some(U256::ZERO));
+            index_round(&db, "1", service.relay_ledger_epoch + 1).await;
+            set_input(&mock, false, false, u64::MAX).await;
+            let (held_object, later_object) = (b"held-ciphertext", b"later-ciphertext");
+            let held = sibling(open_input_job("held", held_object), 1, 7, false);
+            let later = sibling(
+                open_input_job("later", later_object),
+                2,
+                parent,
+                from_wallet,
+            );
+            store_job_in_state(&service, &held, held_object, JobState::Created);
+            store_job_in_state(&service, &later, later_object, JobState::Created);
+            let relayed = |state: &JobState| {
+                matches!(
+                    state,
+                    JobState::AwaitingCommitment {
+                        relayed_transaction_hash: Some(_),
+                        ..
+                    }
+                )
+            };
+
+            service.process(&held.id).await;
+            service.process(&later.id).await;
+            let later_state = pending_state(&service, &later);
+            assert_eq!(
+                matches!(later_state, JobState::Created),
+                waits,
+                "{case}: {later_state:?}"
+            );
+            if waits {
+                // Time does not end a wait behind a hold.
+                let now = service.chain_timestamp().await.unwrap();
+                let later_pass = now + 2 * RELAY_SIBLING_WAIT_SECONDS;
+                assert!(
+                    service
+                        .earlier_sibling_unsent(&later, later_pass)
+                        .await
+                        .unwrap(),
+                    "{case}: the wait lasts as long as the hold"
+                );
+            }
+
+            // The waiting input does not make the relay send above the ceiling.
+            service.process(&held.id).await;
+            let held_state = pending_state(&service, &held);
+            assert!(
+                matches!(held_state, JobState::Created),
+                "{case}: {held_state:?}"
+            );
+            assert_eq!(mock.sends().call().await.unwrap(), U256::ZERO, "{case}");
+
+            // The base fee falls under the ceiling: the held input goes first, then the later one.
+            service.relay.max_base_fee = Some(U256::from(10).pow(U256::from(12)));
+            service.process(&held.id).await;
+            let held_state = pending_state(&service, &held);
+            assert!(relayed(&held_state), "{case}: {held_state:?}");
+            service.process(&later.id).await;
+            let later_state = pending_state(&service, &later);
+            assert!(
+                !matches!(later_state, JobState::Created),
+                "{case}: {later_state:?}"
+            );
+        }
+    }
+
+    /// An earlier input that names the same parent, that no hold keeps, and that the relay has not
+    /// sent keeps a later input waiting for at most `RELAY_SIBLING_WAIT_SECONDS`, and not at all
+    /// that close to the commitment cutoff.
+    #[tokio::test]
+    async fn an_unsent_earlier_input_holds_a_later_one_for_a_limited_time() {
+        let (_db, service) =
+            relay_service(RelayPolicy::new(31_337, false, 3, None, None, None)).await;
+        let earlier = sibling(input_job("earlier", SLOT, 0x11, b"earlier"), 1, 7, false);
+        let later = sibling(input_job("later", SLOT, 0x11, b"later"), 2, 7, true);
+        let late = sibling(input_job("late", SLOT, 0x11, b"late"), 3, 7, true);
+        for (job, object) in [
+            (&earlier, b"earlier".as_slice()),
+            (&later, b"later"),
+            (&late, b"late"),
+        ] {
+            store_job_in_state(&service, job, object, JobState::Created);
+        }
+        assert!(service.reserve_relay(&earlier).unwrap());
+
+        let waits = |job, now| service.earlier_sibling_unsent(job, now);
+        assert!(waits(&later, 100).await.unwrap());
+        assert!(waits(&later, 100 + RELAY_SIBLING_WAIT_SECONDS - 1)
+            .await
+            .unwrap());
+        assert!(!waits(&later, 100 + RELAY_SIBLING_WAIT_SECONDS)
+            .await
+            .unwrap());
+        // The commitment cutoff of `input_job` is 900.
+        assert!(!waits(&late, 900 - RELAY_SIBLING_WAIT_SECONDS)
+            .await
+            .unwrap());
+        // The earlier input never waits for a later one.
+        assert!(!waits(&earlier, 100).await.unwrap());
     }
 
     /// A restart between an Ethereum send and the save of its result must not pay for that send

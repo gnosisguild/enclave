@@ -115,6 +115,11 @@ pub struct Config {
     /// funds for `finalizeInput`. Absent or zero means no floor; `validate_relay` limits both.
     #[serde(default)]
     pub relay_min_balance_eth: Option<String>,
+    /// Hold relayed input commitments on Ethereum mainnet while the base fee of the latest block
+    /// is above this gwei amount, until the commitment cutoff is near. Absent sends at any base fee.
+    /// Other chains ignore it.
+    #[serde(default)]
+    pub mainnet_relay_max_base_fee_gwei: Option<String>,
 }
 
 impl Config {
@@ -200,6 +205,7 @@ impl Config {
             config.relay_max_inputs_per_round,
             config.relay_min_balance()?,
         )?;
+        config.mainnet_relay_max_base_fee()?;
         Ok(config)
     }
 
@@ -222,21 +228,22 @@ impl Config {
 
     /// The relay balance floor in wei, from `RELAY_MIN_BALANCE_ETH`.
     pub fn relay_min_balance(&self) -> Result<Option<U256>, ConfigError> {
-        Self::parse_relay_min_balance(self.relay_min_balance_eth.as_deref())
+        parse_non_negative_units(
+            "RELAY_MIN_BALANCE_ETH",
+            self.relay_min_balance_eth.as_deref(),
+            Unit::ETHER,
+            "ETH",
+        )
     }
 
-    /// Parse a non-negative ETH amount into wei. `parse_ether` alone is not enough: it returns the
-    /// absolute value of a negative amount.
-    fn parse_relay_min_balance(value: Option<&str>) -> Result<Option<U256>, ConfigError> {
-        let Some(value) = value else {
-            return Ok(None);
-        };
-        match ParseUnits::parse_units(value.trim(), Unit::ETHER) {
-            Ok(ParseUnits::U256(wei)) => Ok(Some(wei)),
-            _ => Err(invalid(format!(
-                "RELAY_MIN_BALANCE_ETH must be a non-negative ETH amount, got '{value}'"
-            ))),
-        }
+    /// The relay base fee ceiling in wei, from `MAINNET_RELAY_MAX_BASE_FEE_GWEI`.
+    pub fn mainnet_relay_max_base_fee(&self) -> Result<Option<U256>, ConfigError> {
+        parse_non_negative_units(
+            "MAINNET_RELAY_MAX_BASE_FEE_GWEI",
+            self.mainnet_relay_max_base_fee_gwei.as_deref(),
+            Unit::GWEI,
+            "gwei",
+        )
     }
 
     /// Refuse a relay without an explicit balance floor outside local chains, and a mainnet relay
@@ -329,6 +336,25 @@ fn invalid(message: impl Into<String>) -> ConfigError {
     ConfigError::Message(message.into())
 }
 
+/// Parse a non-negative amount of `unit` into wei. `parse_ether` alone is not enough: it returns
+/// the absolute value of a negative amount.
+fn parse_non_negative_units(
+    name: &str,
+    value: Option<&str>,
+    unit: Unit,
+    unit_name: &str,
+) -> Result<Option<U256>, ConfigError> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    match ParseUnits::parse_units(value.trim(), unit) {
+        Ok(ParseUnits::U256(wei)) => Ok(Some(wei)),
+        _ => Err(invalid(format!(
+            "{name} must be a non-negative {unit_name} amount, got '{value}'"
+        ))),
+    }
+}
+
 /// A comma-separated address list. Blank entries are ignored.
 fn parse_addresses(name: &str, list: Option<&str>) -> Result<Vec<Address>, ConfigError> {
     list.unwrap_or_default()
@@ -361,7 +387,8 @@ pub static CONFIG: LazyLock<Config> =
 
 #[cfg(test)]
 mod tests {
-    use super::Config;
+    use super::{parse_non_negative_units, Config};
+    use alloy::primitives::utils::Unit;
     use config::{Config as ConfigManager, Environment};
     use std::collections::HashMap;
 
@@ -418,15 +445,16 @@ mod tests {
     }
 
     #[test]
-    fn relay_balance_floor_is_a_non_negative_eth_amount() {
-        assert_eq!(Config::parse_relay_min_balance(None).unwrap(), None);
+    fn relay_amounts_are_non_negative() {
+        let parse = |value| parse_non_negative_units("X", value, Unit::ETHER, "ETH");
+        assert_eq!(parse(None).unwrap(), None);
         assert_eq!(
-            Config::parse_relay_min_balance(Some("0.5")).unwrap(),
+            parse(Some("0.5")).unwrap(),
             Some(alloy::primitives::U256::from(500_000_000_000_000_000_u128))
         );
         // `parse_ether` alone would read this as a floor of 1 ETH.
-        assert!(Config::parse_relay_min_balance(Some("-1")).is_err());
-        assert!(Config::parse_relay_min_balance(Some("half")).is_err());
+        assert!(parse(Some("-1")).is_err());
+        assert!(parse(Some("half")).is_err());
     }
 
     #[test]

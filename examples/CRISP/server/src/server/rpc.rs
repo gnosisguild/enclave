@@ -61,3 +61,12 @@ pub async fn latest_timestamp(provider: &impl Provider) -> eyre::Result<u64> {
         .map(|block| block.header.timestamp)
         .ok_or_else(|| eyre::eyre!("the RPC returned no latest block"))
 }
+
+/// The base fee of the latest block, in wei.
+pub async fn latest_base_fee(provider: &impl Provider) -> eyre::Result<u64> {
+    provider
+        .get_block_by_number(BlockNumberOrTag::Latest)
+        .await?
+        .and_then(|block| block.header.base_fee_per_gas)
+        .ok_or_else(|| eyre::eyre!("the RPC returned no base fee for the latest block"))
+}
