@@ -15,8 +15,6 @@
 // changed in colour, a number on each box that has changes inside, a Before and After switch, and
 // a list of every change. Options for the pull request comment:
 //   --md <file>        also write the comment as markdown
-//   --shots <dir>      also take pictures of the changed diagrams, with Chrome (CHROME_PATH)
-//   --image-url <url>  where the comment finds the pictures (default: the --shots folder)
 //   --page-url <url>   where the comment links the page (default: the page file)
 //
 // It compares the crates and their dependencies, the actors, the messages that each actor handles,
@@ -28,7 +26,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 import { OUT } from '../lib/data.mjs'
 import { inventory, ROOT } from '../lib/inventory.mjs'
 import { buildData, pageHtml } from '../lib/page.mjs'
@@ -40,8 +38,7 @@ const HERE = dirname(SELF)
 // The snapshot format. A snapshot in another format is not compared.
 const VERSION = 1
 const T = '\t'
-// At most this many pictures in the comment, and this many characters in it (GitHub takes 65536).
-const MAX_SHOTS = 4
+// At most this many characters in the comment (GitHub takes 65536).
 const MAX_CHARS = 60000
 const MAX_NAME = 120
 
@@ -79,7 +76,7 @@ if (process.argv.includes('--snapshot')) {
 // A ref is extracted whole (about 45 MB): the facts and the hand-drawn diagrams cite files all over
 // the repository, and a file missing from one side would read as a change.
 const argv = process.argv.slice(2)
-const OPTIONS = ['--md', '--shots', '--image-url', '--page-url']
+const OPTIONS = ['--md', '--page-url']
 const opt = (name) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : null)
 const positional = argv.filter((a, i) => !a.startsWith('--') && !OPTIONS.includes(argv[i - 1]))
 const [baseArg = 'main', headArg] = positional
@@ -360,85 +357,9 @@ mkdirSync(OUT, { recursive: true })
 const pageFile = join(OUT, 'interfold-blueprint-diff.html')
 writeFileSync(pageFile, pageHtml(page, extra))
 
-// ---- pictures ---------------------------------------------------------------------------------
-// The overview is the deepest hand-drawn diagram that holds every change. The details are the
-// diagrams with the most changes of their own, after the change, and before it when something was
-// removed.
-function chrome() {
-  const found = [process.env.CHROME_PATH, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome']
-    .filter(Boolean)
-    .find((p) => existsSync(p))
-  if (found) return found
-  for (const name of ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'])
-    if (spawnSync('which', [name], { encoding: 'utf8' }).status === 0) return name
-  return null
-}
-const shots = []
-if (opt('--shots')) {
-  const dir = resolve(opt('--shots'))
-  mkdirSync(dir, { recursive: true })
-  const hand = Object.keys(B).filter((id) => !id.includes(':'))
-  const depth = (id) => (B[id]?.parent ? 1 + depth(B[id].parent) : 0)
-  const all = counts[after.data.root] || 0
-  const overview = hand.filter((id) => all > 0 && counts[id] === all).sort((x, y) => depth(y) - depth(x))[0]
-  const plan = overview ? [{ id: overview, mode: 'after' }] : []
-  // One picture per diagram first, in the view with more marks: diagrams with part of their content
-  // changed before whole new or removed ones. Then the other view, while there is room, when it has
-  // new or removed boxes of its own.
-  const has = (side, state) => Object.values(side.nodes).includes(state) || Object.values(side.edges).includes(state)
-  const marked = (side) => Object.keys(side.nodes).length + Object.keys(side.edges).length
-  const detail = changedIds
-    .filter((id) => id.includes(':'))
-    .sort((x, y) => !!marks[x].whole - !!marks[y].whole || marks[y].own - marks[x].own || x.localeCompare(y))
-  const first = []
-  const second = []
-  for (const id of detail) {
-    const m = marks[id]
-    const views = [
-      B[id] && { id, mode: 'after', n: marked(m.after), own: has(m.after, 'added') },
-      A[id] && { id, mode: 'before', n: marked(m.before), own: has(m.before, 'removed') },
-    ]
-      .filter((v) => v && v.n)
-      .sort((x, y) => y.n - x.n)
-    if (views[0]) first.push(views[0])
-    if (views[1] && views[1].own) second.push(views[1])
-  }
-  plan.push(...[...first, ...second].slice(0, MAX_SHOTS - plan.length))
-  const exe = chrome()
-  if (!exe) console.error('blueprint diff: no Chrome found (set CHROME_PATH), so no pictures')
-  for (const [i, p] of (exe ? plan : []).entries()) {
-    const d = p.mode === 'before' ? A[p.id] : B[p.id]
-    const w = 1400
-    const h = Math.min(2400, Math.round(78 + (w * (d.h + 80)) / (d.w + 80)))
-    const file = join(dir, `${i + 1}.png`)
-    // The diagram goes in the query: the renderer rewrites the fragment of a diagram that the
-    // After view does not have before diffview.js can read it.
-    const url = `${pathToFileURL(pageFile).href}?shot=${p.mode}&d=${encodeURIComponent(p.id)}`
-    const r = spawnSync(
-      exe,
-      [
-        '--headless=new',
-        '--disable-gpu',
-        '--hide-scrollbars',
-        '--force-prefers-reduced-motion',
-        ...(process.env.CI ? ['--no-sandbox'] : []),
-        `--window-size=${w},${h}`,
-        '--virtual-time-budget=4000',
-        `--screenshot=${file}`,
-        url,
-      ],
-      { encoding: 'utf8' },
-    )
-    if (r.status !== 0 || !existsSync(file)) console.error(`blueprint diff: the picture of ${p.id} failed:\n${r.stderr}`)
-    else shots.push({ ...p, file, title: d.title })
-  }
-}
-
 // ---- markdown ---------------------------------------------------------------------------------
 if (opt('--md')) {
-  const imageUrl = opt('--image-url')
   const pageUrl = opt('--page-url') || relative(process.cwd(), pageFile)
-  const src = (s) => (imageUrl ? `${imageUrl}/${s.file.split('/').pop()}` : relative(process.cwd(), s.file))
   const rows = ROWS.map(([key, title, get]) => [title, new Set(get(S0)).size, new Set(get(S1)).size, ch[key]])
     .filter(([, , , d]) => d.added.length || d.removed.length)
     .map(([title, b, a, d]) => `| ${title} | ${b} | ${a} | ${d.added.length || ''} | ${d.removed.length || ''} |`)
@@ -446,20 +367,16 @@ if (opt('--md')) {
     '<!-- blueprint-diff -->',
     '### Architecture change',
     '',
-    `From \`${base.label}\` to \`${head.label}\`. [Open this change in the blueprint](${pageUrl}). Its Before and After switch is at the top.`,
+    `From \`${base.label}\` to \`${head.label}\`. [Open this change in the blueprint](${pageUrl}): green is new, red is removed and yellow is changed, and a number on a box counts the changes inside it.`,
     ...(before.own
       ? []
       : ['', 'The base has no `scripts/blueprint/diff/diff.mjs` of this version, so the scripts of this branch read it.']),
     '',
     ...(rows.length ? ['| | Before | After | New | Removed |', '| --- | --: | --: | --: | --: |', ...rows, ''] : []),
-    ...shots.map((s) => `![${short(s.title).replace(/[[\]()\\]/g, ' ')}, ${s.mode} the change](${src(s)})`),
-    '',
-    'Green is new, red is removed and yellow is changed. A number on a box counts the changes inside it.',
-    '',
   ]
   const foot = [
     '',
-    '<sub>Experimental. The page and the pictures go away when the pull request closes. `scripts/blueprint/diff/README.md` says how to turn it off or remove it.</sub>',
+    '<sub>Experimental. The page goes away when the pull request closes. `scripts/blueprint/diff/README.md` says how to turn it off or remove it.</sub>',
     '',
   ]
   const tail = ['', '</details>', '']
@@ -475,7 +392,5 @@ if (opt('--md')) {
   if (shown < list.length) lines.push(`- … and ${list.length - shown} more. Open the page for all of them.`)
   writeFileSync(opt('--md'), [...top, ...(list.length ? [...lines, ...tail] : []), ...foot].join('\n'))
 }
-console.error(
-  `blueprint diff: ${list.length} change(s) in ${changes} diagram(s) from ${base.label} to ${head.label}${shots.length ? `, ${shots.length} picture(s)` : ''}`,
-)
+console.error(`blueprint diff: ${list.length} change(s) in ${changes} diagram(s) from ${base.label} to ${head.label}`)
 console.log(`Open ${relative(process.cwd(), pageFile) || pageFile} in a browser.`)

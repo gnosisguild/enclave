@@ -3,12 +3,11 @@ name: Blueprint Diff
 # Experimental. scripts/blueprint/diff/README.md says how to turn it off (the repository variable
 # BLUEPRINT_DIFF=off) or remove it.
 #
-# One comment on each pull request with its architecture change, drawn as the blueprint: pictures
-# of the changed diagrams, the counts, every change, and a link to the page on GitHub Pages.
-# scripts/blueprint/diff/diff.mjs reads both versions of the code and builds nothing else. The
-# pictures and the page go to the blueprint-previews branch, one folder per pull request, and Pages
-# serves that branch: a comment shows an image only from a URL. When the pull request closes,
-# merged or not, its folder goes and the comment says so.
+# One comment on each pull request with its architecture change: the counts, every change, and a
+# link to the page on GitHub Pages that draws the change on the blueprint.
+# scripts/blueprint/diff/diff.mjs reads both versions of the code and builds nothing else. The page
+# goes to the blueprint-previews branch, one folder per pull request, and Pages serves that branch.
+# When the pull request closes, merged or not, its folder goes and the comment says so.
 #
 # It runs on every pull request, into any branch: a later push can take back an earlier change, and
 # the comment must follow, and a stacked pull request shows its own layer. To publish from a pull
@@ -23,8 +22,8 @@ permissions:
 jobs:
   diff:
     name: Architecture change
-    # A pull request from a fork gets a read-only token, which can neither store the pictures nor
-    # post the comment.
+    # A pull request from a fork gets a read-only token, which can neither store the page nor post
+    # the comment.
     if:
       vars.BLUEPRINT_DIFF != 'off' && github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
@@ -33,7 +32,7 @@ jobs:
       group: blueprint-diff-${{ github.event.pull_request.number }}
       cancel-in-progress: true
     permissions:
-      contents: write # store the pictures and the page on blueprint-previews
+      contents: write # store the page on blueprint-previews
     outputs:
       published: ${{ steps.store.outputs.published }}
     steps:
@@ -53,20 +52,17 @@ jobs:
         env:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR: ${{ github.event.pull_request.number }}
-          REPO: ${{ github.repository }}
           PAGES: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
         run: |
           out="$RUNNER_TEMP/blueprint"
           mkdir -p "$out/site"
           BLUEPRINT_HEAD_LABEL="${HEAD_SHA::9}" node scripts/blueprint/diff/diff.mjs HEAD^1 \
             --md "$out/comment.md" \
-            --shots "$out/site" \
-            --image-url "https://raw.githubusercontent.com/$REPO/blueprint-previews/pr-$PR/${HEAD_SHA::9}" \
             --page-url "$PAGES/pr-$PR/${HEAD_SHA::9}/"
           if [ -s "$out/comment.md" ]; then cp scripts/blueprint/out/interfold-blueprint-diff.html "$out/site/index.html"; fi
 
       # Without an architecture change, a folder from an earlier push goes.
-      - name: Store the pictures and the page
+      - name: Store the page
         id: store
         env:
           GH_TOKEN: ${{ github.token }}
@@ -118,7 +114,7 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Remove the pictures and the page
+      - name: Remove the page
         id: remove
         env:
           GH_TOKEN: ${{ github.token }}
@@ -129,7 +125,7 @@ jobs:
           node scripts/blueprint/diff/previews.mjs "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "pr-$PR" --remove | tee "$RUNNER_TEMP/remove.txt"
           if grep -q '^changed:' "$RUNNER_TEMP/remove.txt"; then echo "published=true" >> "$GITHUB_OUTPUT"; fi
 
-      # The counts and the list stay; the pictures and the link go.
+      # The counts and the list stay; the link goes.
       - name: Say so in the comment
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
@@ -139,11 +135,8 @@ jobs:
             const issue_number = context.payload.pull_request.number
             const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 })
             const old = comments.find((c) => c.user?.login === 'github-actions[bot]' && c.body?.startsWith(marker))
-            if (!old || !/!\[|\[Open this change in the blueprint\]/.test(old.body)) return
-            const body = old.body
-              .replace(/^!\[.*\]\(.*\)\n?/gm, '')
-              .replace(/^Green is new, red is removed.*\n?/m, '')
-              .replace(/\[Open this change in the blueprint\]\([^)]*\)[^\n]*/, 'The pictures and the page were removed when this pull request closed.')
+            if (!old || !/\[Open this change in the blueprint\]/.test(old.body)) return
+            const body = old.body.replace(/\[Open this change in the blueprint\]\([^)]*\)[^\n]*/, 'The page was removed when this pull request closed.')
             await github.rest.issues.updateComment({ owner, repo, comment_id: old.id, body })
 
   pages:
