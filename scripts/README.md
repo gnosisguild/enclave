@@ -298,8 +298,11 @@ pnpm build:circuits --preset secure-8192 --committee micro
 pnpm build:circuits --preset secure-8192 --committee small
 pnpm store:circuits push
 
-# Pull circuits from git branch (used by CI)
+# Pull circuits from git branch (used by releases)
 pnpm store:circuits pull
+
+# Pull the branch tip without a SOURCE_HASH match (used by CI and the integration tests)
+pnpm store:circuits pull --latest
 ```
 
 ### Source hash
@@ -321,7 +324,11 @@ not need a circuit rebuild.
 - **Pull**: Fetches `circuit-artifacts` and selects its newest first-parent commit with a matching
   `SOURCE_HASH`. It extracts that build to `dist/circuits/`. A build for another source tree at the
   branch tip does not replace this match. If no match exists, the command fails before it changes
-  local artifacts. `verify-release` still checks every required pair and build stamp
+  local artifacts. `verify-release` still checks every required pair and build stamp. With
+  `--latest`, the command takes the branch tip and does not check `SOURCE_HASH`. CI and the
+  integration tests use `--latest` until the circuit drift workflow is designed (#2249). In that period,
+  `--hydrate-bin-only` does not check the stamp's source hash either. It reports a mismatch and
+  continues
 - **Replace**: `pnpm store:circuits push --replace` rewrites the branch from local `dist/circuits/`;
   use only when intentionally deleting old artifact sets
 - **Restamp**: `pnpm store:circuits restamp --expect-source-hash <previous hash>` rewrites the build
