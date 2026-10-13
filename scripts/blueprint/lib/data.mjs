@@ -103,7 +103,9 @@ export function softRef(raw, where, warnings) {
     warnings.push(`${where}: ${raw} is broken (${c.why}), so the build dropped it`)
     return null
   }
-  if (c.status === 'moved') warnings.push(`${where}: ${c.path} line ${c.was} moved to ${c.line}`)
+  // Found on another line, near or far: check.mjs --fix rewrites the number.
+  const cited = Number(String(raw).split('@')[1])
+  if (c.line !== cited) warnings.push(`${where}: ${c.path} line ${cited} moved to ${c.line}`)
   return { path: c.path, line: c.line, token: c.token }
 }
 
@@ -141,7 +143,9 @@ function checkUnit(u, report) {
           return null
         }
         report.refs[r.status]++
-        if (r.status === 'moved') report.moved.push({ unit: u.id, file: u._file, ...r })
+        // A token up to three lines away checks as ok, but the reference moved all the same.
+        const cited = Number(String(item.ref).split('@')[1])
+        if (r.line !== cited) report.moved.push({ unit: u.id, file: u._file, ...r, was: cited })
         return { ...item, ref: { path: r.path, line: r.line, token: r.token } }
       })
       .filter(Boolean)

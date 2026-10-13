@@ -37,6 +37,16 @@ for (const make of CURATED) {
   for (const n of d.nodes) if (n.ref) refs.push({ raw: n.ref, where: `${d.id} diagram, box ${n.id}` })
   for (const e of d.edges) for (const r of e.refs || []) refs.push({ raw: r, where: `${d.id} diagram, arrow ${e.from} → ${e.to}` })
 }
+// Evidence that no diagram shows (a claim the code does not support, a note) is checked the same
+// way, so a broken reference there fails the check too.
+const shown = new Set(refs.map((r) => r.raw))
+for (const f of readdirSync(join(HERE, 'refs')).filter((n) => n.endsWith('.json')))
+  for (const claim of JSON.parse(readFileSync(join(HERE, 'refs', f), 'utf8')))
+    for (const raw of claim.refs || [])
+      if (!shown.has(raw)) {
+        shown.add(raw)
+        refs.push({ raw, where: `refs/${f}, claim ${claim.id} (on no diagram)` })
+      }
 for (const r of refs) Object.assign(r, checkRef(r.raw))
 // The build accepts a token up to three lines from its cited line. The check wants the exact line.
 const cited = (raw) => Number(String(raw).split('@')[1])
@@ -84,7 +94,7 @@ const say = (title, items) => {
   if (items.length > 50) console.log(`  - … and ${items.length - 50} more`)
 }
 console.log(
-  `Blueprint check at ${inv.tag}: ${refs.length} hand-drawn references, ${report.refs.ok + report.refs.moved + report.refs.bad} facts references.`,
+  `Blueprint check at ${inv.tag}: ${refs.length} hand-drawn and evidence references, ${report.refs.ok + report.refs.moved + report.refs.bad} facts references.`,
 )
 say(
   'Broken hand-drawn references (fix by hand)',

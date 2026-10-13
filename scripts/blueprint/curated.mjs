@@ -6,7 +6,7 @@
 
 // Hand-drawn top levels of the blueprint. Every edge carries code references: literal
 // `path@line@token` strings, or `ev('A1')`, the evidence an extraction agent found for claim A1
-// (refs/*.json). The build checks each reference and stops on a bad one.
+// (refs/*.json). The build checks each reference, and check.mjs lists the ones that moved or broke.
 import { readFileSync, readdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
