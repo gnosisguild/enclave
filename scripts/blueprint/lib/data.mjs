@@ -39,8 +39,8 @@ export function checkRef(raw) {
   const line = Number(raw.slice(first + 1, second))
   const token = raw.slice(second + 1).trim()
   const L = fileLines(path)
-  if (!L) return { status: 'bad', why: 'no such file', raw }
-  if (!token) return { status: 'bad', why: 'empty token', raw }
+  if (!L) return { status: 'bad', why: 'no such file', raw, path }
+  if (!token) return { status: 'bad', why: 'empty token', raw, path }
   if (/\.md$/.test(path)) return { status: 'bad', why: 'points at docs, not code', raw }
   if (Number.isFinite(line) && line >= 1) {
     for (let d = 0; d <= WINDOW; d++) {
@@ -53,7 +53,7 @@ export function checkRef(raw) {
     if (text.includes(token) && (best < 0 || Math.abs(i + 1 - line) < Math.abs(best - line))) best = i + 1
   })
   if (best > 0) return { status: 'moved', path, line: best, token, was: line }
-  return { status: 'bad', why: 'token not in file', raw }
+  return { status: 'bad', why: 'token not in file', raw, path }
 }
 
 // A reference into the harness docs (`agent/*.md`), for the reasons behind a design. Checked the

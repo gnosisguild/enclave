@@ -32,7 +32,7 @@
       "read_first": [
         {
           "why": "crate entry: the public re-exports of presets, builders and CRP helpers",
-          "ref": "crates/fhe-params/src/lib.rs@24@pub use presets::{"
+          "ref": "crates/fhe-params/src/lib.rs@25@pub use presets::{"
         },
         {
           "why": "the preset enum and the default preset constant",
@@ -253,7 +253,7 @@
         {
           "name": "PolynomialError",
           "what": "error type for polynomial operations, such as division by the zero polynomial",
-          "ref": "crates/polynomial/src/polynomial.rs@21@pub enum PolynomialError {"
+          "ref": "crates/polynomial/src/polynomial.rs@18@pub enum PolynomialError {"
         }
       ],
       "read_first": [

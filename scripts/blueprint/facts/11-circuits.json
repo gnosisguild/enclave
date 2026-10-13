@@ -10,8 +10,16 @@
       "analogy": "Like a sealed fingerprint of a public key, published before anyone encrypts to it, so the key cannot be swapped later.",
       "actors": [],
       "consumes": [
-        { "name": "private: pk0is", "by": "Pk::execute", "ref": "circuits/bin/dkg/pk/src/main.nr@12@pk0is: [Polynomial<N>; L]" },
-        { "name": "private: pk1is", "by": "Pk::execute", "ref": "circuits/bin/dkg/pk/src/main.nr@12@pk1is: [Polynomial<N>; L]" }
+        {
+          "name": "private: pk0is",
+          "by": "Pk::execute",
+          "ref": "circuits/bin/dkg/pk/src/main.nr@12@pk0is: [Polynomial<N>; L]"
+        },
+        {
+          "name": "private: pk1is",
+          "by": "Pk::execute",
+          "ref": "circuits/bin/dkg/pk/src/main.nr@12@pk1is: [Polynomial<N>; L]"
+        }
       ],
       "emits": [],
       "state": [],
@@ -32,7 +40,10 @@
           "why": "entry point: main takes both key components and returns the commitment",
           "ref": "circuits/bin/dkg/pk/src/main.nr@12@fn main("
         },
-        { "why": "Pk::execute, the whole circuit body", "ref": "circuits/lib/src/core/dkg/pk.nr@37@pub fn execute(self) -> Field" },
+        {
+          "why": "Pk::execute, the whole circuit body",
+          "ref": "circuits/lib/src/core/dkg/pk.nr@37@pub fn execute(self) -> Field"
+        },
         {
           "why": "the commitment: hashes pk0 then pk1 under the DS_PK domain separator",
           "ref": "circuits/lib/src/math/commitments.nr@190@pub fn compute_dkg_pk_commitment"
@@ -249,7 +260,7 @@
       "kind": "circuit",
       "path": "circuits/bin/dkg/share_encryption",
       "one_line": "Proves a share ciphertext is a valid BFV encryption, under the recipient's DKG key, of the share committed in C2.",
-      "explain": "It convinces a verifier that the two ciphertext polynomials ct0 and ct1 encrypt exactly the share the sender committed to in C2, under the recipient's DKG public key that C0 committed, using the BFV relations with small noise u, e0 and e1. The sender generates one proof per recipient and track (C3a for sk shares, C3b for e_sm shares, same binary), recipients verify it on receipt, and c3_fold chains the proofs into node_fold (agent/flow-trace/04). Without it, a sender could send a recipient a share that differs from the one it certified in C2.",
+      "explain": "It convinces a verifier that the two ciphertext polynomials ct0 and ct1 encrypt exactly the share the sender committed to in C2, under the recipient's DKG public key that C0 committed, using the BFV relations with small noise u, e0 and e1. The sender generates one proof for each other recipient, CRT row and track (C3a for sk shares, C3b for e_sm shares, same binary), recipients verify it on receipt, and c3_fold chains the proofs into node_fold (agent/flow-trace/04). Without it, a sender could send a recipient a share that differs from the one it certified in C2.",
       "analogy": "Like sealing a share in a box only one recipient can open, with a notarised note that the box holds exactly the share already certified.",
       "actors": [],
       "consumes": [
@@ -665,7 +676,7 @@
       "key_types": [
         {
           "name": "ShareDecryption",
-          "what": "one member's sk and e_sm aggregates, the ciphertext, the share d and the E3 domain",
+          "what": "one member's sk and e_sm aggregates, the ciphertext and the share d. The E3 domain is an input of the circuit entry point, not of this struct",
           "ref": "circuits/lib/src/core/threshold/share_decryption.nr@39@pub struct ShareDecryption<"
         },
         {
@@ -1022,7 +1033,10 @@
         }
       ],
       "read_first": [
-        { "why": "module tree: math, core and configs are the three public modules", "ref": "circuits/lib/src/lib.nr@16@pub mod core;" },
+        {
+          "why": "module tree: math, core and configs are the three public modules",
+          "ref": "circuits/lib/src/lib.nr@16@pub mod core;"
+        },
         {
           "why": "preset wiring: the default preset re-exports the insecure DKG preset",
           "ref": "circuits/lib/src/configs/default/mod.nr@12@pub use super::insecure::dkg;"

@@ -53,7 +53,10 @@
           "why": "dispatch: with no config only rev, init, ciphernode setup, noir and start (which runs setup) are allowed",
           "ref": "crates/cli/src/cli.rs@88@pub async fn execute(self, out: Console"
         },
-        { "why": "the full command list", "ref": "crates/cli/src/cli.rs@257@pub enum Commands {" },
+        {
+          "why": "the full command list",
+          "ref": "crates/cli/src/cli.rs@257@pub enum Commands {"
+        },
         {
           "why": "what interfold start does before the node is built",
           "ref": "crates/cli/src/start.rs@22@pub async fn execute(mut config: AppConfig"
@@ -606,7 +609,7 @@
       "kind": "crate",
       "path": "crates/console",
       "one_line": "Output sink for CLI commands: each line goes through a channel to a printer task, so output keeps its order and survives exit.",
-      "explain": "Commands never print directly: they call `log!` on a cloneable `Console`, which sends each line into an unbounded channel. A background task prints the lines in order to stdout or writes them to any async writer, and `channel()` lets the daemon collect a remote command's output instead. `flush` drops the sender and waits for the printer to drain, so nothing is lost when the process exits.",
+      "explain": "Commands that use it call `log!` on a cloneable `Console`, which sends each line into an unbounded channel. A background task prints the lines in order to stdout or writes them to any async writer, and `channel()` lets the daemon collect a remote command's output instead. `flush` drops the sender and waits for the printer to drain, so nothing is lost when the process exits.",
       "analogy": "A post room: each letter goes into one tray in order, one clerk sends them all out, and the office closes only after the tray is empty.",
       "actors": [],
       "consumes": [],
@@ -631,12 +634,18 @@
         }
       ],
       "read_first": [
-        { "why": "the production sink: lines go to stdout", "ref": "crates/console/src/lib.rs@21@pub fn stdout() -> ConsoleHandle {" },
+        {
+          "why": "the production sink: lines go to stdout",
+          "ref": "crates/console/src/lib.rs@21@pub fn stdout() -> ConsoleHandle {"
+        },
         {
           "why": "the drain step that main calls before it reports an error",
           "ref": "crates/console/src/lib.rs@72@pub async fn flush(self) {"
         },
-        { "why": "the log macro that every command uses", "ref": "crates/console/src/lib.rs@79@macro_rules! log {" }
+        {
+          "why": "the log macro that every command uses",
+          "ref": "crates/console/src/lib.rs@79@macro_rules! log {"
+        }
       ],
       "rust_patterns": [
         {
@@ -704,7 +713,10 @@
         }
       ],
       "read_first": [
-        { "why": "the entry point that the CLI calls", "ref": "crates/init/src/lib.rs@287@pub async fn execute(" },
+        {
+          "why": "the entry point that the CLI calls",
+          "ref": "crates/init/src/lib.rs@287@pub async fn execute("
+        },
         {
           "why": "the steps in order: clone, read versions, copy, install",
           "ref": "crates/init/src/lib.rs@32@async fn install_interfold("
@@ -713,7 +725,10 @@
           "why": "the Cargo path rewrite that points template crates at the template's commit",
           "ref": "crates/init/src/lib.rs@279@fn interfold_path_filter(commit_hash: &str) -> Filter {"
         },
-        { "why": "the copy routine that applies the filters", "ref": "crates/init/src/copy.rs@63@pub async fn copy_with_filters<P1, P2>(" }
+        {
+          "why": "the copy routine that applies the filters",
+          "ref": "crates/init/src/copy.rs@63@pub async fn copy_with_filters<P1, P2>("
+        }
       ],
       "rust_patterns": [
         {
@@ -776,13 +791,22 @@
         }
       ],
       "read_first": [
-        { "why": "the root type and its constructors", "ref": "crates/fs/src/fs.rs@16@pub struct Fs {" },
+        {
+          "why": "the root type and its constructors",
+          "ref": "crates/fs/src/fs.rs@16@pub struct Fs {"
+        },
         {
           "why": "the real-disk constructor, used by the init copier",
           "ref": "crates/fs/src/fs.rs@35@pub fn physical() -> Result<Self> {"
         },
-        { "why": "the trait that the operations are defined on", "ref": "crates/fs/src/traits.rs@12@pub trait FileReader {" },
-        { "why": "the copier that calls Fs::physical", "ref": "crates/init/src/copy.rs@79@&Fs::physical()?," }
+        {
+          "why": "the trait that the operations are defined on",
+          "ref": "crates/fs/src/traits.rs@12@pub trait FileReader {"
+        },
+        {
+          "why": "the copier that calls Fs::physical",
+          "ref": "crates/init/src/copy.rs@79@&Fs::physical()?,"
+        }
       ],
       "rust_patterns": [
         {
@@ -795,7 +819,11 @@
           "note": "Fs implements each trait; the methods are async through async_trait",
           "ref": "crates/fs/src/fs.rs@41@impl FileReader for Fs {"
         },
-        { "pattern": "async-test", "note": "the copy and glob tests run on tokio", "ref": "crates/fs/src/fs.rs@186@#[tokio::test]" },
+        {
+          "pattern": "async-test",
+          "note": "the copy and glob tests run on tokio",
+          "ref": "crates/fs/src/fs.rs@186@#[tokio::test]"
+        },
         {
           "pattern": "async-await",
           "note": "the read method is async and takes a generic path",

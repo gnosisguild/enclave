@@ -142,7 +142,7 @@ const html = `<!doctype html>
   <aside id="code" hidden></aside>
   <div id="help">Boxes with ⧉ open the diagram inside · boxes with &lt;/&gt; and arrows open the code · Esc goes up · scroll to zoom, drag to pan</div>
 </main>
-<script>window.BLUEPRINT = ${JSON.stringify(data)};</script>
+<script>window.BLUEPRINT = ${JSON.stringify(data).replace(/</g, '\\u003c')};</script>
 <script>${js}</script>
 </body>
 </html>

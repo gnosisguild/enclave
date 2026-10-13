@@ -292,7 +292,7 @@
         },
         {
           "why": "where a ComputeRequest becomes a prover call (crates/multithread)",
-          "ref": "crates/multithread/src/multithread.rs@1262@fn handle_zk_request("
+          "ref": "crates/multithread/src/multithread.rs@1263@fn handle_zk_request("
         }
       ],
       "rust_patterns": [
@@ -415,7 +415,7 @@
       "read_first": [
         {
           "why": "module tree: the circuits, the circuit metadata, encoding and packing",
-          "ref": "crates/zk-helpers/src/lib.rs@8@pub mod circuits;"
+          "ref": "crates/zk-helpers/src/lib.rs@7@pub mod circuits;"
         },
         {
           "why": "the metadata contract: NAME, PREFIX, supported parameter, DKG input type",
@@ -427,7 +427,7 @@
         },
         {
           "why": "the per-circuit entry point: bounds, bits and inputs",
-          "ref": "crates/zk-helpers/src/circuits/dkg/pk/computation.rs@34@impl CircuitComputation for PkCircuit"
+          "ref": "crates/zk-helpers/src/circuits/dkg/pk/computation.rs@33@impl CircuitComputation for PkCircuit"
         }
       ],
       "rust_patterns": [
@@ -444,12 +444,12 @@
         {
           "pattern": "result-question-mark",
           "note": "polynomial conversion errors bubble up with ?",
-          "ref": "crates/zk-helpers/src/circuits/dkg/pk/computation.rs@149@fhe_poly_to_crt_centered(&data.public_key.c[0], moduli)?"
+          "ref": "crates/zk-helpers/src/circuits/dkg/pk/computation.rs@148@fhe_poly_to_crt_centered(&data.public_key.c[0], moduli)?"
         },
         {
           "pattern": "thiserror-enum",
           "note": "CircuitsErrors derives Error with per-variant messages",
-          "ref": "crates/zk-helpers/src/circuits/errors.rs@15@pub enum CircuitsErrors"
+          "ref": "crates/zk-helpers/src/circuits/errors.rs@16@pub enum CircuitsErrors"
         }
       ],
       "depends_on": ["e3-fhe-params", "e3-parity-matrix", "e3-polynomial", "e3-safe"],

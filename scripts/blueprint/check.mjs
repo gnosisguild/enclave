@@ -38,6 +38,9 @@ for (const make of CURATED) {
   for (const e of d.edges) for (const r of e.refs || []) refs.push({ raw: r, where: `${d.id} diagram, arrow ${e.from} → ${e.to}` })
 }
 for (const r of refs) Object.assign(r, checkRef(r.raw))
+// The build accepts a token up to three lines from its cited line. The check wants the exact line.
+const cited = (raw) => Number(String(raw).split('@')[1])
+for (const r of refs) if (r.status === 'ok' && r.line !== cited(r.raw)) Object.assign(r, { status: 'moved', was: cited(r.raw) })
 const moved = refs.filter((r) => r.status === 'moved')
 const broken = refs.filter((r) => r.status === 'bad')
 
@@ -51,7 +54,7 @@ for (const f of factFiles)
         for (const item of list) {
           if (!item || typeof item.ref !== 'string') continue
           const c = checkRef(item.ref)
-          if (c.status === 'moved') factsMoved.push({ raw: item.ref, line: c.line })
+          if (c.status === 'moved' || (c.status === 'ok' && c.line !== cited(item.ref))) factsMoved.push({ raw: item.ref, line: c.line })
         }
 
 // ---- workspace crates that the inventory does not list ------------------------------------
@@ -98,7 +101,9 @@ say('Facts references that moved (--fix rewrites them) or broke (the build drops
 say('Crates that the blueprint does not show (add them to LAYERS in lib/inventory.mjs)', unmapped)
 if (since) {
   const changed = new Set(execFileSync('git', ['diff', '--name-only', since], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean))
-  const recheck = [...new Set(refs.filter((r) => changed.has(r.path)).map((r) => `${r.where}: ${r.path}`))]
+  const recheck = [
+    ...new Set(refs.filter((r) => changed.has(r.path || r.raw.split('@')[0])).map((r) => `${r.where}: ${r.path || r.raw.split('@')[0]}`)),
+  ]
   say(`Hand-drawn arrows whose code changed since ${since} (read them again)`, recheck)
 }
 console.log(`\nBuild with the moved lines accepted: ${build.ok ? 'passes' : 'FAILS'}. ${build.text}`)

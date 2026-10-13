@@ -237,10 +237,15 @@
   }
   const lerp = (a, b, t) => a + (b - a) * t
   let anim = null
+  // The step that swaps in the next diagram when a drill-in animation ends. User input that stops
+  // the animation runs it first, so the drawn diagram always matches the address.
+  let pending = null
   function animate(from, to, ms, done) {
     cancelAnimationFrame(anim)
+    pending = done || null
     if (reduced || ms <= 0) {
       setVB(to)
+      pending = null
       return done && done()
     }
     const t0 = performance.now()
@@ -253,7 +258,10 @@
       const cy = lerp(from.y + from.h / 2, to.y + to.h / 2, e)
       setVB({ x: cx - lw / 2, y: cy - lh / 2, w: lw, h: lh })
       if (p < 1) anim = requestAnimationFrame(step)
-      else if (done) done()
+      else if (done) {
+        pending = null
+        done()
+      }
     }
     anim = requestAnimationFrame(step)
   }
@@ -399,6 +407,11 @@
     (e) => {
       e.preventDefault()
       cancelAnimationFrame(anim)
+      if (pending) {
+        const done = pending
+        pending = null
+        return done()
+      }
       if (e.ctrlKey || e.metaKey || Math.abs(e.deltaY) > Math.abs(e.deltaX) * 0.6) {
         const f = Math.exp(e.deltaY * (e.ctrlKey ? 0.012 : 0.0022))
         const [wx, wy] = toWorld(e.clientX, e.clientY)

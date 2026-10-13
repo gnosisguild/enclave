@@ -29,7 +29,8 @@ A reference is one string: `path@line@token`
 - `line`: the 1-based line number, from `grep -n`.
 - `token`: an exact substring of that line. Use a distinctive identifier, for example
   `impl Handler<E3Requested> for Sortition` or `pub struct ThresholdKeyshare`. It must not contain
-  `@`. A checker rejects the reference when the token is not on that line.
+  `@`. The build accepts the token up to three lines from the cited line and drops the reference
+  otherwise. `check.mjs --fix` rewrites the line number to the exact line.
 
 ## Output
 
