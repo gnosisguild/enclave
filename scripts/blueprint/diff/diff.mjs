@@ -446,7 +446,7 @@ if (opt('--md')) {
     '<!-- blueprint-diff -->',
     '### Architecture change',
     '',
-    `From \`${base.label}\` to \`${head.label}\`. [Open this change in the blueprint](${pageUrl}): download it, unzip it and open the page. Its Before and After switch is at the top.`,
+    `From \`${base.label}\` to \`${head.label}\`. [Open this change in the blueprint](${pageUrl}). Its Before and After switch is at the top.`,
     ...(before.own
       ? []
       : ['', 'The base has no `scripts/blueprint/diff/diff.mjs` of this version, so the scripts of this branch read it.']),
@@ -457,7 +457,11 @@ if (opt('--md')) {
     'Green is new, red is removed and yellow is changed. A number on a box counts the changes inside it.',
     '',
   ]
-  const foot = ['', '<sub>Experimental. `scripts/blueprint/diff/README.md` says how to turn it off or remove it.</sub>', '']
+  const foot = [
+    '',
+    '<sub>Experimental. The page and the pictures go away when the pull request closes. `scripts/blueprint/diff/README.md` says how to turn it off or remove it.</sub>',
+    '',
+  ]
   const tail = ['', '</details>', '']
   const lines = ['<details>', `<summary>Every change (${list.length})</summary>`, '']
   let size = [...top, ...tail, ...foot].join('\n').length + 200
