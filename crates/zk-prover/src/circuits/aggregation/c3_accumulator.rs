@@ -1044,6 +1044,23 @@ pub fn generate_c3_merge_m1(
             "generate_c3_merge_m1: total_slots must be >= 7 (b6 covers 6 fresh slots + the kernel slot), got {total_slots}"
         )));
     }
+    // CR-11: b6's in-circuit window is [slot1, slot1+6) where slot1 == slot_indices[1].
+    // c3_batch itself only range-checks + de-dupes the 6 slots it witnesses; it does NOT
+    // require them to lie in that window. If a caller passes slots outside the window, the
+    // M1 gate reads the window and silently drops those leaves (the b6 sub-gate's
+    // zero-overwrite assert fires only where a leaf overwrites a non-zero anchor cell —
+    // the genesis is all-zero there, so it passes). Reject the mismatch up-front.
+    let m1_scope = slot_indices[1] as usize;
+    if slot_indices[1..].iter().any(|&slot| {
+        let s = slot as usize;
+        s < m1_scope || s >= m1_scope + 6
+    }) {
+        return Err(ZkError::InvalidInput(format!(
+            "generate_c3_merge_m1: b6 covered slots must all fall in [{m1_scope}, {}), \
+             got out-of-window slot(s)",
+            m1_scope + 6
+        )));
+    }
     // Kernel genesis anchors inner 0 at slot_indices[0] (explict-slot form): the b6 sub-gate
     // then reads slot_indices[1..=6] for its covered rows, so the genesis must stamp the
     // same anchor slot — not the legacy hard-stamped slot 0.
@@ -1404,6 +1421,38 @@ pub fn generate_c3_merge_m7(
         return Err(ZkError::InvalidInput(format!(
             "generate_c3_merge_m7: cover_start must be 1 (anchor + 54 covered), got {cover_start}"
         )));
+    }
+    // CR-11: each B10/B2 sub-gate's covered-row window in the M7 circuit is
+    // [slot1 + j, slot1 + j + len) where slot1 == slot_indices[1]. c3_batch only
+    // range-checks + de-dupes the leaf slots it witnesses. If a caller's slot_indices
+    // value at position (cover_start + j + k) is outside that block's window, the
+    // M7 gate copies rows from the window and silently drops that leaf (the zero-
+    // overwrite assert cannot fire because the genesis is all-zero there).
+    // Enforce per-block membership up-front — before the kernel genesis proof.
+    let m7_base = slot_indices[1] as usize;
+    for &(block_start, block_len) in &[
+        (0usize, 10usize),
+        (10, 10),
+        (20, 10),
+        (30, 10),
+        (40, 10),
+        (50, 2),
+        (52, 2),
+    ] {
+        let lo = m7_base + block_start;
+        let hi = lo + block_len;
+        if slot_indices[cover_start + block_start..cover_start + block_start + block_len]
+            .iter()
+            .any(|&slot| {
+                let s = slot as usize;
+                s < lo || s >= hi
+            })
+        {
+            return Err(ZkError::InvalidInput(format!(
+                "generate_c3_merge_m7: covered slots for block [{lo}, {hi}) must all fall \
+                 within that range, got an out-of-window slot"
+            )));
+        }
     }
     // Kernel genesis anchoring inner 0 at slot_indices[0].
     let acc = generate_c3_fold_kernel_genesis_proof(
