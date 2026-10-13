@@ -1,0 +1,109 @@
+name: Blueprint Diff
+
+# Experimental. scripts/blueprint/diff/README.md says how to turn it off (the repository variable
+# BLUEPRINT_DIFF=off) or remove it.
+#
+# One comment on each pull request with its architecture change, drawn as the blueprint: pictures
+# of the changed diagrams, the counts, every change, and the interactive page as a download.
+# scripts/blueprint/diff/diff.mjs reads both versions of the code and builds nothing else. A comment
+# shows an image only from a URL, so the pictures go to the blueprint-previews branch.
+# It runs on every pull request, into any branch: a later push can take back an earlier change,
+# and the comment must follow, and a stacked pull request shows its own layer.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  diff:
+    name: Architecture change
+    # A pull request from a fork gets a read-only token, which can neither store the pictures nor
+    # post the comment.
+    if: vars.BLUEPRINT_DIFF != 'off' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: blueprint-diff-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: write # store the pictures on blueprint-previews
+      pull-requests: write # post the comment
+    steps:
+      # The merge commit is the code after the merge. Its first parent is the base branch.
+      - name: Checkout the merge commit and the base branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Compare with the base branch
+        id: diff
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          out="$RUNNER_TEMP/blueprint"
+          mkdir -p "$out"
+          BLUEPRINT_HEAD_LABEL="${HEAD_SHA::9}" node scripts/blueprint/diff/diff.mjs HEAD^1 \
+            --md "$out/comment.md" \
+            --shots "$out/shots" \
+            --image-url "https://raw.githubusercontent.com/$REPO/blueprint-previews/pr-$PR/${HEAD_SHA::9}" \
+            --page-url '{{PAGE_URL}}'
+          if [ -s "$out/comment.md" ]; then
+            cp scripts/blueprint/out/interfold-blueprint-diff.html "$out/"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+          if compgen -G "$out/shots/*.png" > /dev/null; then echo "shots=true" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Upload the page
+        id: page
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: blueprint-diff-pr-${{ github.event.pull_request.number }}
+          path: ${{ runner.temp }}/blueprint/interfold-blueprint-diff.html
+          retention-days: 30
+
+      - name: Store the pictures
+        if: steps.diff.outputs.shots == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          node scripts/blueprint/diff/previews.mjs "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "pr-$PR" "${HEAD_SHA::9}" "$RUNNER_TEMP"/blueprint/shots/*.png
+
+      - name: Post or update the comment
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PAGE_URL: ${{ steps.page.outputs.artifact-url }}
+        with:
+          script: |
+            const fs = require('fs')
+            const marker = '<!-- blueprint-diff -->'
+            const file = `${process.env.RUNNER_TEMP}/blueprint/comment.md`
+            const body = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').replaceAll('{{PAGE_URL}}', process.env.PAGE_URL || '#') : ''
+            const { owner, repo } = context.repo
+            const issue_number = context.payload.pull_request.number
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 })
+            const old = comments.find((c) => c.user?.login === 'github-actions[bot]' && c.body?.startsWith(marker))
+
+            if (!body.trim()) {
+              // No architecture change now: an earlier comment must not keep showing one.
+              if (old) {
+                const none = `${marker}\n### Architecture change\n\nNo architecture change at \`${process.env.HEAD_SHA.slice(0, 9)}\`.\n`
+                await github.rest.issues.updateComment({ owner, repo, comment_id: old.id, body: none })
+              }
+              return
+            }
+            if (old) await github.rest.issues.updateComment({ owner, repo, comment_id: old.id, body })
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body })

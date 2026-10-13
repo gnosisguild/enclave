@@ -48,6 +48,12 @@ node scripts/blueprint/check.mjs --since v0.19.0   # also list the hand-drawn ar
   `lib/inventory.mjs`. When you remove or rename a crate, a contract or a circuit, change it there
   too, and move or remove its facts in `facts/`. The check lists all of these cases.
 
+## Architecture change in a pull request (experimental)
+
+`node scripts/blueprint/diff/diff.mjs` draws the change of your branch on the blueprint, and a
+workflow posts it on each pull request. [`diff/README.md`](diff/README.md) explains it, and how to
+turn it off or remove it.
+
 ## Add or change a hand-drawn arrow
 
 1. Find the line of code with `grep -n`.
@@ -60,6 +66,8 @@ node scripts/blueprint/check.mjs --since v0.19.0   # also list the hand-drawn ar
 
 - `build.mjs`: builds the page.
 - `check.mjs`: checks the references against the code.
+- `diff/`: experimental, the architecture change of a pull request. Its README says how to remove
+  it.
 - `curated.mjs`: the five hand-drawn diagrams.
 - `generate.mjs`: the generated diagrams.
 - `renderer.js` and `blueprint.css`: the page in the browser.

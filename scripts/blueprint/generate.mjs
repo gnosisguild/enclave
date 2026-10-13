@@ -7,7 +7,7 @@
 // Generated levels of the blueprint, built only from exact data: the inventory and wiring read
 // from code, and the checked facts. One diagram per crate, contract, circuit and app, and one per
 // actor. Layouts are column templates, so every generated diagram reads the same way.
-const evName = (msg) => {
+export const evName = (msg) => {
   const m = msg.match(/^TypedEvent<(.+)>$/)
   return m ? m[1] : msg
 }

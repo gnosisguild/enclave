@@ -6,7 +6,9 @@ This directory contains utility scripts for the Interfold project.
 
 `node scripts/blueprint/build.mjs` builds an interactive map of the architecture from the code:
 `scripts/blueprint/out/interfold-blueprint.html`. `node scripts/blueprint/check.mjs` lists the
-hand-drawn references that moved or broke. See [`blueprint/README.md`](blueprint/README.md).
+hand-drawn references that moved or broke. `node scripts/blueprint/diff/diff.mjs` draws the
+architecture change of a branch on the blueprint, and an experimental workflow posts it on each pull
+request. See [`blueprint/README.md`](blueprint/README.md).
 
 ## CRISP end-to-end test
 

@@ -1,0 +1,180 @@
+/* The change view: diff.mjs adds these styles to the blueprint page. */
+:root {
+  --d-add: #1a7f37;
+  --d-add-fill: #e6f6ea;
+  --d-del: #cf222e;
+  --d-del-fill: #fdeceb;
+  --d-chg: #9a6d00;
+  --d-chg-fill: #fff4cf;
+}
+body[data-theme='dark'] {
+  --d-add: #3fb950;
+  --d-add-fill: #0e2a17;
+  --d-del: #f85149;
+  --d-del-fill: #3b1414;
+  --d-chg: #d29922;
+  --d-chg-fill: #33280b;
+}
+.node.d-added .box {
+  fill: var(--d-add-fill);
+  stroke: var(--d-add);
+  stroke-width: 3.4;
+}
+.node.d-removed .box {
+  fill: var(--d-del-fill);
+  stroke: var(--d-del);
+  stroke-width: 3.4;
+  stroke-dasharray: 9 6;
+}
+.node.d-changed .box {
+  fill: var(--d-chg-fill);
+  stroke: var(--d-chg);
+  stroke-width: 3.4;
+}
+.edge.d-added .line {
+  stroke: var(--d-add);
+  stroke-width: 3;
+}
+.edge.d-removed .line {
+  stroke: var(--d-del);
+  stroke-width: 3;
+  stroke-dasharray: 9 6;
+}
+.edge.d-changed .line {
+  stroke: var(--d-chg);
+  stroke-width: 3;
+}
+.arrowhead.d-added {
+  fill: var(--d-add);
+}
+.arrowhead.d-removed {
+  fill: var(--d-del);
+}
+.arrowhead.d-changed {
+  fill: var(--d-chg);
+}
+.elabel.d-added {
+  fill: var(--d-add);
+}
+.elabel.d-removed {
+  fill: var(--d-del);
+}
+.elabel.d-changed {
+  fill: var(--d-chg);
+}
+.dbadge rect {
+  fill: var(--d-chg);
+}
+.dbadge text {
+  fill: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+}
+.dlegend,
+#dshot {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--sub);
+  white-space: nowrap;
+}
+.dlegend i,
+#dshot i,
+#dchanges i {
+  display: inline-block;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-left: 6px;
+  border: 2px solid;
+  border-radius: 3px;
+}
+:is(.dlegend, #dshot, #dchanges) i.a {
+  border-color: var(--d-add);
+  background: var(--d-add-fill);
+}
+:is(.dlegend, #dshot, #dchanges) i.r {
+  border-color: var(--d-del);
+  border-style: dashed;
+  background: var(--d-del-fill);
+}
+:is(.dlegend, #dshot, #dchanges) i.c {
+  border-color: var(--d-chg);
+  background: var(--d-chg-fill);
+}
+.dswitch {
+  display: inline-flex;
+}
+.dswitch button:first-child {
+  border-radius: 7px 0 0 7px;
+}
+.dswitch button:last-child {
+  margin-left: -1px;
+  border-radius: 0 7px 7px 0;
+}
+.dswitch button[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--bg);
+}
+#dchanges {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 15;
+  width: min(520px, 90vw);
+  max-height: 72%;
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--ink) 14%, transparent);
+}
+#dchanges header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  color: var(--sub);
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+}
+#dchanges header b {
+  color: var(--ink);
+}
+#dchanges .dc {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+#dchanges .dc i {
+  margin-left: 0;
+}
+#dchanges .dc:hover {
+  background: var(--hover);
+}
+#dchanges code {
+  font:
+    12px ui-monospace,
+    'SF Mono',
+    Menlo,
+    monospace;
+}
+body.shot #bar,
+body.shot #help,
+body.shot #dchanges {
+  display: none;
+}
+body.shot #stage {
+  inset: 0;
+}
+#dshot {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  font-size: 13px;
+}
+#dshot b {
+  margin-right: 6px;
+  color: var(--ink);
+}
