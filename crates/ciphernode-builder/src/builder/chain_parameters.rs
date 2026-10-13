@@ -15,6 +15,7 @@ use std::collections::HashMap;
 use tracing::{info, warn};
 
 /// Chain configuration that the protocol extensions read at startup.
+#[derive(Default)]
 pub(super) struct ChainParameters {
     /// DKG fold attestation contexts from static configuration, by chain ID.
     pub dkg_fold_context_by_chain: HashMap<u64, Option<DkgFoldAttestationContext>>,
@@ -26,15 +27,12 @@ impl CiphernodeBuilder {
     /// Read the DKG fold attestation verifiers and the accusation vote validity of the configured
     /// chains.
     pub(super) async fn fetch_chain_parameters(&self, chains: &Chains) -> Result<ChainParameters> {
-        let mut dkg_fold_context_by_chain = HashMap::new();
-        let mut accusation_vote_validity_by_chain = HashMap::new();
         // A bootstrap node runs no keyshare, aggregation, or accusation work, so it reads neither.
         if self.role() == NodeRole::Bootstrap {
-            return Ok(ChainParameters {
-                dkg_fold_context_by_chain,
-                accusation_vote_validity_by_chain,
-            });
+            return Ok(ChainParameters::default());
         }
+        let mut dkg_fold_context_by_chain = HashMap::new();
+        let mut accusation_vote_validity_by_chain = HashMap::new();
 
         // Synthetic runs have no committee-finalized log to carry request-time addresses.
         // Use static configuration only when the chain itself is disabled.

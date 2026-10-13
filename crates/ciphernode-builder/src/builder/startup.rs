@@ -8,9 +8,7 @@
 //! state, the lifecycle is reconciled before restart decisions read it, and effects resume only
 //! after the sync barrier. Each phase takes the output of the phase before it.
 
-use super::{
-    evm::wait_for_evm_gateways, sortition::setup_sortition, CiphernodeBuilder, EventSystemType,
-};
+use super::{sortition::setup_sortition, CiphernodeBuilder, EventSystemType};
 use crate::{
     finalized_lifecycle::reconcile_restored_contexts, recovery::backfill_restart_state,
     CiphernodeHandle,
@@ -167,7 +165,9 @@ impl CiphernodeBuilder {
                     &storage.seq_eventstore,
                     net_ready,
                 ),
-                wait_for_evm_gateways(evm_gateways),
+                futures::future::try_join_all(
+                    evm_gateways.into_iter().map(EvmChainGatewayHandle::wait_until_live)
+                ),
                 network.buffer.wait_until_running(),
             ) } => { result?; }
             failure = async {
@@ -402,8 +402,7 @@ impl CiphernodeBuilder {
         }
 
         // Setup sortition
-        let (sortition, _ciphernode_selector, selector_state) =
-            setup_sortition(bus, repositories, addr).await?;
+        let (sortition, selector_state) = setup_sortition(bus, repositories, addr).await?;
         let selected_party_ids: HashMap<E3id, u64> = selector_state
             .committees
             .iter()
