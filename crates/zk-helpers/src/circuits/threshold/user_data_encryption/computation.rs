@@ -12,7 +12,8 @@
 use crate::calculate_bit_width;
 use crate::get_zkp_modulus;
 use crate::math::compute_k0is;
-use crate::math::{fold_negacyclic, plaintext_poly_u64};
+use crate::math::plaintext_poly_u64;
+use crate::negacyclic::fold_negacyclic;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitData;
 use crate::CircuitsErrors;
@@ -21,6 +22,7 @@ use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use fhe::bfv::SecretKey;
 use fhe_math::zq::Modulus;
 use fhe_traits::Serialize as FheSerialize;
@@ -387,15 +389,9 @@ impl Computation for Inputs {
 
             // Compute e0_quotients[i] = (e0 - e0i) / qi for each coefficient
             // This is used for CRT consistency check: e0[j] = e0i[j] + e0_quotients[i][j] * qi
-            // Polynomial div by constant yields coefficient-wise division.
+            // Each difference must be exactly divisible by qi.
             let diff = e0_mod_q.sub(&e0i);
-            let qi_poly = Polynomial::constant(qi_bigint.clone());
-            let (e0_quotient, remainder) = diff.div(&qi_poly).expect("CRT requires exact division");
-
-            assert!(
-                remainder.is_zero(),
-                "e0 - e0i must be divisible by qi (CRT consistency)"
-            );
+            let e0_quotient = diff.div_exact(&qi_bigint).expect("CRT requires exact division");
 
             // k0qi = -t^{-1} mod qi
             let k0qi = BigInt::from(k0is[i]);
@@ -435,41 +431,27 @@ impl Computation for Inputs {
             //
             // The ct0 hat carries the residue `e0i`, while the identity reads the lifted `e0`.
             // Substituting the CRT split `e0 = e0i + e0_quotient * qi` moves that difference into
-            // the quotient, so `ct0_r` is the folded quotient minus `e0_quotient`. That is how `r`
-            // comes to carry what `e0is`, `r1i` and `r2i` carried between them.
-            //
-            // Everything here is O(N). Going through `decompose_residue` plus
-            // `Polynomial::reduce_by_cyclotomic` ran four generic long divisions per limb, each
-            // (N-1)(N+1) BigInt multiply-subtracts, and recomputed both products for the
-            // self-checks. This generator runs in the voter's browser, where that was about ten
-            // seconds per ballot at secure-8192.
+            // the quotient, so `ct0_r` is the folded quotient minus `e0_quotient`.
+            // Both folds run in O(N) without recomputing their convolutions.
             let ct0_reduced_hat = fold_negacyclic(&ct0i_hat, n as usize);
             let ct1_reduced_hat = fold_negacyclic(&ct1i_hat, n as usize);
 
-            // Exact division is the identity: `div` rejects any coefficient that is not a multiple
+            // Exact division rejects any coefficient that is not a multiple
             // of qi, so a successful division proves an integer quotient closes the reduced
             // equation and a wrong fold surfaces as a divisibility failure.
-            let (ct0_folded_quotient, ct0_remainder) = ct0i
+            let ct0_folded_quotient = ct0i
                 .sub(&ct0_reduced_hat)
-                .div(&qi_poly)
+                .div_exact(&qi_bigint)
                 .expect("ct0i - (pk0i * u + e0i + k0qi * k1 mod X^N + 1) must be divisible by qi");
-            assert!(
-                ct0_remainder.is_zero(),
-                "reduced ct0 identity must divide exactly by qi"
-            );
             let ct0_r = ct0_folded_quotient.sub(&e0_quotient);
 
-            let (ct1_r, ct1_remainder) = ct1i
+            let ct1_r = ct1i
                 .sub(&ct1_reduced_hat)
-                .div(&qi_poly)
+                .div_exact(&qi_bigint)
                 .expect("ct1i - (pk1i * u + e1 mod X^N + 1) must be divisible by qi");
-            assert!(
-                ct1_remainder.is_zero(),
-                "reduced ct1 identity must divide exactly by qi"
-            );
 
             // Restate both identities on the derived witnesses, with the lifted `e0` the circuit
-            // reads. O(N), and independent of `div`.
+            // reads. This checks the derived quotients against the integer equations.
             let ct0_reduced = ct0_reduced_hat
                 .sub(&e0i)
                 .add(&e0_mod_q)

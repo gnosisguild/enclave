@@ -216,7 +216,7 @@ test('pair source hash ignores generated bounds but tracks other Noir config', (
     writeFileSync(thresholdPath, threshold(20, '3, 4', 3))
     assert.notEqual(builder.computeSourceHash('insecure-512', 'micro'), originalHash)
 
-    for (const owner of ['zk-helpers', 'committee']) {
+    for (const owner of ['zk-helpers', 'committee', 'polynomial', 'polynomial/fhe-adapter']) {
       const generatorDir = join(dir, 'crates', owner, 'src')
       mkdirSync(generatorDir, { recursive: true })
       const generatorPath = join(generatorDir, 'generator.rs')

@@ -13,6 +13,7 @@ use crate::{threshold::pk_aggregation::PkAggregationCircuitData, CircuitsErrors}
 use e3_committee::CiphernodesCommittee;
 use e3_fhe_params::{build_pair_for_preset, create_deterministic_crp_from_default_seed, BfvPreset};
 use e3_polynomial::CrtPolynomial;
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use fhe::bfv::{PublicKey, SecretKey};
 use fhe::mbfv::{AggregateIter, PublicKeyShare};
 

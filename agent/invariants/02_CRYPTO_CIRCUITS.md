@@ -107,8 +107,9 @@ every section.
   It normalizes the active preset selector because each pair already identifies its preset. A
   library-only change invalidates every affected pair. Rebuild and push those pairs before release.
 - The pair source hash ignores generated C1/C2 bound values and includes the Rust sources that
-  generate them, including `committee`, without their `#[cfg(test)]` modules. Switching the active
-  committee or editing a test module must not change another pair's source hash.
+  generate them, including `committee`, `polynomial/src`, and `polynomial/fhe-adapter/src`, without
+  their `#[cfg(test)]` modules. Switching the active committee or editing a test module must not
+  change another pair's source hash.
 - The source hash reads `Cargo.lock` for external crate pins only: name, version, source, and
   checksum. A workspace version bump or a dependency edit inside the workspace must not make the
   published artifact matrix stale. — `scripts/build-circuits.ts`

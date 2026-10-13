@@ -9,7 +9,7 @@
 //! Uses [`crate::threshold::decrypted_shares_aggregation::utils`] for Q/delta, modular inverses,
 //! Lagrange-at-zero recovery, and scalar CRT reconstruction. Decryption shares are normalized
 //! with [`e3_polynomial::CrtPolynomial::reduce`]; all input coefficients are reduced to
-//! [0, zkp_modulus) with [`e3_polynomial::reduce`] inside [`Inputs::compute`].
+//! [0, zkp_modulus) with [`num_integer::Integer::mod_floor`] inside [`Inputs::compute`].
 
 /// Max message coefficients in the C7 circuit (matches Noir's MAX_MSG_NON_ZERO_COEFFS).
 pub const MAX_MSG_NON_ZERO_COEFFS: usize = 50;
@@ -26,10 +26,11 @@ use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
-use e3_polynomial::reduce;
 use e3_polynomial::{CrtPolynomial, Polynomial};
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use fhe_math::rq::{Poly, PowerBasis};
 use num_bigint::{BigInt, BigUint};
+use num_integer::Integer;
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 /// Output of [`CircuitComputation::compute`] for [`DecryptedSharesAggregationCircuit`].
@@ -303,11 +304,14 @@ impl Computation for Inputs {
 
         let zkp_modulus = get_zkp_modulus();
 
-        let party_ids: Vec<BigInt> = party_ids.iter().map(|c| reduce(c, &zkp_modulus)).collect();
+        let party_ids: Vec<BigInt> = party_ids
+            .iter()
+            .map(|c| c.mod_floor(&zkp_modulus))
+            .collect();
         let message = Polynomial::new(
             message_trunc
                 .iter()
-                .map(|c| reduce(c, &zkp_modulus))
+                .map(|c| c.mod_floor(&zkp_modulus))
                 .collect(),
         );
 

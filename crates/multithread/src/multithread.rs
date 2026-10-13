@@ -6,6 +6,7 @@
 
 #![allow(clippy::result_large_err)]
 
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;

@@ -1518,6 +1518,7 @@ library ActiveCryptoConfig {
       'crates/fhe-params/src',
       'crates/fhe/src',
       'crates/polynomial/src',
+      'crates/polynomial/fhe-adapter/src',
       'crates/parity-matrix/src',
       'crates/safe/src',
     ]) {

@@ -3,28 +3,19 @@ name = "e3-polynomial"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "A polynomial library with big integer coefficients for cryptographic operations"
+description = "Exact integer polynomial arithmetic and CRT coefficient containers"
 repository.workspace = true
 
 [dependencies]
-num-bigint = { workspace = true, features = ["rand_0_9", "serde"] }
+num-bigint = { workspace = true }
 num-traits = { workspace = true }
-serde = { workspace = true, optional = true, features = ["rc"] }
-bincode = { workspace = true, optional = true }
+num-integer = { workspace = true }
+serde = { workspace = true, optional = true }
 thiserror = { workspace = true }
-fhe-math = { workspace = true }
-
-[dev-dependencies]
-criterion = "0.5"
 
 [features]
 default = []
-serde = ["dep:serde"]
-bincode = ["dep:bincode", "serde"]
-
-[[bench]]
-name = "polynomial"
-harness = false
+serde = ["dep:serde", "num-bigint/serde"]
 
 [package.metadata.docs.rs]
 all-features = true

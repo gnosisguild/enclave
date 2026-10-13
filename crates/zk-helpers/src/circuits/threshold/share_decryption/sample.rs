@@ -9,6 +9,7 @@
 //! Produces a random BFV ciphertext, aggregated secret and smudging-error shares (s, e),
 //! and the corresponding decryption share (d_share) for use in codegen and tests.
 
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use std::sync::Arc;
 
 use crate::{threshold::share_decryption::ShareDecryptionCircuitData, CircuitsErrors};

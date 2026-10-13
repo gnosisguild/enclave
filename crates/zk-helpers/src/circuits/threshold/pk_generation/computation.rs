@@ -11,7 +11,7 @@
 
 use crate::calculate_bit_width;
 use crate::crt_polynomial_to_toml_json;
-use crate::math::fold_negacyclic;
+use crate::negacyclic::fold_negacyclic;
 use crate::polynomial_to_toml_json;
 use crate::threshold::pk_generation::circuit::PkGenerationCircuit;
 use crate::threshold::pk_generation::circuit::PkGenerationCircuitData;
@@ -344,27 +344,19 @@ impl Computation for Inputs {
             //   pk0i == (-(a * sk) + eek mod X^N + 1) + qi * r
             // so folding the already-computed `pk0_share_hat` and dividing gives `r` directly.
             //
-            // Everything here is O(N). Going via `decompose_residue` and then
-            // `reduce_by_cyclotomic` would instead recompute the `a * sk` product and run two
-            // generic long divisions, about 134 million BigInt multiply-subtracts per limb at
-            // N = 8192 -- for a value `fold_negacyclic` reaches in N subtractions. Measured at
-            // secure-8192, that was 5.09s of witness generation against 0.92s.
+            // Fold the existing product in O(N), without recomputing the convolution.
             let reduced_hat = fold_negacyclic(&pk0_share_hat, n as usize);
 
-            // Exact division is the identity: `div` rejects any coefficient of
+            // Exact division rejects any coefficient of
             // `pk0 - reduced_hat` that is not a multiple of qi, so a successful division is a proof
             // that an integer `r` closes the reduced equation. A wrong fold shows up here, because
             // the difference stops being divisible.
-            let (r, remainder) = pk0_share
+            let r = pk0_share
                 .sub(&reduced_hat)
-                .div(&Polynomial::constant(qi.clone()))
+                .div_exact(&qi)
                 .expect("pk0i - (a * sk + eek mod X^N + 1) must be divisible by qi");
-            assert!(
-                remainder.is_zero(),
-                "reduced pk0 identity must divide exactly by qi"
-            );
 
-            // Restate the identity on the derived witness. Cheap at O(N), and independent of `div`.
+            // Check the derived witness against the integer identity.
             assert!(
                 pk0_share
                     .sub(&reduced_hat.add(&r.scalar_mul(&qi)))
@@ -375,13 +367,7 @@ impl Computation for Inputs {
             // e_sm_quotient = (e_sm_lifted - e_sm[i]) / q_i, the witness the circuit uses to tie
             // the committed residue back to the bounded lifted value.
             let diff = e_sm_lifted.sub(&e_sm);
-            let (e_sm_quotient, remainder) = diff
-                .div(&Polynomial::constant(qi.clone()))
-                .expect("CRT requires exact division");
-            assert!(
-                remainder.is_zero(),
-                "e_sm_lifted - e_sm[i] must be divisible by q_i (CRT consistency)"
-            );
+            let e_sm_quotient = diff.div_exact(&qi).expect("CRT requires exact division");
 
             (i, r, pk0_share.clone(), e_sm.clone(), e_sm_quotient)
         })

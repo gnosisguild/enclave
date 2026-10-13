@@ -7,7 +7,7 @@ description = "ZK proof generation for Interfold ciphernodes"
 repository.workspace = true
 
 [dependencies]
-e3-committee = { workspace = true }
+e3-committee.workspace = true
 acir = { git = "https://github.com/noir-lang/noir", tag = "v1.0.0-beta.26" }
 actix.workspace = true
 acvm = { git = "https://github.com/noir-lang/noir", tag = "v1.0.0-beta.26" }
@@ -24,7 +24,6 @@ e3-config.workspace = true
 e3-data.workspace = true
 e3-events.workspace = true
 e3-fhe-params.workspace = true
-e3-polynomial.workspace = true
 e3-request.workspace = true
 e3-slashing.workspace = true
 e3-utils.workspace = true
@@ -51,6 +50,10 @@ tracing.workspace = true
 walkdir = "2.5"
 
 [dev-dependencies]
+num-integer.workspace = true
+e3-polynomial.workspace = true
+e3-polynomial-fhe.workspace = true
+fhe-math.workspace = true
 e3-ciphernode-builder = { workspace = true }
 e3-net = { workspace = true }
 e3-sync = { workspace = true }

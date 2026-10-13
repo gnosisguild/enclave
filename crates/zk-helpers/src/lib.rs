@@ -7,6 +7,7 @@
 pub mod ciphernodes_committee;
 pub mod circuits;
 pub mod math;
+mod negacyclic;
 pub mod packing;
 pub mod registry;
 pub mod utils;

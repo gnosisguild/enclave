@@ -15,8 +15,8 @@ use crate::circuits::commitments::{
 };
 use crate::dkg::share_encryption::ShareEncryptionCircuit;
 use crate::dkg::share_encryption::ShareEncryptionCircuitData;
-use crate::math::fold_negacyclic;
 use crate::math::{compute_k0is, compute_q_mod_t_centered, plaintext_poly_u64};
+use crate::negacyclic::fold_negacyclic;
 use crate::polynomial_to_toml_json;
 use crate::utils::{compute_modulus_bit, compute_msg_bit};
 use crate::CircuitsErrors;
@@ -27,6 +27,7 @@ use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use fhe::bfv::SecretKey;
 use fhe_math::zq::Modulus;
 use itertools::izip;
@@ -669,35 +670,23 @@ impl Computation for Inputs {
             // so folding the hats computed above and dividing by qi gives them. The hats already
             // hold the products, so nothing is recomputed and the cyclotomic quotients never exist.
             //
-            // Everything here is O(N). Going through `decompose_residue` plus
-            // `Polynomial::reduce_by_cyclotomic` instead ran four generic long divisions per limb --
-            // 536,870,904 BigInt multiply-subtracts at N = 8192, L = 2 -- and recomputed both
-            // products for the self-checks. Measured, that was 8.66s of witness generation per C3
-            // proof, and C3 runs about 1,512 times per DKG.
+            // Fold both existing products in O(N), without recomputing their convolutions.
             let ct0_reduced_hat = fold_negacyclic(&ct0i_hat, n as usize);
             let ct1_reduced_hat = fold_negacyclic(&ct1i_hat, n as usize);
 
-            // Exact division is the identity: `div` rejects any coefficient that is not a multiple of
+            // Exact division rejects any coefficient that is not a multiple of
             // qi, so a successful division proves an integer quotient closes the reduced equation and
             // a wrong fold surfaces as a divisibility failure.
-            let (ct0_r, ct0_remainder) = ct0i
+            let ct0_r = ct0i
                 .sub(&ct0_reduced_hat)
-                .div(&Polynomial::constant(qi_bigint.clone()))
+                .div_exact(&qi_bigint)
                 .expect("ct0i - (pk0i * u + e0 + k0qi * k1 mod X^N + 1) must be divisible by qi");
-            assert!(
-                ct0_remainder.is_zero(),
-                "reduced C3 ct0 identity must divide exactly by qi"
-            );
-            let (ct1_r, ct1_remainder) = ct1i
+            let ct1_r = ct1i
                 .sub(&ct1_reduced_hat)
-                .div(&Polynomial::constant(qi_bigint.clone()))
+                .div_exact(&qi_bigint)
                 .expect("ct1i - (pk1i * u + e1 mod X^N + 1) must be divisible by qi");
-            assert!(
-                ct1_remainder.is_zero(),
-                "reduced C3 ct1 identity must divide exactly by qi"
-            );
 
-            // Restate both identities on the derived witnesses. O(N), and independent of `div`.
+            // Check both derived witnesses against their integer identities.
             assert!(
                 ct0i
                     .sub(&ct0_reduced_hat.add(&ct0_r.scalar_mul(&qi_bigint)))
