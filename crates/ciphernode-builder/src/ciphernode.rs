@@ -6,7 +6,7 @@
 
 use actix::Addr;
 use anyhow::{Context, Result};
-use e3_data::{DataStore, InMemStore, StoreAddr};
+use e3_data::DataStore;
 use e3_events::{BusHandle, HistoryCollector, InterfoldEvent};
 use e3_evm::GatewayFailureReceiver;
 use e3_net::{NetChannelBridge, NetworkStatus};
@@ -37,18 +37,6 @@ pub enum NetInterfaceKind {
     Libp2p,
     /// In-process channel bridge (tests / benchmarks).
     ChannelBridge(NetChannelBridge),
-}
-
-impl NetInterfaceKind {
-    /// Extract the channel bridge, failing if this is a libp2p interface.
-    pub fn into_channel_bridge(self) -> Result<NetChannelBridge> {
-        match self {
-            NetInterfaceKind::ChannelBridge(bridge) => Ok(bridge),
-            NetInterfaceKind::Libp2p => Err(anyhow::anyhow!(
-                "No channel bridge exists — node is using libp2p networking"
-            )),
-        }
-    }
 }
 
 /// A sharable handle to a Ciphernode. Clones are available for use in the
@@ -129,22 +117,15 @@ impl CiphernodeHandle {
         &self.aggregate_ids
     }
 
-    pub fn store(&self) -> &DataStore {
-        &self.store
-    }
-
     /// Extract the channel bridge for test network simulation.
     /// Returns an error if the node is using libp2p networking.
     pub fn channel_bridge(&self) -> Result<NetChannelBridge> {
-        self.net_interface.clone().into_channel_bridge()
-    }
-
-    pub fn in_mem_store(&self) -> Option<&Addr<InMemStore>> {
-        let addr = self.store.get_addr();
-        if let StoreAddr::InMem(ref store) = addr {
-            return Some(store);
+        match &self.net_interface {
+            NetInterfaceKind::ChannelBridge(bridge) => Ok(bridge.clone()),
+            NetInterfaceKind::Libp2p => Err(anyhow::anyhow!(
+                "No channel bridge exists — node is using libp2p networking"
+            )),
         }
-        None
     }
 
     /// Stop protocol actors and make persisted state durable within `deadline`.

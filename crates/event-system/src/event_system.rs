@@ -249,7 +249,7 @@ impl EventSystem {
     pub fn buffer(&self) -> Result<Addr<SnapshotBuffer>> {
         self.buffer
             .get_or_try_init(|| {
-                SnapshotBuffer::spawn(&self.aggregate_config(), NoopBatchReceiver::new().start())
+                SnapshotBuffer::spawn(&self.aggregate_config(), NoopBatchReceiver.start())
             })
             .cloned()
     }
@@ -273,11 +273,9 @@ impl EventSystem {
     pub fn eventstore_addrs(&self) -> Result<EventStoreAddrs> {
         self.eventstore_addrs
             .get_or_try_init(|| {
+                let indexes = self.aggregate_config().indexed_ids();
                 match &self.backend {
                     EventSystemBackend::InMem(b) => {
-                        let config = self.aggregate_config();
-                        let indexes = config.indexed_ids();
-
                         let addrs = b
                             .eventstores
                             .get_or_init(|| {
@@ -300,9 +298,6 @@ impl EventSystem {
                         Ok(EventStoreAddrs::InMem(addrs))
                     }
                     EventSystemBackend::Persisted(b) => {
-                        let config = self.aggregate_config();
-                        let indexes = config.indexed_ids();
-
                         let addrs = b
                             .eventstores
                             .get_or_try_init(|| -> Result<_> {
@@ -429,11 +424,6 @@ impl EventSystem {
 
 struct NoopBatchReceiver;
 
-impl NoopBatchReceiver {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
 impl Actor for NoopBatchReceiver {
     type Context = actix::Context<Self>;
 }

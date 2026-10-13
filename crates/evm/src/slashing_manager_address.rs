@@ -18,43 +18,28 @@ use tracing::{error, warn};
 /// Delays before the startup retries of `Interfold.slashingManager()`.
 const SLASHING_MANAGER_READ_RETRY_DELAYS: [u64; 2] = [1, 3];
 
-/// The SlashingManager address that startup chose for one chain.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum SlashingManagerChoice {
-    /// `Interfold.slashingManager()`. The configured address is absent or equal.
-    Chain(Address),
-    /// `Interfold.slashingManager()`, which replaces a different configured address.
-    ChainOverridesConfig { chain: Address, configured: Address },
-    /// The configured address, because the chain gave no address.
-    Configured(Address),
-}
-
-impl SlashingManagerChoice {
-    fn address(self) -> Address {
-        match self {
-            Self::Chain(address)
-            | Self::ChainOverridesConfig { chain: address, .. }
-            | Self::Configured(address) => address,
-        }
-    }
-}
-
 /// Decide the SlashingManager for one chain.
 ///
 /// `Interfold.slashingManager()` is authoritative: the contracts call that manager, and accusation
 /// votes sign its address as the EIP-712 `verifyingContract`. The configured address applies only
 /// when the chain gives no address. `None` means that neither source gives an address.
 fn choose_slashing_manager(
+    chain: &str,
     configured: Option<Address>,
     on_chain: Option<Address>,
-) -> Option<SlashingManagerChoice> {
-    match (on_chain, configured) {
-        (Some(chain), Some(configured)) if chain != configured => {
-            Some(SlashingManagerChoice::ChainOverridesConfig { chain, configured })
+) -> Option<Address> {
+    if let (Some(on_chain), Some(configured)) = (on_chain, configured) {
+        if on_chain != configured {
+            warn!(
+                chain = %chain,
+                configured = %configured,
+                interfold = %on_chain,
+                "Configured SlashingManager differs from Interfold.slashingManager(); \
+                 using the Interfold value"
+            );
         }
-        (Some(chain), _) => Some(SlashingManagerChoice::Chain(chain)),
-        (None, configured) => configured.map(SlashingManagerChoice::Configured),
     }
+    on_chain.or(configured)
 }
 
 /// Resolve the SlashingManager address of each configured chain, in `chains` order.
@@ -101,21 +86,7 @@ pub async fn resolve_slashing_managers(chains: &Chains) -> Result<Vec<Option<Add
                 ),
             }
         }
-        let choice = choose_slashing_manager(configured, on_chain);
-        if let Some(SlashingManagerChoice::ChainOverridesConfig {
-            chain: on_chain,
-            configured,
-        }) = choice
-        {
-            warn!(
-                chain = %config.name,
-                configured = %configured,
-                interfold = %on_chain,
-                "Configured SlashingManager differs from Interfold.slashingManager(); \
-                 using the Interfold value"
-            );
-        }
-        slashing_managers.push(choice.map(SlashingManagerChoice::address));
+        slashing_managers.push(choose_slashing_manager(&config.name, configured, on_chain));
     }
     Ok(slashing_managers)
 }
@@ -155,41 +126,26 @@ pub fn slashing_managers_by_chain(
 
 #[cfg(test)]
 mod tests {
-    use super::{choose_slashing_manager, SlashingManagerChoice};
+    use super::choose_slashing_manager;
     use alloy::primitives::Address;
 
     #[test]
-    fn slashing_manager_uses_the_interfold_dependency() {
+    fn the_interfold_slashing_manager_wins_over_the_configured_address() {
         let live = Address::repeat_byte(0x75);
         let retired = Address::repeat_byte(0x97);
 
-        let choice = choose_slashing_manager(Some(retired), Some(live));
         assert_eq!(
-            choice,
-            Some(SlashingManagerChoice::ChainOverridesConfig {
-                chain: live,
-                configured: retired,
-            })
-        );
-        assert_eq!(choice.map(SlashingManagerChoice::address), Some(live));
-        assert_eq!(
-            choose_slashing_manager(Some(live), Some(live)),
-            Some(SlashingManagerChoice::Chain(live))
+            choose_slashing_manager("test", Some(retired), Some(live)),
+            Some(live)
         );
         assert_eq!(
-            choose_slashing_manager(None, Some(live)),
-            Some(SlashingManagerChoice::Chain(live))
+            choose_slashing_manager("test", None, Some(live)),
+            Some(live)
         );
-    }
-
-    #[test]
-    fn slashing_manager_uses_the_configured_address_without_a_chain_value() {
-        let configured = Address::repeat_byte(0x97);
-
         assert_eq!(
-            choose_slashing_manager(Some(configured), None),
-            Some(SlashingManagerChoice::Configured(configured))
+            choose_slashing_manager("test", Some(retired), None),
+            Some(retired)
         );
-        assert_eq!(choose_slashing_manager(None, None), None);
+        assert_eq!(choose_slashing_manager("test", None, None), None);
     }
 }
