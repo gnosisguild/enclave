@@ -188,3 +188,9 @@ impl Sortition {
         }
     }
 }
+
+// Blueprint diff demo: a fake handler. Do not merge.
+impl Handler<TypedEvent<BlueprintProbe>> for Sortition {
+    type Result = ();
+    fn handle(&mut self, _msg: TypedEvent<BlueprintProbe>, _ctx: &mut Self::Context) {}
+}

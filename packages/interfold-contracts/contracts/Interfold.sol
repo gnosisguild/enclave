@@ -287,6 +287,11 @@ contract Interfold is
     ////////////////////////////////////////////////////////////
 
     /// @inheritdoc IInterfold
+    /// Blueprint diff demo: a fake event and function. Do not merge.
+    event BlueprintProbeHappened(uint256 id);
+
+    function blueprintProbe() external {}
+
     function request(
         E3RequestParams calldata requestParams
     ) external nonReentrant returns (uint256 e3Id, E3 memory e3) {
