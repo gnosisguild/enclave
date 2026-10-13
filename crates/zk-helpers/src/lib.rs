@@ -10,10 +10,8 @@ pub mod encoding;
 pub mod metadata;
 mod negacyclic;
 pub mod packing;
-pub mod registry;
 
 pub use circuits::*;
 pub use encoding::*;
 pub use metadata::*;
 pub use packing::*;
-pub use registry::*;

@@ -1253,7 +1253,6 @@ dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
- "clap",
  "e3-committee",
  "e3-fhe-params",
  "e3-parity-matrix",

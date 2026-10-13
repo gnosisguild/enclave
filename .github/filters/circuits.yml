@@ -22,6 +22,7 @@ verifiers:
   - 'packages/interfold-contracts/contracts/verifiers/**'
   - 'crates/zk-prover/versions.json'
   - 'crates/zk-helpers/**'
+  - 'crates/zk/cli/**'
   - 'crates/fhe-params/**'
   - 'crates/committee/**'
   - 'crates/polynomial/**'

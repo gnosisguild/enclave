@@ -60,6 +60,9 @@ flowchart TD
         Logger[e3-logger]
     end
 
+    ZkArtifacts[e3-zk-artifacts] --> ZkHelpers
+    ZkArtifacts --> FheParams
+    ZkArtifacts --> Committee
 
     subgraph Vocabulary[Protocol vocabulary and deterministic rules]
         Events[e3-events]
