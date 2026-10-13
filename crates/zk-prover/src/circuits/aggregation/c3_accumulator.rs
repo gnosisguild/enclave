@@ -1422,14 +1422,16 @@ pub fn generate_c3_merge_m7(
             "generate_c3_merge_m7: cover_start must be 1 (anchor + 54 covered), got {cover_start}"
         )));
     }
-    // CR-11: each B10/B2 sub-gate's covered-row window in the M7 circuit is
-    // [slot1 + j, slot1 + j + len) where slot1 == slot_indices[1]. c3_batch only
-    // range-checks + de-dupes the leaf slots it witnesses. If a caller's slot_indices
-    // value at position (cover_start + j + k) is outside that block's window, the
-    // M7 gate copies rows from the window and silently drops that leaf (the zero-
-    // overwrite assert cannot fire because the genesis is all-zero there).
-    // Enforce per-block membership up-front — before the kernel genesis proof.
-    let m7_base = slot_indices[1] as usize;
+    // CR-11/CR-12: each B10/B2 sub-gate's covered-row window in the M7 circuit is
+    // [slot1 + j, slot1 + j + len) where the witness sets slot1 = cover_start (see
+    // m7_gate_over_genesis), NOT slot_indices[1]. Anchor the check at cover_start —
+    // the slot origin the M7 circuit actually reads. c3_batch only range-checks +
+    // de-dupes the leaf slots it witnesses. If a caller's slot_indices value at
+    // position (cover_start + j + k) is outside that block's window, the M7 gate
+    // copies rows from the window and silently drops that leaf (the zero-overwrite
+    // assert cannot fire because the genesis is all-zero there). Enforce per-block
+    // membership up-front — before the kernel genesis proof.
+    let m7_base = cover_start;
     for &(block_start, block_len) in &[
         (0usize, 10usize),
         (10, 10),
