@@ -219,6 +219,13 @@ pnpm test:integration --no-prebuild
 				</a>
 			</td>
 			<td align="center">
+				<a href="https://github.com/neogiacomo">
+					<img src="https://avatars.githubusercontent.com/u/20580910?v=4" width="100;" alt="neogiacomo"/>
+					<br />
+					<sub><b>Giacomo Corrias</b></sub>
+				</a>
+			</td>
+			<td align="center">
 				<a href="https://github.com/Subhasish-Behera">
 					<img src="https://avatars.githubusercontent.com/u/92573882?v=4" width="100;" alt="Subhasish-Behera"/>
 					<br />
@@ -239,6 +246,8 @@ pnpm test:integration --no-prebuild
 					<sub><b>callumweb3</b></sub>
 				</a>
 			</td>
+		</tr>
+		<tr>
 			<td align="center">
 				<a href="https://github.com/CryptAm">
 					<img src="https://avatars.githubusercontent.com/u/102138190?v=4" width="100;" alt="CryptAm"/>
