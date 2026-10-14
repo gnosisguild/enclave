@@ -12,13 +12,6 @@ pub fn parse_hex_big(s: &str) -> BigUint {
     BigUint::parse_bytes(t.as_bytes(), 16).expect("invalid hex prime")
 }
 
-pub fn product<I>(xs: I) -> BigUint
-where
-    I: IntoIterator<Item = BigUint>,
-{
-    xs.into_iter().fold(BigUint::one(), |acc, x| acc * x)
-}
-
 /// Compute approximate log2 of a BigUint efficiently.
 ///
 /// Uses the bit length and top 8 bytes to compute a fractional approximation:
@@ -70,19 +63,6 @@ mod tests {
         assert_eq!(parse_hex_big("ff"), BigUint::from(255u64));
         assert_eq!(parse_hex_big("0x100"), BigUint::from(256u64));
         assert_eq!(parse_hex_big("0x1a2b3c"), BigUint::from(1715004u64));
-    }
-
-    #[test]
-    fn test_product() {
-        let nums = vec![
-            BigUint::from(2u64),
-            BigUint::from(3u64),
-            BigUint::from(4u64),
-        ];
-        assert_eq!(product(nums), BigUint::from(24u64));
-
-        let empty: Vec<BigUint> = vec![];
-        assert_eq!(product(empty), BigUint::one());
     }
 
     #[test]

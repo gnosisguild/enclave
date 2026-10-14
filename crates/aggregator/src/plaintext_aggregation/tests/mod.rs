@@ -238,6 +238,7 @@ fn share_with_matching_commitment(
     party: u64,
     ciphertexts: &[ArcBytes],
 ) -> (Vec<ArcBytes>, Vec<SignedProofPayload>) {
+    use e3_polynomial_fhe::FromFhePolynomial as _;
     use e3_zk_helpers::{
         circuits::commitments::compute_threshold_decryption_share_commitment,
         circuits::threshold::decrypted_shares_aggregation::MAX_MSG_NON_ZERO_COEFFS,

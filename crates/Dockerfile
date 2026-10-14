@@ -50,6 +50,7 @@ COPY crates/bfv-client/Cargo.toml ./bfv-client/Cargo.toml
 COPY crates/cli/Cargo.toml ./cli/Cargo.toml
 COPY crates/ciphernode-builder/Cargo.toml ./ciphernode-builder/Cargo.toml
 COPY crates/compute-provider/Cargo.toml ./compute-provider/Cargo.toml
+COPY crates/committee/Cargo.toml ./committee/Cargo.toml
 COPY crates/committee-hash/Cargo.toml ./committee-hash/Cargo.toml
 COPY crates/config/Cargo.toml ./config/Cargo.toml
 COPY crates/console/Cargo.toml ./console/Cargo.toml
@@ -76,7 +77,7 @@ COPY crates/openvm-types/Cargo.toml ./openvm-types/Cargo.toml
 COPY crates/parity-matrix/Cargo.toml ./parity-matrix/Cargo.toml
 COPY crates/zk-prover/Cargo.toml ./zk-prover/Cargo.toml
 COPY crates/polynomial/Cargo.toml ./polynomial/Cargo.toml
-COPY crates/polynomial/benches ./polynomial/benches
+COPY crates/polynomial/fhe-adapter/Cargo.toml ./polynomial/fhe-adapter/Cargo.toml
 COPY crates/program-server/Cargo.toml ./program-server/Cargo.toml
 COPY crates/request/Cargo.toml ./request/Cargo.toml
 COPY crates/safe/Cargo.toml ./safe/Cargo.toml
@@ -94,10 +95,11 @@ COPY crates/utils/Cargo.toml ./utils/Cargo.toml
 COPY crates/utils-derive/Cargo.toml ./utils-derive/Cargo.toml
 COPY crates/wasm/Cargo.toml ./wasm/Cargo.toml
 COPY crates/zk-helpers/Cargo.toml ./zk-helpers/Cargo.toml
+COPY crates/zk/cli/Cargo.toml ./zk/cli/Cargo.toml
 
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./entrypoint/build.rs
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./cli/build.rs
-RUN for d in ./*/ ; do \
+RUN for d in ./*/ ./*/*/ ; do \
         if [ -f "$d/Cargo.toml" ]; then \
           if [ "$d" = "./cli/" ]; then \
             mkdir -p "$d/src" && \
@@ -113,9 +115,8 @@ RUN for d in ./*/ ; do \
     done
 
 # Crates with [[bin]] in Cargo.toml need stub binaries so the first build succeeds
-RUN mkdir -p ./zk-helpers/src/bin && \
-    echo 'fn main() {}' > ./zk-helpers/src/bin/zk_cli.rs && \
-    echo 'fn main() {}' > ./zk-helpers/src/bin/compute_vk_hash.rs
+RUN mkdir -p ./zk/cli/src && \
+    echo 'fn main() {}' > ./zk/cli/src/main.rs
 RUN mkdir -p ./fhe-params/src/bin && echo 'fn main() {}' > ./fhe-params/src/bin/search_params.rs
 
 RUN cargo build --locked --release

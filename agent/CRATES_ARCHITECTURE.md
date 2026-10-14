@@ -59,10 +59,15 @@ flowchart TD
         Logger[e3-logger]
     end
 
+    ZkArtifacts[e3-zk-artifacts] --> ZkHelpers
+    ZkArtifacts --> FheParams
+    ZkArtifacts --> Committee
+
     subgraph Vocabulary[Protocol vocabulary and deterministic rules]
         Events[e3-events]
         Config[e3-config]
         FheParams[e3-fhe-params]
+        Committee[e3-committee]
         ZkHelpers[e3-zk-helpers]
         CommitteeHash[e3-committee-hash]
     end
@@ -70,6 +75,7 @@ flowchart TD
     subgraph Foundations[Foundation crates]
         Crypto[e3-crypto]
         Poly[e3-polynomial]
+        PolyFhe[e3-polynomial-fhe]
         Matrix[e3-parity-matrix]
         Safe[e3-safe]
         Hamt[e3-hamt]
@@ -125,25 +131,31 @@ flowchart TD
     Aggregator --> Prover
     Aggregator --> Evm
     Aggregator --> CommitteeHash
+    Aggregator --> Committee
     Keyshare --> Fhe
     Keyshare --> Multi
     Keyshare --> Trbfv
+    Keyshare --> Committee
     Slashing --> Request
     Slashing --> ZkHelpers
+    Slashing --> Committee
     Prover --> Slashing
     Prover --> ZkHelpers
+    Prover --> Committee
     Multi --> Prover
     Multi --> Trbfv
+    Multi --> Committee
+    Request --> Committee
     Fhe --> BfvClient
     Trbfv --> BfvClient
     BfvClient --> FheParams
-    BfvClient --> Poly
     BfvClient --> ZkHelpers
 
     Evm --> Config
     Evm --> Data
     Evm --> DataAvailability
     Evm --> Events
+    Evm --> Committee
     Net --> Config
     Net --> Data
     Net --> Events
@@ -161,9 +173,14 @@ flowchart TD
     Events --> FheParams
     Events --> Trbfv
     Events --> ZkHelpers
+    Events --> Committee
+    ZkHelpers --> Committee
+    ZkHelpers --> FheParams
     ZkHelpers --> Poly
+    ZkHelpers --> PolyFhe
     ZkHelpers --> Matrix
     ZkHelpers --> Safe
+    PolyFhe --> Poly
     Crypto --> Utils
     Utils --> UtilsDerive
 
@@ -174,10 +191,21 @@ flowchart TD
     TestHelpers --> SDK
 ```
 
+`e3-committee` owns committee configurations and their canonical parameter values. Public-key
+aggregation owns the selection of the lowest distinct verified party IDs for C5's `H` slots, in
+`crates/aggregator/src/public_key_aggregation/workflow.rs`.
+
 The most important current boundary debt is that `e3-events` contains both neutral event transport
 and rich protocol payloads that depend on cryptographic/FHE types. Protocol workflow crates also
 depend directly on Actix and concrete repositories. These are real constraints in the current code
 and are not papered over with empty port traits.
+
+`crates/polynomial` is the `e3-polynomial` package. `Polynomial` owns exact integer coefficient
+arithmetic and transforms; `CrtPolynomial` routes transforms to its ordered residue limbs. The child
+FHE adapter is a separate root-workspace member and reads native ascending coefficients. The ZK
+helper layer owns crate-private negacyclic folding, witness reversal/centering, packing, and JSON
+encoding. Prover test fixtures reconstruct native FHE inputs locally, without a production
+reverse-conversion API in the adapter.
 
 The resulting workflow/actor/effect separation is module-level rather than a clean crate boundary.
 On disk, those roles are grouped by protocol capability; the labels in this diagram describe
