@@ -4,9 +4,10 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::math::fhe_poly_to_crt_centered;
-use crate::utils::{compute_modulus_bit, ZkHelpersUtilsError};
+use crate::encoding::{fhe_poly_to_crt_centered, ZkHelpersUtilsError};
+use e3_fhe_params::utils::compute_modulus_bit;
 use e3_polynomial::{CrtPolynomial, CrtPolynomialError};
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use fhe::bfv::{BfvParameters, Ciphertext, PublicKey};
 
 /// Converts a BFV ciphertext to Greco format.

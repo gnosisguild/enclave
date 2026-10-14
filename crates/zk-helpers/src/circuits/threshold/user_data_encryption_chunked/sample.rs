@@ -50,7 +50,7 @@ mod tests {
 
         assert_eq!(sample.public_key.c.len(), 2);
         assert_eq!(
-            crate::math::plaintext_poly_u64(&sample.plaintext)
+            crate::encoding::plaintext_poly_u64(&sample.plaintext)
                 .unwrap()
                 .len(),
             BfvPreset::InsecureThreshold.metadata().degree

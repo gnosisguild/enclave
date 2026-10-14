@@ -10,6 +10,7 @@ use crate::contracts::IInterfold;
 use alloy::primitives::{keccak256, LogData, B256};
 use alloy::sol_types::{SolEvent, SolValue};
 use anyhow::{anyhow, Context as _, Result};
+use e3_committee::CiphernodesCommitteeSize;
 use e3_events::E3id;
 use e3_events::InterfoldEventData;
 use e3_events::{
@@ -19,10 +20,9 @@ use e3_events::{
 use e3_fhe_params::{encode_bfv_params, BfvParamSet, BfvPreset};
 use e3_trbfv::helpers::calculate_error_size;
 use e3_utils::ArcBytes;
-use e3_zk_helpers::CiphernodesCommitteeSize;
 use tracing::{info, trace, warn};
 
-const CIRCUIT_VERSION_LABEL: &[u8] = b"interfold-bfv-v4";
+const CIRCUIT_VERSION_LABEL: &[u8] = b"interfold-bfv-v5";
 
 struct E3RequestedWithChainId(pub IInterfold::E3Requested, pub u64);
 
@@ -560,15 +560,15 @@ mod tests {
         let expected = [
             (
                 0,
-                "0x353ab90c0ebe9c13e1b9c2048539b7c2872f3eb12a9f1957f31410aa4bf44718",
+                "0x968e91054be28b2b577ac278284e03274ed46bd5c5064e573290312a2323d495",
             ),
             (
                 2,
-                "0x5ebb3432396f21cd97fca47e006b9dd38c021bf2902d3e555cf74cb91b28e44e",
+                "0xa174862efd4487031d423ca96516807775ade0191c714e513aab93d0cc289baa",
             ),
             (
                 3,
-                "0x9c5c09ac7421582c4407c7e6ad923b8f9126aa708957c2575760fb0a38153655",
+                "0x9b9181e0304e51388d6edd6eb4d5ae9a8593cbdbf28838734d829d09d0701d86",
             ),
         ];
 
@@ -606,6 +606,7 @@ mod tests {
                 b"interfold-bfv-v1",
                 b"interfold-bfv-v2",
                 b"interfold-bfv-v3",
+                b"interfold-bfv-v4",
             ] {
                 let mut legacy_event = event.clone();
                 legacy_event.cryptoConfigId = keccak256(
@@ -627,7 +628,7 @@ mod tests {
     }
 
     #[test]
-    fn insecure_v4_config_id_differs_from_origin_v1() {
+    fn insecure_v5_config_id_differs_from_origin_v1() {
         let params = encode_bfv_params(
             &BfvParamSet::from(BfvPreset::from_on_chain_param_set(0).unwrap()).build_arc(),
         );
@@ -642,7 +643,7 @@ mod tests {
 
         assert_eq!(
             crypto_config_id(&params),
-            "0x353ab90c0ebe9c13e1b9c2048539b7c2872f3eb12a9f1957f31410aa4bf44718"
+            "0x968e91054be28b2b577ac278284e03274ed46bd5c5064e573290312a2323d495"
                 .parse::<B256>()
                 .unwrap()
         );

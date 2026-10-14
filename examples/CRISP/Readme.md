@@ -22,7 +22,7 @@ root structure.
 CRISP/
 ├── client/                  # React frontend application (Vite + @crisp-e3/sdk)
 ├── server/                  # Rust coordination server & CLI
-├── program/                 # FHE program for encrypted computation + RISC Zero verification
+├── program/                 # FHE policy proved with OpenVM
 ├── packages/
 │   ├── crisp-contracts/     # CRISP program contract + Hardhat deployment scripts
 │   └── crisp-sdk/           # TypeScript helpers to generate a ZK proof
@@ -54,20 +54,28 @@ Before getting started, ensure you have installed:
   - `nargo`: `noirup -v v1.0.0-beta.26` (`NOIR_TOOLCHAIN` in `.github/workflows/ci.yml`)
   - `bb`: version and per-platform checksums live in `crates/zk-prover/versions.json`
 
-[RiscZero](https://dev.risczero.com/api/zkvm/install) is **not** required for local development.
-`scripts/dev_program.sh` starts the program server with `--dev true`, so `pnpm dev:up` runs without
-a proving backend no matter what `program.dev` says in `interfold.config.yaml`. Real proving runs
-inside a container image that already ships RiscZero, so what that path needs locally is **Docker**,
-not a RiscZero install.
+Local development runs the unproved development runner unless `CRISP_REAL_PROOFS=1` (see
+`crisp.dev.env.example`). Real proofs use OpenVM: build the workers, configure `program.openvm` in
+`interfold.config.yaml`, and run `interfold program compile`. Follow
+[`crates/openvm-prover/README.md`](../../crates/openvm-prover/README.md). A machine with a working
+CUDA GPU proves on it when the CUDA worker is configured; any other machine proves on the CPU.
+
+The CRISP deployment reads the receipt identity `interfold program compile` wrote, unless
+`OPENVM_APP_EXE_COMMIT`, `OPENVM_APP_VM_COMMIT`, and either `OPENVM_VERIFIER_ARTIFACT` with
+`OPENVM_VERIFIER_SHA256` or `OPENVM_HALO2_VERIFIER` with `OPENVM_HALO2_RUNTIME_CODE_HASH` are set.
+Outside `CRISP_UNPROVED_TEST=1`, it never selects a mock compute verifier. `CRISP_UNPROVED_TEST=1`
+deploys `MockOpenVmReceiptVerifier`, which accepts every receipt. It works on the local chain (chain
+ID 31337), and on Sepolia (chain ID 11155111) only with `ALLOW_SEPOLIA_UNPROVED_COMPUTE=true`. Every
+other chain, mainnet included, refuses it. A Sepolia deployment with this verifier does not verify
+compute proofs. It runs `e3-support-scripts-dev`, the unproved development runner, instead of the
+OpenVM service.
 
 ## Quick Start
 
 The simplest way to run CRISP is:
 
 ```bash
-# From the repository root — the CRISP contracts depend on the risc0-ethereum submodule
-git submodule update --init --recursive
-
+# From the repository root
 cd examples/CRISP
 
 # Optional: choose local profile (copied to crisp.dev.env on first setup)
@@ -80,10 +88,6 @@ pnpm dev:setup
 # Start all services (Hardhat, contracts, ciphernodes, program server, coordination server, and UI)
 pnpm dev:up
 ```
-
-> **_Note:_** Without the submodule step, `pnpm dev:setup` fails while compiling contracts with
-> `HHE902 ... lib/risc0-ethereum/contracts/src/groth16/RiscZeroGroth16Verifier.sol doesn't exist`.
-> CI does not hit this because its checkout uses `submodules: recursive`.
 
 The program server accepts caller-supplied HTTP(S) callback URLs. It is a development-only test
 service, does not authenticate callers or allowlist callback destinations, and must stay isolated
@@ -141,66 +145,25 @@ pnpm test:e2e
 
 ### Ciphernode Configuration
 
-The `interfold.config.yaml` file in the CRISP root directory configures the ciphernode network. By
-default, it runs in development mode with fake proofs for fast local development:
+The `interfold.config.yaml` file in the CRISP root directory configures the ciphernode network. It
+sets `program.dev: false`. The local scripts override that with `E3_PROGRAM__DEV=true` unless
+`CRISP_REAL_PROOFS=1`, so a local round uses the unproved development runner by default.
 
-```yaml
-program:
-  dev: true # Uses fake zkVM proofs (fast for development)
-```
+### OpenVM configuration
 
-### Boundless Configuration
+The real-proof compute service uses OpenVM. CRISP's guest is `examples/CRISP/guest`, and its service
+is `.interfold/support/openvm`; both link `program/`, the processor and policy the contract agrees
+with. Follow the [OpenVM guide](../../crates/openvm-prover/README.md) to build the workers, then run
+`interfold program compile` for the guest, keys, identity and service.
 
-For production-grade zero-knowledge proofs with [Boundless](https://docs.boundless.network/), update
-`interfold.config.yaml`:
+Set `program.dev: false` and supply deployment-local `program.openvm.prover_bin` and, on a GPU
+machine, `program.openvm.prover_bin_cuda` paths. Do not put account keys, proving artifacts, or
+machine-specific values in the shared configuration.
 
-```yaml
-program:
-  dev: false # Disable dev mode to use real proofs
-  risc0:
-    risc0_dev_mode: 0 # 0 = production (Boundless), 1 = dev mode
-    boundless:
-      rpc_url: 'https://sepolia.infura.io/v3/YOUR_KEY' # RPC endpoint
-      private_key: 'YOUR_PRIVATE_KEY' # Wallet with funds for proving
-      pinata_jwt: 'YOUR_PINATA_JWT' # Required for uploading programs to IPFS
-      # The gateway must allow full, unauthenticated downloads by Boundless provers.
-      ipfs_gateway_url: 'https://your-gateway.mypinata.cloud'
-      program_url: 'https://your-gateway.mypinata.cloud/ipfs/YOUR_CID' # Pre-uploaded program URL
-      onchain: true # true = onchain requests, false = offchain
-```
-
-> **_Note:_** For production proving with Boundless, you need:
->
-> - An RPC endpoint (e.g., Infura, Alchemy) with funds
-> - A private key with sufficient ETH/tokens for proof generation
-> - A Pinata JWT for uploading programs to IPFS (get one at [pinata.cloud](https://pinata.cloud))
-> - Pre-uploaded program URL to avoid uploading the ~40MB program at runtime
-
-#### Uploading Your Program to IPFS
-
-When you make changes to the guest program in `program/`, you need to upload it to IPFS to get a
-program URL:
-
-1. First, configure your Pinata JWT in `interfold.config.yaml` (as shown above)
-
-2. Build and upload your program:
-
-   ```bash
-   # This compiles the guest program and uploads it to IPFS via Pinata
-   interfold program upload
-   ```
-
-3. The command will output an IPFS hash like `QmXxx...`. Update your `interfold.config.yaml` with
-   the full URL:
-
-   ```yaml
-   ipfs_gateway_url: 'https://your-gateway.mypinata.cloud'
-   program_url: 'https://your-gateway.mypinata.cloud/ipfs/QmXxx...'
-   ```
-
-> **_Important:_** Every time you modify the guest program code in `program/`, you must rebuild and
-> re-upload it to IPFS, then update the `program_url` in your configuration. This ensures Boundless
-> uses your latest program version.
+A new OpenVM deployment requires matching receipt and ciphertext-duty verifiers. Existing RISC Zero
+deployments do not become compatible by changing the service configuration. Drain active rounds and
+use a separate reviewed migration before changing a live verifier route. The old Boundless upload
+and auction settings are not used by this backend.
 
 ### Encrypted-object data availability
 
@@ -208,19 +171,28 @@ Local development uses `DATA_AVAILABILITY_MODE=mock`. The mock keeps the full in
 ciphertext in the CRISP server database and produces a deterministic local receipt. It does not
 model VectorX latency or Avail fees.
 
-Sepolia and Ethereum mainnet use Avail. The Sepolia verifiers are real. CRISPProgram on Sepolia is
-`0xc6b6f740C85878D046A50f203A3Aa379150bF8C7`, and its Avail data availability verifier is
-`AvailVectorXDataAvailabilityVerifier` (`0x2Dff6C2f010336Fb2f553aAF20525579F9617cEA`). Before
-starting the CRISP server:
+Sepolia and Ethereum mainnet use Avail. On Sepolia, CRISP and the protocol ciphertext verifier use
+`MockOpenVmReceiptVerifier`, which accepts every OpenVM receipt. Ethereum mainnet uses real RISC
+Zero verification. CRISPProgram on Sepolia is `0xA9894A39061EC33f8550a2B63A66Be59fb9fa443`, and its
+Avail data availability verifier is `AvailVectorXDataAvailabilityVerifier`
+(`0x6D373da705B443EF76e37cb96275623818c50657`). Its two Noir verifiers come from the circuits in
+this directory at commit `8da77bf52`. Their sources did not change after `@crisp-e3/sdk` 0.25.0.
+Before starting the CRISP server:
 
 1. Register an Avail App ID for CRISP.
 2. Fund a dedicated Avail account that can pay for every `submit_data` transaction.
 3. Keep the server database durable. It stores each pending publication until its VectorX proof is
    available and resumes the job after a restart.
 4. Deploy CRISP with `INPUT_AVAILABILITY_SIGNER` set to the Ethereum address derived from the
-   server's `PRIVATE_KEY`. On Sepolia, CRISPProgram uses the deployer address
-   (`0x8837e47c4Bb520ADE83AAB761C3B60679443af1B`) as the signer. The server `PRIVATE_KEY` must be
-   the key of that address.
+   server's `PRIVATE_KEY`. On every network, the server `PRIVATE_KEY` must be the key of the signer
+   address that CRISPProgram stores. The current Sepolia deployment used
+   `CRISP_UNPROVED_TEST=1 ALLOW_SEPOLIA_UNPROVED_COMPUTE=true USE_MOCKS=true MOCK_DATA_AVAILABILITY=false`.
+   `USE_MOCKS=true` deploys the mock voting token and selects the mock data-availability verifier,
+   unless `MOCK_DATA_AVAILABILITY=false` keeps Avail. It does not select a compute mock: every
+   network except the isolated local chain deploys the real OpenVM receipt verifier, unless
+   `CRISP_UNPROVED_TEST=1` and `ALLOW_SEPOLIA_UNPROVED_COMPUTE=true` opt in to the unproved verifier
+   on Sepolia. Ciphernodes read all inputs on a chain from one data-availability source, so keep
+   Avail on a shared network.
 5. Schedule voting after the current on-chain committee setup budget. The server reads that bound
    from `CRISPProgram.earliestVotingStart()` and adds `VOTING_START_BUFFER_SECONDS` for transaction
    mining. `E3_DURATION` starts at that fixed voting time; it covers voting plus the VectorX
@@ -289,7 +261,7 @@ service limits the total bytes held by unfinished jobs, which bounds abandoned s
 deleting data that Ethereum already accepted. After Avail and Ethereum accept an object, the service
 removes its staging copy because Avail is then the recovery source.
 
-The aggregate ciphertext follows the Avail and VectorX path after its RISC Zero proof is ready.
+The aggregate ciphertext follows the Avail and VectorX path after its OpenVM proof is ready.
 
 Each accepted Ethereum reference contains `keccak256(exact bytes)`. The CRISP server and ciphernodes
 re-hash retrieved bytes before they use them. An App ID helps indexing, but it is not a security

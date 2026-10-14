@@ -171,9 +171,10 @@ These commands make and run an E3 project from the template. For a walkthrough, 
 
 ### `interfold init`
 
-Makes a new Interfold project from a template. The command clones the template, copies the support
-scripts to `.interfold/support`, adds the `lib/risc0-ethereum` submodule, runs `pnpm install`, and
-makes the first Git commit. It needs `git` and `pnpm`.
+Makes a new Interfold project from a template. The command clones the template, pins its Interfold
+crates to the cloned commit, copies the development runner and the OpenVM proving service to
+`.interfold/support`, runs `pnpm install`, and makes the first Git commit. It needs `git` and
+`pnpm`.
 
 ```bash
 interfold init [PATH] [--template <TEMPLATE>] [--skip-cleanup] [--skip-install]
@@ -208,15 +209,14 @@ current directory. `interfold init` puts these scripts in the project.
 The `--dev` flag selects the script set. When the flag is absent, the CLI uses `program.dev` from
 the configuration, which defaults to `false`.
 
-| Subcommand                      | Purpose                                                                                                      | Script                                                    |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
-| `program start [--dev <DEV>]`   | Starts the program. In Dev Mode, the program runs without a proving backend, so nothing verifies the result. | `dev/start`, or `ctl/start` with `program.risc0` settings |
-| `program compile [--dev <DEV>]` | Compiles the program code.                                                                                   | `dev/compile` or `ctl/compile`                            |
-| `program shell`                 | Opens a shell in the Docker environment that runs the program.                                               | `ctl/shell`                                               |
-| `program upload`                | Uploads the compiled program to Pinata IPFS. It passes `pinata_jwt` and `ipfs_gateway_url` from the config.  | `ctl/upload`                                              |
-| `program cache purge`           | Deletes `.interfold/caches`. The next compilation takes longer.                                              | None                                                      |
+| Subcommand                      | Purpose                                                                                                                                                                                              | Script                            |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `program start [--dev <DEV>]`   | Starts the program server. In Dev Mode, the program runs without a proving backend, so nothing verifies the result. Otherwise the OpenVM service checks its worker and keys, then proves each round. | `dev/start` or `openvm/start`     |
+| `program compile [--dev <DEV>]` | Compiles the program. Outside Dev Mode, it also builds the OpenVM guest, its keys, the receipt identity, and the worker configuration.                                                               | `dev/compile` or `openvm/compile` |
+| `program cache purge`           | Deletes `.interfold/caches`, including the OpenVM guest build and keys. The next compilation takes longer.                                                                                           | None                              |
 
-`program start` without Dev Mode needs a `program.risc0` section in the configuration. See
+Outside Dev Mode, `program compile` and `program start` need a `program.openvm` section with at
+least one worker. The CLI refuses the removed `program.risc0` section. See
 [program settings](/reference/configuration#program-settings).
 
 ### `interfold print-env`
@@ -355,13 +355,15 @@ empties. When the purge stops part of the way, run it again. The second run fini
 that hold this file. If another file or a link has this name, the purge stops and deletes nothing.
 
 `interfold start` writes the path of its store next to the key file, as `<key file>.store-record`.
-For a key file with a record, the purge locks and checks the recorded store, also when the node ran
-with another `E3_DATA_DIR`, `data_dir`, or working directory. A key file that no configured node
-uses is checked through its record.
+The record keeps the store of each start, one path per line. For a key file with a record, the purge
+locks and checks every recorded store, also when the node ran with another `E3_DATA_DIR`,
+`data_dir`, or working directory. A recorded store that is no longer there is a refusal that
+`--allow-active-e3s` overrides, unless an earlier purge of the same folders deleted it. To forget a
+store that is gone for good, or that belongs to the project that this one was copied from, delete
+its line from the record. A key file that no configured node uses is checked through its record.
 
 The purge has limits:
 
-- The record names the store of the node's last start only.
 - A key file without a record, as of a node that has not started with this release, is checked
   through the store at the configured path. A stale copy of a store there passes the check.
 - It finds stores only directly inside each node folder in `.interfold/data`.
@@ -382,10 +384,10 @@ Manages the Noir prover tools that the node uses to make zero-knowledge proofs: 
 binary (`bb`) and the compiled circuits. The required versions come from
 `crates/zk-prover/versions.json`. For release 0.18.0, they are `bb` 5.1.0 and circuits 0.18.0.
 
-| Subcommand    | Flags                                                                                                                                                                                                                                                                                   | Purpose                                                                                                             |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `noir status` | None                                                                                                                                                                                                                                                                                    | Prints the path, version, and install state of `bb` and the circuits. The last line is `Ready` or the action to do. |
-| `noir setup`  | `-f`, `--force`: installs `bb` and the circuits again. `--circuits-archive <PATH>`: installs the circuits from a local release archive instead of a download. `--circuits-configuration <PRESET/COMMITTEE>`: selects a required pair from the local archive. Repeat for multiple pairs. | Installs or updates `bb` and the circuits. When both are current and `--force` is absent, it does nothing.          |
+| Subcommand    | Flags                                                                                                                                                                                                                                                                                                                                                                                      | Purpose                                                                                                             |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `noir status` | None                                                                                                                                                                                                                                                                                                                                                                                       | Prints the path, version, and install state of `bb` and the circuits. The last line is `Ready` or the action to do. |
+| `noir setup`  | `-f`, `--force`: installs `bb` and the circuits again. `--circuits-archive <PATH>`: installs the circuits from a local release archive instead of a download. `--circuits-configuration <PRESET/COMMITTEE>`: selects a required pair from the local archive. Repeat for multiple pairs. `--allow-unpinned-archive`: installs a local archive that does not have this binary's release pin. | Installs or updates `bb` and the circuits. When both are current and `--force` is absent, it does nothing.          |
 
 With a configuration file, the tools go to `.interfold/noir` next to that file. Without one, they go
 to `~/.interfold/noir`. A custom `bb` from `custom_bb` or `E3_CUSTOM_BB` replaces the downloaded
@@ -397,11 +399,12 @@ version and this pin. The installer checks this digest before extraction. It the
 nonempty `checksums.json` that covers every artifact file and verifies each entry. The archive must
 contain the full supported preset/committee matrix and the complete artifact inventory used by
 release validation. If validation fails, the installed circuits and version record stay unchanged.
-`--circuits-archive` trusts the operator's local file and applies the same internal manifest checks
-without a release archive pin. To install a subset from a local archive, add
-`--circuits-configuration <PRESET/COMMITTEE>` for each required pair. For example,
-`--circuits-configuration insecure-512/minimum` selects the development configuration. This option
-requires `--circuits-archive` and cannot reduce the network download requirements.
+`--circuits-archive` applies the same checks to a local file: the archive must have the release pin
+of this binary's circuit version. To install another archive, such as a local build, add
+`--allow-unpinned-archive`; the internal manifest checks still apply. To install a subset from a
+local archive, add `--circuits-configuration <PRESET/COMMITTEE>` for each required pair. For
+example, `--circuits-configuration insecure-512/minimum` selects the development configuration. This
+option requires `--circuits-archive` and cannot reduce the network download requirements.
 
 If circuit replacement or the version update fails, the installer attempts rollback and returns the
 original installation error. Each rollback failure logs the source and target paths. If the previous

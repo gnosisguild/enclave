@@ -5,12 +5,14 @@ name: rust-cache
 # main, and the first run of every pull request compiled the whole workspace from scratch.
 #
 # This job builds what the `ci` Rust jobs compile and saves it on main under the same key as
-# `.github/actions/cache-dependencies`. A pull request with the same Cargo.lock restores it by exact
-# key and does not save its own copy.
+# `.github/actions/cache-dependencies`. It is the one writer of the root target cache: every ci job,
+# on pull requests and on main, only restores it.
 #
-# The key changes only with Cargo.lock, so this runs when Cargo.lock changes. Workspace crates
-# compiled from an older main recompile incrementally; dependencies, the bulk of the build, do not.
-# Keep RUST_TOOLCHAIN equal to the value in ci.yml: artifacts from another rustc are not reusable.
+# The key changes with Cargo.lock, the toolchain and the debug-information settings, so this runs
+# when Cargo.lock or the cache configuration changes. Workspace crates compiled from an older main
+# recompile incrementally; dependencies, the bulk of the build, do not. Keep RUST_TOOLCHAIN and the
+# CARGO_PROFILE_* values equal to those in ci.yml: artifacts built with other values are not
+# reusable.
 
 on:
   push:
@@ -20,6 +22,10 @@ on:
       - Cargo.lock
       - .github/workflows/rust-cache.yml
       - .github/actions/cache-dependencies/**
+  # Pull requests only read the entry. The daily run restores it, which keeps it from expiring after
+  # seven unused days, and rebuilds it when it is gone.
+  schedule:
+    - cron: '17 4 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -32,6 +38,15 @@ permissions:
 env:
   NODE_VERSION: 22
   RUST_TOOLCHAIN: 1.91.1
+  # Debug and test builds keep only the line tables, which backtraces need, not the full debug
+  # information that only a debugger reads. The full information made the root target directory, and
+  # every cache restore and save of it, several GB larger. .github/actions/cache-dependencies puts
+  # both values in the cache key.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_TEST_DEBUG: line-tables-only
+  # Every ci job rebuilds the workspace crates from scratch after its checkout, so incremental data
+  # only costs time: on a 12-thread host that rebuild took 185 s without it and 426 s with it.
+  CARGO_INCREMENTAL: 0
 
 jobs:
   warm:
@@ -40,9 +55,12 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
+      # An exact hit means the entry exists and holds what the steps below build, so they are skipped.
       - name: Cache Rust dependencies
         id: cache
         uses: ./.github/actions/cache-dependencies
+        with:
+          root-writer: 'true'
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -68,15 +86,41 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install the dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Compile contracts
+        if: steps.cache.outputs.cache-hit != 'true'
         run: pnpm evm:build
 
       # Unit and integration test binaries.
       - name: Build test targets
+        if: steps.cache.outputs.cache-hit != 'true'
         run: cargo test --no-run
 
       # Doc-tests link against the non-test build of each library.
       - name: Build libraries and binaries
+        if: steps.cache.outputs.cache-hit != 'true'
         run: cargo build
+
+      # scripts/build-circuits.ts runs zk-artifacts with --release in every ci job that
+      # builds or hydrates circuits, zk_prover_e2e included. Built from scratch, they took about two
+      # minutes.
+      - name: Build the release circuit CLI
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: pnpm rust:build:zk --release
+
+      # A checkout gives the workspace sources new modification times, so every ci job rebuilds the
+      # workspace crates and relinks their test binaries, and reuses only the dependencies' artifacts.
+      # The workspace outputs and incremental data were 16 of the 20 GB that the entry unpacked to,
+      # and restoring the entry took up to four minutes per job. What is left is about 3.7 GB.
+      - name: Keep only the dependencies' artifacts
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          packages=()
+          for package in $(cargo metadata --no-deps --format-version 1 | jq -r '.packages[].name'); do
+            packages+=(-p "$package")
+          done
+          cargo clean "${packages[@]}"
+          cargo clean --release "${packages[@]}"
+          rm -rf target/debug/incremental target/release/incremental

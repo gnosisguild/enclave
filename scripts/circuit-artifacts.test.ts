@@ -12,13 +12,20 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { AbiCoder, id, keccak256 } from 'ethers'
 import { BFV_PARAMS } from '../packages/interfold-contracts/scripts/protocol/constants'
-import { committeeBoundUpdates, NoirCircuitBuilder, normalizeCargoLockForCircuitHash, stripRustTestModules } from './build-circuits'
+import {
+  committeeBoundUpdates,
+  NoirCircuitBuilder,
+  normalizeCargoLockForCircuitHash,
+  reportsToolVersion,
+  stripRustTestModules,
+} from './build-circuits'
 import { isPresetCommitteeSupported } from './circuit-constants'
 import {
   findArtifactRevision,
   RELEASE_REQUIRED_PAIRS,
   requiredArtifactMarkers,
   validateArtifactSet,
+  validateChecksums,
   validateReleaseArtifacts,
 } from './circuit-artifacts'
 
@@ -93,9 +100,39 @@ test('checksums command covers exactly the staged circuit configurations', () =>
         .sort(),
     )
     assert.equal(
-      manifest.files['insecure-512/minimum/default/dkg/pk/pk.vk'],
+      manifest.files['insecure/minimum/default/dkg/pk/pk.vk'],
       '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',
     )
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('release verification refuses the checksum manifests that a node refuses', () => {
+  const dir = makeCompleteMatrix()
+  try {
+    execFileSync('pnpm', ['tsx', 'scripts/circuit-artifacts.ts', 'checksums', '--dir', dir])
+    validateChecksums(dir)
+    const manifestPath = join(dir, 'checksums.json')
+    const manifest = readFileSync(manifestPath, 'utf8')
+    const [first] = Object.keys(JSON.parse(manifest).files).filter((file) => !file.endsWith('.build-stamp.json'))
+    const edit = (change: (files: Record<string, string>) => void) => {
+      const parsed = JSON.parse(manifest)
+      change(parsed.files)
+      writeFileSync(manifestPath, JSON.stringify(parsed))
+    }
+
+    edit((files) => delete files[first])
+    assert.throws(() => validateChecksums(dir), /does not list/)
+    edit((files) => (files[first] = '0'.repeat(64)))
+    assert.throws(() => validateChecksums(dir), /wrong digest/)
+    edit((files) => (files['../outside'] = files[first]))
+    assert.throws(() => validateChecksums(dir), /invalid path/)
+    edit((files) => (files['insecure/minimum/absent.json'] = files[first]))
+    assert.throws(() => validateChecksums(dir), /missing file/)
+    edit(() => {})
+    unlinkSync(manifestPath)
+    assert.throws(() => validateChecksums(dir), /checksums.json is missing/)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -206,13 +243,20 @@ test('pair source hash ignores generated bounds but tracks other Noir config', (
     writeFileSync(thresholdPath, threshold(20, '3, 4', 3))
     assert.notEqual(builder.computeSourceHash('insecure', 'micro'), originalHash)
 
-    const generatorDir = join(dir, 'crates', 'zk-helpers', 'src')
-    mkdirSync(generatorDir, { recursive: true })
-    const generatorPath = join(generatorDir, 'generator.rs')
-    writeFileSync(generatorPath, 'first')
-    const generatorHash = builder.computeSourceHash('insecure', 'micro')
-    writeFileSync(generatorPath, 'second')
-    assert.notEqual(builder.computeSourceHash('insecure', 'micro'), generatorHash)
+    for (const owner of ['zk-helpers', 'zk/cli', 'fhe-params', 'committee', 'polynomial', 'polynomial/fhe-adapter']) {
+      const generatorDir = join(dir, 'crates', owner, 'src')
+      mkdirSync(generatorDir, { recursive: true })
+      const generatorPath = join(generatorDir, 'generator.rs')
+      const production = 'pub fn bound() -> u64 { 7 }\n'
+      const tests = '#[cfg(test)]\nmod tests {\n    fn example() {}\n}\n'
+      writeFileSync(generatorPath, production + tests)
+      const generatorHash = builder.computeSourceHash('insecure', 'micro')
+      writeFileSync(generatorPath, production.replace('7', '8') + tests)
+      const changedHash = builder.computeSourceHash('insecure', 'micro')
+      assert.notEqual(changedHash, generatorHash, owner)
+      writeFileSync(generatorPath, production.replace('7', '8') + tests.replace('example', 'another_example'))
+      assert.equal(builder.computeSourceHash('insecure', 'micro'), changedHash, `${owner} test-only change`)
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -227,6 +271,50 @@ test('every pair regenerates all of its C1/C2 bounds, array bounds included', ()
         assert.ok(config.includes(declaration.replace(/\s+/g, '')), `${preset}/${committee} ${path}: ${declaration}`)
       }
     }
+  }
+})
+
+test('the circuit build accepts only the pinned nargo and bb versions', () => {
+  const nargo = (version: string) =>
+    `nargo version = ${version}\nnoirc version = ${version}+40d6574f851d926f93e0c3a271bac3e6e82ac905\n(git version hash: 40d6574f, is dirty: false)\n`
+  assert.ok(reportsToolVersion(nargo('1.0.0-beta.26'), '1.0.0-beta.26'))
+  assert.ok(reportsToolVersion('5.2.0\n', '5.2.0'))
+  assert.ok(reportsToolVersion('v5.2.0\r\n', '5.2.0'))
+  for (const other of ['1.0.0-beta.26-dev', '1.0.0-beta.260', '1.0.0-beta.25']) {
+    assert.ok(!reportsToolVersion(nargo(other), '1.0.0-beta.26'), other)
+  }
+  for (const other of ['5.2.0-nightly', '5.2.01', '15.2.0', '5.1.0']) {
+    assert.ok(!reportsToolVersion(`${other}\n`, '5.2.0'), other)
+  }
+})
+
+test('every pair source hash tracks the pinned nargo and bb versions', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'interfold-toolchain-hash-'))
+  const cargo = (tag: string) => `[dependencies]\nnargo = { git = "https://github.com/noir-lang/noir", tag = "${tag}" }\n`
+  const versions = (bb: string) => JSON.stringify({ required_bb_version: bb, required_circuits_version: '0.0.0' })
+  try {
+    mkdirSync(join(dir, 'crates', 'zk-prover'), { recursive: true })
+    writeFileSync(join(dir, 'crates', 'zk-prover', 'Cargo.toml'), cargo('v1.0.0'))
+    writeFileSync(join(dir, 'crates', 'zk-prover', 'versions.json'), versions('5.0.0'))
+    const builder = new NoirCircuitBuilder(dir)
+    for (const [preset, committee] of RELEASE_REQUIRED_PAIRS) {
+      const original = builder.computeSourceHash(preset, committee)
+      writeFileSync(join(dir, 'crates', 'zk-prover', 'versions.json'), versions('5.0.1'))
+      assert.notEqual(builder.computeSourceHash(preset, committee), original, `${preset}/${committee}: bb`)
+      writeFileSync(join(dir, 'crates', 'zk-prover', 'versions.json'), versions('5.0.0'))
+      writeFileSync(join(dir, 'crates', 'zk-prover', 'Cargo.toml'), cargo('v1.0.1'))
+      assert.notEqual(builder.computeSourceHash(preset, committee), original, `${preset}/${committee}: nargo`)
+      writeFileSync(join(dir, 'crates', 'zk-prover', 'Cargo.toml'), cargo('v1.0.0'))
+      // A release that changes only the circuit version keeps the artifacts current.
+      writeFileSync(
+        join(dir, 'crates', 'zk-prover', 'versions.json'),
+        JSON.stringify({ required_bb_version: '5.0.0', required_circuits_version: '9.9.9' }),
+      )
+      assert.equal(builder.computeSourceHash(preset, committee), original)
+      writeFileSync(join(dir, 'crates', 'zk-prover', 'versions.json'), versions('5.0.0'))
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
   }
 })
 
@@ -261,7 +349,7 @@ test('every pair source hash tracks shared Noir sources and dependency pins', ()
 test('shared Noir constants change the hash but the active preset does not', () => {
   const dir = mkdtempSync(join(tmpdir(), 'interfold-noir-selection-hash-'))
   const configPath = join(dir, 'circuits/lib/src/configs/default/mod.nr')
-  const source = '// preset: insecure-512\npub use super::insecure::threshold;\npub global MAX_MSG_NON_ZERO_COEFFS: u32 = 100;\n'
+  const source = '// preset: insecure\npub use super::insecure::threshold;\npub global MAX_MSG_NON_ZERO_COEFFS: u32 = 100;\n'
   try {
     mkdirSync(join(configPath, '..'), { recursive: true })
     writeFileSync(configPath, source)
@@ -269,7 +357,7 @@ test('shared Noir constants change the hash but the active preset does not', () 
     for (const [preset, committee] of RELEASE_REQUIRED_PAIRS) {
       writeFileSync(configPath, source)
       const original = builder.computeSourceHash(preset, committee)
-      writeFileSync(configPath, source.replace('insecure', 'secure-8192').replace('super::insecure::', 'super::secure::'))
+      writeFileSync(configPath, source.replace('insecure', 'secure-8192').replace('super::insecure::', 'super::secure_8192::'))
       assert.equal(builder.computeSourceHash(preset, committee), original)
       writeFileSync(configPath, source.replace('= 100;', '= 101;'))
       assert.notEqual(builder.computeSourceHash(preset, committee), original)
@@ -279,7 +367,7 @@ test('shared Noir constants change the hash but the active preset does not', () 
   }
 })
 
-test('config generation binds both BFV parameter sets to circuit version v4', () => {
+test('config generation binds every BFV parameter set to circuit version v5', () => {
   const dir = mkdtempSync(join(tmpdir(), 'interfold-circuit-version-'))
   const utilsPath = join(dir, 'packages/interfold-contracts/scripts/utils.ts')
   const contractPath = join(dir, 'packages/interfold-contracts/contracts/lib/ActiveCryptoConfig.sol')
@@ -291,10 +379,11 @@ test('config generation binds both BFV parameter sets to circuit version v4', ()
     builder.syncProtocolConfig('insecure', 'minimum')
     const contract = readFileSync(contractPath, 'utf8')
     const utils = readFileSync(utilsPath, 'utf8')
-    assert.match(contract, /CIRCUIT_VERSION = keccak256\("interfold-bfv-v4"\)/)
+    assert.match(contract, /CIRCUIT_VERSION = keccak256\("interfold-bfv-v5"\)/)
     for (const [prefix, params] of [
-      ['INSECURE', BFV_PARAMS.insecure512],
+      ['INSECURE', BFV_PARAMS.insecure],
       ['SECURE', BFV_PARAMS.secure8192],
+      ['SECURE_16384', BFV_PARAMS.secure16384],
     ] as const) {
       const coder = AbiCoder.defaultAbiCoder()
       const paramHash = keccak256(
@@ -305,8 +394,8 @@ test('config generation binds both BFV parameter sets to circuit version v4', ()
       )
       const configId = (version: string) =>
         keccak256(coder.encode(['bytes32', 'bytes32', 'bytes32'], [id('fhe.rs:BFV'), paramHash, id(version)]))
-      assert.match(contract, new RegExp(`${prefix}_CONFIG_ID =\\s*${configId('interfold-bfv-v4')}`))
-      assert.match(utils, new RegExp(`${prefix}_CONFIG_ID =\\s*"${configId('interfold-bfv-v4')}"`))
+      assert.match(contract, new RegExp(`${prefix}_CONFIG_ID =\\s*${configId('interfold-bfv-v5')}`))
+      assert.match(utils, new RegExp(`${prefix}_CONFIG_ID =\\s*"${configId('interfold-bfv-v5')}"`))
     }
   } finally {
     rmSync(dir, { recursive: true, force: true })

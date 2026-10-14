@@ -35,8 +35,8 @@ test('the v2 circuit label changes the insecure configuration ID', () => {
   const configId = (label: string) =>
     keccak256(abiCoder.encode(['bytes32', 'bytes32', 'bytes32'], [id('fhe.rs:BFV'), keccak256(encodedParams), id(label)]))
 
-  assert.equal(CIRCUIT_VERSION, 'interfold-bfv-v4')
-  assert.equal(configId(CIRCUIT_VERSION), '0x353ab90c0ebe9c13e1b9c2048539b7c2872f3eb12a9f1957f31410aa4bf44718')
+  assert.equal(CIRCUIT_VERSION, 'interfold-bfv-v5')
+  assert.equal(configId(CIRCUIT_VERSION), '0x968e91054be28b2b577ac278284e03274ed46bd5c5064e573290312a2323d495')
   assert.notEqual(configId(CIRCUIT_VERSION), configId('interfold-bfv-v1'))
 })
 

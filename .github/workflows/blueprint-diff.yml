@@ -1,0 +1,227 @@
+name: Blueprint Diff
+
+# Experimental. scripts/blueprint/diff/README.md says how to turn it off (the repository variable
+# BLUEPRINT_DIFF=off) or remove it.
+#
+# One comment on each pull request with its architecture change: the counts, every change, and a
+# link to the page on GitHub Pages that draws the change on the blueprint.
+# scripts/blueprint/diff/diff.mjs reads both versions of the code and builds nothing else. The page
+# goes to the blueprint-previews branch, one folder per pull request, and Pages serves that branch.
+# When the pull request closes, merged or not, its folder goes and the comment says so.
+#
+# It runs on every pull request, into any branch: a later push can take back an earlier change, and
+# the comment must follow, and a stacked pull request shows its own layer. To publish from a pull
+# request, the github-pages environment must allow every branch (Settings > Environments).
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+permissions:
+  contents: read
+
+jobs:
+  diff:
+    name: Architecture change
+    # A pull request from a fork gets a read-only token, which can neither store the page nor post
+    # the comment.
+    if:
+      vars.BLUEPRINT_DIFF != 'off' && github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: blueprint-diff-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: write # store the page on blueprint-previews
+    outputs:
+      published: ${{ steps.store.outputs.published }}
+    steps:
+      # The merge commit is the code after the merge. Its first parent is the base branch.
+      - name: Checkout the merge commit and the base branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Compare with the base branch
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR: ${{ github.event.pull_request.number }}
+          PAGES: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+        run: |
+          out="$RUNNER_TEMP/blueprint"
+          mkdir -p "$out/site"
+          BLUEPRINT_HEAD_LABEL="${HEAD_SHA::9}" node scripts/blueprint/diff/diff.mjs HEAD^1 \
+            --md "$out/comment.md" \
+            --page-url "$PAGES/pr-$PR/${HEAD_SHA::9}/"
+          if [ -s "$out/comment.md" ]; then cp scripts/blueprint/out/interfold-blueprint-diff.html "$out/site/index.html"; fi
+
+      # Without an architecture change, a folder from an earlier push goes.
+      - name: Store the page
+        id: store
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          out="$RUNNER_TEMP/blueprint"
+          if [ -s "$out/comment.md" ]; then
+            node scripts/blueprint/diff/previews.mjs "$remote" "pr-$PR" "${HEAD_SHA::9}" "$out"/site/* | tee "$out/store.txt"
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            node scripts/blueprint/diff/previews.mjs "$remote" "pr-$PR" --remove | tee "$out/store.txt"
+            if grep -q '^changed:' "$out/store.txt"; then echo "published=true" >> "$GITHUB_OUTPUT"; fi
+          fi
+
+      - name: Keep the comment for the comment job
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: blueprint-comment
+          path: ${{ runner.temp }}/blueprint/comment.md
+          retention-days: 1
+
+  cleanup:
+    name: Remove the preview
+    if:
+      vars.BLUEPRINT_DIFF != 'off' && github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: blueprint-diff-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    permissions:
+      contents: write # remove the folder from blueprint-previews
+      pull-requests: write # say so in the comment
+    outputs:
+      published: ${{ steps.remove.outputs.published }}
+    steps:
+      # The base branch: its code is trusted, and it is still there when a merge deletes the head.
+      - name: Checkout the base branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: Remove the page
+        id: remove
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ ! -f scripts/blueprint/diff/previews.mjs ]; then echo "The base branch has no previews.mjs."; exit 0; fi
+          node scripts/blueprint/diff/previews.mjs "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "pr-$PR" --remove | tee "$RUNNER_TEMP/remove.txt"
+          if grep -q '^changed:' "$RUNNER_TEMP/remove.txt"; then echo "published=true" >> "$GITHUB_OUTPUT"; fi
+
+      # The counts and the list stay; the link goes.
+      - name: Say so in the comment
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const marker = '<!-- blueprint-diff -->'
+            const { owner, repo } = context.repo
+            const issue_number = context.payload.pull_request.number
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 })
+            const old = comments.find((c) => c.user?.login === 'github-actions[bot]' && c.body?.startsWith(marker))
+            if (!old || !/\[Open this change in the blueprint\]/.test(old.body)) return
+            const body = old.body.replace(/\[Open this change in the blueprint\]\([^)]*\)[^\n]*/, 'The page was removed when this pull request closed.')
+            await github.rest.issues.updateComment({ owner, repo, comment_id: old.id, body })
+
+  pages:
+    name: Publish the previews
+    needs: [diff, cleanup]
+    if: ${{ !cancelled() && (needs.diff.outputs.published == 'true' || needs.cleanup.outputs.published == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # One deployment at a time for the whole site: each one publishes every open pull request.
+    concurrency:
+      group: blueprint-pages
+      cancel-in-progress: false
+    permissions:
+      pages: write # deploy the site
+      id-token: write # prove the deployment comes from this workflow
+    environment:
+      name: github-pages
+      url: ${{ steps.page.outputs.url }}
+    steps:
+      - name: Checkout blueprint-previews
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: blueprint-previews
+          persist-credentials: false
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: .
+
+      - name: Publish the site
+        id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5
+
+      - name: Name the page of this pull request
+        id: page
+        env:
+          SITE: ${{ steps.deploy.outputs.page_url }}
+          ACTION: ${{ github.event.action }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ "$ACTION" = closed ]; then echo "url=$SITE" >> "$GITHUB_OUTPUT"; else echo "url=${SITE}pr-$PR/${HEAD_SHA::9}/" >> "$GITHUB_OUTPUT"; fi
+
+  comment:
+    name: Post the comment
+    needs: [diff, pages]
+    if: ${{ !cancelled() && needs.diff.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write # post the comment
+    steps:
+      - name: Get the comment
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: blueprint-comment
+          path: ${{ runner.temp }}/blueprint
+
+      - name: Post or update the comment
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUBLISHED: ${{ needs.pages.result }}
+        with:
+          script: |
+            const fs = require('fs')
+            const marker = '<!-- blueprint-diff -->'
+            const file = `${process.env.RUNNER_TEMP}/blueprint/comment.md`
+            let body = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
+            // A page that did not publish gets no link, rather than a dead one.
+            if (body.trim() && process.env.PUBLISHED !== 'success')
+              body = body.replace(/\[Open this change in the blueprint\]\([^)]*\)[^\n]*/, 'The page could not be published this time.')
+            const { owner, repo } = context.repo
+            const issue_number = context.payload.pull_request.number
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number, per_page: 100 })
+            const old = comments.find((c) => c.user?.login === 'github-actions[bot]' && c.body?.startsWith(marker))
+
+            if (!body.trim()) {
+              // No architecture change now: an earlier comment must not keep showing one.
+              if (old) {
+                const none = `${marker}\n### Architecture change\n\nNo architecture change at \`${process.env.HEAD_SHA.slice(0, 9)}\`.\n`
+                await github.rest.issues.updateComment({ owner, repo, comment_id: old.id, body: none })
+              }
+              return
+            }
+            if (old) await github.rest.issues.updateComment({ owner, repo, comment_id: old.id, body })
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body })

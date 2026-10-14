@@ -7,10 +7,10 @@
 //! Raw witness and configuration generation for the user-data encryption proof tree.
 
 use crate::circuits::computation::Computation;
+use crate::encoding::join_display;
 use crate::threshold::user_data_encryption_chunked::circuit::UserDataEncryptionCircuit;
 use crate::threshold::user_data_encryption_chunked::computation::{Configs, Inputs};
 use crate::threshold::user_data_encryption_chunked::UserDataEncryptionCircuitData;
-use crate::utils::join_display;
 use crate::Circuit;
 use crate::CircuitCodegen;
 use crate::CircuitsErrors;

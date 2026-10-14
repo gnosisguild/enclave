@@ -60,9 +60,12 @@ CiphernodeSelected event arrives at ThresholdKeyshare
 │   │     e3_id, party_id, bfv_public_key
 │   │   }
 │   │   → ZK proof actor picks this up
-│   │   → Only once effects run: in replay, resume publishes it. When the log
-│   │     holds another key of this node, the node lost the secret of the key that
-│   │     its peers hold, and publishes no second key (it abstains)
+│   │   → Only once effects run: in replay, resume publishes it. When replay has
+│   │     delivered another key of this node from the log, the node lost the secret
+│   │     of the key that its peers hold, and publishes no second key (it abstains).
+│   │     When that key arrives after the publication, the node has published a
+│   │     second key. If the log's key reached the key collector first, the
+│   │     collection check (AllEncryptionKeysCollected) stops its share generation
 │   │
 │   └─ Collector schedules use the frozen per-E3 window and absolute deadline:
 │         ├─ shared base window from `E3_DKG_WINDOW_SECS` (default 21600s), frozen per E3
@@ -209,14 +212,14 @@ EncryptionKeyCollector collects verified EncryptionKeyCreated events
 
 ### Step 4: Generate TrBFV Key Shares + Shamir Secret Shares
 
-For `secure-8192`, the threshold key uses plaintext modulus 1,000,000 and three 59-bit CRT primes
-(`0x0400000000c00001`, `0x0400000000a40001`, `0x0400000000990001`). The paired share-encryption key
-uses plaintext modulus 288230376164294657 and two 61-bit primes (`0x1000000000024001`,
-`0x1000000000054001`). Both use ring degree 8192 and statistical security parameter 45. The
-threshold encryption error variance is 17723039943798878305460955570711717478400. These values bind
-the C1-C7 witness dimensions and the on-chain BFV parameter hash. C7 uses
-`Q_INVERSE_MOD_T = 663169`, the inverse of the product of the three threshold primes modulo
-1,000,000. New secure E3s use on-chain parameter-set index 2. Index 1 retains the previous secure
+For `secure-8192`, the threshold key uses plaintext modulus 17,000,000 and three 60-bit CRT primes
+(`0x0800000000db4001`, `0x0800000000d54001`, `0x0800000000cbc001`). The paired share-encryption key
+uses plaintext modulus 576460752317792257 (the largest threshold prime) and two 62-bit primes
+(`0x2000000000104001`, `0x200000000013c001`). Both use ring degree 8192 and statistical security
+parameter 45. The threshold encryption error variance is 17723039943798878305460955570711717478400.
+These values bind the C1-C7 witness dimensions and the on-chain BFV parameter hash. C7 uses
+`Q_INVERSE_MOD_T = 3898177`, the inverse of the product of the three threshold primes modulo
+17,000,000. New secure E3s use on-chain parameter-set index 2. Index 1 retains the previous secure
 tuple for historical requests. C3 share encryption and user-data encryption use non-centered `k1`
 residues in `[0, t - 1]`; the Rust witness, Noir equation, and quotient bounds must agree.
 
@@ -430,9 +433,9 @@ generated `configs.nr` values (`SHARE_COMPUTATION_CHUNK_SIZE` / `SHARE_COMPUTATI
 the witness always matches the circuit parameters the artifacts were generated against. The
 generated `configs.nr` `N` and `L` values come from the same parameter object that drives the
 witness computation. The secure-16384 `dkg.nr` writes the chunk size as an expression over the
-active committee's `N_PARTIES`; the insecure and secure-8192 files write the fixed values 128 and
-512. A non-default `--chunk-size` produces artifacts that
-are valid only if the C2/C3/C4 circuits are recompiled against the generated `configs.nr`.
+active committee's `N_PARTIES`; the insecure and secure-8192 files write the fixed values 128
+and 512. A non-default `--chunk-size` produces artifacts that are valid only if the C2/C3/C4
+circuits are recompiled against the generated `configs.nr`.
 
 All packed polynomial commitments constrain each shifted coefficient to one radix digit. An
 out-of-range C2 secret chunk or C4 decrypted share cannot carry into an adjacent digit and collide
@@ -459,10 +462,12 @@ C6 tree    = hash(c6_fold, c6_fold_kernel, C6)
 ```
 
 The builder derives `nodes_fold.vk_tree_hash` and `c6_fold.vk_tree_hash` from each complete artifact
-pair that builds the trBFV path; an l-BFV-only pair (secure-16384) carries only `c6_fold.vk_tree_hash`. `dkg_aggregator` requires every folded node row to carry the same node-tree hash. Both final
-aggregators expose their complete tree anchor at public input zero. The immutable wrapper pin comes
-from the matching tree-hash file, not the immediate fold VK. Public input one retains the separate
-C5 or C7 non-ZK recursive VK hash. The final EVM public-input layouts do not change.
+pair that builds the trBFV path; an l-BFV-only pair (secure-16384) carries only
+`c6_fold.vk_tree_hash`. `dkg_aggregator` requires every folded node row to carry the same node-tree
+hash. Both final aggregators expose their complete tree anchor at public input zero. The immutable
+wrapper pin comes from the matching tree-hash file, not the immediate fold VK. Public input one
+retains the separate C5 or C7 non-ZK recursive VK hash. The final EVM public-input layouts do not
+change.
 
 C1, normal C2, C3, C4 per-share checks, and `NodeFold` now use the same root commitment scheme. C3
 fold steps bind each inner proof's recipient and modulus indices to its accumulator slot, including
@@ -806,10 +811,11 @@ starts, a roster from a lower party ID replaces a roster from a higher party ID.
 roster is never dropped, so the commitment checker keeps its selection; until C4 starts, an
 expelled dealer is not an honest party, also when a restart restores the roster, and a fixed
 roster is restored with every dealer. C4 starts when the node sends its decryption-key
-calculation. It saves that fact with the selected parties. The logged calculation request saves
-the state again at its own position, also when the store refused the dispatch write as stale and
-memory already holds the fact, and replay delivers that request again, so a restart that loses the
-calculation keeps the roster fixed. A held
+calculation. It saves that fact with the selected parties. After a restart, the store can refuse
+that write as stale when its context trails the saved snapshot cursor; memory keeps the fact, and
+the next state write saves it. If the node restarts again before that write, a lower-ranked roster
+that arrives later can replace the roster that the calculation used. This case is not handled. A
+held
 roster with an expelled member gives way to a later roster of the same proposer. A promoted
 aggregator re-proposes the accepted dealer list instead of deriving
 a different list from its local delivery order.
@@ -1061,14 +1067,14 @@ stores the same inputs and collection outcomes. Only the active aggregator dispa
 The active secure-16384 aggregator dispatches five PK aggregation proofs and ten RLK aggregation
 proofs from the accepted documents: one `d0` and one `d2` proof per row, as independent compute
 requests. It folds each row's PK proof and its two RLK component proofs into one five-row
-accumulator.
-After the fold completes, it derives both operational keys from the same accepted PK and RLK shares.
-It persists both keys in `//publickey_lbfv_aggregation/v1/{e3_id}` before final V2 proof dispatch.
-If the final V2 proof inputs are ready before both keys are available, the aggregator waits and
-retries after the keys are persisted. Restart clears process-local correlations. It resumes missing
-row or fold work only from a non-terminal aggregation state. Persisted aggregation failures and
-other terminal aggregation snapshots do not resume this work. If the fold is complete but either
-operational key is absent, restart derives and persists the same keys again.
+accumulator. After the fold completes, it derives both operational keys from the same accepted PK
+and RLK shares. It persists both keys in `//publickey_lbfv_aggregation/v1/{e3_id}` before final V2
+proof dispatch. If the final V2 proof inputs are ready before both keys are available, the
+aggregator waits and retries after the keys are persisted. Restart clears process-local
+correlations. It resumes missing row or fold work only from a non-terminal aggregation state.
+Persisted aggregation failures and other terminal aggregation snapshots do not resume this work. If
+the fold is complete but either operational key is absent, restart derives and persists the same
+keys again.
 
 An l-BFV aggregation worker error persists one immutable terminal failure before it publishes
 `E3Failed { failed_at_stage: CommitteeFinalized, reason: DKGInvalidShares }`. Restart republishes
@@ -1101,6 +1107,8 @@ only that failure. It does not resume row, fold, final V2 proof, or publication 
 │   │     key; the first valid committee publication on chain wins. Once a key is on chain,
 │   │     the demoted node stops, and any node ignores a late verification result: it neither fails the
 │   │     E3 nor accuses a dealer. A node that did not start the work ignores worker results
+│   │   → The public-key recovery record keeps that the node dispatched the C1 verification, so a
+│   │     restart after the demotion still finishes it (every node enters VerifyingC1)
 │   │     File: crates/aggregator/src/public_key_aggregation/actor.rs (started_as_aggregator)
 │   ├─ Legacy presets verify all collected non-excluded C1 proofs, then keep the H lowest valid IDs
 │   ├─ Secure-16384 verifies only its persisted exact-H candidates
@@ -1242,10 +1250,14 @@ this incompatible byte-codec boundary.
      → A restart replays the legacy intent, so an unfinished publication still reaches the chain.
        The public-key aggregator also sends its saved publication again when effects resume,
        whatever its role now, since replay can start after the publication event; the writer
-       skips a commitment that is already on chain and finishes the chunks.
+       skips a commitment that is already on chain and sends every chunk again.
        E3RequestComplete that arrives before EffectsEnabled comes from that same replay and
        drops the intent: a completed request published its candidate in an earlier run, and
        repeating it only spends gas
+     → Once the node assembles the whole key from the chain's chunks (CommitteePublished), the
+       aggregator clears its saved publication, and the writer drops the intent and ignores
+       later key results of the E3. A restart after that sends no chunk; a restart in the
+       middle of the chunks sends all of them again
         │
         │  ┌─── ON-CHAIN (CiphernodeRegistryOwnable) ──────────┐
         │  │                                                     │
@@ -1397,25 +1409,25 @@ deadlines, recovery flow, and remaining trust.
 ### User-data encryption proof tree (P3)
 
 The client gets one raw BFV witness from Rust or WASM. The shared proof-tree builder at
-`packages/user-data-encryption-prover/src/index.ts` passes the whole witness to one leaf per
-round. Each leg's identity is checked reduced modulo `X^N + 1`, so the witness has no cyclotomic
-quotient and its modulus-switch quotients (`r1is`, `p1is`) have `N` coefficients. The Interfold SDK
-uses this builder. The CRISP SDK still builds the earlier two-chunk tree and must be updated before
-CRISP uses these circuits. `e3-bfv-client`
-serializes witness integers outside JavaScript's safe range as decimal strings. This preserves exact
-coefficients when WASM returns JSON to the SDK. The SDK selects its proof bundle by BFV degree. Its
-artifact guard checks the minimum committee and a supported local preset; the active local preset
-does not select the bundle. `zk_cli --circuit user-data-encryption` generates this raw witness. The
-shared builder, not one Noir circuit, uses the witness to produce the recursive tree.
+`packages/user-data-encryption-prover/src/index.ts` passes the whole witness to one leaf per round.
+Each leg's identity is checked reduced modulo `X^N + 1`, so the witness has no cyclotomic quotient
+and its modulus-switch quotients (`r1is`, `p1is`) have `N` coefficients. The Interfold SDK uses this
+builder. The CRISP SDK still builds the earlier two-chunk tree and must be updated before CRISP uses
+these circuits. `e3-bfv-client` serializes witness integers outside JavaScript's safe range as
+decimal strings. This preserves exact coefficients when WASM returns JSON to the SDK. The SDK
+selects its proof bundle by BFV degree. Its artifact guard checks the minimum committee and a
+supported local preset; the active local preset does not select the bundle.
+`zk_cli --circuit user-data-encryption` generates this raw witness. The shared builder, not one Noir
+circuit, uses the witness to produce the recursive tree.
 
 Each ciphertext leg uses four proofs:
 
-1. The leaf (`*_chunk_main`, ZK) range-checks every private coefficient and commits each
-   polynomial. It derives the Fiat-Shamir challenge from those commitments and the public-key and
-   ciphertext commitments, then evaluates its polynomials at the challenge. The challenge is
-   derived after every input is committed, so one circuit can both commit and evaluate.
-2. The ciphertext circuit (`*_pk_ct_commit`, ZK) range-checks the ciphertext limbs to their
-   centered residues, commits them, and evaluates them at the leaf's challenge.
+1. The leaf (`*_chunk_main`, ZK) range-checks every private coefficient and commits each polynomial.
+   It derives the Fiat-Shamir challenge from those commitments and the public-key and ciphertext
+   commitments, then evaluates its polynomials at the challenge. The challenge is derived after
+   every input is committed, so one circuit can both commit and evaluate.
+2. The ciphertext circuit (`*_pk_ct_commit`, ZK) range-checks the ciphertext limbs to their centered
+   residues, commits them, and evaluates them at the leaf's challenge.
 3. The identity circuit (`*_eval_chunk_identity`, ZK) verifies the leaf. It opens the public key
    against the leaf's public-key commitment and `u` against the leaf's `u` root, evaluates
    `pk * u mod X^N + 1` at the leaf's challenge through `negacyclic_kernel`, and evaluates the
@@ -1448,16 +1460,21 @@ CRISP CI jobs.
 
 ### Ciphertext Output Publication
 
-The support host sends raw bincode input by default. `BOUNDLESS_INPUT_ENCODING=risc0-serde` selects
-the older byte-vector wrapper for an external Boundless guest and requires `PROGRAM_URL`. The
-embedded guest always receives raw bincode. This compatibility setting does not change the guest or
-its image ID. The selected external guest must match the deployed verifiers and produce the same
-journal as the host for the round inputs.
+The OpenVM host streams the round to the guest one item at a time: a bincode header (domain,
+parameters, on-chain indices, published commitments and metadata), every ciphertext in index order,
+then the selected ciphertexts again. The guest keeps a hash of each ciphertext from the first pass
+and refuses a second-pass ciphertext that differs. The native host and guest run the same
+`SecureProcess` with the project's policy; the guest build swaps in accelerated hashing, packing and
+commitment code (see `invariants/02`). The guest commits nine 32-byte ABI words in this order: chain
+ID, Interfold address, full uint256 E3 ID, encryption scheme ID, committee public-key hash, output
+hash, SAFE commitment, parameter hash, and input root. It reveals SHA-256 of these 288 bytes.
 
-The RISC Zero guest commits nine 32-byte fields in this order: chain ID, Interfold address, E3 ID,
-encryption scheme ID, committee public key, output hash, SAFE commitment, parameter hash, and input
-root. RISC Zero serializes these fields as a 1,188-byte journal. The support app returns the seal,
-parameter hash, and input root in one ABI-encoded proof.
+The OpenVM worker generates an application proof, recursive aggregate, and Halo2 EVM proof. It
+checks the configured executable and VM commitments and verifies the EVM proof against the native
+journal before it returns a seal. The app returns the seal, parameter hash, and input root in one
+ABI-encoded proof. Missing configuration or a failed proof cannot select a fake-proof mode. See
+`crates/openvm-prover/README.md` for the build and deployment boundary. Existing RISC Zero
+deployment records are not migrated by this source change.
 
 For secure-16384, the private compute input also carries the published `IFLBFVKE` envelope. The
 guest recomputes its envelope commitment and compares it with the existing `committee public key`
@@ -1467,18 +1484,18 @@ before the FHE processor runs. The journal keeps the same nine-field layout.
 The request-time scheme verifier reconstructs the protocol fields from on-chain state. The E3
 program reconstructs the application fields from its state. Both contracts verify the same receipt.
 An application verifier cannot create a decryption duty unless the scheme verifier also accepts it.
-The RISC Zero wrapper accepts only a receipt-verifier address that contains deployed code. An EOA
+The OpenVM wrapper accepts only a receipt-verifier address that contains deployed code. An EOA
 cannot satisfy the verifier's void-return call with empty return data. The input root uses the
 smallest binary Poseidon tree that can hold the submitted SAFE ciphertext commitments, with a
 minimum depth of one. The compute provider and E3 program must use this same leaf value, order, zero
 value, and depth rule.
 
-The guest derives the input root from the ciphertexts it processed. `ComputeInput` holds only
-`fhe_inputs`, and `ComputeInput::run_batched` calls `MerkleTreeBuilder::compute_leaf_hashes_batched`
-over those ciphertexts before it builds the tree (`crates/compute-provider/src/compute_input.rs`).
-The leaves are therefore a function of the processed set, not a separate prover-supplied value.
+The guest derives the input root from the ciphertexts it processed. Its input carries no root or
+leaf, and `SecureProcess::absorb` builds each leaf from the ciphertext it reads, before the tree is
+built (`crates/compute-provider/src/secure_process.rs`). The leaves are therefore a function of the
+processed set, not a separate prover-supplied value.
 
-This binding matters because nothing else supplies it. `Risc0BfvCiphertextVerifier` takes the input
+This binding matters because nothing else supplies it. `OpenVmBfvCiphertextVerifier` takes the input
 root from the proof envelope and never constrains it, so the only check on the root is the
 comparison an E3 program performs against its own on-chain root (`CRISPProgram.verify`,
 `MyProgram.verify`). If the guest accepted the leaves as an independent input, that comparison would
@@ -1667,7 +1684,8 @@ InterfoldSolReader decodes CiphertextOutputPublished event
       │     redelivery at once, also while its cleanup retries.
       │   → `ComputeEffectGate` runs one compute per request payload and answers every
       │     correlation ID. A request under a new ID whose result has not reached the gate 10
-      │     minutes after it went to the worker goes to the worker again.
+      │     minutes after it went to the worker goes to the worker again, once no run of it is
+      │     left in the worker, queued ones included.
       │   → `ProofRequestActor` asks for the proof again for each new nonzero `redelivery`, also
       │     after the proof completed, and ignores copies. `DecryptionShareProofSigned` carries
       │     the `redelivery` it answers, so EventBus deduplication passes a second completion.
@@ -2265,9 +2283,13 @@ lookup uses the request record, so a round remains visible while its key is pend
 the round only when both records exist. Either handler can complete the activation after their
 records converge, and deferred checks cover slow live-handler ordering. Duplicate request and
 committee events do not reset the round, replace indexed output, or resubmit an already-matching
-Merkle root. The shared Interfold contract also emits requests for other E3 programs. The CRISP
-indexer ignores those requests before it creates a round or makes a program-specific RPC call. An
-old program's historical round therefore cannot stop a fresh CRISP backfill.
+Merkle root. A duplicate request whose holder discovery fails keeps the stored census and owes a
+retry. The shared Interfold contract also emits requests and plaintext outputs for other E3
+programs. The CRISP indexer ignores those requests before it creates a round or makes a
+program-specific RPC call. Its `PlaintextOutputPublished` handler leaves a round without a CRISP
+record unchanged. An old program's historical round therefore cannot stop a fresh CRISP backfill.
+The handler decodes the tally only for a stored round whose recorded program is the configured one.
+Any other stored round finishes with an empty tally.
 
 Startup rebuilds deadline callbacks for active and expired rounds and releases an interrupted
 compute submission for retry. The compute transition is atomic, and a synchronous program-server
@@ -2290,14 +2312,25 @@ the complete key publication arrives and passes that commitment check.
 
 - leaves are **derived** from the ciphertexts the Secure Process consumed, never received alongside
   them;
-- **every** published input contributes a leaf, whatever is computed over.
+- **every** published input contributes a leaf, whatever is computed over;
+- the selected ciphertexts the processor reads are the ones the leaves were built from.
+
+`SecureProcess` reads a round in two passes, one ciphertext at a time. The first pass reads every
+ciphertext in index order and keeps its leaf, recomputed commitment and Keccak hash. Selection then
+runs over those records. The second pass reads the selected ciphertexts again, and refuses one whose
+hash differs from its first read (`InputChanged`), a first pass that is short or long
+(`InputCount`), and a processor that stops before the last selected input (`Unread`). The guest
+therefore holds one ciphertext at a time, and its memory does not bound a round. `ComputeInput::run`
+runs the same code over a round held in memory. The host's predicted journal and the guest's agree
+while the guest's accelerated hashing, packing and commitments match the reference code the host
+runs; unit tests and the CI guest-parity check (an insecure and a secure fixture) cover that.
 
 The leaf layout and which inputs are computed over come from the program, as an `InputPolicy`:
 
 ```rust
 pub struct InputPolicy {
     pub leaf: fn(&PublishedInput) -> Result<String, ComputeError>,
-    pub select: fn(&[PublishedInput]) -> Vec<usize>,
+    pub select: fn(&[InputRecord]) -> Vec<usize>,
 }
 ```
 
@@ -2309,19 +2342,28 @@ answers differently from a program where every input counts.
 commitment and every input is computed over — and matches the starter template, whose
 `MyProgram.publishInput` inserts the commitment directly. Every E3 program exports `policy()` beside
 `fhe_processor`, so the guest and the dev runner need not know which program they are running.
+`select` sees an `InputRecord`: the published input without its ciphertext bytes, which the Secure
+Process no longer holds at selection time. The processor receives the selected ciphertexts as an
+iterator.
 
-The published support image embeds the CRISP guest from `crates/support/program`. The reference app
-keeps the same guest in `examples/CRISP/program`. A CRISP policy change must update both copies and
-regenerate `crates/support/contracts/ImageID.sol` before the support image is published.
+Each project's guest (`guest/`) and proving service (`.interfold/support/openvm`) link the project's
+own `program/`. A policy or processor change requires a new OpenVM executable, derived application
+commitments, and matching receipt-verifier deployment. Do not reuse a legacy RISC Zero image ID or
+an aggregation key for another VM configuration.
 
-The guest links `risc0-zkvm` with `heap-embedded-alloc`. The default bump allocator never frees, so
-each input's temporary Greco form stayed allocated and a secure-preset round aborted out of memory
-at about 500 inputs. The allocator is part of the guest ELF: changing it changes the image ID, and
-`ImageID.sol`, the ciphertext verifier and every deployed `CRISPProgram.imageId` must move with it.
+The OpenVM guest enables `heap-embedded-alloc`. A bump allocator never frees, so each input's
+temporary Greco form would stay allocated and a secure-preset round would run out of memory as the
+round grows. The allocator is part of the guest executable, so changing it changes the application
+commitments that the receipt verifiers bind.
 
-`interfold program start` sends each configured Boundless offer parameter through the project
-support launcher to the container. The container maps these values to the environment variables that
-build the on-chain offer. An omitted parameter uses the host's built-in default.
+`interfold program compile` builds the project's guest, its keys, the receipt identity and the
+worker configuration, and `interfold program start` runs the project's service with the
+`program.openvm` workers. The service picks the CUDA worker when it is configured and its probe
+opens a GPU, and the CPU worker otherwise, and runs the worker's `check` before it accepts work.
+Every worker run has a deadline. Proving artifacts and machine-specific paths stay outside Git.
+Explicit development mode remains separate from the real-proof service.
+
+File: `examples/CRISP/packages/crisp-contracts/tests/openvm-service.test.ts`
 
 `PublishedData` carries what the program published per input: the stored commitment, and opaque
 `metadata` the crate never interprets. CRISP puts its 20-byte slot address and the 5-byte parent
@@ -2348,9 +2390,9 @@ leaf = sha256(keccak256(encryptedVote) || encryptedVoteCommitment || slotAddress
 - the **parent**, because the guest walks each slot's chain by it — an unbound parent would let a
   prover re-point entries and change which one holds the slot.
 
-`MerkleTreeBuilder::compute_leaf_hashes_batched` rebuilds exactly that layout. Both sides pin the
-same test vector (`program/tests/input_leaf.rs` and `tests/input-leaf.test.ts`), and
-`examples/CRISP/program/tests/onchain_root_agreement.rs` asserts Rust reproduces a root a real
+The CRISP `policy::leaf`, which `SecureProcess` applies to each input, rebuilds exactly that layout.
+Both sides pin the same test vector (`program/tests/input_leaf.rs` and `tests/input-leaf.test.ts`),
+and `examples/CRISP/program/tests/onchain_root_agreement.rs` asserts Rust reproduces a root a real
 contract produced, from a fixture generated by `tests/input-tree-e2e.test.ts`. A one-byte divergence
 would make every root mismatch and nothing else would detect it.
 
@@ -2451,17 +2493,51 @@ server that lost its database, or one of several instances, can report `not_inde
 Closing the gap entirely would need the guest to tell a replace from an add, which means publishing
 that distinction — the thing the whole design exists to hide.
 
-Capacity: `TREE_DEPTH = 20` gives 2^20 entries, against a physical ceiling of roughly three writes
-per block at the secure preset — append-only is not capacity-bound.
+Capacity: `TREE_DEPTH = 20` gives 2^20 entries. Every input, whether a vote, an update, or a mask,
+appends one entry, and `_verifyInputProof` refuses an input once the round holds `inputLimit`
+entries (`InputLimitReached`), on both `publishInput` and `validateInputProof`. The limit is at most
+`MAX_INPUTS_PER_ROUND` (100,000). Every input adds at most one fresh ciphertext to the sum that the
+committee decrypts. Decryption stays correct for `SEARCH_Z` additions, which is 100,000 for
+secure-8192. The insecure test preset is sized for 1,024 additions. A CUSTOM round on it, or a
+CONSTANT round with zero credits, can accept more inputs than that.
+
+A mask needs no voter signature, so any account can fill `inputLimit` with masks (`00_INDEX.md`,
+"Masks can fill the input limit").
 
 **Plaintext modulus bound.** The committee decrypts each tally coefficient modulo the plaintext
-modulus `t` of the round's BFV parameters: 100 for insecure, 1,000,000 for secure-8192, and 1,000
-for secure-16384. Every ballot coefficient is 0 or 1 and the tally adds one ballot per selected
-slot, so a coefficient counts the ballots that set that bit, and the decoded count is exact only
-while fewer than `t` ballots set it. `CRISPProgram` does not enforce the bound, and the input tree
-(`2^20` entries) does not prevent a round past it. At secure-8192 a wrong count needs a million
-ballots in one round; at insecure it needs 100 and at secure-16384 it needs 1,000, so a round on
-that preset with 100 or more voters for one option can decode a wrong result with every proof valid.
+modulus `t` of the round's BFV parameters: 100 for insecure, 17,000,000 for secure-8192, and 1,000
+for secure-16384. A ballot holds one weight in `[0, t)` for each option, so the decrypted tally
+holds per-option totals: coefficient `o` is the total weight on option `o`, exact only while it is
+below `t`. `CRISPProgram.validate` decodes `t` from `e3ProgramParams` (the `BfvParameters` tuple
+that `encode_bfv_params` and `encodeBfvParams` write) and sizes the round so that no total reaches
+it:
+
+- CONSTANT credits: `credits >= t` reverts with `CreditsExceedPlaintextModulus`. A ballot's weights
+  sum to at most `credits`, so the input limit is `(t - 1) / credits`, capped at
+  `MAX_INPUTS_PER_ROUND`. Zero credits carry no weight and take `MAX_INPUTS_PER_ROUND`. No divisor
+  is recorded.
+- CUSTOM credits: the round records the token snapshot and a divisor of at least
+  `getPastTotalSupply(snapshot) / t + 1`. A requested 0 takes that minimum, and a smaller request
+  reverts with `VotingPowerDivisorBelowMinimum`. A slot's weight bound is
+  `getPastVotes(slot, snapshot) / divisor`, and the votes of all accounts sum to at most the total
+  supply, so the bounds of all slots sum to less than `t`. A token that does not answer
+  `getPastTotalSupply` reverts with `CustomCreditsRequireVotesToken`.
+
+An ONCHAIN round takes each slot's bound from the contract, so the bound holds without trusting the
+coordinator. A census-tree round takes it from the census leaf, so it also relies on the coordinator
+writing `credits` (CONSTANT) or the scaled voting power (CUSTOM) into each leaf, the same trust the
+census already carries. The server reads CUSTOM leaf balances at `snapshotOf(e3Id)`, in the clock
+units of the token, which is the snapshot that sized the divisor. It stores and serves each round's
+snapshot (`snapshot_block`) in the same clock units, and serves 0 until it has read the token's
+clock. A CONSTANT-credit census converts the snapshot to a block by the token's clock mode. It
+retries a failed `getPastVotes` read. If the read keeps failing, the server posts no root:
+`setMerkleRoot` accepts one root, so a census without that voter would bar the voter for the whole
+round. The round stays registered with `discovery_pending` set, and a retry pass posts the root
+after it reads every voter. A CUSTOM round also relies on the token: at the snapshot, `getPastVotes`
+over all accounts must not sum above `getPastTotalSupply`. ERC20Votes meets this. `BondedVotes` with
+an escrow votes source does not guarantee it (see the `BondedVotes` gap in
+`invariants/01_PROTOCOL_ONCHAIN.md`). The bound still holds while the FOLD that two accounts both
+count is at most the FOLD that carries no vote at the snapshot.
 
 A round where _every_ entry is unusable fails at the output commitment, because the processor's
 empty ciphertext does not deserialize. That is only reachable when no honest input exists, and is
@@ -2503,9 +2579,8 @@ derived from the commitments accepted a mask that published its ballot alone: th
 second opening of the parent commitment that satisfied the single equation. A per-coefficient linear
 relation, aligned across three ciphertexts that pack with the same `BIT_CT`, proves the same
 statement for the committed coefficients under any opening that keeps the carriers, so the circuit
-needs no `pack_checked` digit asserts. At secure-8192 the `crisp` circuit is 1,844,049 gates and
-`crisp_onchain` 1,824,326, under the `2^21` browser ceiling. With the checked helper on the three
-commitments, the secure `crisp` circuit measured 2,520,034 gates.
+needs no `pack_checked` digit asserts. At secure-8192 the `crisp` circuit is 1,759,587 gates and
+`crisp_onchain` 1,739,864, under the `2^21` browser ceiling.
 
 The circuit returns `sum_ct_commitment` on every path, so the public inputs, the stored commitment,
 the ballot digest, and the published ciphertext have the same shape whichever operation ran. Telling
@@ -2513,9 +2588,15 @@ them apart would mean distinguishing a fresh BFV ciphertext from a sum, which th
 hides. The SDK has one code path for all three, and `CrispSDK.prepareBallot` makes the same
 `state/previous-ciphertext` request either way, so the request pattern says nothing either.
 
-The plaintext is fully constrained on both branches. `check_coefficient_values_with_balance` binds
-every coefficient of `k1`: those inside an option segment must be binary, and every coefficient
-outside the ballot region must be zero. `check_coefficient_zero` requires the whole polynomial to be
-zero for a mask. Both read the payload at `k1[D - MAX_MSG_NON_ZERO_COEFFS ..]`, because the witness
-generator reverses the message over the full BFV degree — the ballot occupies the **last** 100
-coefficients, and the options appear back to front.
+The plaintext is fully constrained on both branches. The witness generator reverses the message over
+the full BFV degree, so option `o` is `k1[D - 1 - o]`. `check_coefficient_values_with_balance`
+requires every coefficient outside the first `num_options` message positions to be zero and decodes
+each option weight. The prover hints the weight `v` and a quotient `r`. `check_weight` range-checks
+the coefficient, `v`, and `r` to `[0, t)` and checks `k1 + t * r == Q_MOD_T * v`. With every value
+below `t`, the equation holds over the integers, so `v` is the value that the coefficient decrypts
+to. The fold binds this `k1` to the plaintext of `user_data_encryption_ct0` through `k1_commitment`.
+A packed commitment has one opening only while every coefficient fits its slot.
+`user_data_encryption_ct0` range-checks its `k1` to `[0, t)`, and the ballot circuit bounds every
+coefficient of its own `k1`. The weights must sum to at most the slot's bound, and with two options
+at most one weight is nonzero. `check_coefficient_zero` requires the whole polynomial to be zero for
+a mask.

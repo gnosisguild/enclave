@@ -1,7 +1,7 @@
 {
   "name": "@interfold/main",
   "description": "Interfold is an open-source protocol for Encrypted Execution Environments (E3).",
-  "version": "0.19.0-test.2",
+  "version": "0.19.0",
   "private": true,
   "license": "LGPL-3.0-only",
   "author": {
@@ -42,6 +42,10 @@
     "prepare": "husky",
     "interfold": "cd crates && ./scripts/launch.sh",
     "rust:lint": "cargo fmt -- --check",
+    "rust:format": "cargo fmt",
+    "rust:clippy": "cargo clippy --locked",
+    "rust:build:zk": "cargo build --locked -p e3-zk-artifacts",
+    "zk": "cargo run --locked --release -p e3-zk-artifacts --bin zk-artifacts --",
     "ciphernode:add": "cd packages/interfold-contracts && pnpm ciphernode:admin-add",
     "ciphernode:remove": "cd packages/interfold-contracts && pnpm ciphernode:remove",
     "rust:test": "cd crates && ./scripts/test.sh",
@@ -81,6 +85,7 @@
     "config:release": "cd packages/interfold-config && pnpm release",
     "react:release": "cd packages/interfold-react && pnpm release",
     "npm:release": "pnpm build && pnpm config:release && pnpm evm:release && pnpm wasm:release && pnpm sdk:release && pnpm react:release && pnpm mcp:release",
+    "openvm": "bash scripts/run-openvm.sh",
     "support:build": "cd crates/support && ./scripts/build.sh",
     "build": "pnpm compile",
     "fixtures:build": "cd crates/evm-helpers && ./scripts/build_fixtures.sh && cd ../indexer && ./scripts/build_fixtures.sh",

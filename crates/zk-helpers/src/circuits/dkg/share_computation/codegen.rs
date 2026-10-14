@@ -14,7 +14,7 @@ use crate::circuits::dkg::share_computation::{
 };
 use crate::circuits::{Artifacts, CircuitCodegen, CircuitsErrors, CodegenToml};
 use crate::codegen::CodegenConfigs;
-use crate::registry::Circuit;
+use crate::metadata::Circuit;
 use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::BfvPreset;
 
@@ -76,7 +76,7 @@ pub fn generate_configs_with_chunk_size(
         ));
     }
     // C2's parity matrix must match a canonical (T, N) committee; reject arbitrary values.
-    crate::ciphernodes_committee::try_canonical_from_t_n(n_parties, threshold)
+    crate::committee::try_canonical_from_t_n(n_parties, threshold)
         .map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
     let degree = threshold_params.degree();
     if !degree.is_multiple_of(chunk_size) {
@@ -145,12 +145,12 @@ pub global {}_E_SM_CONFIGS: ShareComputationConfigs<L_THRESHOLD> =
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::circuits::computation::Computation;
     use crate::circuits::dkg::share_computation::{Bits, Bounds};
     use crate::codegen::write_artifacts;
     use crate::computation::DkgInputType;
     use crate::Circuit;
+    use e3_committee::CiphernodesCommitteeSize;
     use e3_fhe_params::BfvPreset;
     use tempfile::TempDir;
 

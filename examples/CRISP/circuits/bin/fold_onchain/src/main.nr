@@ -11,9 +11,9 @@ use interfold_lib::math::commitments::compute_vk_hash;
 /// Run `pnpm compute:vk-hash` in `examples/CRISP` after a circuit or preset change.
 /// Each preset has a different circuit tree and must have a different anchor.
 pub global CRISP_ONCHAIN_FOLD_EXPECTED_KEY_HASH_INSECURE: Field =
-    0x29a57cdac769542e08198843f007f56420f7ebafb36119ec6980172dc5e9425a;
+    0x090d43b8bbd50e0840fd14a5918216321b0fc5dc5696da80da7cca2b22614696;
 pub global CRISP_ONCHAIN_FOLD_EXPECTED_KEY_HASH_SECURE_8192: Field =
-    0x04bbfc5d61e22e8034eef60274df17048375c80b54bce71570a8835c65d8f447;
+    0x225abc9d92035e910c9bd0deac6060640ad49b30ed6ef4de6d094397010ebdac;
 pub global CRISP_ONCHAIN_FOLD_EXPECTED_KEY_HASH_SECURE_16384: Field =
     0x29ef5fc0b104605ead5b7d55cbb4144f11206771213ee248ea8b9f9618c4674b;
 

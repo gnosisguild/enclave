@@ -1,7 +1,7 @@
 # Invariants — Cryptography / circuits
 
 Scope: `circuits/`, `crates/zk-prover`, `crates/zk-helpers`, `crates/trbfv`, `crates/fhe-params`,
-the BFV and RISC Zero verifier contracts, `crates/compute-provider`, and the CRISP example.
+the BFV and OpenVM receipt verifier contracts, `crates/compute-provider`, and the CRISP example.
 Committee config sync, Noir/Barretenberg compatibility, DKG and threshold structure, proof binding
 and domain separation, and E3 program input rules.
 
@@ -17,10 +17,10 @@ every section.
   ciphernodes in `crates/fhe-params/src/constants.rs`, and for circuits in
   `circuits/lib/src/configs/{insecure,secure_8192,secure_16384}/threshold.nr`. Committee values also
   appear in `circuits/lib/src/configs/committee/active.nr`,
-  `packages/interfold-contracts/scripts/utils.ts`, `crates/zk-helpers/src/ciphernodes_committee.rs`,
-  and `packages/interfold-contracts/contracts/lib/ActiveCryptoConfig.sol`. The generated Solidity
-  and TypeScript values bind the BFV parameter-set hashes and configuration IDs. The gate verifies
-  the tuple, the circuit error bound, and every runtime configuration-ID copy. The local
+  `packages/interfold-contracts/scripts/utils.ts`, `crates/committee/src/lib.rs`, and
+  `packages/interfold-contracts/contracts/lib/ActiveCryptoConfig.sol`. The generated Solidity and
+  TypeScript values bind the BFV parameter-set hashes and configuration IDs. The gate verifies the
+  tuple, the circuit error bound, and every runtime configuration-ID copy. The local
   `circuits/bin/.active-preset.json` cache may differ from the production chain pair. Drift means a
   deployment can register parameters that ciphernodes or circuits do not implement. Regenerate
   configuration constants with `pnpm build:circuits sync-config --preset <name> --committee <name>`;
@@ -40,9 +40,9 @@ every section.
   `BfvPkVerifierRouter.sol`
 - Parity matrices (`parity_{insecure,secure_8192,secure_16384}.nr`) are derived artifacts
   regenerated from preset `QIS` + committee `(N, T)`. Do not hand-edit them.
-  `scripts/check-committee.sh` regenerates and diffs them only when
-  `target/release/generate_parity_matrices` and `nargo` exist; the Agent Harness CI job skips that
-  step. The CI circuits job catches edits to the committed selection through its rebuild diff.
+  `scripts/check-committee.sh` regenerates and diffs them only when `target/release/zk-artifacts`
+  and `nargo` exist; the Agent Harness CI job skips that step. The CI circuits job catches edits to
+  the committed selection through its rebuild diff.
 - The C1 and C2 bound globals (`PK_GENERATION_*`, `SHARE_COMPUTATION_*`) are derived artifacts of
   the preset and committee. The build regenerates them for the selected pair and replaces each whole
   declaration, array bounds included. It rejects a declaration with its config file's prefix that
@@ -54,11 +54,15 @@ every section.
 ### Noir / Barretenberg compatibility
 
 - Treat Nargo, the Rust Noir crates, witness serialization, Barretenberg, circuit release archives,
-  verification keys, and generated Solidity verifiers as one compatibility unit. The current unit is
-  Nargo and Rust Noir `1.0.0-beta.26` with Barretenberg `5.1.0`. The same pins also appear in the
-  SDK's `@noir-lang/noir_js` and `@aztec/bb.js`. No script checks that these pins agree. —
-  `.github/workflows/ci.yml` and `releases.yml`; `crates/zk-prover/versions.json`;
-  `crates/zk-prover/Cargo.toml`; `packages/interfold-sdk/package.json`
+  verification keys, and generated Solidity verifiers as one compatibility unit. The current
+  source-build unit is Nargo and Rust Noir `1.0.0-beta.26` with Barretenberg `5.2.0`. The same pins
+  also appear in the SDK's `@noir-lang/noir_js` and `@aztec/bb.js`. No script checks that these pins
+  agree. — `.github/workflows/ci.yml` and `releases.yml`; `crates/zk-prover/versions.json`;
+  `crates/zk-prover/Cargo.toml`; `packages/interfold-sdk/package.json`. A release must bind its
+  archive to matching source artifacts and a version-bound digest.
+  `pnpm store:circuits verify-release` checks all six supported preset/committee pairs before
+  archive publication. An archive from an older toolchain is not compatible merely because its file
+  checksum is valid.
 - Rust-generated witnesses must use `WitnessStack::serialize()`. Do not serialize a witness stack
   with `bincode`; Barretenberg 5 accepts the beta.26 MessagePack format markers, not the legacy
   marker. — `crates/zk-prover/src/witness.rs`
@@ -88,19 +92,20 @@ every section.
   `crates/zk-prover/required-artifacts.json` (shared), plus `required-artifacts-trbfv.json` when the
   pair serves the trBFV path and `required-artifacts-lbfv.json` when it serves the l-BFV path, each
   with a verified manifest entry. Secure-16384 serves only the l-BFV path; insecure serves both. The
-  release tooling's `requiredArtifactMarkers` uses the same rule. Root manifests, `SOURCE_HASH`, and build
-  stamps are metadata, not required prover artifacts. Validation failure preserves the installed
-  circuits and `version.json`. Installation errors trigger best-effort rollback and remain the
-  returned error even if rollback fails. Each rollback failure logs its source and target paths. If
-  restoration of the previous circuits fails, the installer retains the staging directory and logs
-  its path for recovery. — `crates/zk-prover/src/backend/download.rs`
+  release tooling's `requiredArtifactMarkers` uses the same rule. Root manifests, `SOURCE_HASH`, and
+  build stamps are metadata, not required prover artifacts. Validation failure preserves the
+  installed circuits and `version.json`. Installation errors trigger best-effort rollback and remain
+  the returned error even if rollback fails. Each rollback failure logs its source and target paths.
+  If restoration of the previous circuits fails, the installer retains the staging directory and
+  logs its path for recovery. — `crates/zk-prover/src/backend/download.rs`
 - Archive pins ship with the binary; neither the archive nor its download endpoint supplies the
   expected digest at runtime. The 0.18.0 pin comes from the published GitHub asset digest. Local
-  archive installation trusts the operator's file and does not require a release pin. Release
-  packaging supplies `E3_CIRCUITS_ARCHIVE_SHA256` before binary and ciphernode image compilation.
-  `build.rs` validates the digest, and `ZkConfig::default` binds it to the crate version. Other pins
-  remain in `versions.json`. The workflow retains the same archive bytes for publication.
-  `SOURCE_HASH` identifies circuit sources, not archive bytes, and cannot replace this check.
+  archive installation requires the same pin unless the operator passes `--allow-unpinned-archive`,
+  as CI does for a candidate build; a missing pin then fails closed too. Release packaging supplies
+  `E3_CIRCUITS_ARCHIVE_SHA256` before binary and ciphernode image compilation. `build.rs` validates
+  the digest, and `ZkConfig::default` binds it to the crate version. Other pins remain in
+  `versions.json`. The workflow retains the same archive bytes for publication. `SOURCE_HASH`
+  identifies circuit sources, not archive bytes, and cannot replace this check.
 - The secure-16384 l-BFV CRS and URS use constants version 1 and different fixed SHA-256 domain
   labels. The runtime and circuit generator expand both values with
   `CommonRandomPolyVec::from_seed`. The CRS, URS, Garner rows, parameter set, level, and row
@@ -109,12 +114,14 @@ every section.
   `generate_config_modules.rs`; `flow-trace/04`
 - Artifact identity must cover every source that compiles into an artifact. `computeSourceHash`
   (`scripts/build-circuits.ts`) includes shared Noir logic, the library entry point and dependency
-  manifest, and shared configuration constants. It normalizes the active preset selector because
-  each pair already identifies its preset. A library-only change invalidates every affected pair.
-  Rebuild and push those pairs before release.
+  manifest, shared configuration constants, and the pinned toolchain: nargo at the Noir tag of the
+  prover crates and bb at `required_bb_version`. The build refuses a nargo or bb of another version.
+  It normalizes the active preset selector because each pair already identifies its preset. A
+  library-only change invalidates every affected pair. Rebuild and push those pairs before release.
 - The pair source hash ignores generated C1/C2 bound values and includes the Rust sources that
-  generate them, without their `#[cfg(test)]` modules. Switching the active committee or editing a
-  test module must not change another pair's source hash.
+  generate them, including `zk/cli`, `fhe-params`, `committee`, `polynomial/src`, and
+  `polynomial/fhe-adapter/src`, without their `#[cfg(test)]` modules. Switching the active committee
+  or editing a test module must not change another pair's source hash.
 - The source hash reads `Cargo.lock` for external crate pins only: name, version, source, and
   checksum. A workspace version bump or a dependency edit inside the workspace must not make the
   published artifact matrix stale. — `scripts/build-circuits.ts`
@@ -135,8 +142,9 @@ every section.
   result authorizes only its exact dispatch batch. Share admission checks the signed sender, E3,
   proof type, raw bytes, and ciphertext position before reserving a party slot. — `flow-trace/04`
 
-- SK splits into N shares; exactly **T+1** shares feed the recursive decryption proof. —
-  `flow-trace/04`
+- SK splits into N shares; exactly **T+1** shares feed the recursive decryption proof. The C7 input
+  computation (`Inputs::compute` in `decrypted_shares_aggregation`) refuses any other count of
+  shares or party IDs, so an oversized witness cannot be built. — `flow-trace/04`
 - Runtime `party_id` derives from the finalized committee normalized by ascending address and is
   zero-indexed. DKG circuit party IDs and fold-attestation slots use the same zero-based index. Only
   decryption uses one-based Shamir coordinates, `party_id + 1`, which must be strictly increasing;
@@ -157,9 +165,11 @@ every section.
   whose party ID is at most the active party ID from `AggregatorChanged`, and only when its local
   Ready state supports that roster. Before C4 starts, a roster from a lower party ID replaces an
   accepted roster from a higher one, and an expelled dealer of an accepted roster is not an honest
-  party; after C4 starts, the accepted roster is fixed, also after a restart that loses the
-  decryption-key calculation. Accepting a roster ends only the DKG-roster failover phase. Public-key
-  aggregation receives a new readiness-gated failover budget. —
+  party; after C4 starts, the accepted roster is fixed. **Gap:** after a restart, the store can
+  refuse the write that fixes it as stale; memory keeps it and the next state write saves it, but a
+  second restart before that write lets a lower-ranked roster replace the roster that C4 used.
+  Accepting a roster ends only the DKG-roster failover phase. Public-key aggregation receives a new
+  readiness-gated failover budget. —
   `crates/keyshare/src/threshold_keyshare/effects/coordinate_roster.rs`; `flow-trace/04`; INDEX
   concerns #42 and #52
 - DKG dealer identity binds the public proof statement, not randomized proof bytes. Replacing a
@@ -207,22 +217,22 @@ every section.
 - fhe.rs v0.4.1 derives additive smudging bounds as `2^(lambda + 1) * degree * B_C` and uses
   sampler-specific encryption error bounds. The C1/C2 Noir bit widths must use the same bounds as
   the Rust sampler for each preset and committee. Regenerate them with `pnpm build:circuits`;
-  rebuild the matching verifier artifacts before deploying a protocol-version-7 node. —
+  rebuild the matching verifier artifacts before deploying a protocol-version-8 node. —
   `flow-trace/04`; `scripts/build-circuits.ts`
 - fhe.rs v0.4.1 passes plaintext-scaled ballot coefficients as non-centered residues. Both CRISP
-  vote circuits must check `Q_MOD_T`, rather than `Q_MOD_T_CENTERED`, against those coefficients. —
-  `examples/CRISP/circuits/bin/{crisp,crisp_onchain}/src/main.nr`
+  vote circuits decode each ballot weight against `Q_MOD_T`, rather than `Q_MOD_T_CENTERED`. —
+  `examples/CRISP/circuits/lib/src/utils.nr`
 - The C3 and user-data-encryption `k1` witnesses use non-centered residues in `[0, t - 1]`. Their
   Noir equations and asymmetric quotient bounds must match the Rust witnesses. —
   `circuits/lib/src/core/dkg/share_encryption.nr`; `crates/zk-helpers/src/circuits/`
-- Mainnet secure parameter-set index 1 contains the old tuple. Version 7 registers the new tuple at
-  index 2 and must not reinterpret old index-1 E3s as version-7 secure requests. — `flow-trace/07`;
+- Mainnet secure parameter-set index 1 contains the old tuple. Version 8 registers the new tuple at
+  index 2 and must not reinterpret old index-1 E3s as version-8 secure requests. — `flow-trace/07`;
   `crates/fhe-params/src/presets.rs`; `ActiveCryptoConfig.sol`
 - The local C1 (trBFV only; the l-BFV path has no C1), C2a, C2b, and every C3a and C3b proof must
   complete and be signed before any `ThresholdShareCreated` is published. C4 through C7 belong to
   later phases. — `crates/zk-prover/src/proof_request/effects/publish_threshold_shares.rs`;
   `flow-trace/04`
-- The decrypted plaintext is exactly 100 u64 coefficients in every layer: `MAX_MSG_NON_ZERO_COEFFS`
+- The decrypted plaintext is exactly 50 u64 coefficients in every layer: `MAX_MSG_NON_ZERO_COEFFS`
   in Noir (`configs/default/mod.nr`, written by `scripts/build-circuits.ts`) and in `zk-helpers`,
   and `MESSAGE_COEFFS_COUNT` in `BfvDecryptionVerifier.sol`. **Gap:** no gate compares these copies.
 - A CRT consistency equation of the form `lifted[j] == limb[i][j] + quotient[i][j] * q_i` constrains
@@ -326,10 +336,10 @@ every section.
   needs a `should_fail` test in each direction, since nothing else stops it being wrong. —
   `flow-trace/04`
 - **A path gated off for one preset is the path CI exercises least, and usually the one that
-  ships.** C3's scaled quotient is generated-false on insecure-512, which is the default preset and
-  the only one `rust:test:proofs` and `local_e2e_tests` run. So the production path gets no
-  end-to-end proof coverage from them: it needs its own `nargo execute` against a real secure-8192
-  witness, plus a unit test that enters the branch. Before C3 added one, every C3 test exercised the
+  ships.** C3's scaled quotient is generated-false on insecure, which is the default preset and the
+  only one `rust:test:proofs` and `local_e2e_tests` run. So the production path gets no end-to-end
+  proof coverage from them: it needs its own `nargo execute` against a real secure-8192 witness,
+  plus a unit test that enters the branch. Before C3 added one, every C3 test exercised the
   fallback. — `flow-trace/04`
 - **Grep `nargo execute` output for `bug:`, not just for failure.** Noir's "Brillig function call
   isn't properly covered by a manual constraint" diagnostic prints even under `--silence-warnings`,
@@ -403,15 +413,14 @@ every section.
   not create (the parent's and the ballot's ciphertexts) and keep plain `pack`: `verify_slot_update`
   checks a relation that is linear and aligned coefficient by coefficient across ciphertexts packed
   with the same `BIT_CT`, so an opening that keeps the carriers proves the same relation for the
-  committed coefficients. With the checked helper on the three commitments, the secure `crisp`
-  circuit measured 2,520,034 gates, above the browser ceiling. The exemption holds only for that
-  shape of relation, and only while every commitment in it has a bounded opening that something else
-  fixes: the ballot through the range checks of `user_data_encryption_ct0/ct1`, and the parent and
-  the published result because `chain_head_per_slot` takes an entry only when its bytes reproduce
-  its commitment and it extends the selected head. A check at one point over those commitments, or a
-  Secure Process that follows a parent by its stored commitment without its bytes, needs injective
-  openings: chained masks could then carry a coefficient past the radix and shift a plaintext
-  coefficient by a carry. — `flow-trace/04`
+  committed coefficients. The exemption holds only for that shape of relation, and only while every
+  commitment in it has a bounded opening that something else fixes: the ballot through the range
+  checks of `user_data_encryption_ct0/ct1`, and the parent and the published result because
+  `chain_head_per_slot` takes an entry only when its bytes reproduce its commitment and it extends
+  the selected head. A check at one point over those commitments, or a Secure Process that follows a
+  parent by its stored commitment without its bytes, needs injective openings: chained masks could
+  then carry a coefficient past the radix and shift a plaintext coefficient by a carry. —
+  `flow-trace/04`
 - A bound that is not tight enough for the slot is no bound for this purpose. C2b's `as u64` cast
   limited coefficients to `2^64` while the slot was `radix = 2^64` with `base = 2^60`, so a digit
   could still overflow. — `flow-trace/04`
@@ -475,14 +484,15 @@ every section.
   (no BFV decoding/Poseidon2 in Solidity); C3/C6 commitments are checked against their ciphertext
   witnesses. — INDEX IF-004
 - **Ciphertext-duty proof (Zenith #15):** each E3 snapshots the protocol verifier for its encryption
-  scheme at request time. Before `CiphertextReady`, this verifier checks a RISC Zero receipt that
-  binds the chain, Interfold address, E3 ID, scheme ID, BFV parameter hash, committee public key,
-  output hash, and SAFE commitment. The E3 program verifies application rules separately and cannot
-  create a decryption duty by itself. — `flow-trace/04`; INDEX Z-15
+  scheme at request time. Before `CiphertextReady`, this verifier checks a zkVM receipt that binds
+  the chain, Interfold address, E3 ID, scheme ID, BFV parameter hash, committee public key, output
+  hash, and SAFE commitment. The E3 program verifies application rules separately and cannot create
+  a decryption duty by itself. — `flow-trace/04`; INDEX Z-15
 - **The compute path carries no external audit.** Neither Zenith protocol audit (2026-08-17, six
-  Solidity files; 2026-09-08, a scoped review of 14 Solidity files) covered Rust, the RISC Zero
-  guest, `crates/compute-provider`, `crates/zk-helpers`, or `Risc0BfvCiphertextVerifier.sol`. Treat
-  changes there as unaudited. — `packages/interfold-contracts/audits/README.md`
+  Solidity files; 2026-09-08, a scoped review of 14 Solidity files) covered Rust, the OpenVM guest
+  and prover, `crates/compute-provider`, `crates/zk-helpers`, or the OpenVM receipt verifiers
+  (`OpenVmBfvCiphertextVerifier.sol`, `OpenVmReceiptVerifier.sol`). Treat changes there as
+  unaudited. — `packages/interfold-contracts/audits/README.md`
 - **A Secure Process derives its input root; it never receives it.** `ComputeInput` holds
   `fhe_inputs` and per-input `published` data, never a root, and `ComputeInput::process` derives one
   leaf from each supplied input through the E3 program's `InputPolicy`. The protocol verifier
@@ -493,16 +503,16 @@ every section.
   publish a tally over ciphertexts that were never submitted. `MerkleTreeBuilder::with_leaf_hashes`
   is `#[cfg(test)]` to keep it out of that path. — `flow-trace/04`
 - **Every E3 program must compare the proof's input root against its own root.**
-  `Risc0BfvCiphertextVerifier` authenticates the receipt's `inputRoot` but compares it with nothing.
-  A program that skips the comparison accepts a result computed over any input set. —
+  `OpenVmBfvCiphertextVerifier` authenticates the receipt's `inputRoot` but compares it with
+  nothing. A program that skips the comparison accepts a result computed over any input set. —
   `flow-trace/04`
 - **A Secure Process derives its leaves; it never receives them, and never drops one.**
-  `MerkleTreeBuilder::compute_leaf_hashes_batched` computes one leaf per supplied input, in the
-  supplied order whatever the batching schedule, through the program's `InputPolicy::leaf`,
-  including inputs that the policy does not select for computation. The caller must supply the
-  complete input set in on-chain order: a received root can disagree with the data it claims to
-  describe, and a missing leaf changes the root and makes the result unpublishable. —
-  `crates/compute-provider/src/merkle_tree_builder.rs`; `flow-trace/04`
+  `SecureProcess` computes one leaf per supplied input, in the supplied order whatever the batching
+  schedule, through the program's `InputPolicy::leaf`, including inputs that the policy does not
+  select for computation. The caller must supply the complete input set in on-chain order: a
+  received root can disagree with the data it claims to describe, and a missing leaf changes the
+  root and makes the result unpublishable. — `crates/compute-provider/src/secure_process.rs`;
+  `flow-trace/04`
 - **A CRISP input is committed before it is finalized, but computation requires both.**
   `publishInput` verifies the Noir proof and the configured service's EIP-712 storage attestation,
   then reserves the leaf and index so a later input can name it as its parent. `finalizeInput` must
@@ -529,6 +539,16 @@ every section.
   universal answer. `InputPolicy::default` is the historical behaviour — leaf is the ciphertext's
   own commitment, every input counts — which matches the starter template. Every E3 program exports
   `policy()` beside `fhe_processor`. — `flow-trace/04`
+- **The Secure Process holds one ciphertext at a time and checks its second pass.** It reads every
+  ciphertext once for its leaf, selects over records without bytes, then reads the selected
+  ciphertexts again and refuses one whose Keccak hash differs from the first read. The host and the
+  guest run the same `SecureProcess`, but the guest build swaps in accelerated code the host does
+  not run: OpenVM's Poseidon2 (`e3-safe/openvm`), Keccak and SHA-256 (`openvm-hashes`), and the
+  power-basis commitment and RNS packing (`crisp_fhe_optimized`). The host's predicted journal is
+  the guest's only while each accelerated path matches its reference. Unit tests compare them, and
+  CI runs the real guest against the host's journal on an insecure and a secure fixture
+  (`pnpm openvm guest-parity`). A mismatch cannot make a false proof, because contracts rebuild the
+  journal from chain state, but no proof can then be made and every round fails. — `flow-trace/04`
 - **CRISP binds bytes, commitment, slot and parent into its leaf, and selects the end of each slot's
   chain.** `CRISPProgram.inputLeaf` is
   `sha256(keccak256(bytes) || commitment || slot || parentIndexPlusOne) mod SNARK_SCALAR_FIELD` and
@@ -594,22 +614,34 @@ every section.
   a change to either ballot circuit must regenerate those constants (`pnpm compute:vk-hash`, both
   presets) and the generated verifiers; a deployed `CRISPProgram` keeps the circuit its verifier was
   built from. — `flow-trace/04`
-- **A CRISP tally coefficient is exact only below the plaintext modulus.** Every ballot coefficient
-  is 0 or 1, and the tally adds one ballot per selected slot, so each decrypted coefficient counts
-  the ballots that set that bit of that option. The committee decrypts it modulo the plaintext
-  modulus `t` of the round's BFV parameters: 100 at insecure, 1,000,000 at secure-8192, and 1,000 at
-  secure-16384. Voting power does not change the bound, because a ballot adds at most 1 to each
-  coefficient. A tally format that is not one bit per coefficient per ballot needs a new bound.
-  **Gap:** `CRISPProgram` does not limit the slots of a round. When `t` or more ballots in one round
-  set the same bit, `decodeTally` reads the residue and the count is wrong with every proof valid.
-  That takes 100 ballots at insecure, a million at secure-8192, and 1,000 at secure-16384. —
-  `flow-trace/04`
+- **CRISPProgram keeps every option total below the plaintext modulus.** A ballot holds one weight
+  for each option, so coefficient `o` of the decrypted tally is the total weight on option `o`, and
+  the committee decrypts it modulo the plaintext modulus `t` of the round's BFV parameters.
+  `CRISPProgram.validate` must read `t` from `e3ProgramParams`, not from a constant, and size the
+  round so that no total reaches `t`. A CONSTANT-credit round must refuse `credits >= t` and accept
+  at most `(t - 1) / credits` inputs, capped at `MAX_INPUTS_PER_ROUND`. Each input adds at most one
+  fresh ciphertext to the decrypted sum. A mask adds its ciphertext to the one already in the slot,
+  so the count follows the inputs, not the slots. Every secure preset must therefore be searched
+  with `SEARCH_Z` of at least `MAX_INPUTS_PER_ROUND`. A CUSTOM-credit round must record a divisor of
+  at least `getPastTotalSupply(snapshot) / t + 1`, which bounds the totals only while the past votes
+  of all accounts sum to at most the past supply. ERC20Votes meets this. `BondedVotes` with an
+  escrow votes source does not guarantee it (`01_PROTOCOL_ONCHAIN.md`). Every input counts toward
+  the limit, including updates and masks, on both `publishInput` and `validateInputProof`. A
+  census-tree round also relies on the coordinator writing `credits` or the scaled voting power at
+  the snapshot into each leaf. For a CUSTOM-credit round, the server reads that power at
+  `snapshotOf(e3Id)`, in the clock units of the token. If the server cannot read the power of a
+  voter, it posts no root until a retry pass reads every voter. A change to the tally format, the
+  credit modes, or the parameter sets needs a new bound. — `flow-trace/04`
 - **CRISP constrains every coefficient of the ballot plaintext, at the real BFV degree.** The
-  witness generator reverses the message over the full degree, so the payload starts at
-  `D - MAX_MSG_NON_ZERO_COEFFS + (MAX_MSG_NON_ZERO_COEFFS mod num_options)` with the options back to
-  front; `crisp_lib::utils::ballot_layout` derives that offset, both checkers use it, and no code
-  may hand-code it. Each coefficient inside an option segment encodes one bit as 0 or `q_mod_t`,
-  everything outside the ballot region must be zero, and a mask's plaintext must be zero everywhere.
+  witness generator reverses the message over the full degree, so option `o` is `k1[D - 1 - o]`.
+  `check_coefficient_values_with_balance` must decode each option weight from that coefficient,
+  require every other coefficient to be zero, and bound the sum of the weights by the slot's bound.
+  A mask's plaintext must be zero everywhere. `check_weight` must range-check the option
+  coefficient, the hinted weight, and the quotient to `[0, t)`. Then `k1 + t * r == Q_MOD_T * v`
+  holds over the integers, and `v` is the value that the coefficient decrypts to. The bound on the
+  coefficient also gives the packed `k1_commitment` one opening. Thus the fold's equality check
+  binds this `k1` to the plaintext that `user_data_encryption_ct0` encrypts. Without that bound, a
+  prover can open the commitment to shifted option coefficients that decode to other weights.
   Indexing as if the polynomial were the message width makes both checks read only padding: every
   vote passes any balance bound, and a mask — which needs no signature and may be written to any
   eligible slot — can carry an arbitrary payload into someone else's ballot. Tests must build `k1`
@@ -687,12 +719,12 @@ every section.
   public-key rows and five RLK rows, all with one SK commitment, and no C1. Aggregation verification
   requires the five PK rows, then the five RLK `d0` rows, then the five RLK `d2` rows; each RLK
   aggregation proof must carry its family's public `component` (0 or 1), and its `ProofIdentity`
-  instance is `component * rows + row`. The version-3 PK document carries the five signed PK
-  row proofs and no C1 proof; the expected signer comes from row 0. Validation rejects version-1
-  and version-2 PK documents, which carry a C1 proof. Rows are ordered from 0 through
-  4 within each family and are keyed by `ProofIdentity`, not only `ProofType`. A versioned dispatch
-  context is authoritative for the proof session. Aggregation requires exactly `H` unique ascending
-  parties, and every public expected-commitment array must match the accepted PK, RLK D0, and RLK D2
+  instance is `component * rows + row`. The version-3 PK document carries the five signed PK row
+  proofs and no C1 proof; the expected signer comes from row 0. Validation rejects version-1 and
+  version-2 PK documents, which carry a C1 proof. Rows are ordered from 0 through 4 within each
+  family and are keyed by `ProofIdentity`, not only `ProofType`. A versioned dispatch context is
+  authoritative for the proof session. Aggregation requires exactly `H` unique ascending parties,
+  and every public expected-commitment array must match the accepted PK, RLK D0, and RLK D2
   generation commitments. PK and RLK aggregation rows use the same accepted-set hash. Before heavy
   verification, the verifier rejects a missing or incompatible context or a mixed identity.
 - **l-BFV generation rows:** the PK row proof (`lbfv_pk_generation`) proves all `L` limbs of one row
@@ -741,15 +773,15 @@ every section.
   `k1` chunk root from the complete polynomial before it outputs the whole-polynomial commitment
   that CRISP checks. Its proof must use the ZK recursive target because that circuit receives the
   private `k1` polynomial directly. The identity proofs must use the ZK recursive target too,
-  because each receives the private `u` polynomial to open it and evaluate `pk * u`. Each SDK proof request must use the circuit bundle compiled for
-  the witness's BFV preset and polynomial degree. —
+  because each receives the private `u` polynomial to open it and evaluate `pk * u`. Each SDK proof
+  request must use the circuit bundle compiled for the witness's BFV preset and polynomial degree. —
   `lib::core::threshold::user_data_encryption_chunk`, `examples/CRISP/scripts/compute_vk_hash.sh`
 - Circuit soundness fixes to preserve: `ModU64::div_mod` verifies
   `result*divisor == dividend (mod modulus)` (IF-001); C7 compares **every** decoded coefficient,
   including zeros, to the claimed message (IF-002). The l-BFV C7
   (`decrypted_shares_aggregation_wide`) forms the decode numerator `t * u + (Q - 1) / 2` in `U384`,
-  because at secure-16384 it passes the field (l-BFV C7 decode width). Every `pack` call
-  constrains the shifted digit, after BN254 field addition, to its radix before the packed value
-  enters a commitment or Fiat-Shamir transcript. Values near the field modulus can wrap below the
-  offset and represent negative coefficients; the range check applies to the shifted digit, not the
-  canonical field value.
+  because at secure-16384 it passes the field (l-BFV C7 decode width). Every `pack` call constrains
+  the shifted digit, after BN254 field addition, to its radix before the packed value enters a
+  commitment or Fiat-Shamir transcript. Values near the field modulus can wrap below the offset and
+  represent negative coefficients; the range check applies to the shifted digit, not the canonical
+  field value.

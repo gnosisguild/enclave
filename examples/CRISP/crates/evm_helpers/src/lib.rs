@@ -5,21 +5,22 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use alloy::{
+    eips::{BlockId, BlockNumberOrTag},
     network::{Ethereum, EthereumWallet},
-    primitives::{Address, Bytes, B256, I256, U256},
+    primitives::{Address, Bytes, B256, U256},
     providers::{
         fillers::{
             BlobGasFiller, ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller,
             WalletFiller,
         },
-        Identity, ProviderBuilder, RootProvider, WalletProvider,
+        Identity, Provider, ProviderBuilder, RootProvider, WalletProvider,
     },
     rpc::types::TransactionReceipt,
     signers::local::PrivateKeySigner,
     sol,
     transports::RpcError,
 };
-use e3_evm_helpers::nonce::send_with_next_nonce;
+use e3_evm_helpers::{contracts::Interfold, nonce::send_with_next_nonce};
 use eyre::Result;
 use std::sync::Arc;
 
@@ -34,7 +35,6 @@ sol! {
     #[sol(rpc)]
     contract CRISPProgram {
         function setMerkleRoot(uint256 e3_id, uint256 _root) external;
-        function getSlotIndex(uint256 e3_id, address slot_address) external view returns (int256);
         function publishInput(uint256 e3_id, bytes data) external;
         function finalizeInput(
             uint256 e3Id,
@@ -83,11 +83,11 @@ sol! {
         function pendingInputCount(uint256 e3Id) external view returns (uint40);
         function inputCommitmentDeadline(uint256 e3Id) external view returns (uint256);
         /// The divisor `CRISPProgram` resolved and stored when the round was requested.
-        /// Zero for a round that is not ONCHAIN, and for a round it never initialized.
+        /// Non-zero for every CUSTOM-credit round, zero for a CONSTANT-credit round and for a
+        /// round it never initialized.
         function votingPowerDivisorOf(uint256 e3Id) external view returns (uint256);
-        /// The census mode recorded at validation. Declared as a uint8 because that is how
-        /// Solidity encodes the enum, so no enum declaration has to be mirrored here.
-        function censusModeOf(uint256 e3Id) external view returns (uint8);
+        /// The timepoint, in the token's clock units, the divisor was sized at.
+        function snapshotOf(uint256 e3Id) external view returns (uint48);
         function verify(
             uint256 e3Id,
             bytes32 ciphertextOutputHash,
@@ -101,6 +101,19 @@ sol! {
     contract CiphernodeRegistryTiming {
         function randomnessRequestTimeout() external view returns (uint256);
         function sortitionSubmissionWindow() external view returns (uint256);
+    }
+
+    #[sol(rpc)]
+    contract CiphertextVerifier {
+        function verify(
+            uint256 e3Id,
+            bytes32 encryptionSchemeId,
+            bytes32 paramsHash,
+            bytes32 committeePublicKey,
+            bytes32 ciphertextOutputHash,
+            bytes32 ciphertextCommitment,
+            bytes proof
+        ) external view returns (bool);
     }
 
     #[sol(rpc)]
@@ -132,12 +145,6 @@ sol! {
         uint40 parentIndexPlusOne
     );
 }
-
-/// The `CensusMode.ONCHAIN` discriminant, as `CRISPProgram` declares the enum.
-///
-/// The third variant, after `TOKEN` and `BY_REQUESTER`. A round of any other mode holds no
-/// voting-power divisor.
-const CENSUS_MODE_ONCHAIN: u8 = 2;
 
 /// Why a `publishInput` dry run failed.
 ///
@@ -225,6 +232,40 @@ fn derive_earliest_voting_start(
 pub struct CRISPContract<P = CRISPWriteProvider> {
     provider: Arc<P>,
     contract_address: Address,
+}
+
+/// The ERC-7201 location of Interfold's `CiphertextVerifierStorage.Layout`
+/// (`erc7201:interfold.storage.CiphertextVerifier`, set in `InterfoldLifecycle.sol`).
+const CIPHERTEXT_VERIFIER_STORAGE: B256 =
+    alloy::primitives::b256!("fc399dd26441dab88259cd69fffcf8b5f96dd87f2db63f29285d86101a4d1500");
+
+/// The storage slot of `requests[e3Id]`: the mapping is the second field of the layout, and the
+/// slot of a mapping value is `keccak256(abi.encode(key, mapping slot))`.
+fn request_config_slot(e3_id: U256) -> U256 {
+    let requests = U256::from_be_bytes(CIPHERTEXT_VERIFIER_STORAGE.0) + U256::from(1);
+    let mut key = [0u8; 64];
+    key[..32].copy_from_slice(&e3_id.to_be_bytes::<32>());
+    key[32..].copy_from_slice(&requests.to_be_bytes::<32>());
+    U256::from_be_bytes(alloy::primitives::keccak256(key).0)
+}
+
+/// The ciphertext verifier and parameter hash that Interfold froze for an E3 at request time:
+/// `requests[e3Id]`, the second field of `CiphertextVerifierStorage.Layout`. Interfold has no getter
+/// for them, and the scheme's current verifier can differ after a rotation.
+async fn frozen_ciphertext_verifier<P: Provider>(
+    provider: &P,
+    interfold: Address,
+    e3_id: U256,
+) -> Result<(Address, B256)> {
+    let slot = request_config_slot(e3_id);
+    let verifier = provider.get_storage_at(interfold, slot).await?;
+    let params_hash = provider
+        .get_storage_at(interfold, slot + U256::from(1))
+        .await?;
+    Ok((
+        Address::from_word(B256::from(verifier.to_be_bytes::<32>())),
+        B256::from(params_hash.to_be_bytes::<32>()),
+    ))
 }
 
 impl CRISPContract<CRISPWriteProvider> {
@@ -530,9 +571,11 @@ impl CRISPContract<CRISPWriteProvider> {
 
     /// Check the aggregate ciphertext and its compute proof before paying to publish it to DA.
     ///
-    /// This calls the same CRISP verifier that Interfold calls after the availability receipt is
-    /// ready. The earlier check prevents an unauthenticated or malformed webhook from spending
-    /// the server's Avail balance on bytes that can never be accepted on Ethereum.
+    /// Interfold accepts the output only if the E3's ciphertext verifier and CRISP both accept the
+    /// proof, after the availability receipt is ready. This runs both checks first, so that an
+    /// unauthenticated or malformed webhook cannot spend the server's Avail balance on bytes that
+    /// can never be accepted on Ethereum. The E3's verifier is the one Interfold froze at request
+    /// time, which a later rotation does not change.
     pub async fn validate_compute_output(
         &self,
         e3_id: U256,
@@ -540,12 +583,46 @@ impl CRISPContract<CRISPWriteProvider> {
         ciphertext_commitment: B256,
         proof: Bytes,
     ) -> Result<()> {
-        let contract = CRISPProgram::new(self.contract_address, self.provider.as_ref());
+        let provider = self.provider.as_ref();
+        let contract = CRISPProgram::new(self.contract_address, provider);
         let accepted = contract
-            .verify(e3_id, ciphertext_output_hash, ciphertext_commitment, proof)
+            .verify(
+                e3_id,
+                ciphertext_output_hash,
+                ciphertext_commitment,
+                proof.clone(),
+            )
             .call()
             .await?;
         eyre::ensure!(accepted, "CRISP rejected the aggregate ciphertext proof");
+
+        let interfold_address = contract.interfold().call().await?;
+        let (verifier, params_hash) =
+            frozen_ciphertext_verifier(provider, interfold_address, e3_id).await?;
+        eyre::ensure!(
+            verifier != Address::ZERO,
+            "Interfold holds no ciphertext verifier for the E3"
+        );
+        let e3 = Interfold::new(interfold_address, provider)
+            .getE3(e3_id)
+            .call()
+            .await?;
+        let accepted = CiphertextVerifier::new(verifier, provider)
+            .verify(
+                e3_id,
+                e3.encryptionSchemeId,
+                params_hash,
+                e3.committeePublicKey,
+                ciphertext_output_hash,
+                ciphertext_commitment,
+                proof,
+            )
+            .call()
+            .await?;
+        eyre::ensure!(
+            accepted,
+            "the E3's ciphertext verifier rejected the aggregate ciphertext proof"
+        );
         Ok(())
     }
 
@@ -621,27 +698,6 @@ impl CRISPContract<CRISPReadProvider> {
         Ok(round.numberOfVotes.to::<u64>())
     }
 
-    /// Get the slot index from a given slot address.
-    /// Returns `None` when the slot is empty (contract returns -1).
-    pub async fn get_slot_index_from_address(
-        &self,
-        e3_id: U256,
-        slot_address: Address,
-    ) -> Result<Option<u64>> {
-        let contract = CRISPProgram::new(self.contract_address, self.provider.as_ref());
-
-        match contract.getSlotIndex(e3_id, slot_address).call().await {
-            Ok(slot_index) => {
-                if slot_index < I256::ZERO {
-                    Ok(None)
-                } else {
-                    Ok(Some(slot_index.as_u64()))
-                }
-            }
-            Err(e) => Err(eyre::eyre!("Failed to get slot index: {}", e)),
-        }
-    }
-
     /// Read the CRISP-specific voter cutoff. The Interfold input deadline remains later so
     /// already committed inputs can finish data-availability finalization.
     pub async fn input_commitment_deadline(&self, e3_id: U256) -> Result<u64> {
@@ -659,32 +715,32 @@ impl CRISPContract<CRISPReadProvider> {
         Ok(contract.pendingInputCount(e3_id).call().await?.to::<u64>())
     }
 
-    /// The voting-power divisor `CRISPProgram` stored for an ONCHAIN round.
-    ///
-    /// The authority on the divisor. The contract resolves it once, in the transaction that
-    /// requests the E3, and every input is then scaled by exactly this value. Reading it removes
-    /// the whole off-chain derivation, so the coordinator cannot disagree with the chain over an
-    /// optional `decimals()` call or over the width of an intermediate value.
-    ///
-    /// `Ok(None)` when the round is not ONCHAIN, or when the contract holds no divisor for it.
-    /// Both are legitimate answers rather than failures, and neither one is authoritative.
-    pub async fn onchain_voting_power_divisor(&self, e3_id: U256) -> Result<Option<U256>> {
+    /// The voting-power divisor and snapshot `CRISPProgram` stored for a CUSTOM-credit round at
+    /// request time. A census must scale every voter by exactly this divisor and read every voter at
+    /// exactly this snapshot. `validate` writes both in one transaction, and both reads name one
+    /// block by its hash, so a non-zero divisor vouches for the snapshot beside it. `Ok(None)` when
+    /// the divisor is zero: a CONSTANT-credit round, a round it never initialized, or a node that
+    /// lacks the request block.
+    pub async fn stored_voting_power_scale(&self, e3_id: U256) -> Result<Option<(U256, u64)>> {
         let contract = CRISPProgram::new(self.contract_address, self.provider.as_ref());
-
-        // The mode is checked first. The contract records a divisor for ONCHAIN rounds only, and
-        // applying one to a Merkle round would scale the census by a factor the tally does not
-        // read back.
-        let census_mode = contract.censusModeOf(e3_id).call().await?;
-        if census_mode != CENSUS_MODE_ONCHAIN {
-            return Ok(None);
-        }
-
-        let divisor = contract.votingPowerDivisorOf(e3_id).call().await?;
+        // Nodes behind one endpoint can hold different blocks at one height. A hash names one
+        // block, and a node without that block fails the call.
+        let head = self
+            .provider
+            .get_block_by_number(BlockNumberOrTag::Latest)
+            .await?
+            .ok_or_else(|| eyre::eyre!("The node returned no latest block"))?;
+        let block = BlockId::hash(head.header.hash);
+        let divisor = contract
+            .votingPowerDivisorOf(e3_id)
+            .block(block)
+            .call()
+            .await?;
         if divisor.is_zero() {
             return Ok(None);
         }
-
-        Ok(Some(divisor))
+        let snapshot = contract.snapshotOf(e3_id).block(block).call().await?;
+        Ok(Some((divisor, snapshot.to::<u64>())))
     }
 }
 
@@ -719,6 +775,111 @@ impl CRISPContractFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// CRISP accepts the aggregate proof and the verifier that Interfold froze for the E3 rejects
+    /// it: Interfold would refuse the output, so the server must refuse before it pays for
+    /// availability. The frozen verifier is read from Interfold's storage, so a verifier rotated
+    /// after the request is never asked.
+    #[tokio::test]
+    async fn an_output_that_the_e3_verifier_rejects_is_refused() {
+        use alloy::{sol_types::SolCall, transports::mock::Asserter};
+        use e3_evm_helpers::contracts::{CommitteeSize, E3};
+
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new()
+            .wallet(EthereumWallet::from(PrivateKeySigner::random()))
+            .connect_mocked_client(asserter.clone());
+        let crisp = CRISPContract {
+            provider: Arc::new(provider),
+            contract_address: Address::repeat_byte(1),
+        };
+        let e3 = E3 {
+            seed: U256::ZERO,
+            committeeSize: CommitteeSize::Minimum,
+            requestBlock: U256::ZERO,
+            inputWindow: [U256::ZERO; 2],
+            encryptionSchemeId: B256::repeat_byte(2),
+            e3Program: Address::repeat_byte(1),
+            paramSet: 2,
+            customParams: Bytes::new(),
+            decryptionVerifier: Address::ZERO,
+            pkVerifier: Address::ZERO,
+            committeePublicKey: B256::repeat_byte(3),
+            ciphertextOutput: B256::ZERO,
+            plaintextOutput: Bytes::new(),
+            requester: Address::ZERO,
+            ciphertextCommitment: B256::ZERO,
+        };
+        let frozen = Address::repeat_byte(5);
+        for (verifier, protocol_accepts) in [(frozen, false), (frozen, true), (Address::ZERO, true)]
+        {
+            let push = |data: Vec<u8>| asserter.push_success(&Bytes::from(data));
+            push(CRISPProgram::verifyCall::abi_encode_returns(&true));
+            push(CRISPProgram::interfoldCall::abi_encode_returns(
+                &Address::repeat_byte(4),
+            ));
+            // `requests[e3Id]`: the verifier, then the parameter hash.
+            asserter.push_success(&verifier.into_word());
+            asserter.push_success(&B256::repeat_byte(6));
+            if verifier != Address::ZERO {
+                push(Interfold::getE3Call::abi_encode_returns(&e3));
+                push(CiphertextVerifier::verifyCall::abi_encode_returns(
+                    &protocol_accepts,
+                ));
+            }
+
+            let result = crisp
+                .validate_compute_output(U256::from(1), B256::ZERO, B256::ZERO, Bytes::new())
+                .await;
+            match (verifier == Address::ZERO, protocol_accepts) {
+                (true, _) => assert!(result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("no ciphertext verifier")),
+                (false, true) => result.unwrap(),
+                (false, false) => {
+                    let error = result.unwrap_err().to_string();
+                    assert!(error.contains("ciphertext verifier rejected"), "{error}");
+                }
+            }
+        }
+    }
+
+    /// The slot of `requests[e3Id]`, against `cast index uint256 <e3Id> <namespace + 1>`.
+    #[test]
+    fn the_request_config_slot_is_the_mapping_slot() {
+        assert_eq!(
+            request_config_slot(U256::from(1)),
+            U256::from_be_bytes(
+                alloy::primitives::b256!(
+                    "16fd55b120c97b5773cf45474582700e3b7605a07ad4413eb32f632619891086"
+                )
+                .0
+            )
+        );
+        assert_eq!(
+            request_config_slot(U256::from(0x123456789abcdef_u64)),
+            U256::from_be_bytes(
+                alloy::primitives::b256!(
+                    "d1103c916f8d949d5cd03237419b6690836eed54753a486eeba88b2994307705"
+                )
+                .0
+            )
+        );
+    }
+
+    /// The storage location is the ERC-7201 slot of Interfold's ciphertext-verifier namespace.
+    #[test]
+    fn the_verifier_storage_is_the_namespaced_slot() {
+        use alloy::primitives::keccak256;
+
+        let namespace = U256::from_be_bytes(keccak256("interfold.storage.CiphertextVerifier").0)
+            - U256::from(1);
+        let slot = keccak256(namespace.to_be_bytes::<32>()).0;
+        let mut expected = slot;
+        expected[31] = 0;
+        assert_eq!(CIPHERTEXT_VERIFIER_STORAGE, B256::from(expected));
+    }
 
     #[test]
     fn compatibility_schedule_includes_every_committee_setup_window() {

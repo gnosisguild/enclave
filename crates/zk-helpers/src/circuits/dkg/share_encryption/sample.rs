@@ -9,8 +9,8 @@
 
 use crate::circuits::dkg::share_encryption::circuit::ShareEncryptionCircuitData;
 use crate::computation::DkgInputType;
-use crate::CiphernodesCommittee;
 use crate::CircuitsErrors;
+use e3_committee::CiphernodesCommittee;
 use e3_fhe_params::{build_pair_for_preset, generate_smudging_error, BfvPreset};
 use fhe::bfv::Encoding;
 use fhe::bfv::Plaintext;
@@ -133,8 +133,10 @@ impl ShareEncryptionCircuitData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{computation::DkgInputType, CiphernodesCommitteeSize};
+    use crate::computation::DkgInputType;
+    use e3_committee::CiphernodesCommitteeSize;
     use e3_fhe_params::{build_pair_for_preset, BfvPreset};
+    use fhe_traits::FheDecoder;
 
     #[test]
     fn test_generate_secret_key_sample() {
@@ -150,7 +152,7 @@ mod tests {
 
         assert_eq!(sample.public_key.c.len(), 2);
         assert_eq!(
-            crate::math::plaintext_poly_u64(&sample.plaintext)
+            Vec::<u64>::try_decode(&sample.plaintext, Encoding::poly())
                 .unwrap()
                 .len(),
             BfvPreset::InsecureThreshold.metadata().degree

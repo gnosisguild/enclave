@@ -25,11 +25,20 @@ env:
   NODE_VERSION: 22
   RUST_TOOLCHAIN: 1.91.1
   NOIR_TOOLCHAIN: v1.0.0-beta.26
-  BB_VERSION: 5.1.0
+  BB_VERSION: 5.2.0
   HARDHAT_VAR_MNEMONIC: 'test test test test test test test test test test test junk'
   HARDHAT_VAR_INFURA_API_KEY: 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'
   PRIVATE_KEY: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
   RUST_BACKTRACE: 1
+  # Debug and test builds keep only the line tables, which backtraces need, not the full debug
+  # information that only a debugger reads. The full information made the root target directory, and
+  # every cache restore and save of it, several GB larger. .github/actions/cache-dependencies puts
+  # both values in the cache key.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_TEST_DEBUG: line-tables-only
+  # Every ci job rebuilds the workspace crates from scratch after its checkout, so incremental data
+  # only costs time: on a 12-thread host that rebuild took 185 s without it and 426 s with it.
+  CARGO_INCREMENTAL: 0
 
 # packages: write is granted per-job to the two image builds that can push
 # (workflow_dispatch from main); everything else only needs to read the repo.
@@ -66,6 +75,8 @@ jobs:
       build_sdk: ${{ steps.jobs.outputs.build_sdk }}
       sdk_tests: ${{ steps.jobs.outputs.sdk_tests }}
       build_e3_support_dev: ${{ steps.jobs.outputs.build_e3_support_dev }}
+      openvm_worker: ${{ steps.jobs.outputs.openvm_worker }}
+      openvm_guest: ${{ steps.jobs.outputs.openvm_guest }}
       build_circuits: ${{ steps.jobs.outputs.build_circuits }}
       noir_checks: ${{ steps.jobs.outputs.noir_checks }}
       integration_prebuild: ${{ steps.jobs.outputs.integration_prebuild }}
@@ -90,6 +101,41 @@ jobs:
               - 'Cargo.toml'
               - 'Cargo.lock'
               - 'rust-toolchain.toml'
+              # The OpenVM worker is a workspace of its own, and no cargo build reads the image
+              # files. The `openvm_worker` and `docker` filters select their jobs.
+              - '!crates/openvm-prover/**'
+              - '!crates/Dockerfile'
+              - '!crates/support/**'
+              - '!**/*.md'
+              - '!**/*.mdx'
+            # The OpenVM worker is a cargo workspace of its own, built against the OpenVM SDK.
+            openvm_worker:
+              - 'crates/openvm-prover/**'
+              - '!**/*.md'
+              - '!**/*.mdx'
+            # What the OpenVM guests compile: each project's program and guest, and the crates they
+            # link, some of them under guest-only cfg flags.
+            openvm_guest:
+              - 'Cargo.toml'
+              - 'crates/bfv-client/**'
+              - 'crates/committee/**'
+              - 'crates/compute-provider/**'
+              - 'crates/fhe-params/**'
+              - 'crates/openvm-types/**'
+              - 'crates/parity-matrix/**'
+              - 'crates/polynomial/**'
+              - 'crates/safe/**'
+              - 'crates/zk-helpers/**'
+              # The programs inherit dependencies from their project workspace, and the native
+              # fixture builds in CRISP's.
+              - 'examples/CRISP/Cargo.toml'
+              - 'examples/CRISP/Cargo.lock'
+              - 'examples/CRISP/guest/**'
+              - 'examples/CRISP/program/**'
+              - 'templates/default/Cargo.toml'
+              - 'templates/default/guest/**'
+              - 'templates/default/program/**'
+              - 'scripts/run-openvm.sh'
               - '!**/*.md'
               - '!**/*.mdx'
             contracts:
@@ -99,8 +145,13 @@ jobs:
               # path a hand-edited manifest never runs the drift check and
               # reaches the release assets stale.
               - 'deployments/**'
+              # SecureCrispArtifacts.spec.ts reads the CRISP image ID from this directory.
+              - 'crates/support/contracts/**'
               - '!**/*.md'
               - '!**/*.mdx'
+            # `pnpm check:bindings` in rust_unit_tests runs this script.
+            bindings:
+              - 'scripts/check-cli-bindings.ts'
             # The `circuits` and `verifiers` filters are in .github/filters/circuits.yml, because
             # .husky/pre-push reads them too. The next step evaluates that file.
             # What the e2e reads: everything in CRISP except the unit test directories
@@ -117,8 +168,9 @@ jobs:
               - 'examples/CRISP/Cargo.toml'
               - 'examples/CRISP/Cargo.lock'
               - 'examples/CRISP/rust-toolchain.toml'
-              # A symlink to a member of the CRISP cargo workspace.
+              # Symlinks to members of the CRISP cargo workspace.
               - 'examples/CRISP/.interfold/support/dev'
+              - 'examples/CRISP/.interfold/support/openvm'
               - 'examples/CRISP/crates/**'
               - 'examples/CRISP/program/**'
               - 'examples/CRISP/server/**'
@@ -198,10 +250,14 @@ jobs:
               - 'tests/integration/test.sh'
               - '!**/*.md'
               - '!**/*.mdx'
+            # Both images build from the repository root, so the root .dockerignore decides their
+            # context. The ciphernode image runs the entrypoint script.
             docker:
               - 'crates/Dockerfile'
+              - 'crates/ciphernode-entrypoint.sh'
               - 'crates/support/Dockerfile'
               - 'crates/support/**'
+              - '.dockerignore'
               - '!**/*.md'
               - '!**/*.mdx'
             # Only the workflow, its path filters, and the local actions that it runs. Other
@@ -240,6 +296,7 @@ jobs:
         run: |
           RUST="${{ steps.filter.outputs.rust }}"
           CONTRACTS="${{ steps.filter.outputs.contracts }}"
+          BINDINGS="${{ steps.filter.outputs.bindings }}"
           CIRCUITS="${{ steps.circuit_filter.outputs.circuits }}"
           VERIFIERS="${{ steps.circuit_filter.outputs.verifiers }}"
           CIRCUIT_BUILD="${{ steps.filter.outputs.circuit_build }}"
@@ -257,11 +314,13 @@ jobs:
           DOCKER="${{ steps.filter.outputs.docker }}"
           CI="${{ steps.filter.outputs.ci }}"
           TOOLING="${{ steps.filter.outputs.tooling }}"
+          OPENVM_WORKER="${{ steps.filter.outputs.openvm_worker }}"
+          OPENVM_GUEST="${{ steps.filter.outputs.openvm_guest }}"
           FORCE="${{ github.event_name == 'workflow_dispatch' || inputs.release_candidate }}"
 
           any() { for v in "$@"; do [ "$v" = "true" ] && echo "true" && return; done; echo "false"; }
 
-          echo "rust_unit_tests=$(any $FORCE $RUST $CONTRACTS $CIRCUITS $CI $TOOLING)" >> $GITHUB_OUTPUT
+          echo "rust_unit_tests=$(any $FORCE $RUST $CONTRACTS $CIRCUITS $BINDINGS $CI $TOOLING)" >> $GITHUB_OUTPUT
           echo "rust_integration_tests=$(any $FORCE $RUST $CONTRACTS $CIRCUITS $CI $TOOLING)" >> $GITHUB_OUTPUT
           echo "ciphernode_e2e=$(any $FORCE $RUST $CONTRACTS $CIRCUITS $INTEGRATION $CI $TOOLING)" >> $GITHUB_OUTPUT
           echo "build_sdk=$(any $FORCE $RUST $CONTRACTS $SDK $REACT $INTEGRATION $CIRCUITS $CI $TEMPLATES $TOOLING)" >> $GITHUB_OUTPUT
@@ -293,7 +352,8 @@ jobs:
           echo "templates=$(any $FORCE $TEMPLATES $RUST $CONTRACTS $CIRCUITS $SDK $CI $TOOLING)" >> $GITHUB_OUTPUT
           echo "zk=$(any $FORCE $RUST $CIRCUITS $CI $TOOLING)" >> $GITHUB_OUTPUT
           echo "contracts=$(any $FORCE $CONTRACTS $CI $TOOLING)" >> $GITHUB_OUTPUT
-          echo "docker_support=$(any $FORCE $DOCKER $CI)" >> $GITHUB_OUTPUT
+          # The OpenVM service compiles repository-local Rust and CRISP program sources.
+          echo "docker_support=$(any $FORCE $DOCKER $RUST $CRISP_RUST $CI)" >> $GITHUB_OUTPUT
           # The rust jobs already compile the workspace, so the image build only
           # needs to run when the Dockerfiles or their build context change.
           echo "docker_ciphernode=$(any $FORCE $DOCKER $CI)" >> $GITHUB_OUTPUT
@@ -302,6 +362,8 @@ jobs:
           # Both feed template_integration, so each must cover every path that
           # triggers it — a skipped dependency silently skips the e2e job.
           echo "build_e3_support_dev=$(any $FORCE $TEMPLATES $RUST $CONTRACTS $CIRCUITS $SDK $CI $TOOLING)" >> $GITHUB_OUTPUT
+          echo "openvm_worker=$(any $FORCE $OPENVM_WORKER $CI)" >> $GITHUB_OUTPUT
+          echo "openvm_guest=$(any $FORCE $OPENVM_GUEST $CI)" >> $GITHUB_OUTPUT
           # build_circuits runs check:verifiers, so every input of the generated verifiers runs it.
           # CIRCUIT_BUILD adds the other files that the job runs or hashes.
           echo "build_circuits=$(any $FORCE $RUST $CIRCUITS $VERIFIERS $CIRCUIT_BUILD $CI $TOOLING)" >> $GITHUB_OUTPUT
@@ -323,7 +385,10 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - name: Test DAppNode credentials and health checks
-        run: sudo apt-get update && sudo apt-get install -y gettext-base && bash dappnode/tests/test-hardening.sh
+        run: |
+          timeout 180 sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
+          timeout 180 sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y gettext-base
+          bash dappnode/tests/test-hardening.sh
       - name: Test the ciphernode image state location
         run: bash crates/tests/docker/test-ciphernode-entrypoint.sh
 
@@ -335,19 +400,32 @@ jobs:
     timeout-minutes: 30
     runs-on:
       ${{ github.repository == 'theinterfold/interfold' && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' ||
-      github.ref == 'refs/heads/dev') && format('runs-on={0}-{1}-{2}-{3}/runner=4cpu-linux-x64/ram=16', github.run_id, github.run_attempt,
-      'rust_unit_tests', matrix.suite) || 'ubuntu-latest' }}
+      github.ref == 'refs/heads/dev') && format('runs-on={0}-{1}-{2}-{3}{4}/runner=4cpu-linux-x64/ram=16', github.run_id,
+      github.run_attempt, 'rust_unit_tests', matrix.suite, matrix.partition) || 'ubuntu-latest' }}
     # Library tests link cfg(test) builds. Doc-tests and the separate test targets link the plain
     # libraries, so they run together in the `doc` leg. The legs share no compiled crates, and each
     # leg builds its kind once.
+    #
+    # Running the 1,900 library tests took about 8 minutes after about 5 minutes of compiling, so two
+    # `lib` legs each build the tests and run half of them. The checks that read the whole tree run in
+    # the first one.
     strategy:
       matrix:
-        suite: [lib, doc]
+        include:
+          - suite: lib
+            partition: 1
+          - suite: lib
+            partition: 2
+          - suite: doc
     permissions:
       contents: read
       actions: write
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          # Keeps the token out of .git/config, where install and build scripts could read it and use
+          # this job's actions: write. The cancel step gets the token on its own.
+          persist-credentials: false
 
       - name: Cache Rust dependencies
         uses: ./.github/actions/cache-dependencies
@@ -378,18 +456,19 @@ jobs:
         run: 'pnpm install --frozen-lockfile'
 
       - name: Checking code format rust
-        if: matrix.suite == 'lib'
+        if: matrix.suite == 'lib' && matrix.partition == 1
         run: pnpm rust:lint
 
+      # The Agent Harness workflow runs the same script on every pull request.
       - name: Check repository invariants
-        if: matrix.suite == 'lib'
+        if: matrix.suite == 'lib' && matrix.partition == 1 && github.event_name != 'pull_request'
         run: pnpm check:invariants
 
       - name: Compile contracts for ABI catalog tests
         run: pnpm evm:build
 
       - name: Check the committed contract artifacts against the build
-        if: matrix.suite == 'lib'
+        if: matrix.suite == 'lib' && matrix.partition == 1
         run: pnpm check:bindings
 
       - name: Install cargo-nextest
@@ -401,7 +480,7 @@ jobs:
       # the step took the sum of every crate's tests rather than the slowest crate's.
       - name: Run library tests
         if: matrix.suite == 'lib'
-        run: cargo nextest run --lib
+        run: cargo nextest run --lib --partition hash:${{ matrix.partition }}/2
 
       - name: Run doc-tests
         if: matrix.suite == 'doc'
@@ -418,9 +497,8 @@ jobs:
       # `parallel` is off by default, so the library tests compile the sequential fallback of
       # `recompute_commitments` and the rayon body of that function ships untested. This step is
       # what exercises it. Scoped with `-p` rather than `--all-features`: the feature is the one
-      # thing this crate needs enabled, and the zkVM guest is unaffected either way because it
-      # builds from `crates/support/methods/guest`, which takes this crate by git revision with
-      # default features.
+      # thing this crate needs enabled, and the OpenVM guest is unaffected either way because it
+      # builds this crate without the feature.
       - name: Run compute-provider Unit Tests with parallel batching
         if: matrix.suite == 'doc'
         run: 'cargo test -p e3-compute-provider --features parallel'
@@ -593,16 +671,15 @@ jobs:
           curl --fail --silent --head --retry 10 --retry-connrefused --retry-delay 1 "$E3_TEST_CIRCUITS_DOWNLOAD_URL" >/dev/null
           cargo test -p e3-zk-prover --features integration-tests --test integration_tests -- --nocapture
 
-  # Guards the RISC Zero guest artifact. The on-chain imageId is immutable, so a guest change
-  # that leaves ImageID.sol untouched ships a verifier that no longer matches this tree.
-  build_e3_support_risc0:
+  # Build the native OpenVM HTTP service. Proving artifacts are deployment-specific.
+  build_e3_support_openvm:
     needs: [detect_changes]
     if: needs.detect_changes.outputs.docker_support == 'true'
     timeout-minutes: 30
     runs-on:
       ${{ github.repository == 'theinterfold/interfold' && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' ||
       github.ref == 'refs/heads/dev') && format('runs-on={0}-{1}-{2}/runner=4cpu-linux-x64/ram=16/spot=false', github.run_id,
-      github.run_attempt, 'build_e3_support_risc0') || 'ubuntu-latest' }}
+      github.run_attempt, 'build_e3_support_openvm') || 'ubuntu-latest' }}
     permissions:
       contents: read
       packages: write
@@ -618,7 +695,8 @@ jobs:
             TAGS="$TAGS,${SUPPORT_IMAGE_NAME}:main"
           fi
 
-          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+          echo "image=${SUPPORT_IMAGE_NAME}:${SHORT_SHA}" >> "$GITHUB_OUTPUT"
       - name: Set up BuildKit
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
@@ -630,17 +708,59 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Loaded for the smoke test, which runs before the image is published.
       - name: Build image
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
-          context: ./crates/support
+          context: .
           file: ${{ env.SUPPORT_DOCKERFILE_PATH }}
-          push: ${{ github.ref == 'refs/heads/main' }}
+          load: true
           tags: ${{ steps.tags.outputs.tags }}
           cache-from: |
             type=gha,scope=e3-support
-          cache-to: |
-            type=gha,mode=max,scope=e3-support
+          # Pull requests read the layer cache and do not write it. Exporting the whole graph
+          # (`mode=max`) took 13 of the ciphernode job's 27 minutes, and a pull request's cache is
+          # readable only by reruns of that pull request.
+          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max,scope=e3-support' || '' }}
+
+      # Starts the service with a stub worker that passes its configuration check, then asks for its
+      # health: the image's command and environment, the worker launch and the HTTP server.
+      - name: Smoke-test the image
+        env:
+          IMAGE: ${{ steps.tags.outputs.image }}
+        run: |
+          fixtures="${RUNNER_TEMP}/openvm-smoke"
+          mkdir -p "$fixtures"
+          printf '#!/bin/sh\nexit 0\n' > "$fixtures/worker"
+          echo '{}' > "$fixtures/worker.json"
+          chmod 755 "$fixtures" "$fixtures/worker"
+          chmod 644 "$fixtures/worker.json"
+          docker run -d --name openvm-smoke -p 127.0.0.1:13151:13151 -v "${fixtures}:/fixtures:ro" \
+            -e OPENVM_PROVER_BIN=/fixtures/worker -e OPENVM_PROVER_CONFIG=/fixtures/worker.json "$IMAGE"
+          deadline=$((SECONDS + 60))
+          until curl -sf --max-time 5 http://127.0.0.1:13151/health; do
+            if (( SECONDS >= deadline )) || [ "$(docker inspect -f '{{.State.Running}}' openvm-smoke)" != true ]; then
+              docker logs openvm-smoke
+              docker rm -f openvm-smoke > /dev/null
+              echo "The service did not answer its health check within 60 seconds" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+          echo
+          docker rm -f openvm-smoke > /dev/null
+
+      # The builder still holds every layer of the build above, so this only uploads it.
+      - name: Push image
+        if: github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: .
+          file: ${{ env.SUPPORT_DOCKERFILE_PATH }}
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: |
+            type=gha,scope=e3-support
 
   build_ciphernode_image:
     needs: [detect_changes]
@@ -666,7 +786,8 @@ jobs:
             TAGS="$TAGS,${CIPHERNODE_IMAGE_NAME}:main"
           fi
 
-          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+          echo "image=${CIPHERNODE_IMAGE_NAME}:${SHORT_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -679,17 +800,48 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Loaded for the smoke test, which runs before the image is published.
       - name: Build ciphernode image
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: .
           file: ${{ env.CIPHERNODE_DOCKERFILE_PATH }}
-          push: ${{ github.ref == 'refs/heads/main' }}
+          load: true
           tags: ${{ steps.tags.outputs.tags }}
           cache-from: |
             type=gha,scope=ciphernode
-          cache-to: |
-            type=gha,mode=max,scope=ciphernode
+          # Pull requests read the layer cache and do not write it. Exporting the whole graph
+          # (`mode=max`) took 13 of the ciphernode job's 27 minutes, and a pull request's cache is
+          # readable only by reruns of that pull request.
+          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max,scope=ciphernode' || '' }}
+
+      # The entrypoint reads the config file and resolves the node's state paths with the binary
+      # before it runs the command. An empty config file is a valid config.
+      - name: Smoke-test the ciphernode image
+        env:
+          IMAGE: ${{ steps.tags.outputs.image }}
+        run: |
+          config="${RUNNER_TEMP}/ciphernode-config.yaml"
+          : > "$config"
+          chmod 644 "$config"
+          status=0
+          output=$(timeout 60 docker run --rm -v "${config}:/home/ciphernode/.config/interfold/config.yaml:ro" "$IMAGE" --version 2>&1) ||
+            status=$?
+          echo "$output"
+          [ "$status" -eq 0 ]
+          grep -Eq '^interfold [0-9]+\.[0-9]+\.[0-9]+' <<<"$output"
+
+      # The builder still holds every layer of the build above, so this only uploads it.
+      - name: Push ciphernode image
+        if: github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: .
+          file: ${{ env.CIPHERNODE_DOCKERFILE_PATH }}
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: |
+            type=gha,scope=ciphernode
 
   test_contracts:
     needs: [detect_changes]
@@ -705,6 +857,10 @@ jobs:
     steps:
       - name: 'Check out the repo'
         uses: 'actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10' # v6
+        with:
+          # Keeps the token out of .git/config, where install and build scripts could read it and use
+          # this job's actions: write. The cancel step gets the token on its own.
+          persist-credentials: false
 
       - name: pnpm-setup
         uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
@@ -818,7 +974,8 @@ jobs:
       - name: Install Barretenberg (bb)
         if: steps.cache-integration-bb.outputs.cache-hit != 'true'
         run: |
-          curl -fsSL "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 5 --retry-all-errors --connect-timeout 20 --max-time 300 --retry-max-time 600 \
+            "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
           mkdir -p bb_extract && tar -xzf bb.tar.gz -C bb_extract
           BB_BIN=$(find bb_extract -name bb -type f | head -n 1)
           sudo mv "$BB_BIN" /usr/local/bin/bb
@@ -948,6 +1105,9 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
+          # Keeps the token out of .git/config, where install and build scripts could read it and use
+          # this job's actions: write. The cancel step gets the token on its own.
+          persist-credentials: false
           submodules: recursive
 
       - name: Cache Rust dependencies
@@ -1189,7 +1349,10 @@ jobs:
 
       - name: Install yq
         run: |
-          sudo wget -qO- https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64.tar.gz | sudo tar xz -C /usr/local/bin --transform='s|yq_linux_amd64|yq|' --no-same-owner
+          archive="${RUNNER_TEMP}/yq.tar.gz"
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 5 --retry-all-errors --connect-timeout 20 --max-time 120 \
+            --retry-max-time 300 https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64.tar.gz -o "$archive"
+          sudo tar xzf "$archive" -C /usr/local/bin --transform='s|yq_linux_amd64|yq|' --no-same-owner
 
       - name: Install dependencies
         working-directory: .
@@ -1251,7 +1414,8 @@ jobs:
       - name: Install Barretenberg (bb)
         if: steps.cache-bb.outputs.cache-hit != 'true'
         run: |
-          curl -fsSL "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 5 --retry-all-errors --connect-timeout 20 --max-time 300 --retry-max-time 600 \
+            "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
           mkdir -p bb_extract && tar -xzf bb.tar.gz -C bb_extract
           BB_BIN=$(find bb_extract -name bb -type f | head -n 1)
           sudo mv "$BB_BIN" /usr/local/bin/bb
@@ -1265,7 +1429,7 @@ jobs:
         run: |
           tar -C "$GITHUB_WORKSPACE/dist" -czf "$RUNNER_TEMP/circuits-candidate.tar.gz" circuits/
           interfold noir setup --circuits-archive "$RUNNER_TEMP/circuits-candidate.tar.gz" \
-            --circuits-configuration insecure/minimum
+            --circuits-configuration insecure/minimum --allow-unpinned-archive
           interfold noir setup
 
       - name: Run Playwright tests
@@ -1296,6 +1460,10 @@ jobs:
       actions: write
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          # Keeps the token out of .git/config, where install and build scripts could read it and use
+          # this job's actions: write. The cancel step gets the token on its own.
+          persist-credentials: false
 
       - name: Install Nargo
         uses: noir-lang/noirup@7dbe69ccc78877f0200ffa5a40836c953d2cfd8f # v0.1.4
@@ -1328,6 +1496,9 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
+          # Keeps the token out of .git/config, where install and build scripts could read it and use
+          # this job's actions: write. The cancel step gets the token on its own.
+          persist-credentials: false
           submodules: recursive
 
       - name: Install Nargo
@@ -1336,7 +1507,7 @@ jobs:
           toolchain: ${{ env.NOIR_TOOLCHAIN }}
 
       - name: Install protoc
-        run: sudo apt-get update -y && sudo apt-get install -y protobuf-compiler
+        uses: ./.github/actions/install-protoc
 
       - name: Cache Barretenberg binary
         id: cache-bb
@@ -1348,7 +1519,8 @@ jobs:
       - name: Install Barretenberg (bb)
         if: steps.cache-bb.outputs.cache-hit != 'true'
         run: |
-          curl -fsSL "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 5 --retry-all-errors --connect-timeout 20 --max-time 300 --retry-max-time 600 \
+            "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
           mkdir -p bb_extract && tar -xzf bb.tar.gz -C bb_extract
           BB_BIN=$(find bb_extract -name bb -type f | head -n 1)
           sudo mv "$BB_BIN" /usr/local/bin/bb
@@ -1386,58 +1558,11 @@ jobs:
       # The generated verifier contracts must match the freshly built verification keys. A drift
       # means the deployed verifier accepts a different circuit from the one in this tree.
       #
-      # `--no-compile` is load-bearing, not an optimisation. Without it the checker deletes every
-      # nargo target directory first — its guard against comparing stale artifacts — and recompiles
-      # only what it needs, which is the `.json` and the evm `.vk`. That silently discards the
-      # `.vk_recursive` files `build:circuits` had just written, and the upload below then ships an
-      # artifact `zk_prover_e2e` cannot use. Nothing here fails; the damage surfaces two jobs later.
-      # The step above has just built these circuits, so there is nothing stale to guard against.
+      # `--no-compile`: without it the checker deletes every nargo target directory first, its guard
+      # against comparing stale artifacts, and recompiles them. The step above has just built these
+      # circuits, so there is nothing stale to guard against.
       - name: Check generated verifiers are in sync
         run: pnpm generate:verifiers --preset insecure --committee minimum --check --no-compile
-
-      # Release workflows also verify the promoted six-pair circuit matrix.
-      - name: Pull the complete circuit matrix
-        run: pnpm store:circuits pull
-
-      - name: Verify release circuit provenance
-        run: pnpm store:circuits verify-release
-
-      - name: Check every generated BFV verifier
-        run: pnpm check:verifiers --no-compile
-
-      # Asserted before the upload, so a step that consumes or clears a build output fails in the
-      # job that did it rather than in the job that needed it. Same list `zk_prover_e2e` checks.
-      - name: Verify recursive aggregation artifacts survived
-        run: |
-          for artifact in \
-            circuits/bin/recursive_aggregation/dkg_aggregator/target/dkg_aggregator.json \
-            circuits/bin/recursive_aggregation/dkg_aggregator/target/dkg_aggregator.vk_recursive \
-            circuits/bin/recursive_aggregation/decryption_aggregator/target/decryption_aggregator.json \
-            circuits/bin/recursive_aggregation/decryption_aggregator/target/decryption_aggregator.vk_recursive
-          do
-            test -f "$artifact" || {
-              echo "Missing before upload: $artifact"
-              echo "A step between 'Build circuits' and here removed it."
-              exit 1
-            }
-            echo "  ok $artifact"
-          done
-
-      - name: Upload compiled circuit artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: compiled-circuits
-          # `.active-preset.json` is a hidden file, and upload-artifact v4 drops hidden files
-          # unless told otherwise. Without it zk_prover_e2e cannot tell which committee the
-          # circuits were built for, and the minimum-committee proof tests fail.
-          include-hidden-files: true
-          path: |
-            circuits/bin/.active-preset.json
-            circuits/bin/dkg/target/
-            circuits/bin/threshold/target/
-            circuits/bin/recursive_aggregation/*/target/
-          retention-days: 1
-          if-no-files-found: error
 
       - name: Cancel workflow on failure
         if: failure()
@@ -1445,14 +1570,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
+  # Proves with the newest published circuit set. The published set is not checked against this
+  # tree's SOURCE_HASH until the circuit drift workflow is designed. The proof suites run in two
+  # legs; the correlated node test alone sets the floor.
   zk_prover_e2e:
-    needs: [detect_changes, build_circuits]
+    needs: [detect_changes]
     if: needs.detect_changes.outputs.zk == 'true'
     timeout-minutes: 60
     runs-on:
       ${{ github.repository == 'theinterfold/interfold' && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' ||
-      github.ref == 'refs/heads/dev') && format('runs-on={0}-{1}-{2}/runner=4cpu-linux-x64/ram=16', github.run_id, github.run_attempt,
-      'zk_prover_e2e') || 'ubuntu-latest' }}
+      github.ref == 'refs/heads/dev') && format('runs-on={0}-{1}-{2}-{3}/runner=4cpu-linux-x64/ram=16', github.run_id, github.run_attempt,
+      'zk_prover_e2e', matrix.leg) || 'ubuntu-latest' }}
+    strategy:
+      matrix:
+        leg: [suites, node-fold]
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
@@ -1482,7 +1613,8 @@ jobs:
       - name: Install Barretenberg (bb)
         if: steps.cache-bb.outputs.cache-hit != 'true'
         run: |
-          curl -fsSL "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 5 --retry-all-errors --connect-timeout 20 --max-time 300 --retry-max-time 600 \
+            "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
           mkdir -p bb_extract && tar -xzf bb.tar.gz -C bb_extract
           BB_BIN=$(find bb_extract -name bb -type f | head -n 1)
           sudo mv "$BB_BIN" /usr/local/bin/bb
@@ -1491,11 +1623,26 @@ jobs:
       - name: Verify bb
         run: bb --version
 
-      - name: Download compiled circuit artifacts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - name: pnpm-setup
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
+      - name: Setup node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          name: compiled-circuits
-          path: circuits/bin/
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Takes the branch tip without a SOURCE_HASH match.
+      - name: Pull the published circuits
+        timeout-minutes: 10
+        run: pnpm store:circuits pull --latest
+
+      - name: Hydrate the insecure/minimum circuits
+        run: pnpm build:circuits --preset insecure --committee minimum --hydrate-bin-only --no-clean-targets
 
       - name: Verify circuit artifacts
         run: |
@@ -1532,16 +1679,22 @@ jobs:
           done
 
       - name: Run ZK prover e2e tests
+        if: matrix.leg == 'suites'
         run: cargo test -p e3-zk-prover --test local_e2e_tests -- --nocapture --test-threads=1
 
       - name: Verify C0 recovery after local verifier errors
+        if: matrix.leg == 'suites'
         run: cargo test -p e3-zk-prover --lib c0_local_verifier_failures_retry_without_peer_blame -- --nocapture
 
-      - name: Verify fold accumulators and the correlated node proof
+      - name: Verify fold accumulators
+        if: matrix.leg == 'suites'
         timeout-minutes: 30
-        run:
-          cargo test --locked -p e3-zk-prover --test fold_accumulators_e2e_tests --test node_fold_correlated_e2e_tests -- --include-ignored
-          --nocapture --test-threads=1
+        run: cargo test --locked -p e3-zk-prover --test fold_accumulators_e2e_tests -- --include-ignored --nocapture --test-threads=1
+
+      - name: Verify the correlated node proof
+        if: matrix.leg == 'node-fold'
+        timeout-minutes: 30
+        run: cargo test --locked -p e3-zk-prover --test node_fold_correlated_e2e_tests -- --include-ignored --nocapture --test-threads=1
 
   build_e3_support_dev:
     needs: [detect_changes]
@@ -1555,8 +1708,6 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           submodules: recursive
-      - name: Test support image resolution
-        run: bash crates/support-scripts/tests/container.sh
       - name: Cache Rust dependencies
         uses: ./.github/actions/cache-dependencies
         with:
@@ -1567,9 +1718,14 @@ jobs:
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Install protoc
-        run: sudo apt-get update -y && sudo apt-get install -y protobuf-compiler
+        uses: ./.github/actions/install-protoc
+      # The e3-support-scripts tests run in rust_unit_tests: every input of that crate selects it.
       - name: Build support scripts
         run: cd templates/default && cargo build --locked --bin e3-support-scripts-dev
+      # The OpenVM proving service links the template program. Its guest needs cargo-openvm and a GPU
+      # host for proofs, so CI builds only the service.
+      - name: Build the OpenVM proving service
+        run: cd templates/default && cargo build --locked --bin e3-support-scripts-openvm
       - name: Verify build artifacts
         run: |
           echo "Checking for support scripts binary:"
@@ -1583,6 +1739,80 @@ jobs:
           path: templates/default/target/debug/e3-support-scripts-dev
           retention-days: 1
           if-no-files-found: error
+
+  # The CPU build of the OpenVM worker and its tests. Proofs and the CUDA build need a GPU host.
+  openvm_worker:
+    needs: [detect_changes]
+    if: needs.detect_changes.outputs.openvm_worker == 'true'
+    timeout-minutes: 45
+    runs-on:
+      ${{ github.repository == 'theinterfold/interfold' && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/dev') && format('runs-on={0}-{1}-{2}/runner=4cpu-linux-x64/ram=16', github.run_id, github.run_attempt,
+      'openvm_worker') || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Cache Rust dependencies
+        uses: ./.github/actions/cache-dependencies
+        with:
+          cargo-lock-path: crates/openvm-prover/Cargo.lock
+          rust-target-path: crates/openvm-prover/target/
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Test the CPU worker
+        run: cargo test --locked --manifest-path crates/openvm-prover/Cargo.toml
+
+  # Builds both OpenVM guests, which compiles the guest-only code paths, then runs CRISP's guest on a
+  # fresh fixture without proving and compares the digest it reveals with the native journal.
+  openvm_guest:
+    needs: [detect_changes]
+    if: needs.detect_changes.outputs.openvm_guest == 'true'
+    timeout-minutes: 75
+    runs-on:
+      ${{ github.repository == 'theinterfold/interfold' && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/dev') && format('runs-on={0}-{1}-{2}/runner=4cpu-linux-x64/ram=16', github.run_id, github.run_attempt,
+      'openvm_guest') || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Cache Rust dependencies
+        uses: ./.github/actions/cache-dependencies
+        with:
+          cargo-lock-path: examples/CRISP/**/Cargo.lock
+          rust-target-path: target/openvm/
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Install protoc
+        uses: ./.github/actions/install-protoc
+      - name: Install the OpenVM guest toolchain
+        run: rustup toolchain install nightly-2026-01-18 --component rust-src
+      # The published binary of the pinned release, checked against its SHA-256. Building it from
+      # source took 7-9 minutes whenever its cache missed.
+      - name: Install cargo-openvm
+        run: |
+          archive="${RUNNER_TEMP}/cargo-openvm.tar.gz"
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 5 --retry-all-errors --connect-timeout 20 --max-time 300 --retry-max-time 600 \
+            https://github.com/openvm-org/openvm/releases/download/v2.0.2/cargo-openvm-v2.0.2-x86_64-unknown-linux-gnu.tar.gz \
+            -o "${archive}"
+          echo "c2a1d63a96c093a4969c799f3021fb991b0c51f56b53f26e3468d2d13676de2f  ${archive}" | sha256sum --check
+          tar -xzf "${archive}" -C ~/.cargo/bin cargo-openvm
+          cargo openvm --version
+      - name: Build the template guest
+        working-directory: templates/default/guest
+        env:
+          OPENVM_BUILD_LOCKED: '1'
+          RUSTFLAGS: --cfg crisp_openvm --cfg crisp_fhe_optimized
+        run: cargo openvm build --target-dir ../../../target/openvm/template-guest
+      # The guest replaces hashing, packing and commitments with accelerated versions that the host
+      # does not run. The secure fixture covers their secure-8192 widths.
+      - name: Run the CRISP guest against the native journal
+        run: |
+          bash scripts/run-openvm.sh fixture 3 "$RUNNER_TEMP/crisp-fixture" --insecure
+          bash scripts/run-openvm.sh guest-parity "$RUNNER_TEMP/crisp-fixture"
+          bash scripts/run-openvm.sh fixture 2 "$RUNNER_TEMP/crisp-fixture-secure"
+          bash scripts/run-openvm.sh guest-parity "$RUNNER_TEMP/crisp-fixture-secure"
 
   build_sdk:
     needs: [detect_changes]
@@ -1622,7 +1852,7 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - name: Install protoc
-        run: sudo apt-get update -y && sudo apt-get install -y protobuf-compiler
+        uses: ./.github/actions/install-protoc
 
       - name: Install node dependencies
         run: pnpm install --frozen-lockfile
@@ -1632,10 +1862,6 @@ jobs:
 
       - name: Build the React package
         run: pnpm react:build
-
-      - name: Test the SDK
-        if: needs.detect_changes.outputs.sdk_tests == 'true'
-        uses: ./.github/actions/sdk-tests
 
       - name: Upload SDK artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -1654,6 +1880,54 @@ jobs:
             circuits/bin/threshold/target
           retention-days: 1
           if-no-files-found: error
+
+  # The SDK tests read only the outputs that build_sdk uploads: the SDK, WASM and contract builds and
+  # the threshold circuits. In their own job, they no longer hold back the jobs that download them.
+  sdk_tests:
+    needs: [detect_changes, build_sdk]
+    if: needs.detect_changes.outputs.sdk_tests == 'true'
+    timeout-minutes: 30
+    runs-on:
+      ${{ github.repository == 'theinterfold/interfold' && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/dev') && format('runs-on={0}-{1}-{2}/runner=4cpu-linux-x64/ram=16', github.run_id, github.run_attempt,
+      'sdk_tests') || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          # Keeps the token out of .git/config, where install and build scripts could read it and use
+          # this job's actions: write. The cancel step gets the token on its own.
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install node dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download SDK artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: sdk-artifacts
+          path: ./
+
+      - name: Test the SDK
+        uses: ./.github/actions/sdk-tests
+
+      - name: Cancel workflow on failure
+        if: failure()
+        run: gh run cancel ${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   build_crisp_sdk:
     needs: [detect_changes]
@@ -1681,6 +1955,11 @@ jobs:
         with:
           toolchain: ${{ env.NOIR_TOOLCHAIN }}
 
+      # The preset build runs the root circuit tools (scripts/build-circuits.ts), which took about two
+      # and a half of this step's six minutes when built from scratch. rust-cache.yml warms them.
+      - name: Cache Rust dependencies
+        uses: ./.github/actions/cache-dependencies
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
@@ -1688,7 +1967,7 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - name: Install protoc
-        run: sudo apt-get update -y && sudo apt-get install -y protobuf-compiler
+        uses: ./.github/actions/install-protoc
 
       - name: Install node dependencies
         run: pnpm install --frozen-lockfile
@@ -1753,7 +2032,7 @@ jobs:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
 
       - name: Install protoc
-        run: sudo apt-get update -y && sudo apt-get install -y protobuf-compiler
+        uses: ./.github/actions/install-protoc
 
       - name: Install node dependencies
         run: pnpm install --frozen-lockfile
@@ -1799,7 +2078,8 @@ jobs:
       - name: Install Barretenberg (bb)
         if: steps.cache-bb.outputs.cache-hit != 'true'
         run: |
-          curl -fsSL "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 5 --retry-all-errors --connect-timeout 20 --max-time 300 --retry-max-time 600 \
+            "https://github.com/AztecProtocol/aztec-packages/releases/download/v${{ env.BB_VERSION }}/barretenberg-amd64-linux.tar.gz" -o bb.tar.gz
           mkdir -p bb_extract && tar -xzf bb.tar.gz -C bb_extract
           BB_BIN=$(find bb_extract -name bb -type f | head -n 1)
           sudo mv "$BB_BIN" /usr/local/bin/bb
@@ -1813,7 +2093,7 @@ jobs:
         run: |
           tar -C "$GITHUB_WORKSPACE/dist" -czf "$RUNNER_TEMP/circuits-candidate.tar.gz" circuits/
           interfold noir setup --circuits-archive "$RUNNER_TEMP/circuits-candidate.tar.gz" \
-            --circuits-configuration insecure/minimum
+            --circuits-configuration insecure/minimum --allow-unpinned-archive
           interfold noir setup
 
       - name: Verify downloaded artifacts
@@ -1831,12 +2111,10 @@ jobs:
         run: |
           cd templates/default
           pnpm compile
-          chmod 755 .interfold/generated/contracts tests
-          chmod 644 .interfold/generated/contracts/ImageID.sol
           pnpm test:integration
 
   test_interfold_init:
-    needs: [detect_changes, build_interfold_cli, build_e3_support_dev]
+    needs: [detect_changes, build_interfold_cli]
     if: needs.detect_changes.outputs.init == 'true'
     timeout-minutes: 10
     runs-on:

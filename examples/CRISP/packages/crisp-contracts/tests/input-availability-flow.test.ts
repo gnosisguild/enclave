@@ -23,7 +23,8 @@ const FINALIZATION_WINDOW = 30
 const PRODUCTION_FINALIZATION_WINDOW = 10_800
 
 describe('CRISP input availability flow', function () {
-  async function openRound() {
+  /// Opens a round with the mock's default parameters, or with the given `customParams`.
+  async function openRound(customParams?: string) {
     const mockInterfold = await deployMockInterfold()
     const mockHonk = (await deployContract('MockHonkVerifier')) as unknown as HonkVerifier
     const program = await deployCRISPProgram({
@@ -37,7 +38,10 @@ describe('CRISP input availability flow', function () {
     const end = start + 3_700
     await (await mockInterfold.setInputWindow(start, end)).wait()
     const e3Id = await mockInterfold.nextE3Id()
-    await (await mockInterfold.request(await program.getAddress())).wait()
+    const programAddress = await program.getAddress()
+    await (
+      await (customParams ? mockInterfold.requestWithParams(programAddress, 2, customParams) : mockInterfold.request(programAddress))
+    ).wait()
     await (await mockInterfold.setCommitteePublicKey(ethers.id('committee-key'))).wait()
     await (await program.setMerkleRoot(e3Id, 1)).wait()
     await increaseTimeTo(start)
@@ -97,6 +101,31 @@ describe('CRISP input availability flow', function () {
     )
   })
 
+  it('refuses a byte-identical resubmission and a second finalization of one input', async function () {
+    const { program, e3Id } = await openRound()
+    const ballot = await input(program, e3Id)
+    const id = await program.inputId(e3Id, ballot.encryptedVoteHash, ballot.encryptedVoteCommitment, ballot.slotAddress, 0)
+    const finalizeArgs = [e3Id, ballot.slotAddress, ballot.encryptedVoteCommitment, ballot.encryptedVoteHash, 0, ballot.ciphertext] as const
+
+    await (await program.publishInput(e3Id, ballot.commitmentPayload)).wait()
+    // A replay would append a second leaf and spend the round's input limit.
+    await expect(program.publishInput(e3Id, ballot.commitmentPayload))
+      .to.be.revertedWithCustomError(program, 'InputAlreadyCommitted')
+      .withArgs(id)
+
+    await (await program.finalizeInput(...finalizeArgs)).wait()
+    await expect(program.finalizeInput(...finalizeArgs))
+      .to.be.revertedWithCustomError(program, 'InputNotCommitted')
+      .withArgs(id)
+    // Finalization does not reopen the input to a resubmission.
+    await expect(program.publishInput(e3Id, ballot.commitmentPayload))
+      .to.be.revertedWithCustomError(program, 'InputAlreadyCommitted')
+      .withArgs(id)
+
+    expect((await program.getRoundData(e3Id)).numberOfVotes).to.equal(1n)
+    expect(await program.pendingInputCount(e3Id)).to.equal(0n)
+  })
+
   it('verifies ballot proofs against the round committee key, not a caller-supplied key', async function () {
     const { program, mockInterfold, mockHonk, e3Id } = await openRound()
     const verifier = await ethers.getContractAt('MockHonkVerifier', await mockHonk.getAddress())
@@ -120,7 +149,6 @@ describe('CRISP input availability flow', function () {
 
     expect((await program.getRoundData(e3Id)).numberOfVotes).to.equal(2n)
     expect(await program.pendingInputCount(e3Id)).to.equal(2n)
-    expect(await program.getSlotIndex(e3Id, slot)).to.equal(1n)
     expect(await program.inputCommitmentOf(e3Id, slot, 0)).to.equal(first.encryptedVoteCommitment)
     expect(await program.inputCommitmentOf(e3Id, slot, 1)).to.equal(second.encryptedVoteCommitment)
 
@@ -397,5 +425,36 @@ describe('CRISP input availability flow', function () {
     await expect(program.inputCommitmentDeadline(e3Id))
       .to.be.revertedWithCustomError(program, 'InputWindowTooShort')
       .withArgs(e3Id, FINALIZATION_WINDOW, FINALIZATION_WINDOW + 1)
+  })
+
+  /// Every input adds one ciphertext to a slot's chain, and a CONSTANT round carries `credits` per
+  /// input, so its input count is capped to keep their sum below the plaintext modulus. Both entry
+  /// points must refuse alike: a service that pre-checks with `validateInputProof` must not see an
+  /// input accepted that `publishInput` then rejects.
+  it('accepts inputs up to the round limit and rejects the next from both entry points', async function () {
+    const t = await (await deployMockInterfold()).plaintextModulus()
+    // The largest input count that keeps `credits * count` below `t` is 2 for these credits.
+    const credits = (t - 1n) / 2n
+    const limit = (t - 1n) / credits
+    const params = abiCoder.encode(
+      ['address', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256', 'uint256'],
+      [ethers.ZeroAddress, 0n, 2, 0, credits, 0, 0],
+    )
+    const { program, e3Id } = await openRound(params)
+
+    for (let i = 0; i < Number(limit); i++) {
+      const accepted = await input(program, e3Id, `within-limit-${i}`)
+      await expect(program.publishInput(e3Id, accepted.commitmentPayload)).to.emit(program, 'InputCommitted')
+    }
+
+    const refused = await input(program, e3Id, 'over-limit')
+    await expect(
+      program.validateInputProof(e3Id, '0x01', refused.slotAddress, refused.encryptedVoteCommitment, refused.encryptedVoteHash, 0),
+    )
+      .to.be.revertedWithCustomError(program, 'InputLimitReached')
+      .withArgs(e3Id, limit)
+    await expect(program.publishInput(e3Id, refused.commitmentPayload))
+      .to.be.revertedWithCustomError(program, 'InputLimitReached')
+      .withArgs(e3Id, limit)
   })
 })

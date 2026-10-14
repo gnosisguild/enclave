@@ -68,7 +68,7 @@ const FILES: Record<string, Role> = {
   'docs/pages/build/tutorials/deploy-to-testnet.mdx': 'consumer',
   'docs/pages/reference/contracts.mdx': 'consumer',
   'packages/interfold-dashboard/.env.example': 'consumer',
-  'packages/interfold-dashboard/src/lib/chain.ts': 'consumer',
+  'packages/interfold-dashboard/src/lib/networks.ts': 'consumer',
   'examples/CRISP/interfold.config.yaml': 'consumer',
   'dappnode/docker-compose.yml': 'consumer',
 }
@@ -85,19 +85,21 @@ const ALLOWED: Record<string, string> = {
 
   // An E3 program belongs to its application, not to the protocol. See the
   // comment on `CONTRACT_KEYS` in packages/interfold-contracts/scripts/genManifest.ts.
-  '0xc6b6f740c85878d046a50f203a3aa379150bf8c7': 'CRISPProgram, sepolia',
+  '0xa9894a39061ec33f8550a2b63a66be59fb9fa443': 'CRISPProgram, sepolia',
   '0x53fcdb21e73a461cfe6c64b19855204384b91ba3': 'CRISPProgram, mainnet',
 
   // Sepolia contracts that the docs list but the manifest does not publish (it publishes only
   // the CONTRACT_KEYS set). Source: packages/interfold-contracts/deploy/protocol/sepolia-protocol.deployment.json
   // and examples/CRISP/packages/crisp-contracts/deployed_contracts.json.
-  '0x09b1727bcfd2d9edae16bb2838fe5bf2f48cd360': 'RiscZeroGroth16Verifier, sepolia',
-  '0x2dff6c2f010336fb2f553aaf20525579f9617cea': 'AvailVectorXDataAvailabilityVerifier (CRISP), sepolia',
-  '0x3d95cfa8018db4b5474bfe536702b5dc05ee1444': 'BondedCheckpoints, sepolia',
-  '0x44f8cbc2ea686e60e59e571f61322cfc7ab4b3c7': 'SelfRegistry (CRISP), sepolia',
-  '0x46cd950499b312e53cb73a1d1e12d3541966f823': 'ChainlinkVrfRandomnessProvider, sepolia',
-  '0x85e5176a8d387be3b53506ddcbbc8aa9c2156e9f': 'BondedVotes, sepolia',
-  '0x8837e47c4bb520ade83aab761c3b60679443af1b': 'Sepolia deployer and owner account, not a contract',
+  '0x00a49042e0550a272ed393dd324749c18c0c8e62': 'MockOpenVmReceiptVerifier (CRISP), sepolia',
+  '0x6d373da705b443ef76e37cb96275623818c50657': 'AvailVectorXDataAvailabilityVerifier (CRISP), sepolia',
+  '0x3d5d8c688545a3c336d373cc61e501211238226a': 'HonkVerifier (CRISP), sepolia',
+  '0x97508380e92a92f2e02818ab493539f84d54c66b': 'OnchainHonkVerifier (CRISP), sepolia',
+  '0x52c1ab7e5ee4a8f5ea1ad8d00971f2a7a49ae28c': 'MockVotingToken (CRISP), sepolia',
+  '0x4b4b85f007c241bd8bf22c951efe0f44d82ae6d1': 'BondedCheckpoints, sepolia',
+  '0x31de033af64f9955b729714d49c8bbf3b5f33847': 'SelfRegistry (CRISP), sepolia',
+  '0xea5a716afce9c7a4fd6808ca7b0db4dec40a9e1b': 'ChainlinkVrfRandomnessProvider, sepolia',
+  '0x1c721de6a736054dbe7e8fce99a68b76d4f603fb': 'BondedVotes, sepolia',
 
   // TODO: record this in deployed_contracts.json so the manifest can publish
   // it. Until then no check can tell a correct value here from a stale one.
@@ -106,7 +108,6 @@ const ALLOWED: Record<string, string> = {
   // Not an address: the first 20 bytes of the 32-byte RISC Zero guest image ID that the mainnet
   // Risc0BfvCiphertextVerifier checks. The address pattern matches the start of the hash.
   '0x9d3e21fd7cc08e629cb467e5ca6bfc8e1a645b48': 'prefix of the mainnet ciphertext guest image ID (a hash, not an address)',
-  '0xa38bb986e6c064ba05001b83fd40dccbaceec63a': 'prefix of the sepolia ciphertext guest image ID (a hash, not an address)',
 
   // Deterministic Anvil accounts used by the local CRISP stack.
   '0x70997970c51812dc3a010c7d01b50e0d17dc79c8': 'Anvil account 1',
@@ -177,6 +178,9 @@ const LABELS: Record<string, string> = {
   BfvDecryptionVerifierRouter: 'BfvDecryptionVerifierRouter',
   BfvPkVerifierRouter: 'BfvPkVerifierRouter',
   Risc0BfvCiphertextVerifier: 'Risc0BfvCiphertextVerifier',
+  OpenVmBfvCiphertextVerifier: 'OpenVmBfvCiphertextVerifier',
+  OpenVmReceiptVerifier: 'OpenVmReceiptVerifier',
+  OpenVmHalo2Verifier: 'OpenVmHalo2Verifier',
 }
 
 /** Files this check never reads, whatever they contain. */

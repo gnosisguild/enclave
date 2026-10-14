@@ -244,10 +244,20 @@ impl ZkBackend {
         Ok(())
     }
 
-    /// Install a circuit release archive from the local filesystem.
-    pub async fn install_circuits_archive(&self, path: &Path) -> Result<(), ZkError> {
-        self.install_circuits_archive_for_configurations(path, &supported_configurations())
-            .await
+    /// Install a circuit release archive from the local filesystem. The archive must match the
+    /// release pin of the required circuits version unless `allow_unpinned` is set, as for a local
+    /// build.
+    pub async fn install_circuits_archive(
+        &self,
+        path: &Path,
+        allow_unpinned: bool,
+    ) -> Result<(), ZkError> {
+        self.install_circuits_archive_for_configurations(
+            path,
+            &supported_configurations(),
+            allow_unpinned,
+        )
+        .await
     }
 
     /// Install a local archive for an explicit subset of supported preset/committee pairs.
@@ -255,8 +265,19 @@ impl ZkBackend {
         &self,
         path: &Path,
         configurations: &[(&str, &str)],
+        allow_unpinned: bool,
     ) -> Result<(), ZkError> {
         let bytes = fs::read(path).await?;
+        let version = &self.config.required_circuits_version;
+        let archive_name = format!("circuits-{version}.tar.gz");
+        match self.config.circuits_checksums.get(version) {
+            _ if allow_unpinned => warn!(
+                "installing circuits from {} without checking the release pin",
+                path.display()
+            ),
+            Some(pin) => verify_checksum(&archive_name, &bytes, Some(pin))?,
+            None => return Err(ZkError::ChecksumMissing(archive_name)),
+        }
         let mut version_info = self.load_version_info().await;
         self.install_circuits_bytes(&bytes, &mut version_info, configurations)
             .await?;
@@ -1180,7 +1201,7 @@ mod tests {
         let backend = test_backend(&temp);
         let previous_version = seed_installation(&backend).await;
 
-        let result = backend.install_circuits_archive(&archive_path).await;
+        let result = backend.install_circuits_archive(&archive_path, true).await;
         assert!(
             matches!(result, Err(ZkError::CircuitNotFound(_))),
             "{result:?}"
@@ -1188,7 +1209,11 @@ mod tests {
         assert_installation_unchanged(&backend, &previous_version);
 
         backend
-            .install_circuits_archive_for_configurations(&archive_path, &[("insecure", "minimum")])
+            .install_circuits_archive_for_configurations(
+                &archive_path,
+                &[("insecure", "minimum")],
+                true,
+            )
             .await
             .unwrap();
 
@@ -1214,7 +1239,7 @@ mod tests {
             b"previous-circuit",
         );
 
-        let result = backend.install_circuits_archive(&archive_path).await;
+        let result = backend.install_circuits_archive(&archive_path, true).await;
 
         assert!(matches!(result, Err(ZkError::ChecksumMissing(_))));
         assert_eq!(fs::read(installed_circuit).unwrap(), b"previous-circuit");
@@ -1222,6 +1247,68 @@ mod tests {
             fs::read(backend.circuits_dir.join("installed.txt")).unwrap(),
             b"installed"
         );
+    }
+
+    /// A local archive must match the release pin of the required version, unless the operator
+    /// allows an unpinned archive, as for a local build.
+    #[tokio::test]
+    async fn local_archive_must_match_the_release_pin() {
+        let temp = TempDir::new().unwrap();
+        let archive_path = temp.path().join("circuits.tar.gz");
+        let mut manifest = fixture_manifest(b"circuit");
+        let artifacts = fixture_artifacts();
+        let omitted: Vec<&str> = artifacts
+            .iter()
+            .filter(|path| !path.starts_with("insecure/minimum/"))
+            .map(String::as_str)
+            .collect();
+        for path in &omitted {
+            manifest.remove(*path);
+        }
+        let archive = circuit_archive_with_manifest(b"circuit", Some(manifest), &[], &omitted);
+        fs::write(&archive_path, &archive).unwrap();
+        let configurations = [("insecure", "minimum")];
+        let pinned_to = |digest: String, dir: &TempDir| {
+            let base_dir = dir.path().join("noir");
+            ZkBackend::with_config(
+                BBPath::Default(base_dir.join("bin/bb")),
+                base_dir.join("circuits"),
+                base_dir.join("work"),
+                ZkConfig {
+                    required_circuits_version: "candidate".into(),
+                    circuits_checksums: HashMap::from([("candidate".into(), digest)]),
+                    ..Default::default()
+                },
+            )
+        };
+
+        let unpinned = test_backend(&temp);
+        let result = unpinned
+            .install_circuits_archive_for_configurations(&archive_path, &configurations, false)
+            .await;
+        assert!(
+            matches!(result, Err(ZkError::ChecksumMissing(_))),
+            "{result:?}"
+        );
+
+        let other = pinned_to(hex::encode(Sha256::digest(b"another archive")), &temp);
+        let result = other
+            .install_circuits_archive_for_configurations(&archive_path, &configurations, false)
+            .await;
+        assert!(
+            matches!(result, Err(ZkError::ChecksumMismatch { .. })),
+            "{result:?}"
+        );
+        other
+            .install_circuits_archive_for_configurations(&archive_path, &configurations, true)
+            .await
+            .unwrap();
+
+        let own_dir = TempDir::new().unwrap();
+        pinned_to(hex::encode(Sha256::digest(&archive)), &own_dir)
+            .install_circuits_archive_for_configurations(&archive_path, &configurations, false)
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -1237,7 +1324,7 @@ mod tests {
         write_file(&backend.base_dir, "bin/bb", b"installed-binary");
         write_file(&backend.circuits_dir, "installed.txt", b"installed-circuit");
 
-        let result = backend.install_circuits_archive(&archive_path).await;
+        let result = backend.install_circuits_archive(&archive_path, true).await;
 
         assert!(matches!(result, Err(ZkError::InvalidInput(_))));
         assert_eq!(

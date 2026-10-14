@@ -14,6 +14,7 @@ use e3_events::{
 };
 use e3_utils::MAILBOX_LIMIT;
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 use tracing::{debug, info};
 
@@ -43,13 +44,59 @@ struct ForwardedRequest {
 }
 
 /// A request that comes again under a new ID this long after it went to the worker, with no
-/// result in the gate, goes to the worker again. EventBus fan-out can drop the result on its way
-/// to the gate, and the gate would otherwise keep every later ID waiting for good. The value must
-/// stay below the public-key aggregator's l-BFV correlation timeouts, which bound the only
-/// in-process re-publishers of an identical l-BFV request. The rule applies to every compute
-/// kind: a re-published legacy request (for example a streaming nodes-fold step) must also run
-/// again, and a duplicated job is harmless because responses still resolve by correlation ID.
+/// result in the gate and no run of it left in the worker, goes to the worker again. EventBus
+/// fan-out can drop the result on its way to the gate, and the gate would otherwise keep every
+/// later ID waiting for good. The value must stay below the public-key aggregator's l-BFV
+/// correlation timeouts, which bound the only in-process re-publishers of an identical l-BFV
+/// request. The rule applies to every compute kind: a re-published legacy request (for example a
+/// streaming nodes-fold step) must also run again, and a duplicated job is harmless because
+/// responses still resolve by correlation ID.
 const REFORWARD_AFTER: Duration = Duration::from_secs(10 * 60);
+
+/// The compute requests that the worker runs, queued ones included, by correlation ID with the
+/// number of runs: IDs restart from 1 in each process, so a replayed request can share its ID with
+/// a new one. The gate sends a request to the worker again only when no earlier run of it is left,
+/// so a slow proof under load runs once instead of once per retry.
+#[derive(Clone, Default)]
+pub(crate) struct RunningJobs(Arc<Mutex<HashMap<CorrelationId, usize>>>);
+
+impl RunningJobs {
+    /// Note that the worker runs `id` until the returned guard drops.
+    pub(crate) fn start(&self, id: CorrelationId) -> RunningJob {
+        *self.lock().entry(id).or_default() += 1;
+        RunningJob {
+            jobs: self.clone(),
+            id,
+        }
+    }
+
+    pub(crate) fn any(&self, ids: &[CorrelationId]) -> bool {
+        let running = self.lock();
+        ids.iter().any(|id| running.contains_key(id))
+    }
+
+    fn lock(&self) -> MutexGuard<'_, HashMap<CorrelationId, usize>> {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+/// A compute request that the worker runs. Dropping it ends the run.
+pub(crate) struct RunningJob {
+    jobs: RunningJobs,
+    id: CorrelationId,
+}
+
+impl Drop for RunningJob {
+    fn drop(&mut self) {
+        let mut running = self.jobs.lock();
+        if let Some(runs) = running.get_mut(&self.id) {
+            *runs -= 1;
+            if *runs == 0 {
+                running.remove(&self.id);
+            }
+        }
+    }
+}
 
 /// Buffers compute effects observed during EventStore replay. Legacy requests
 /// use their complete payload as the deduplication key. l-BFV requests use
@@ -72,6 +119,7 @@ pub(crate) struct ComputeEffectGate {
     replayed_responses: HashMap<RequestKey, ComputeOutcome>,
     stages: HashMap<E3id, E3Stage>,
     canonical_keys: e3_request::canonical_key::CanonicalPublicKeys,
+    running: RunningJobs,
     reforward_after: Duration,
 }
 
@@ -87,6 +135,7 @@ impl ComputeEffectGate {
             replayed_responses: HashMap::new(),
             stages: initial_stages,
             canonical_keys: Default::default(),
+            running: RunningJobs::default(),
             reforward_after: REFORWARD_AFTER,
         }
     }
@@ -277,7 +326,9 @@ impl ComputeEffectGate {
                         self.publish_outcome(&outcome, correlation_id, &event);
                         return false;
                     }
-                    if forwarded.forwarded_at.elapsed() < self.reforward_after {
+                    if forwarded.forwarded_at.elapsed() < self.reforward_after
+                        || self.running.any(&forwarded.correlation_ids)
+                    {
                         if !forwarded.waiting.contains(&correlation_id) {
                             forwarded.waiting.push(correlation_id);
                         }
@@ -319,9 +370,16 @@ impl ComputeEffectGate {
             ),
             _ => return,
         };
+        // An ID names one request. An outcome of another E3 under the same ID answers a request of
+        // an earlier boot, so it must not answer, or be kept for, the request that holds the ID now.
+        let outcome_e3 = match &outcome {
+            ComputeOutcome::Response(response) => &response.e3_id,
+            ComputeOutcome::Error(error) => &error.request().e3_id,
+        };
         let key = self
             .request_keys_by_correlation
             .get(&correlation_id)
+            .filter(|key| &key.0 == outcome_e3)
             .cloned();
         let forwarded_key = key.as_ref().filter(|key| {
             self.forwarded
@@ -393,9 +451,11 @@ impl ComputeEffectGate {
         target: Recipient<InterfoldEvent>,
         initial_stages: HashMap<E3id, E3Stage>,
         canonical_keys: e3_request::canonical_key::CanonicalPublicKeys,
+        running: RunningJobs,
     ) {
         let mut gate = Self::new(target, initial_stages).with_bus(bus.clone());
         gate.canonical_keys = canonical_keys;
+        gate.running = running;
         let gate = gate.start();
         bus.subscribe_all(
             &[
@@ -506,6 +566,7 @@ impl Handler<InterfoldEvent> for ComputeEffectGate {
 pub(crate) mod tests {
     use super::*;
     use actix::{Addr, Message, ResponseFuture};
+    use e3_committee::CiphernodesCommitteeSize;
     use e3_crypto::SensitiveBytes;
     use e3_events::{
         hlc_factory::HlcFactory, CircuitName, ComputeRequest, ComputeRequestErrorKind,
@@ -520,7 +581,6 @@ pub(crate) mod tests {
     use e3_fhe_params::BfvPreset;
     use e3_trbfv::lbfv_operation::LbfvOperationId;
     use e3_utils::ArcBytes;
-    use e3_zk_helpers::CiphernodesCommitteeSize;
 
     fn proof_domain() -> e3_committee_hash::LbfvProofDomainContext {
         e3_zk_helpers::threshold::lbfv_proof_domain::sample_lbfv_proof_domain()
@@ -753,6 +813,24 @@ pub(crate) mod tests {
         .into_sequenced(1)
     }
 
+    /// `compute` for another E3: the request that a fresh boot can number like an old one.
+    fn compute_for_other_e3(correlation_id: CorrelationId, timestamp: u128) -> InterfoldEvent {
+        let InterfoldEventData::ComputeRequest(mut request) =
+            compute(correlation_id, timestamp).into_data()
+        else {
+            unreachable!();
+        };
+        request.e3_id = E3id::new("4", 2);
+        InterfoldEvent::<Unsequenced>::new_with_timestamp(
+            request.into(),
+            None,
+            timestamp,
+            None,
+            EventSource::Local,
+        )
+        .into_sequenced(1)
+    }
+
     fn failed() -> InterfoldEvent {
         InterfoldEvent::<Unsequenced>::new_with_timestamp(
             e3_events::E3Failed {
@@ -903,6 +981,27 @@ pub(crate) mod tests {
             InterfoldEventData::ComputeResponse(result)
                 if result.correlation_id == regenerated
         ));
+    }
+
+    #[actix::test]
+    async fn an_earlier_boots_response_does_not_answer_a_request_with_the_same_id() {
+        let (bus, _history) = test_bus();
+        let recorder = Recorder::default().start();
+        let gate = ComputeEffectGate::new(recorder.clone().recipient(), HashMap::new())
+            .with_bus(bus)
+            .start();
+        let reused = CorrelationId::new();
+
+        // Replay delivers an old request of E3 1 and, later, its response. In between, a hydrated
+        // actor of E3 2 issues a fresh request that carries the same ID.
+        gate.send(compute(reused, 10)).await.unwrap();
+        gate.send(compute_for_other_e3(reused, 20)).await.unwrap();
+        gate.send(outcome_event(response(reused))).await.unwrap();
+        gate.send(effects_enabled()).await.unwrap();
+
+        // Both requests reach the worker. Without the ownership check the gate answers E3 2 with
+        // E3 1's proof and sends only the E3 1 request.
+        assert_eq!(recorder.send(Received).await.unwrap(), vec![reused, reused]);
     }
 
     #[actix::test]
@@ -1229,6 +1328,55 @@ pub(crate) mod tests {
             ));
         }
         assert_eq!(recorder.send(Received).await.unwrap(), vec![lost, again]);
+    }
+
+    #[actix::test]
+    async fn a_request_that_the_worker_still_runs_goes_to_it_once() {
+        let (bus, history) = test_bus();
+        let recorder = Recorder::default().start();
+        let running = RunningJobs::default();
+        let mut gate =
+            ComputeEffectGate::new(recorder.clone().recipient(), HashMap::new()).with_bus(bus);
+        gate.reforward_after = Duration::from_millis(100);
+        gate.running = running.clone();
+        let gate = gate.start();
+        let first = CorrelationId::new();
+        let waiting = CorrelationId::new();
+        let again = CorrelationId::new();
+
+        // The worker still runs `first` after the window, as a slow proof under load does: a new
+        // ID waits for that run.
+        let job = running.start(first);
+        gate.send(compute(first, 10)).await.unwrap();
+        gate.send(effects_enabled()).await.unwrap();
+        actix::clock::sleep(Duration::from_millis(200)).await;
+        gate.send(compute(waiting, 40)).await.unwrap();
+        assert_eq!(recorder.send(Received).await.unwrap(), vec![first]);
+
+        // The run ends, and its result never reaches the gate: a new ID sends the request again,
+        // and that result answers the waiting ID.
+        drop(job);
+        gate.send(compute(again, 50)).await.unwrap();
+        assert_eq!(recorder.send(Received).await.unwrap(), vec![first, again]);
+        gate.send(outcome_event(response(again))).await.unwrap();
+        assert!(matches!(
+            next_outcome(&history).await.into_data(),
+            InterfoldEventData::ComputeResponse(result) if result.correlation_id == waiting
+        ));
+    }
+
+    /// A replayed run can share its correlation ID with a new run, since IDs restart in each
+    /// process. The ID runs until both end.
+    #[test]
+    fn an_id_runs_until_its_last_run_ends() {
+        let running = RunningJobs::default();
+        let id = CorrelationId::new();
+        let replayed = running.start(id);
+        let new = running.start(id);
+        drop(replayed);
+        assert!(running.any(&[id]));
+        drop(new);
+        assert!(!running.any(&[id]));
     }
 
     #[actix::test]

@@ -9,16 +9,16 @@
 //! [`Configs`], [`Bounds`], [`Bits`], and [`Inputs`] are produced from BFV parameters
 //! and (for input) a public key. They implement [`Computation`] and are used by codegen.
 
-use crate::calculate_bit_width;
-use crate::ciphernodes_committee::CiphernodesCommittee;
-use crate::crt_polynomial_to_toml_json;
-use crate::math::fold_negacyclic;
-use crate::polynomial_to_toml_json;
+use crate::encoding::crt_polynomial_to_toml_json;
+use crate::encoding::polynomial_to_toml_json;
+use crate::negacyclic::fold_negacyclic;
 use crate::threshold::pk_generation::circuit::PkGenerationCircuit;
 use crate::threshold::pk_generation::circuit::PkGenerationCircuitData;
 use crate::threshold::pk_generation::utils::deterministic_crp_crt_polynomial;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
+use e3_committee::CiphernodesCommittee;
+use e3_fhe_params::utils::calculate_bit_width;
 use e3_fhe_params::BfvPreset;
 use e3_fhe_params::{build_pair_for_preset, calculate_smudging_bound};
 use e3_polynomial::CrtPolynomial;
@@ -133,31 +133,30 @@ impl Computation for Bits {
 
     fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         // Calculate bit widths for each bound type
-        let eek_bit = calculate_bit_width(BigInt::from(data.eek_bound.clone()));
-        let sk_bit = calculate_bit_width(BigInt::from(data.sk_bound.clone()));
+        let eek_bit = calculate_bit_width(&data.eek_bound);
+        let sk_bit = calculate_bit_width(&data.sk_bound);
         // e_sm limbs are centered residues, so they share the pk/modulus width. The lifted value
         // carries the smudging bound and needs its own, much wider, window.
-        let e_sm_lifted_bit = calculate_bit_width(BigInt::from(data.e_sm_bound.clone()));
+        let e_sm_lifted_bit = calculate_bit_width(&data.e_sm_bound);
         let mut e_sm_bit = 0;
         for bound in &data.e_sm_limb_bounds {
-            e_sm_bit = e_sm_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
+            e_sm_bit = e_sm_bit.max(calculate_bit_width(bound));
         }
         let mut e_sm_quotient_bit = 0;
         for bound in &data.e_sm_quotient_bounds {
-            e_sm_quotient_bit =
-                e_sm_quotient_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
+            e_sm_quotient_bit = e_sm_quotient_bit.max(calculate_bit_width(bound));
         }
 
         // pk_bit: centered representation uses (max(qi) - 1) / 2 as the bound,
         // matching compute_modulus_bit() used in C5 (pk_aggregation).
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
-        let pk_bit = crate::compute_modulus_bit(&threshold_params);
+        let pk_bit = e3_fhe_params::utils::compute_modulus_bit(&threshold_params);
 
         // One width covers every limb's `r`, so take the widest bound.
         let mut r_bit = 0;
         for bound in &data.r_bounds {
-            r_bit = r_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
+            r_bit = r_bit.max(calculate_bit_width(bound));
         }
 
         Ok(Bits {
@@ -181,7 +180,7 @@ impl Computation for Bounds {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
-        let committee = crate::ciphernodes_committee::canonical_committee_for_circuit(committee)
+        let committee = crate::committee::canonical_committee_for_circuit(committee)
             .map_err(|e| CircuitsErrors::Other(e.to_string()))?;
         let committee_n = committee.n;
 
@@ -287,7 +286,7 @@ impl Computation for Inputs {
         let n = threshold_params.degree();
         let l = threshold_params.moduli().len();
         let a = deterministic_crp_crt_polynomial(&threshold_params)?;
-        crate::utils::verify_crt_shapes(
+        crate::encoding::verify_crt_shapes(
             &[&data.pk0_share, &a, &data.eek, &data.e_sm, &data.sk],
             l,
             n,
@@ -350,27 +349,19 @@ impl Computation for Inputs {
             //   pk0i == (-(a * sk) + eek mod X^N + 1) + qi * r
             // so folding the already-computed `pk0_share_hat` and dividing gives `r` directly.
             //
-            // Everything here is O(N). Going via `decompose_residue` and then
-            // `reduce_by_cyclotomic` would instead recompute the `a * sk` product and run two
-            // generic long divisions, about 134 million BigInt multiply-subtracts per limb at
-            // N = 8192 -- for a value `fold_negacyclic` reaches in N subtractions. Measured at
-            // secure-8192, that was 5.09s of witness generation against 0.92s.
+            // Fold the existing product in O(N), without recomputing the convolution.
             let reduced_hat = fold_negacyclic(&pk0_share_hat, n as usize);
 
-            // Exact division is the identity: `div` rejects any coefficient of
+            // Exact division rejects any coefficient of
             // `pk0 - reduced_hat` that is not a multiple of qi, so a successful division is a proof
             // that an integer `r` closes the reduced equation. A wrong fold shows up here, because
             // the difference stops being divisible.
-            let (r, remainder) = pk0_share
+            let r = pk0_share
                 .sub(&reduced_hat)
-                .div(&Polynomial::constant(qi.clone()))
+                .div_exact(&qi)
                 .expect("pk0i - (a * sk + eek mod X^N + 1) must be divisible by qi");
-            assert!(
-                remainder.is_zero(),
-                "reduced pk0 identity must divide exactly by qi"
-            );
 
-            // Restate the identity on the derived witness. Cheap at O(N), and independent of `div`.
+            // Check the derived witness against the integer identity.
             assert!(
                 pk0_share
                     .sub(&reduced_hat.add(&r.scalar_mul(&qi)))
@@ -381,13 +372,7 @@ impl Computation for Inputs {
             // e_sm_quotient = (e_sm_lifted - e_sm[i]) / q_i, the witness the circuit uses to tie
             // the committed residue back to the bounded lifted value.
             let diff = e_sm_lifted.sub(&e_sm);
-            let (e_sm_quotient, remainder) = diff
-                .div(&Polynomial::constant(qi.clone()))
-                .expect("CRT requires exact division");
-            assert!(
-                remainder.is_zero(),
-                "e_sm_lifted - e_sm[i] must be divisible by q_i (CRT consistency)"
-            );
+            let e_sm_quotient = diff.div_exact(&qi).expect("CRT requires exact division");
 
             (i, r, pk0_share.clone(), e_sm.clone(), e_sm_quotient)
         })
@@ -452,7 +437,7 @@ impl Computation for Inputs {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::CiphernodesCommittee;
+    use e3_committee::CiphernodesCommittee;
     use e3_fhe_params::BfvPreset;
 
     #[test]
@@ -484,14 +469,14 @@ mod tests {
     #[test]
     fn test_bound_and_bits_computation_consistency() {
         let preset = BfvPreset::InsecureThreshold;
-        use crate::ciphernodes_committee::CiphernodesCommitteeSize;
+        use e3_committee::CiphernodesCommitteeSize;
         let committee = CiphernodesCommitteeSize::Micro.values();
         let bounds = Bounds::compute(preset, &committee).unwrap();
         let bits = Bits::compute(preset, &bounds).unwrap();
 
         // pk_bit uses compute_modulus_bit: (max(qi) - 1) / 2 for centered representation
         let (threshold_params, _) = build_pair_for_preset(preset).unwrap();
-        let expected_bit = crate::compute_modulus_bit(&threshold_params);
+        let expected_bit = e3_fhe_params::utils::compute_modulus_bit(&threshold_params);
 
         assert_eq!(bits.pk_bit, expected_bit);
     }

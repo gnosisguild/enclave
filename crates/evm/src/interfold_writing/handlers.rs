@@ -382,9 +382,13 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<SubmitPlaintext>
                 match should_publish_plaintext(provider.clone(), contract_address, e3_id.clone())
                     .await
                 {
-                    Ok(false) => {
-                        info!(e3_id = %e3_id, "Skipping publishPlaintextOutput; plaintext already published");
+                    Ok(PlaintextPublication::Done) => {
+                        info!(e3_id = %e3_id, "Skipping publishPlaintextOutput; the E3 ended or has its plaintext");
                         return (e3_id, true);
+                    }
+                    Ok(PlaintextPublication::NotYet) => {
+                        info!(e3_id = %e3_id, "The provider does not show the ciphertext yet; retrying publishPlaintextOutput later");
+                        return (e3_id, false);
                     }
                     Err(err) => {
                         bus.err(
@@ -396,7 +400,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<SubmitPlaintext>
                         );
                         return (e3_id, false);
                     }
-                    Ok(true) => {}
+                    Ok(PlaintextPublication::Publish) => {}
                 }
 
                 let result = publish_plaintext_output(
@@ -719,6 +723,7 @@ mod tests {
             sol_types::SolCall,
             transports::TransportErrorKind,
         };
+        use e3_committee::CiphernodesCommitteeSize;
         use e3_data::{InMemEventLog, InMemSequenceIndex};
         use e3_events::{
             CiphertextOutputPublished, CircuitName, EventBusFanout, EventStore, EventStoreRouter,
@@ -727,7 +732,6 @@ mod tests {
         use e3_fhe_params::BfvPreset;
         use e3_request::canonical_key::CanonicalPublicKey;
         use e3_utils::ArcBytes;
-        use e3_zk_helpers::CiphernodesCommitteeSize;
         use std::sync::{Arc, Mutex};
 
         for authority_after_replay in [false, true] {

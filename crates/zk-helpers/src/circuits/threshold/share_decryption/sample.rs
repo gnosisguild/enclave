@@ -11,14 +11,14 @@
 
 use std::sync::Arc;
 
-use crate::{
-    threshold::share_decryption::ShareDecryptionCircuitData, CiphernodesCommittee, CircuitsErrors,
-};
+use crate::{threshold::share_decryption::ShareDecryptionCircuitData, CircuitsErrors};
+use e3_committee::CiphernodesCommittee;
 use e3_fhe_params::{
     build_pair_for_preset, create_deterministic_crp_from_default_seed, generate_smudging_error,
     BfvPreset,
 };
-use e3_polynomial::CrtPolynomial;
+use e3_polynomial::{CrtPolynomial, Polynomial};
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use fhe::{
     bfv::{Encoding, Plaintext, PublicKey},
     mbfv::{AggregateIter, PublicKeyShare},
@@ -222,16 +222,20 @@ impl ShareDecryptionCircuitData {
             }
         }
 
-        let sk_crt = CrtPolynomial::from_bigint_vectors(
+        let sk_crt = CrtPolynomial::new(
             sk_sum_matrix
                 .outer_iter()
-                .map(|row| row.iter().copied().map(num_bigint::BigInt::from).collect())
+                .map(|row| {
+                    Polynomial::new(row.iter().copied().map(num_bigint::BigInt::from).collect())
+                })
                 .collect(),
         );
-        let es_crt = CrtPolynomial::from_bigint_vectors(
+        let es_crt = CrtPolynomial::new(
             es_sum_matrix
                 .outer_iter()
-                .map(|row| row.iter().copied().map(num_bigint::BigInt::from).collect())
+                .map(|row| {
+                    Polynomial::new(row.iter().copied().map(num_bigint::BigInt::from).collect())
+                })
                 .collect(),
         );
         let sk_aggregate = share_manager
@@ -267,7 +271,7 @@ impl ShareDecryptionCircuitData {
 
 #[cfg(test)]
 mod tests {
-    use crate::CiphernodesCommitteeSize;
+    use e3_committee::CiphernodesCommitteeSize;
 
     use super::*;
     use e3_fhe_params::BfvPreset;

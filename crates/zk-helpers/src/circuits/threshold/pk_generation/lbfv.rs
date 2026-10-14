@@ -6,18 +6,19 @@
 
 //! Conversion of l-BFV public-key rows into Noir witnesses.
 
-use crate::math::{
-    cyclotomic_polynomial, exact_quotient, fhe_poly_to_crt_centered_checked,
-    fhe_secret_key_to_crt_centered, negacyclic_mul, validate_fhe_poly_context,
+use crate::encoding::verify_crt_shapes;
+use crate::encoding::{
+    fhe_poly_to_crt_centered_checked, fhe_secret_key_to_crt_centered, validate_fhe_poly_context,
 };
+use crate::negacyclic::{exact_quotient, negacyclic_mul};
 use crate::threshold::lbfv_proof_domain::{
     lbfv_proof_session, sample_lbfv_proof_domain, validate_lbfv_generation_party_id,
 };
-use crate::utils::verify_crt_shapes;
 use crate::{
-    crt_polynomial_to_toml_json, polynomial_to_toml_json, Artifacts, CiphernodesCommittee, Circuit,
-    CircuitCodegen, CircuitComputation, CircuitsErrors, CodegenToml, Computation,
+    crt_polynomial_to_toml_json, polynomial_to_toml_json, Artifacts, Circuit, CircuitCodegen,
+    CircuitComputation, CircuitsErrors, CodegenToml, Computation,
 };
+use e3_committee::CiphernodesCommittee;
 use e3_committee_hash::LbfvProofDomainContext;
 use e3_fhe_params::{build_pair_for_preset, lbfv_crs_seed, BfvPreset};
 use e3_polynomial::{CrtPolynomial, Polynomial};
@@ -220,7 +221,6 @@ pub struct LbfvPkGenerationAdapter {
     moduli: Vec<u64>,
     degree: usize,
     a_rows: Vec<CrtPolynomial>,
-    cyclotomic: Vec<BigInt>,
 }
 
 impl LbfvPkGenerationAdapter {
@@ -280,11 +280,7 @@ impl LbfvPkGenerationAdapter {
 
         let mut eek_limbs = Vec::with_capacity(self.moduli.len());
         for (index, qi) in self.moduli.iter().enumerate() {
-            let product = a
-                .limb(index)
-                .mul(&sk)
-                .reduce_by_cyclotomic(&self.cyclotomic)
-                .map_err(|error| CircuitsErrors::Other(error.to_string()))?;
+            let product = negacyclic_mul(a.limb(index), &sk, self.degree)?;
             let mut eek = pk0_share.limb(index).add(&product);
             eek.reduce(&BigInt::from(*qi));
             eek.center(&BigInt::from(*qi));
@@ -390,7 +386,6 @@ impl LbfvPkGenerationAdapter {
             moduli,
             degree,
             a_rows,
-            cyclotomic: cyclotomic_polynomial(degree as u64),
         })
     }
 }
@@ -459,7 +454,7 @@ pub fn lbfv_limb_quotient_bounds(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::CiphernodesCommitteeSize;
+    use e3_committee::CiphernodesCommitteeSize;
     use fhe::bfv::BfvParametersBuilder;
     use num_traits::Signed;
     use rand::rng;
@@ -505,12 +500,10 @@ mod tests {
             }
 
             for (index, qi) in params.moduli().iter().enumerate() {
-                let product = data
-                    .a
-                    .limb(index)
-                    .mul(&data.sk)
-                    .reduce_by_cyclotomic(&adapter.cyclotomic)
-                    .map_err(|error| CircuitsErrors::Other(error.to_string()))?;
+                let product = crate::negacyclic::reduce_reference(
+                    &data.a.limb(index).mul(&data.sk),
+                    params.degree(),
+                );
                 let mut expected = data.eek.sub(&product);
                 expected.reduce(&BigInt::from(*qi));
                 expected.center(&BigInt::from(*qi));
@@ -609,12 +602,12 @@ mod tests {
                 params
                     .moduli()
                     .iter()
-                    .map(|_| Polynomial::zero(degree - 1))
+                    .map(|_| Polynomial::new(vec![BigInt::from(0); degree]))
                     .collect(),
             ),
             a: adapter.crs_row(0)?,
-            eek: Polynomial::zero(degree - 1),
-            sk: Polynomial::zero(degree - 1),
+            eek: Polynomial::new(vec![BigInt::from(0); degree]),
+            sk: Polynomial::new(vec![BigInt::from(0); degree]),
         };
 
         let inputs = compute_inputs(&params, &adapter, &data)?;

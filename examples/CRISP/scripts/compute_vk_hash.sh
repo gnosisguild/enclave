@@ -32,10 +32,10 @@ need() {
 }
 
 vk_hash() {
-  (cd "$REPO" && cargo run -q -p e3-zk-helpers --bin compute-vk-hash -- "$@")
+  (cd "$REPO" && cargo run --quiet --locked --release -p e3-zk-artifacts --bin zk-artifacts -- vk-hash "$@")
 }
 
-# Write a 0x-prefixed field element as the 32-byte big-endian file compute-vk-hash reads.
+# Write a 0x-prefixed field element as the 32-byte big-endian file `zk-artifacts vk-hash` reads.
 to_file() {
   local hex="${1#0x}"
   printf '%064s' "$hex" | tr ' ' '0' | xxd -r -p >"$2"

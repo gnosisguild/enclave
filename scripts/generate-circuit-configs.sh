@@ -5,19 +5,19 @@
 # without even the implied warranty of MERCHANTABILITY
 # or FITNESS FOR A PARTICULAR PURPOSE.
 
-# Batch-driven deterministic zk_cli codegen for every (preset x committee) x circuit.
+# Batch-driven deterministic `zk-artifacts generate` codegen for every (preset x committee) x circuit.
 #
 # Produces per-circuit `configs.nr` + `Prover.toml` under:
 #     dist/circuit-codegen/<preset>/<committee>/<circuit_path>/
 # for all three BFV presets (insecure, secure-8192, secure-16384) and all
 # committees (minimum, micro, small).
 #
-# This is a convenience batch wrapper: it drives the same per-circuit `zk_cli codegen`
+# This is a convenience batch wrapper: it drives the same per-circuit `zk-artifacts generate`
 # path as `circuits/benchmarks/scripts/generate_prover_toml.sh`, but for the full
 # matrix at once and including configs (not just Prover.toml), so operators do not
-# need to repeat zk_cli runs manually.
+# need to repeat `zk-artifacts generate` runs manually.
 #
-# Augments — does not replace — `zk_cli`. `zk_cli` remains the on-demand single-circuit
+# Augments — does not replace — `zk-artifacts generate`. That command remains the on-demand single-circuit
 # path; this script is the deterministic matrix sweep.
 #
 # Usage:
@@ -103,7 +103,7 @@ done
 [[ ${#SELECT_COMMITTEES[@]} -eq 0 ]] && SELECT_COMMITTEES=("${ALL_COMMITTEES[@]}")
 [[ ${#SELECT_CIRCUITS[@]} -eq 0 ]] && SELECT_CIRCUITS=("${ALL_CIRCUITS[@]}")
 
-# map circuit path -> exact zk_cli preset name (BfvPreset::name, e.g. SECURE_THRESHOLD_16384)
+# map preset -> exact `zk-artifacts` preset name (BfvPreset::name, e.g. SECURE_THRESHOLD_16384)
 preset_to_zk_name() {
     case "$1" in
         insecure) echo "INSECURE_THRESHOLD" ;;
@@ -142,11 +142,11 @@ for preset in "${SELECT_PRESETS[@]}"; do
             if [[ "$zk_circuit" == "_no_zk_cli" ]]; then
                 # `config` circuit has no witness inputs; emit an empty Prover.toml so nargo runs.
                 : > "$out_dir/Prover.toml"
-                echo "  . $preset/$committee/$circuit_path  (no zk_cli)"
+                echo "  . $preset/$committee/$circuit_path  (no witness)"
                 continue
             fi
 
-            cmd=(cargo run -q -p e3-zk-helpers --bin zk_cli --
+            cmd=(cargo run -q --locked --release -p e3-zk-artifacts --bin zk-artifacts -- generate
                 --circuit "$zk_circuit"
                 --preset "$zk_preset"
                 --committee "$committee"
@@ -156,7 +156,7 @@ for preset in "${SELECT_PRESETS[@]}"; do
                 cmd+=(--inputs "$zk_inputs")
             fi
 
-            echo "  → $preset/$committee/$circuit_path  (zk_cli --circuit $zk_circuit --preset $zk_preset --committee $committee)"
+            echo "  → $preset/$committee/$circuit_path  (zk-artifacts generate --circuit $zk_circuit --preset $zk_preset --committee $committee)"
             if "${cmd[@]}"; then
                 if [[ "$circuit_path" == "dkg/sk_share_computation_chunk" || "$circuit_path" == "dkg/esm_share_computation_chunk" ]]; then
                     # Mirrors e3_zk_helpers::circuits::dkg::share_computation::c2_chunk_size.
@@ -175,7 +175,7 @@ for preset in "${SELECT_PRESETS[@]}"; do
                     rm -f "$out_dir/Prover.full.toml"
                 fi
             else
-                printf -v fail "%s\t%s\t%s\t(zk_cli %s %s failed)" "$preset" "$committee" "$circuit_path" "$zk_circuit" "$zk_inputs"
+                printf -v fail "%s\t%s\t%s\t(zk-artifacts generate %s %s failed)" "$preset" "$committee" "$circuit_path" "$zk_circuit" "$zk_inputs"
                 FAILURES+=("$fail")
                 if [[ "$ALLOW_FAILURES" != "1" ]]; then
                     echo "  ✗ $preset/$committee/$circuit_path failed (strict mode) — aborting" >&2

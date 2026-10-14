@@ -6,8 +6,9 @@
 
 //! Shared public-domain inputs for secure l-BFV row proofs.
 
-use crate::{CiphernodesCommittee, CircuitsErrors};
+use crate::CircuitsErrors;
 use alloy_primitives::{Address, B256, U256};
+use e3_committee::CiphernodesCommittee;
 use e3_committee_hash::{
     hash_lbfv_accepted_party_set, lbfv_proof_session_limbs, LbfvProofDomainContext,
 };
@@ -127,7 +128,7 @@ pub fn sample_lbfv_proof_domain() -> LbfvProofDomainContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::CiphernodesCommitteeSize;
+    use e3_committee::CiphernodesCommitteeSize;
 
     #[test]
     fn sample_context_produces_canonical_session_limbs() {

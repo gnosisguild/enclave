@@ -11,7 +11,9 @@ use e3_compute_provider::{
 use e3_program_server::E3ProgramServer;
 use e3_user_program::fhe_processor;
 
-struct MockProofProvider;
+struct MockProofProvider {
+    committee_public_key_hash: [u8; 32],
+}
 
 impl ComputeProvider for MockProofProvider {
     type Output = ComputeResult;
@@ -24,7 +26,7 @@ impl ComputeProvider for MockProofProvider {
         // This dev provider stands in for the zkVM, where a failure aborts the guest. Panicking
         // with the reason keeps that behaviour while naming the input that could not be used.
         input
-            .process(fhe_processor, policy)
+            .process_bound(fhe_processor, policy, self.committee_public_key_hash)
             .expect("the Secure Process rejected its inputs")
     }
 }
@@ -58,12 +60,16 @@ async fn main() -> Result<()> {
     let server = E3ProgramServer::builder(|job| async move {
         // `with_published`, not `new`: a program whose policy reads the commitment or the slot
         // needs what the E3 program published, and `new` supplies none of it.
+        let committee_public_key_hash = job.domain.committee_public_key_hash;
         let mut manager = ComputeManager::with_published(
-            MockProofProvider,
+            MockProofProvider {
+                committee_public_key_hash,
+            },
             job.inputs,
             job.published,
             fhe_processor,
-        );
+        )
+        .with_committee_public_key_hash(committee_public_key_hash);
         let (result, ciphertext) = manager.start(e3_user_program::policy())?;
         let proof = encode_mock_compute_proof(&[3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5], &result)?;
 

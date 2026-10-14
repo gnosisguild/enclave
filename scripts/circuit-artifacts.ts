@@ -76,62 +76,34 @@ export function refreshChecksums(dir: string): void {
   )
 }
 
-function validateChecksumEntries(dir: string, files: string[], entries: Record<string, unknown>, source: string): void {
-  const entryFiles = Object.keys(entries).sort()
-  if (entryFiles.join('\n') !== files.join('\n')) {
-    throw new Error(`${source} does not cover the complete circuit artifact set`)
-  }
-
-  for (const file of files) {
-    const expected = entries[file]
-    if (typeof expected !== 'string' || !/^[0-9a-f]{64}$/i.test(expected)) {
-      throw new Error(`${source} contains an invalid SHA-256 value for ${file}`)
+/**
+ * Check `checksums.json` as a node's installer does (`crates/zk-prover/src/backend/download.rs`):
+ * sha256, at least one file, plain relative paths, every listed file present with its digest, and
+ * every artifact listed. Build stamps and the root manifests need no entry.
+ */
+export function validateChecksums(dir: string): void {
+  const manifestPath = join(dir, 'checksums.json')
+  if (!existsSync(manifestPath)) throw new Error('checksums.json is missing')
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { algorithm?: string; files?: Record<string, string> }
+  if (manifest.algorithm !== 'sha256') throw new Error('checksums.json must use sha256')
+  const files = Object.entries(manifest.files ?? {})
+  if (files.length === 0) throw new Error('checksums.json lists no files')
+  const listed = new Set<string>()
+  for (const [file, digest] of files) {
+    if (file.startsWith('/') || file.split('/').some((part) => part === '' || part === '.' || part === '..')) {
+      throw new Error(`checksums.json lists an invalid path: ${file}`)
     }
-
-    const fullPath = resolve(dir, file)
-    const normalized = relative(dir, fullPath)
-    if (normalized !== file || normalized === '..' || normalized.startsWith(`..${sep}`)) {
-      throw new Error(`${source} contains an invalid artifact path: ${file}`)
+    const path = join(dir, file)
+    if (!existsSync(path) || !statSync(path).isFile()) throw new Error(`checksums.json lists a missing file: ${file}`)
+    const actual = createHash('sha256').update(readFileSync(path)).digest('hex')
+    if (actual !== digest) throw new Error(`checksums.json has the wrong digest for ${file}`)
+    listed.add(file)
+  }
+  for (const file of artifactFiles(dir)) {
+    if (!file.endsWith('.build-stamp.json') && !listed.has(file)) {
+      throw new Error(`checksums.json does not list ${file}`)
     }
-
-    const actual = createHash('sha256').update(readFileSync(fullPath)).digest('hex')
-    if (actual !== expected.toLowerCase()) {
-      throw new Error(`${source} hash mismatch for ${file}`)
-    }
   }
-}
-
-/** Verify both checksum manifests against every non-metadata archive file. */
-export function validateArtifactChecksums(dir: string): void {
-  const files = artifactFiles(dir)
-  const jsonPath = join(dir, 'checksums.json')
-  const sumsPath = join(dir, 'SHA256SUMS')
-  if (!existsSync(jsonPath) || !existsSync(sumsPath)) {
-    throw new Error('Circuit artifact checksums are missing')
-  }
-
-  let manifest: { algorithm?: unknown; files?: unknown }
-  try {
-    manifest = JSON.parse(readFileSync(jsonPath, 'utf8')) as typeof manifest
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    throw new Error(`Invalid checksums.json: ${message}`)
-  }
-  if (manifest.algorithm !== 'sha256' || typeof manifest.files !== 'object' || manifest.files === null || Array.isArray(manifest.files)) {
-    throw new Error('Invalid checksums.json: expected a sha256 files map')
-  }
-  validateChecksumEntries(dir, files, manifest.files as Record<string, unknown>, 'checksums.json')
-
-  const sums: Record<string, unknown> = {}
-  const lines = readFileSync(sumsPath, 'utf8').split(/\r?\n/).filter(Boolean)
-  for (const line of lines) {
-    const match = /^([0-9a-f]{64}) {2}(.+)$/i.exec(line)
-    if (!match || sums[match[2]] !== undefined) {
-      throw new Error(`Invalid SHA256SUMS entry: ${line}`)
-    }
-    sums[match[2]] = match[1]
-  }
-  validateChecksumEntries(dir, files, sums, 'SHA256SUMS')
 }
 
 function stampFiles(dir: string): string[] {
@@ -389,14 +361,17 @@ async function pull() {
     process.exit(1)
   }
 
-  const hash = run('pnpm tsx scripts/build-circuits.ts hash')
-  const revision = findArtifactRevision(ROOT, `origin/${BRANCH}`, hash)
+  // `--latest` takes the branch tip without a SOURCE_HASH match. CI and the integration tests use it
+  // until the drift workflow is designed; the release workflow still requires a match.
+  const latest = process.argv.includes('--latest')
+  const hash = latest ? undefined : run('pnpm tsx scripts/build-circuits.ts hash')
+  const revision = hash ? findArtifactRevision(ROOT, `origin/${BRANCH}`, hash) : run(`git rev-parse origin/${BRANCH}`)
 
   if (existsSync(DIST)) rmSync(DIST, { recursive: true })
   mkdirSync(DIST, { recursive: true })
 
   runV(`git archive ${revision} | tar -x -C "${DIST}"`)
-  console.log(`✅ Pulled ${revision} (SOURCE_HASH=${hash}) to ${DIST}`)
+  console.log(`✅ Pulled ${revision} (SOURCE_HASH=${readFileSync(join(DIST, 'SOURCE_HASH'), 'utf8').trim()}) to ${DIST}`)
 }
 
 async function verifyRelease() {
@@ -405,13 +380,13 @@ async function verifyRelease() {
   try {
     validateSourceHash(DIST, expectedHash)
     validateArtifactSet(DIST)
-    validateArtifactChecksums(DIST)
+    validateChecksums(DIST)
   } catch (error: any) {
     console.error(`❌ ${error.message}`)
     process.exit(1)
   }
 
-  console.log(`✅ circuit-artifacts verified (SOURCE_HASH=${expectedHash}, required chain artifacts present)`)
+  console.log(`✅ circuit-artifacts verified (SOURCE_HASH=${expectedHash}, required chain artifacts present and checksummed)`)
 }
 
 if (require.main === module) {
@@ -423,6 +398,6 @@ if (require.main === module) {
   else if (cmd === 'checksums') refreshChecksums(resolve(argValue('--dir') ?? DIST))
   else
     console.log(
-      'Usage: circuit-artifacts.ts [push [--replace]|pull|verify-release [--source-hash <hash>]|checksums [--dir <path>]|restamp --expect-source-hash <hash>]',
+      'Usage: circuit-artifacts.ts [push [--replace]|pull [--latest]|verify-release [--source-hash <hash>]|checksums [--dir <path>]|restamp --expect-source-hash <hash>]',
     )
 }

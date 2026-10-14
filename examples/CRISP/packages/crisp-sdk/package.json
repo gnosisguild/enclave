@@ -1,6 +1,6 @@
 {
   "name": "@crisp-e3/sdk",
-  "version": "0.24.0",
+  "version": "0.26.0",
   "type": "module",
   "author": {
     "name": "gnosisguild",
@@ -73,7 +73,7 @@
     "vitest": "^1.6.1"
   },
   "dependencies": {
-    "@aztec/bb.js": "5.1.0",
+    "@aztec/bb.js": "5.2.0",
     "@crisp-e3/zk-inputs": "workspace:*",
     "@noir-lang/noir_js": "1.0.0-beta.26",
     "@zk-kit/lean-imt": "^2.2.4",

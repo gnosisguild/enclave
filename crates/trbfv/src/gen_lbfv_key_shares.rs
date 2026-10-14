@@ -249,12 +249,14 @@ fn generate_with_params<R: RngCore + CryptoRng>(
 mod tests {
     use super::*;
     use crate::helpers::deserialize_secret_key;
+    use e3_committee::CiphernodesCommitteeSize;
     use e3_fhe_params::{lbfv_crs_seed, lbfv_urs_seed};
     use e3_polynomial::CrtPolynomial;
+    use e3_polynomial_fhe::FromFhePolynomial as _;
     use e3_zk_helpers::circuits::commitments::compute_sc_sk_secret_root_commitment;
     use e3_zk_helpers::threshold::pk_generation::{Bits, Bounds, LbfvPkGenerationAdapter};
     use e3_zk_helpers::threshold::rlk_generation::RlkGenerationAdapter;
-    use e3_zk_helpers::{CiphernodesCommitteeSize, Computation};
+    use e3_zk_helpers::Computation;
     use fhe_math::rq::traits::TryConvertFrom;
     use fhe_traits::{DeserializeParametrized, DeserializeWithContext};
     use rand::SeedableRng;

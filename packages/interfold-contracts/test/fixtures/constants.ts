@@ -33,7 +33,7 @@ export const PROOF = "0x1337";
 
 // ── Active BFV parameter set ────────────────────────────────────────────────
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
-export const CIRCUIT_VERSION = ethers.id("interfold-bfv-v4");
+export const CIRCUIT_VERSION = ethers.id("interfold-bfv-v5");
 
 function encodeBfvParams(params: {
   degree: bigint;

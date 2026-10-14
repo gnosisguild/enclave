@@ -22,6 +22,7 @@ use actix::{
 use alloy::primitives::Address;
 use anyhow::{anyhow, ensure, Result};
 use async_trait::async_trait;
+use e3_committee::CiphernodesCommitteeSize;
 use e3_data::{AutoPersist, Persistable, RepositoriesFactory};
 use e3_events::{
     prelude::*, CiphernodeSelected, CiphertextOutputPublished, E3Stage, E3id, EventContext,
@@ -35,7 +36,6 @@ use e3_request::{
     DKG_FOLD_ATTESTATION_CONTEXT_KEY, META_KEY,
 };
 use e3_sortition::Sortition;
-use e3_zk_helpers::CiphernodesCommitteeSize;
 use std::collections::HashMap;
 
 /// Full finalized committee from the chain (length `N`)

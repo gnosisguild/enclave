@@ -14,12 +14,11 @@ import { proofToFields } from '../utils'
 import type { TrbfvCircuitInputs } from './user-data-encryption'
 
 export const proveUserDataEncryption = async (circuitInputs: TrbfvCircuitInputs): Promise<ProofData> => {
-  // Size the SRS at creation: on the WASM backend `new()` loads bb.js's default (2^19 points), and
-  // a later `initSRSChonk` does not enlarge it. These circuits need 2^21 points.
+  // The outer circuit needs 2^21 SRS points. Pass the size to `new`: on the WASM backend that
+  // browsers use, a later `initSRSChonk` call does not enlarge the SRS that `new` loads.
   const api = await Barretenberg.new({ srsSize: 2 ** 21 })
 
   try {
-
     const { witness: userDataEncryptionCt0Witness } = await executeCircuit(userDataEncryptionCt0Circuit as CompiledCircuit, {
       pk0is: circuitInputs.pk0is,
       ct0is: circuitInputs.ct0is,

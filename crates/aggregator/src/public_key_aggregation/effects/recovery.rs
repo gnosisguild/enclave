@@ -6,6 +6,25 @@ use super::super::*;
 use anyhow::ensure;
 
 impl PublicKeyAggregator {
+    /// Every node assembled the whole key from the chain's chunks, so a restart has no key
+    /// publication left to send again.
+    pub(in crate::actors::publickey_aggregator) fn forget_saved_publication(
+        &mut self,
+        ec: &EventContext<Sequenced>,
+    ) -> Result<()> {
+        if self
+            .recovery
+            .get()
+            .is_none_or(|recovery| recovery.pending_publication.is_none())
+        {
+            return Ok(());
+        }
+        self.recovery.try_mutate(ec, |mut recovery| {
+            recovery.pending_publication = None;
+            Ok(recovery)
+        })
+    }
+
     pub(in crate::actors::publickey_aggregator) fn resume_in_flight_work(
         &mut self,
         effects_context: EventContext<Sequenced>,
@@ -55,8 +74,9 @@ impl PublicKeyAggregator {
         }
 
         // A saved key publication is this node's finished result, whatever its role now: send it
-        // again, so the registry writer finishes publishing the key. The writer skips a commitment
-        // that is already on chain.
+        // again until the whole key is on chain, so that the registry writer publishes it. The
+        // writer skips a commitment that is already on chain and sends every chunk again.
+        // `CommitteePublished` clears the saved publication.
         if matches!(state, PublicKeyAggregatorState::Complete { .. }) {
             // The l-BFV path rebuilds its publication from the persisted l-BFV aggregation state.
             if self.is_lbfv() {
@@ -70,13 +90,14 @@ impl PublicKeyAggregator {
         }
 
         // The active aggregator resumes any phase. A demoted node resumes only the work that it
-        // started, which is every phase after C1 verification.
+        // started: every phase after C1 verification, and a C1 verification that it dispatched.
         if !(self.can_run_aggregation_effects()
-            || (aggregation_started(&state) && self.can_continue_aggregation_effects()))
+            || ((aggregation_started(&state) || self.started_as_aggregator)
+                && self.can_continue_aggregation_effects()))
         {
             return Ok(());
         }
-        self.mark_started_as_aggregator();
+        self.mark_started_as_aggregator(&effects_context)?;
 
         match state {
             PublicKeyAggregatorState::VerifyingC1 { .. } => {

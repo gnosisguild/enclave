@@ -18,6 +18,9 @@ what CRISP does in `examples/CRISP/circuits` and `packages/crisp-contracts`.
 At the end, you have two Noir circuits, a generated Solidity verifier, and a `publishInput` that
 rejects an input without a valid proof.
 
+This tutorial targets Interfold `v0.18.0` and its toolchain. For source builds from another
+checkout, use that checkout's matching SDK, circuits, and [toolchain pins](/build/noir-circuits).
+
 **Prerequisites:**
 
 - A project from the default template. See
@@ -153,9 +156,10 @@ fn main(
 ```
 
 The input `k1` is the plaintext polynomial scaled to `[q * m]_t` (`k1 = [q*m]_t` in
-`crates/zk-helpers/src/circuits/threshold/user_data_encryption/computation.rs`). CRISP uses the same
-test for each vote bit in `check_coefficient_values_with_balance`. The two commitment functions are
-the ones that `user_data_encryption` uses, so equal inputs give equal outputs.
+`crates/zk-helpers/src/circuits/threshold/user_data_encryption/computation.rs`). For each option,
+CRISP's `check_coefficient_values_with_balance` proves that the coefficient in `k1` is a weight in
+`[0, t)` scaled the same way. The two commitment functions are the ones that `user_data_encryption`
+uses, so equal inputs give equal outputs.
 
 Check the circuit:
 
@@ -186,7 +190,7 @@ Create `circuits/binary_input_fold/src/main.nr`. It follows `examples/CRISP/circ
 use bb_proof_verification::{UltraHonkProof, UltraHonkVerificationKey, verify_honk_proof_non_zk};
 use interfold_lib::math::commitments::compute_vk_hash;
 
-/// The hash of the four inner verification keys. Set it from the compute-vk-hash output.
+/// The hash of the four inner verification keys. Set it from the zk-artifacts vk-hash output.
 pub global EXPECTED_KEY_HASH: Field = 0;
 
 fn main(
@@ -290,7 +294,7 @@ From the root of the Interfold checkout, hash the four key hashes. The order mus
 the fold circuit:
 
 ```bash
-cargo run -q -p e3-zk-helpers --bin compute-vk-hash -- \
+pnpm zk vk-hash \
   circuits/bin/threshold/target/user_data_encryption.vk_recursive_hash \
   <my-e3>/circuits/binary_input/target/binary_input.vk_recursive_hash \
   circuits/bin/threshold/target/user_data_encryption_ct0.vk_recursive_hash \
@@ -344,7 +348,7 @@ contract MyProgram is IE3Program, IE3ProgramDataAvailability, IERC165, Ownable {
 
   constructor(
     IInterfold _interfold,
-    IRiscZeroVerifier _verifier,
+    IOpenVmReceiptVerifier _verifier,
     ICircuitVerifier _inputVerifier,
     bytes32 _imageId
   ) Ownable(msg.sender) {
@@ -440,7 +444,7 @@ Before you use it, do these two things:
 1. Copy the five compiled JSON files (`user_data_encryption_ct0`, `user_data_encryption_ct1`,
    `user_data_encryption`, `binary_input`, and `binary_input_fold`) into `client/src/circuits`.
 2. Add `@aztec/bb.js` `5.1.0` and `@noir-lang/noir_js` `1.0.0-beta.26` to `client/package.json`.
-   These are the versions that `@interfold/sdk` uses.
+   These are the versions that `@interfold/sdk` uses in release `0.18.0`.
 
 ```ts filename="client/src/utils/prove-input.ts"
 import { Barretenberg, UltraHonkBackend } from '@aztec/bb.js'
@@ -462,8 +466,9 @@ const proofToFields = (proof: Uint8Array): string[] => {
 export async function proveBinaryInput(sdk: InterfoldSDK, value: bigint, publicKey: Uint8Array) {
   const { encryptedData, circuitInputs: c } = await sdk.encryptNumberAndGenInputs(value, publicKey)
 
-  const api = await Barretenberg.new()
-  await api.initSRSChonk(2 ** 21) // the fold circuit needs 2^21 points
+  // The fold circuit needs 2^21 points. In the browser, a later `initSRSChonk` call does not
+  // enlarge the SRS that `new` loads, so pass the size here.
+  const api = await Barretenberg.new({ srsSize: 2 ** 21 })
   const inner = { verifierTarget: 'noir-recursive-no-zk' } as const
 
   const prove = async (circuit: CompiledCircuit, inputs: Record<string, unknown>) => {

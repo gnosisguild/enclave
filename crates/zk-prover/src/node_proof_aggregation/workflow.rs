@@ -13,7 +13,7 @@
 
 use std::collections::BTreeMap;
 
-use e3_zk_helpers::CiphernodesCommitteeSize;
+use e3_committee::CiphernodesCommitteeSize;
 
 use crate::utils::{proves_c1, C1_SEQ};
 

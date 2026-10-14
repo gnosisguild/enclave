@@ -14,6 +14,7 @@ use crate::{
 };
 use actix::prelude::*;
 use anyhow::Result;
+use e3_committee::CiphernodesCommitteeSize;
 use e3_data::{Persistable, Repositories};
 use e3_events::DkgFoldAttestationContext;
 use e3_events::{
@@ -33,7 +34,6 @@ use e3_fhe::{Fhe, GetAggregatePublicKey};
 use e3_fhe_params::BfvPreset;
 use e3_utils::NotifySync;
 use e3_utils::{ArcBytes, MAILBOX_LIMIT};
-use e3_zk_helpers::CiphernodesCommitteeSize;
 use std::{
     collections::{BTreeSet, HashMap},
     sync::Arc,
@@ -159,7 +159,11 @@ impl PublicKeyAggregator {
             // actor's serialized in-memory view without issuing duplicate asynchronous writes.
             collection.stage();
         }
-        let started_as_aggregator = state.get().as_ref().is_some_and(aggregation_started);
+        let started_as_aggregator = state.get().as_ref().is_some_and(aggregation_started)
+            || params
+                .recovery
+                .get()
+                .is_some_and(|recovery| recovery.started_as_aggregator);
         let mut actor = PublicKeyAggregator {
             fhe: params.fhe,
             bus: params.bus,
@@ -230,11 +234,17 @@ impl PublicKeyAggregator {
             && (self.is_aggregator || (self.started_as_aggregator && !self.key_published))
     }
 
-    /// Record that this node, as the active aggregator, starts aggregation work.
-    fn mark_started_as_aggregator(&mut self) {
-        if self.can_run_aggregation_effects() {
-            self.started_as_aggregator = true;
+    /// Record that this node, as the active aggregator, starts aggregation work. The record is
+    /// persisted, so that a restart after a failover still resumes the C1 verification.
+    fn mark_started_as_aggregator(&mut self, ec: &EventContext<Sequenced>) -> Result<()> {
+        if !self.can_run_aggregation_effects() || self.started_as_aggregator {
+            return Ok(());
         }
+        self.started_as_aggregator = true;
+        self.recovery.try_mutate(ec, |mut recovery| {
+            recovery.started_as_aggregator = true;
+            Ok(recovery)
+        })
     }
 
     fn publish_inputs_ready(&self, ec: EventContext<Sequenced>) -> Result<()> {

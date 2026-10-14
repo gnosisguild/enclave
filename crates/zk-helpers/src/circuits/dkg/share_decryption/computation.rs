@@ -11,11 +11,11 @@
 //! field so the Noir circuit's range checks and commitment checks succeed.
 //!
 //! Bit widths:
-//! - **`msg_bit`** — [`crate::compute_msg_bit`] on the **DKG** BFV params: coefficients in
+//! - **`msg_bit`** — [`e3_fhe_params::utils::compute_msg_bit`] on the **DKG** BFV params: coefficients in
 //!   `[0, t)` so the bound is `t − 1`. Matches C2 share-encryption
 //!   `compute_share_encryption_commitment_from_message` on per-share plaintexts. Emitted as
 //!   `SHARE_DECRYPTION_BIT_MSG` in codegen.
-//! - **`agg_bit`** — [`crate::compute_modulus_bit`] on the **threshold** BFV params: same as C6
+//! - **`agg_bit`** — [`e3_fhe_params::utils::compute_modulus_bit`] on the **threshold** BFV params: same as C6
 //!   aggregate hashing. Emitted as `SHARE_DECRYPTION_BIT_AGG`; the Noir C4 circuit uses it for
 //!   `compute_aggregated_shares_commitment` on the sum (per-share verification still uses `BIT_MSG`).
 
@@ -24,15 +24,15 @@ use crate::circuits::commitments::{
 };
 use crate::dkg::share_decryption::ShareDecryptionCircuit;
 use crate::dkg::share_decryption::ShareDecryptionCircuitData;
-use crate::math::plaintext_poly_u64;
+use crate::encoding::{bigint_2d_to_json_values, poly_coefficients_to_toml_json};
 use crate::CircuitsErrors;
-use crate::{bigint_2d_to_json_values, poly_coefficients_to_toml_json};
-use crate::{compute_modulus_bit, compute_msg_bit};
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
+use e3_fhe_params::utils::{compute_modulus_bit, compute_msg_bit};
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::Polynomial;
-use fhe_traits::FheDecrypter;
+use fhe::bfv::Encoding;
+use fhe_traits::{FheDecoder, FheDecrypter};
 use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 /// Output of [`CircuitComputation::compute`] for [`ShareDecryptionCircuit`]: bounds, bit widths, and input.
@@ -88,7 +88,7 @@ pub struct Bits {
     /// (`compute_msg_bit` on DKG params).
     pub msg_bit: u32,
     /// CRT aggregate polynomials (same ring semantics as C6 `sk` / `e_sm`);
-    /// matches [`crate::compute_modulus_bit`] on threshold params.
+    /// matches [`e3_fhe_params::utils::compute_modulus_bit`] on threshold params.
     pub agg_bit: u32,
 }
 
@@ -118,7 +118,7 @@ impl Computation for Configs {
 
     fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, CircuitsErrors> {
         let (_, dkg_params) = build_pair_for_preset(preset)
-            .map_err(|e| crate::utils::ZkHelpersUtilsError::ParseBound(e.to_string()))?;
+            .map_err(|e| crate::encoding::ZkHelpersUtilsError::ParseBound(e.to_string()))?;
 
         let n = dkg_params.degree();
         let l = dkg_params.moduli().len();
@@ -141,11 +141,11 @@ impl Computation for Configs {
 impl Computation for Bits {
     type Preset = BfvPreset;
     type Data = Bounds;
-    type Error = crate::utils::ZkHelpersUtilsError;
+    type Error = crate::encoding::ZkHelpersUtilsError;
 
     fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, dkg_params) = build_pair_for_preset(preset)
-            .map_err(|e| crate::utils::ZkHelpersUtilsError::ParseBound(e.to_string()))?;
+            .map_err(|e| crate::encoding::ZkHelpersUtilsError::ParseBound(e.to_string()))?;
 
         Ok(Bits {
             msg_bit: compute_msg_bit(&dkg_params),
@@ -174,9 +174,8 @@ impl Computation for Inputs {
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Sample(e.to_string()))?;
         let threshold_l = threshold_params.moduli().len();
 
-        let canonical =
-            crate::ciphernodes_committee::canonical_committee_for_circuit(&data.committee)
-                .map_err(|e| CircuitsErrors::Other(e.to_string()))?;
+        let canonical = crate::committee::canonical_committee_for_circuit(&data.committee)
+            .map_err(|e| CircuitsErrors::Other(e.to_string()))?;
         if data.honest_ciphertexts.len() != canonical.h {
             return Err(CircuitsErrors::Other(format!(
                 "honest_ciphertexts has {} slots but canonical H is {}",
@@ -251,7 +250,7 @@ impl Computation for Inputs {
                                 mod_idx, e
                             ))
                         })?;
-                        let share_coeffs = plaintext_poly_u64(&decrypted_pt)?;
+                        let share_coeffs = Vec::<u64>::try_decode(&decrypted_pt, Encoding::poly())?;
                         // Reverse to match C3's reversed commitment convention.
                         let mut reversed_coeffs = share_coeffs.clone();
                         reversed_coeffs.reverse();
@@ -330,8 +329,8 @@ impl Computation for Inputs {
 mod tests {
     use super::*;
 
-    use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::computation::DkgInputType;
+    use e3_committee::CiphernodesCommitteeSize;
     use e3_fhe_params::BfvPreset;
     use fhe::bfv::{Encoding, Plaintext, PublicKey};
     use fhe_traits::{FheEncoder, FheEncrypter};
@@ -445,7 +444,7 @@ mod tests {
                     Some(party_cts) => {
                         let decrypted_pt =
                             sample.secret_key.try_decrypt(&party_cts[mod_idx]).unwrap();
-                        plaintext_poly_u64(&decrypted_pt).unwrap()
+                        Vec::<u64>::try_decode(&decrypted_pt, Encoding::poly()).unwrap()
                     }
                     None => sample.own_plaintext_share[mod_idx].clone(),
                 };

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# generate_prover_toml.sh - Generates Prover.toml (and configs.nr) for a circuit via zk_cli
+# generate_prover_toml.sh - Generates Prover.toml for a circuit via zk-artifacts generate
 # Usage: ./generate_prover_toml.sh <circuit_path> <mode> <repo_root>
 #   circuit_path: e.g. "dkg/pk" or "threshold/share_decryption"
 #   mode: "insecure" or "secure"; set BENCHMARK_PRESET for the exact BFV preset
@@ -51,9 +51,9 @@ fi
 
 OUTPUT_DIR="${REPO_ROOT}/circuits/bin/${CIRCUIT_PATH}"
 
-# Map circuit path to zk_cli --circuit and optional --inputs
+# Map circuit path to zk-artifacts generate --circuit and optional --inputs
 # DKG circuits that need --inputs: share-computation, share-encryption, share-decryption
-# config has no witness inputs (verifies constants only), so skip zk_cli
+# config has no witness inputs (verifies constants only), so skip generation
 # shellcheck source=zk_cli_helpers.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/zk_cli_helpers.sh"
 
@@ -65,7 +65,7 @@ cd "$REPO_ROOT"
 
 generate_raw_toml() {
     local output_dir="$1"
-    local cmd=(cargo run -p e3-zk-helpers --bin zk_cli -- --circuit "$ZK_CIRCUIT" --preset "$PRESET" --committee "$COMMITTEE_NAME" --output "$output_dir" --toml --no-configs)
+    local cmd=(pnpm zk generate --circuit "$ZK_CIRCUIT" --preset "$PRESET" --committee "$COMMITTEE_NAME" --output "$output_dir" --toml --no-configs)
     if [ -n "$ZK_INPUTS" ]; then
         cmd+=(--inputs "$ZK_INPUTS")
     fi
@@ -135,8 +135,8 @@ if [ "$ZK_CIRCUIT" = "_no_zk_cli" ]; then
     exit 0
 fi
 
-echo "  Generating Prover.toml: zk_cli --circuit $ZK_CIRCUIT --preset $PRESET --committee $COMMITTEE_NAME ${ZK_INPUTS:+--inputs $ZK_INPUTS}"
+echo "  Generating Prover.toml: zk-artifacts generate --circuit $ZK_CIRCUIT --preset $PRESET --committee $COMMITTEE_NAME ${ZK_INPUTS:+--inputs $ZK_INPUTS}"
 if ! generate_raw_toml "$OUTPUT_DIR" 2>&1; then
-    echo "Error: zk_cli failed for $CIRCUIT_PATH"
+    echo "Error: zk-artifacts generate failed for $CIRCUIT_PATH"
     exit 1
 fi

@@ -24,6 +24,8 @@ use anyhow::Result;
 use e3_crypto::Cipher;
 use e3_events::trap_fut;
 
+use e3_committee::CiphernodesCommittee;
+use e3_committee::CiphernodesCommitteeSize;
 use e3_events::EType;
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeRequestErrorKind, ComputeRequestKind,
@@ -51,6 +53,7 @@ use e3_fhe_params::build_pair_for_preset;
 use e3_fhe_params::create_deterministic_crp_from_default_seed;
 use e3_fhe_params::{BfvParamSet, BfvPreset};
 use e3_polynomial::{CrtPolynomial, Polynomial};
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use e3_trbfv::calculate_decryption_key::calculate_decryption_key;
 use e3_trbfv::calculate_decryption_share::calculate_decryption_share;
 use e3_trbfv::calculate_threshold_decryption::calculate_threshold_decryption;
@@ -88,8 +91,6 @@ use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuit;
 use e3_zk_helpers::threshold::pk_aggregation::PkAggregationCircuitData;
 use e3_zk_helpers::threshold::rlk_aggregation::{RlkAggregationCircuit, RlkAggregationCircuitData};
 use e3_zk_helpers::threshold::rlk_generation::{RlkGenerationAdapter, RlkGenerationCircuitData};
-use e3_zk_helpers::CiphernodesCommittee;
-use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_prover::c2_chunk_size;
 use e3_zk_prover::{
     generate_nodes_fold_step, prove_chunked_share_computation, prove_decryption_aggregation_jobs,
@@ -123,7 +124,7 @@ fn c2_chunk_size_for(preset: BfvPreset, n_parties: usize) -> usize {
     c2_chunk_size(degree, n_parties)
 }
 
-use crate::effect_gate::ComputeEffectGate;
+use crate::effect_gate::{ComputeEffectGate, RunningJob, RunningJobs};
 
 /// Multithread actor
 pub struct Multithread {
@@ -135,6 +136,8 @@ pub struct Multithread {
     report: Option<Addr<MultithreadReport>>,
     zk_prover: Option<Arc<ZkProver>>,
     retry_logs: Arc<RetryLogLimiter>,
+    /// The requests that this worker runs, which the effect gate reads.
+    running: RunningJobs,
 }
 
 impl Multithread {
@@ -155,6 +158,7 @@ impl Multithread {
             report,
             zk_prover: None,
             retry_logs: Arc::new(RetryLogLimiter::default()),
+            running: RunningJobs::default(),
         }
     }
 
@@ -184,15 +188,16 @@ impl Multithread {
         lifecycle_stages: HashMap<E3id, E3Stage>,
         canonical_keys: e3_request::canonical_key::CanonicalPublicKeys,
     ) -> Addr<Self> {
-        let addr = Self::new(
+        let actor = Self::new(
             bus.clone(),
             rng.clone(),
             cipher.clone(),
             task_pool,
             task_scope,
             report,
-        )
-        .start();
+        );
+        let running = actor.running.clone();
+        let addr = actor.start();
 
         Self::subscribe_to_lifecycle(bus, &addr);
         ComputeEffectGate::attach(
@@ -200,6 +205,7 @@ impl Multithread {
             addr.clone().recipient(),
             lifecycle_stages,
             canonical_keys,
+            running,
         );
         info!("Multithread actor waiting behind the replay-safe effect gate.");
 
@@ -228,6 +234,7 @@ impl Multithread {
             report,
         )
         .with_zk_prover(zk_prover);
+        let running = actor.running.clone();
         let addr = actor.start();
         Self::subscribe_to_lifecycle(bus, &addr);
 
@@ -236,6 +243,7 @@ impl Multithread {
             addr.clone().recipient(),
             lifecycle_stages,
             canonical_keys,
+            running,
         );
         info!("Multithread actor with ZK waiting behind the replay-safe effect gate.");
 
@@ -338,7 +346,7 @@ mod task_group_tests {
         let proofs = VerifyShareProofsRequest {
             party_proofs: vec![],
             params_preset: e3_fhe_params::BfvPreset::default(),
-            committee_size: e3_zk_helpers::CiphernodesCommitteeSize::Micro,
+            committee_size: e3_committee::CiphernodesCommitteeSize::Micro,
         };
         assert_eq!(
             request_task_group(
@@ -381,7 +389,7 @@ mod task_group_tests {
         let proofs = VerifyShareProofsRequest {
             party_proofs: vec![],
             params_preset: e3_fhe_params::BfvPreset::default(),
-            committee_size: e3_zk_helpers::CiphernodesCommitteeSize::Micro,
+            committee_size: e3_committee::CiphernodesCommitteeSize::Micro,
         };
         let request = |kind| ComputeRequest::zk(kind, CorrelationId::new(), e3_id.clone());
         let event = |data: InterfoldEventData, seq: u64| {
@@ -433,6 +441,64 @@ mod task_group_tests {
         worker.send(event(late.into(), 5)).await?;
         actix::clock::sleep(Duration::from_millis(200)).await;
         assert_eq!(results().await?, vec![accusation.correlation_id]);
+        Ok(())
+    }
+
+    /// The worker notes a request as running from its intake until its result, also while the
+    /// request waits in the pool's queue, so the effect gate does not send it again meanwhile.
+    #[actix::test]
+    async fn a_request_runs_from_its_intake_until_its_result() -> anyhow::Result<()> {
+        use e3_events::{CorrelationId, EventConstructorWithTimestamp, EventSource, Unsequenced};
+        use rand::SeedableRng;
+
+        let (bus, _history) = crate::effect_gate::tests::test_bus();
+        let rng: SharedRng = Arc::new(Mutex::new(rand_chacha::ChaCha20Rng::seed_from_u64(7)));
+        let cipher = Arc::new(Cipher::from_password("test-password").await?);
+        let pool = TaskPool::new(1, 8);
+        let worker = Multithread::new(bus, rng, cipher, pool.clone(), "node".to_string(), None);
+        let running = worker.running.clone();
+        let worker = worker.start();
+
+        // A long task holds the pool's one thread, so the request waits in the queue.
+        let blocked = actix::spawn(async move {
+            pool.spawn("blocker".to_string(), TaskTimeouts::default(), || {
+                thread::sleep(Duration::from_millis(400))
+            })
+            .await
+        });
+        actix::clock::sleep(Duration::from_millis(50)).await;
+        let request = ComputeRequest::zk(
+            ZkRequest::VerifyShareProofs(VerifyShareProofsRequest {
+                party_proofs: vec![],
+                params_preset: e3_fhe_params::BfvPreset::default(),
+                committee_size: e3_committee::CiphernodesCommitteeSize::Micro,
+            }),
+            CorrelationId::new(),
+            E3id::new("7", 1),
+        );
+        let id = request.correlation_id;
+        worker
+            .send(
+                InterfoldEvent::<Unsequenced>::new_with_timestamp(
+                    request.into(),
+                    None,
+                    1,
+                    None,
+                    EventSource::Local,
+                )
+                .into_sequenced(1),
+            )
+            .await?;
+        actix::clock::sleep(Duration::from_millis(100)).await;
+        assert!(running.any(&[id]), "a queued request runs");
+
+        // Without a prover, the request ends with an error result once it gets the thread.
+        blocked.await?.map_err(|error| anyhow::anyhow!("{error}"))?;
+        actix::clock::sleep(Duration::from_millis(200)).await;
+        assert!(
+            !running.any(&[id]),
+            "a request with a result no longer runs"
+        );
         Ok(())
     }
 
@@ -548,11 +614,13 @@ impl Handler<TypedEvent<ComputeRequest>> for Multithread {
         let zk_prover = self.zk_prover.clone();
         let task_scope = self.task_scope.clone();
         let retry_logs = self.retry_logs.clone();
+        // The request runs, queued or in a worker, until its future ends.
+        let running = self.running.start(msg.correlation_id);
         trap_fut(
             EType::Computation,
             &self.bus.clone(),
             handle_compute_request_event(
-                msg, bus, cipher, rng, pool, task_scope, report, zk_prover, retry_logs,
+                msg, bus, cipher, rng, pool, task_scope, report, zk_prover, retry_logs, running,
             ),
         )
     }
@@ -569,6 +637,7 @@ async fn handle_compute_request_event(
     report: Option<Addr<MultithreadReport>>,
     zk_prover: Option<Arc<ZkProver>>,
     retry_logs: Arc<RetryLogLimiter>,
+    _running: RunningJob,
 ) -> anyhow::Result<()> {
     let msg_string = msg.to_string();
     let job_name = msg_string.clone();
@@ -1195,7 +1264,7 @@ fn build_rlk_aggregation_data(
 fn validate_lbfv_aggregation_parties(
     party_ids: &[u32],
     share_count: usize,
-    committee: &e3_zk_helpers::CiphernodesCommittee,
+    committee: &e3_committee::CiphernodesCommittee,
     request: &ComputeRequest,
 ) -> Result<(), ComputeRequestError> {
     if share_count != committee.h || party_ids.len() != committee.h {
@@ -2961,7 +3030,7 @@ fn handle_decrypted_shares_aggregation_proof(
             .map_err(|e| make_zk_error(&request, format!("plaintext[{}] decode: {:?}", i, e)))?;
 
         // d. Build committee
-        let committee = e3_zk_helpers::CiphernodesCommittee {
+        let committee = e3_committee::CiphernodesCommittee {
             n: req.threshold_n as usize,
             h: num_parties,
             threshold: req.threshold_m as usize,

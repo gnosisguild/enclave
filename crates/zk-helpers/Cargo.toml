@@ -10,10 +10,11 @@ repository.workspace = true
 anyhow = { workspace = true }
 alloy-primitives = { workspace = true }
 ark-bn254 = { workspace = true }
-clap = { workspace = true }
 ark-ff = { workspace = true }
 e3-polynomial = { workspace = true, features = ["serde"] }
 e3-committee-hash = { workspace = true }
+e3-polynomial-fhe = { workspace = true }
+e3-committee = { workspace = true }
 e3-safe = { workspace = true }
 e3-fhe-params = { workspace = true }
 fhe = { workspace = true }
@@ -36,11 +37,3 @@ zeroize = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
-
-[[bin]]
-name = "zk_cli"
-path = "src/bin/zk_cli.rs"
-
-[[bin]]
-name = "compute-vk-hash"
-path = "src/bin/compute_vk_hash.rs"

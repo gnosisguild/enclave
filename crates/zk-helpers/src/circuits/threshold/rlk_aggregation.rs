@@ -13,12 +13,13 @@ use crate::threshold::lbfv_proof_domain::{
     validate_lbfv_generation_party_id,
 };
 use crate::{
-    bigint_1d_to_json_values, compute_modulus_bit, compute_rlk_d0_commitment,
-    compute_rlk_d2_commitment, crt_polynomial_to_toml_json, Artifacts, CiphernodesCommittee,
-    Circuit, CircuitCodegen, CircuitComputation, CircuitsErrors, CodegenConfigs, CodegenToml,
-    Computation,
+    bigint_1d_to_json_values, compute_rlk_d0_commitment, compute_rlk_d2_commitment,
+    crt_polynomial_to_toml_json, Artifacts, Circuit, CircuitCodegen, CircuitComputation,
+    CircuitsErrors, CodegenConfigs, CodegenToml, Computation,
 };
+use e3_committee::CiphernodesCommittee;
 use e3_committee_hash::LbfvProofDomainContext;
+use e3_fhe_params::utils::compute_modulus_bit;
 use e3_fhe_params::{build_pair_for_preset, lbfv_crs_seed, lbfv_urs_seed, BfvPreset};
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use fhe::bfv::{CommonRandomPolyVec, SecretKey};
@@ -154,7 +155,7 @@ impl Computation for RlkAggregationConfigs {
 
     fn compute(preset: Self::Preset, committee: &Self::Data) -> Result<Self, Self::Error> {
         ensure_supported(preset)?;
-        crate::ciphernodes_committee::canonical_committee_for_circuit(committee)
+        crate::committee::canonical_committee_for_circuit(committee)
             .map_err(|error| CircuitsErrors::Other(error.to_string()))?;
         let (params, _) = build_pair_for_preset(preset)
             .map_err(|error| CircuitsErrors::Other(error.to_string()))?;
@@ -174,9 +175,8 @@ impl Computation for RlkAggregationInputs {
 
     fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         ensure_supported(preset)?;
-        let canonical =
-            crate::ciphernodes_committee::canonical_committee_for_circuit(&data.committee)
-                .map_err(|error| CircuitsErrors::Other(error.to_string()))?;
+        let canonical = crate::committee::canonical_committee_for_circuit(&data.committee)
+            .map_err(|error| CircuitsErrors::Other(error.to_string()))?;
         let session = lbfv_proof_session(data.proof_domain)?;
         validate_lbfv_generation_party_id(data.aggregator_party_id, &data.committee)?;
         let accepted = lbfv_accepted_party_set(&data.party_ids, &data.committee)?;
@@ -268,7 +268,7 @@ pub fn generate_toml(inputs: RlkAggregationInputs) -> Result<CodegenToml, Circui
 /// Generate standalone Noir constants for RLK aggregation.
 pub fn generate_configs(configs: &RlkAggregationConfigs) -> CodegenConfigs {
     let prefix = <RlkAggregationCircuit as Circuit>::PREFIX;
-    let moduli = crate::utils::join_display(&configs.moduli, ", ");
+    let moduli = crate::encoding::join_display(&configs.moduli, ", ");
     format!(
         r#"use crate::core::threshold::rlk_aggregation::Configs as RlkAggregationConfigs;
 
@@ -292,7 +292,7 @@ impl RlkAggregationCircuitData {
         component: RlkAggregationComponent,
     ) -> Result<Self, CircuitsErrors> {
         ensure_supported(preset)?;
-        let canonical = crate::ciphernodes_committee::canonical_committee_for_circuit(&committee)
+        let canonical = crate::committee::canonical_committee_for_circuit(&committee)
             .map_err(|error| CircuitsErrors::Sample(error.to_string()))?;
         let (params, _) = build_pair_for_preset(preset)
             .map_err(|error| CircuitsErrors::Sample(error.to_string()))?;
@@ -359,7 +359,7 @@ fn aggregate_rows(
             "RLK aggregation requires at least one share".to_string(),
         ));
     }
-    crate::utils::verify_crt_shapes(&rows.iter().collect::<Vec<_>>(), moduli.len(), degree)
+    crate::encoding::verify_crt_shapes(&rows.iter().collect::<Vec<_>>(), moduli.len(), degree)
         .map_err(|error| CircuitsErrors::Other(format!("RLK CRT shape mismatch: {error}")))?;
 
     let limbs = (0..moduli.len())
@@ -385,7 +385,8 @@ fn aggregate_rows(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{compute_rlk_aggregation_commitment, CiphernodesCommitteeSize};
+    use crate::compute_rlk_aggregation_commitment;
+    use e3_committee::CiphernodesCommitteeSize;
 
     #[test]
     fn unsupported_presets_fail_closed() {
@@ -398,14 +399,18 @@ mod tests {
     #[test]
     fn aggregation_reduces_and_centers_each_limb() -> Result<(), CircuitsErrors> {
         let rows = vec![
-            CrtPolynomial::from_bigint_vectors(vec![
-                vec![4.into(), (-4).into()],
-                vec![6.into(), 1.into()],
-            ]),
-            CrtPolynomial::from_bigint_vectors(vec![
-                vec![4.into(), 3.into()],
-                vec![6.into(), 6.into()],
-            ]),
+            CrtPolynomial::new(
+                vec![vec![4.into(), (-4).into()], vec![6.into(), 1.into()]]
+                    .into_iter()
+                    .map(Polynomial::new)
+                    .collect::<Vec<_>>(),
+            ),
+            CrtPolynomial::new(
+                vec![vec![4.into(), 3.into()], vec![6.into(), 6.into()]]
+                    .into_iter()
+                    .map(Polynomial::new)
+                    .collect::<Vec<_>>(),
+            ),
         ];
         let aggregate = aggregate_rows(&rows, &[7, 11], 2)?;
 

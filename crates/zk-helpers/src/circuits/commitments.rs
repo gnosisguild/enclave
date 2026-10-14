@@ -10,16 +10,18 @@
 //! (polynomials, public keys, secret keys, shares, etc.) using the SAFE sponge hash function.
 //! All functions match the corresponding Noir circuit implementations exactly.
 
-use crate::packing::flatten;
-use crate::utils::compute_safe;
+use crate::packing::{flatten, pack_centered_rns_row};
 use alloy_primitives::B256;
 use ark_bn254::Fr as Field;
 use ark_ff::BigInteger;
 use ark_ff::PrimeField;
 use e3_fhe_params::{build_pair_for_preset, BfvPreset};
 use e3_polynomial::{CrtPolynomial, Polynomial};
+use e3_polynomial_fhe::FromFhePolynomial as _;
+use e3_safe::SafeSponge;
 use fhe::bfv::PublicKey;
 use fhe::trlbfv::{PublicKeyShare as LbfvPublicKeyShare, RelinKeyShare};
+use fhe_math::rq::{Poly, PowerBasis};
 use fhe_traits::DeserializeParametrized;
 use num_bigint::BigInt;
 use std::slice::from_ref;
@@ -239,7 +241,11 @@ pub fn compute_commitments(
     domain_separator: [u8; 64],
     io_pattern: [u32; 2],
 ) -> Vec<Field> {
-    compute_safe(domain_separator, payload, io_pattern)
+    let mut sponge = SafeSponge::start(io_pattern, domain_separator);
+    sponge.absorb(payload);
+    let digests = sponge.squeeze();
+    sponge.finish();
+    digests
 }
 
 /// Combine verification-key hashes with the `VK_HASH` domain separator (SAFE sponge).
@@ -306,11 +312,15 @@ pub fn compute_dkg_pk_commitment_from_public_key_bytes(
         .get(1)
         .ok_or_else(|| crate::CircuitsErrors::Other("PublicKey is missing pk1".to_string()))?;
     let moduli = dkg_params.moduli();
-    let pk0 = crate::math::fhe_poly_to_crt_centered(pk0, moduli)
+    let pk0 = crate::encoding::fhe_poly_to_crt_centered(pk0, moduli)
         .map_err(|e| crate::CircuitsErrors::Other(format!("pk0 conversion: {e}")))?;
-    let pk1 = crate::math::fhe_poly_to_crt_centered(pk1, moduli)
+    let pk1 = crate::encoding::fhe_poly_to_crt_centered(pk1, moduli)
         .map_err(|e| crate::CircuitsErrors::Other(format!("pk1 conversion: {e}")))?;
-    let commitment = compute_dkg_pk_commitment(&pk0, &pk1, crate::compute_modulus_bit(&dkg_params));
+    let commitment = compute_dkg_pk_commitment(
+        &pk0,
+        &pk1,
+        e3_fhe_params::utils::compute_modulus_bit(&dkg_params),
+    );
 
     let (_, be_bytes) = commitment.to_bytes_be();
     if be_bytes.len() > 32 {
@@ -409,7 +419,7 @@ pub fn compute_pk_commitment_from_keyshare_bytes(
     params: &std::sync::Arc<fhe::bfv::BfvParameters>,
     crp: &fhe::mbfv::CommonRandomPoly,
 ) -> Result<[u8; 32], crate::CircuitsErrors> {
-    let bit_pk = crate::compute_modulus_bit(params);
+    let bit_pk = e3_fhe_params::utils::compute_modulus_bit(params);
     let moduli = params.moduli();
 
     let pk_share = fhe::mbfv::PublicKeyShare::deserialize(keyshare_bytes, params, crp.clone())
@@ -882,7 +892,7 @@ fn validate_lbfv_serialized_share_commitments_with_adapters(
     let rlk_share = RelinKeyShare::from_bytes(rlk_share_bytes, params).map_err(|error| {
         crate::CircuitsErrors::Other(format!("l-BFV RLK share deserialize: {error}"))
     })?;
-    let bit = crate::compute_modulus_bit(params);
+    let bit = e3_fhe_params::utils::compute_modulus_bit(params);
     let pk_layout = CircuitOutputLayout::Fixed {
         fields: LBFV_PK_GENERATION_OUTPUTS,
     };
@@ -1036,6 +1046,14 @@ pub fn compute_recursive_aggregation_commitment(payload: Vec<Field>) -> BigInt {
     BigInt::from_bytes_le(num_bigint::Sign::Plus, &commitment_bytes)
 }
 
+/// The commitment to one ciphertext component (`ct0` or `ct1`) under `DS_CIPHERTEXT`, as the Noir
+/// `compute_multiple_polynomial_commitment::<N, L, BIT_CT>(ct, DS_CIPHERTEXT)` computes it.
+pub fn compute_ciphertext_component_commitment(ct: &CrtPolynomial, bit_ct: u32) -> BigInt {
+    let payload = flatten(Vec::new(), &ct.limbs, bit_ct);
+    let io = [0x80000000 | payload.len() as u32, 1];
+    field_to_bigint(compute_commitments(payload, DS_CIPHERTEXT, io)[0])
+}
+
 /// Compute CRISP ciphertext commitment.
 ///
 /// Matches the Noir `compute_ciphertext_commitment` exactly: commits ct0 and ct1
@@ -1048,24 +1066,41 @@ pub fn compute_recursive_aggregation_commitment(payload: Vec<Field>) -> BigInt {
 ///
 /// # Returns
 /// A `BigInt` representing the commitment hash value
-/// The commitment to one ciphertext component (`ct0` or `ct1`) under `DS_CIPHERTEXT`, as the Noir
-/// `compute_multiple_polynomial_commitment::<N, L, BIT_CT>(ct, DS_CIPHERTEXT)` computes it.
-pub fn compute_ciphertext_component_commitment(ct: &CrtPolynomial, bit_ct: u32) -> BigInt {
-    let payload = flatten(Vec::new(), &ct.limbs, bit_ct);
-    let io = [0x80000000 | payload.len() as u32, 1];
-    field_to_bigint(compute_commitments(payload, DS_CIPHERTEXT, io)[0])
-}
-
 pub fn compute_ciphertext_commitment(
     ct0: &CrtPolynomial,
     ct1: &CrtPolynomial,
     bit_ct: u32,
 ) -> BigInt {
     let payload0 = flatten(Vec::new(), &ct0.limbs, bit_ct);
+    let payload1 = flatten(Vec::new(), &ct1.limbs, bit_ct);
+    ciphertext_commitment_from_packed(payload0, payload1)
+}
+
+/// Computes the same SAFE commitment directly from canonical power-basis rows.
+/// Returns `None` when the caller must use the general polynomial path.
+pub fn compute_ciphertext_commitment_from_power_basis(
+    ct0: &Poly<PowerBasis>,
+    ct1: &Poly<PowerBasis>,
+    moduli: &[u64],
+    bit_ct: u32,
+) -> Option<BigInt> {
+    let pack = |component: &Poly<PowerBasis>| {
+        if component.coefficients().nrows() != moduli.len() {
+            return None;
+        }
+        let mut payload = Vec::new();
+        for (row, modulus) in component.coefficients().outer_iter().zip(moduli.iter()) {
+            payload.extend(pack_centered_rns_row(row.as_slice()?, *modulus, bit_ct)?);
+        }
+        Some(payload)
+    };
+    Some(ciphertext_commitment_from_packed(pack(ct0)?, pack(ct1)?))
+}
+
+fn ciphertext_commitment_from_packed(payload0: Vec<Field>, payload1: Vec<Field>) -> BigInt {
     let io = [0x80000000 | payload0.len() as u32, 1];
     let commit_ct0 = compute_commitments(payload0, DS_CIPHERTEXT, io)[0];
 
-    let payload1 = flatten(Vec::new(), &ct1.limbs, bit_ct);
     let commit_ct1 = compute_commitments(payload1, DS_CIPHERTEXT, io)[0];
 
     let inputs = vec![commit_ct0, commit_ct1];
@@ -1344,7 +1379,7 @@ mod tests {
             0,
             &mut rng,
         )?;
-        let bit = crate::compute_modulus_bit(&params);
+        let bit = e3_fhe_params::utils::compute_modulus_bit(&params);
         let mut public_key_row_signals: [Vec<u8>; LBFV_SHARE_ROW_COUNT] =
             std::array::from_fn(|_| {
                 vec![
@@ -1547,8 +1582,14 @@ mod tests {
     #[test]
     fn compute_ciphertext_commitment_matches_manual_payload() {
         let bit_ct = 4;
-        let ct0 = CrtPolynomial::from_bigint_vectors(vec![vec![BigInt::from(1), BigInt::from(2)]]);
-        let ct1 = CrtPolynomial::from_bigint_vectors(vec![vec![BigInt::from(3), BigInt::from(4)]]);
+        let ct0 = CrtPolynomial::new(vec![Polynomial::new(vec![
+            BigInt::from(1),
+            BigInt::from(2),
+        ])]);
+        let ct1 = CrtPolynomial::new(vec![Polynomial::new(vec![
+            BigInt::from(3),
+            BigInt::from(4),
+        ])]);
 
         let mut payload0 = Vec::new();
         payload0 = flatten(payload0, &ct0.limbs, bit_ct);
@@ -1571,7 +1612,7 @@ mod tests {
     #[test]
     fn rlk_commitments_match_tagged_noir_payloads() {
         let bit_d = 4;
-        let component = CrtPolynomial::from_bigint_vectors(vec![vec![1.into(), (-2).into()]]);
+        let component = CrtPolynomial::new(vec![Polynomial::new(vec![1.into(), (-2).into()])]);
 
         let r_payload = flatten(
             vec![Field::from(0u64)],
@@ -1729,7 +1770,7 @@ mod tests {
             compute_pk_commitment_from_keyshare_bytes(&ks_bytes, &params, &crp).unwrap();
 
         // Compute commitment manually (same steps as PkAggInputs::compute)
-        let bit_pk = crate::compute_modulus_bit(&params);
+        let bit_pk = e3_fhe_params::utils::compute_modulus_bit(&params);
         let mut pk0 = CrtPolynomial::from_fhe_polynomial(&pk_share.p0_share());
         pk0.reverse();
         pk0.center(params.moduli()).unwrap();

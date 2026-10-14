@@ -68,9 +68,8 @@ with Barretenberg (`bb`) as UltraHonk proofs. For the cryptographic specificatio
 
 ## Committee shapes and fault budget
 
-`crates/zk-helpers/src/ciphernodes_committee.rs` defines three committee shapes. The on-chain
-registry stores `threshold` as `[H, N]`. The runtime field `threshold_m` carries T and `threshold_n`
-carries N.
+`crates/committee/src/lib.rs` defines three committee shapes. The on-chain registry stores
+`threshold` as `[H, N]`. The runtime field `threshold_m` carries T and `threshold_n` carries N.
 
 | Committee | N   | T   | H   | Members that can drop before the roster ($N - H$) | Roster members that can drop before decryption ($H - (T + 1)$) |
 | --------- | --- | --- | --- | ------------------------------------------------- | -------------------------------------------------------------- |
@@ -150,10 +149,10 @@ share under its own C0 key to fill the slot. The dealer does not deliver that pl
 
 The protocol uses two different BFV key pairs. They use different parameter sets.
 
-| Key            | Preset (`BfvPreset`)                            | Purpose                                                        | Lifetime |
-| -------------- | ----------------------------------------------- | -------------------------------------------------------------- | -------- |
-| Individual key | `InsecureDkg512` or `SecureDkg8192`             | Encrypts the Shamir shares sent to one node. C0 commits to it. | One DKG  |
-| Threshold key  | `InsecureThreshold512` or `SecureThreshold8192` | Data providers encrypt to it. C1 proves each contribution.     | One E3   |
+| Key            | Preset (`BfvPreset`)                         | Purpose                                                        | Lifetime |
+| -------------- | -------------------------------------------- | -------------------------------------------------------------- | -------- |
+| Individual key | `InsecureDkg` or `SecureDkg8192`             | Encrypts the Shamir shares sent to one node. C0 commits to it. | One DKG  |
+| Threshold key  | `InsecureThreshold` or `SecureThreshold8192` | Data providers encrypt to it. C1 proves each contribution.     | One E3   |
 
 The threshold key uses a common random polynomial (CRP) $a$. Every node derives the same CRP from
 the default seed with `create_deterministic_crp_from_default_seed`. The node encrypts its individual
@@ -434,7 +433,7 @@ The smudging noise $e_{sm}$ hides the secret key share. C6 first checks that $sk
 the C4 commitments. It binds the witness ciphertext to `ct_commitment` and checks the relation at a
 Fiat-Shamir challenge point. Its public inputs are `expected_sk_commitment`,
 `expected_e_sm_commitment`, `ct_commitment`, `domain_hi`, and `domain_lo`. Its output is
-`d_commitment`, a commitment to the first 100 coefficients of $d$ for each modulus.
+`d_commitment`, a commitment to the first 50 coefficients of $d$ for each modulus.
 
 The decryption domain binds each C6 proof to one E3:
 
@@ -690,7 +689,7 @@ public inputs:
 | 6               | `ciphertext_commitment`                              |
 | 7               | Aggregate verification key hash                      |
 | next $3(T + 1)$ | `party_ids`, then `expected_sk`, then `expected_esm` |
-| last 100        | Plaintext coefficients                               |
+| last 50         | Plaintext coefficients                               |
 
 `decryption_aggregator` requires one domain and one ciphertext commitment across all C6 leaves. It
 requires each C6 `d_commitment` to equal the matching C7 input. Its party IDs must be 1-indexed,
@@ -699,7 +698,7 @@ strictly increasing, and at most N. The wrapper then checks:
 - Every public input is a canonical BN254 field element, and each plaintext coefficient fits in 64
   bits.
 - The VK hashes, the committee hash limbs, the domain limbs, and the stored ciphertext commitment.
-- `keccak256` of the 100 coefficients, each as 8 little-endian bytes, equals the plaintext hash.
+- `keccak256` of the 50 coefficients, each as 8 little-endian bytes, equals the plaintext hash.
 - For each party, `party_id - 1` is in the DKG anchors, and the proof commitments equal the stored
   `dkgSkAggCommits` and `dkgEsmAggCommits`.
 
@@ -857,8 +856,8 @@ registry for older E3s.
 | Ring degree $d$                          | 128                              | 8192          | 16384                           |
 | Threshold CRT moduli L                   | 3                                | 3             | 5                               |
 | DKG CRT moduli                           | 2                                | 2             | 2                               |
-| Threshold plaintext modulus $t$          | 100                              | 1000000       | 1000                            |
-| Statistical security parameter $\lambda$ | 2                                | 50            | 31                              |
+| Threshold plaintext modulus $t$          | 100                              | 17000000      | 1000                            |
+| Statistical security parameter $\lambda$ | 2                                | 45            | 31                              |
 | Use                                      | Local development and tests only | Production    | l-BFV, `minimum` committee only |
 
 Circuit artifacts are compiled separately for each preset and committee. The prover and the verifier

@@ -19,7 +19,7 @@ use crate::search::constants::{K_MAX, RING_DIM, TARGET_NUM_PRIMES};
 use crate::search::errors::{BfvParamsResult, SearchError, ValidationError};
 use crate::search::prime::{build_prime_items, build_prime_items_for_second};
 use crate::search::prime::{group_by_bits, has_duplicate_primes, PrimeItem};
-use crate::search::utils::{log2_big, product};
+use crate::search::utils::log2_big;
 
 /// Fixed ring dimension used for both parameter sets.
 const D: u64 = RING_DIM;
@@ -185,7 +185,7 @@ pub fn bfv_search_first(
 
             let sel: Vec<PrimeItem> = bucket.iter().take(num_primes).cloned().collect();
 
-            let q = product(sel.iter().map(|pi| pi.value.clone()));
+            let q = sel.iter().map(|pi| &pi.value).product::<BigUint>();
             let q_bits = log2_big(&q);
             let max_qi_log2 = sel.iter().map(|p| p.log2).fold(0.0_f64, f64::max);
 
@@ -337,7 +337,7 @@ pub fn finalize_first_param(
         return None;
     }
 
-    let q_bfv = product(chosen.iter().map(|pi| pi.value.clone()));
+    let q_bfv = chosen.iter().map(|pi| &pi.value).product::<BigUint>();
     let k_plain_eff = config.k.max(config.z);
     let k_big = BigUint::from(k_plain_eff);
 
@@ -514,7 +514,7 @@ pub fn bfv_search_second_param(
                 .map(|pi| (*pi).clone())
                 .collect();
 
-            let q = product(sel.iter().map(|pi| pi.value.clone()));
+            let q = sel.iter().map(|pi| &pi.value).product::<BigUint>();
             let q_bits = log2_big(&q);
 
             let min_selected = sel.iter().map(|p| &p.value).min().unwrap();
@@ -574,7 +574,7 @@ pub fn finalize_second_param(
         }
     }
 
-    let q_bfv = product(chosen.iter().map(|pi| pi.value.clone()));
+    let q_bfv = chosen.iter().map(|pi| &pi.value).product::<BigUint>();
     let rkq: u128 = (&q_bfv % &k_second_big).to_u128().unwrap_or(0);
     let delta = &q_bfv / &k_second_big;
 
@@ -651,7 +651,7 @@ mod tests {
         let result = BfvSearchResult {
             d: 512,
             k_plain_eff: 1000,
-            q_bfv: product(test_primes.iter().map(|p| p.value.clone())),
+            q_bfv: test_primes.iter().map(|p| &p.value).product::<BigUint>(),
             selected_primes: test_primes.clone(),
             rkq: 0,
             delta: BigUint::one(),

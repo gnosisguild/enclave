@@ -122,15 +122,15 @@ export interface ActiveBfvConfig {
 const INSECURE_PARAM_SET_HASH =
   "0x0619925361a4d022377f93ccd0022c0164257ffb889b979eb382aa06d401e258";
 const INSECURE_CONFIG_ID =
-  "0x353ab90c0ebe9c13e1b9c2048539b7c2872f3eb12a9f1957f31410aa4bf44718";
+  "0x968e91054be28b2b577ac278284e03274ed46bd5c5064e573290312a2323d495";
 const SECURE_PARAM_SET_HASH =
-  "0x80775a19b6126a12943f9c1c53f92299f0c92ece819b625026ab1406bbbe0721";
+  "0x1b2620f6a5919d5ee19a51f34026369816f479efd0404b56585ad37d31c52317";
 const SECURE_CONFIG_ID =
-  "0x5ebb3432396f21cd97fca47e006b9dd38c021bf2902d3e555cf74cb91b28e44e";
+  "0xa174862efd4487031d423ca96516807775ade0191c714e513aab93d0cc289baa";
 const SECURE_16384_PARAM_SET_HASH =
   "0x8afd5dddf1bc0cfb00c70e9a7d0a0fb11bd0617df27574fa7d2ccf9ae3a6bdb8";
 const SECURE_16384_CONFIG_ID =
-  "0x9c5c09ac7421582c4407c7e6ad923b8f9126aa708957c2575760fb0a38153655";
+  "0x9b9181e0304e51388d6edd6eb4d5ae9a8593cbdbf28838734d829d09d0701d86";
 
 /** On-chain index of the insecure parameters on the l-BFV path. */
 export const INSECURE_LBFV_PARAM_SET = 4;
@@ -379,7 +379,7 @@ export function bfvPkV2PublicInputLayout(
 
 /** `decryption_aggregator` EVM public-input count for BFV threshold `t`. */
 export function bfvDecExpectedPublicInputsLen(threshold: number): number {
-  return 111 + 3 * threshold;
+  return 61 + 3 * threshold;
 }
 
 /** `publicInputs` indices for decryption-aggregator committee hash limbs. */

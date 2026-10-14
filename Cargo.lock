@@ -1194,12 +1194,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anes"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b46cbb362ab8752921c97e041f5e366ee6297bd428a31275b9fcf1e380f7299"
-
-[[package]]
 name = "anstream"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2548,12 +2542,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cast"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37b2a672a2cb129a2e41c10b1224bb368f9f37a2b16b612598138befd7b37eb5"
-
-[[package]]
 name = "cbc"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2636,33 +2624,6 @@ dependencies = [
  "serde",
  "wasm-bindgen",
  "windows-link 0.1.3",
-]
-
-[[package]]
-name = "ciborium"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42e69ffd6f0917f5c029256a24d0161db17cea3997d185db0d35926308770f0e"
-dependencies = [
- "ciborium-io",
- "ciborium-ll",
- "serde",
-]
-
-[[package]]
-name = "ciborium-io"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05afea1e0a06c9be33d539b876f1ce3692f4afea2cb41f740e7743225ed1c757"
-
-[[package]]
-name = "ciborium-ll"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57663b653d948a338bfb3eeba9bb2fd5fcfaecb9e199e87e1eda4d9e8b240fd9"
-dependencies = [
- "ciborium-io",
- "half",
 ]
 
 [[package]]
@@ -3013,42 +2974,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "criterion"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2b12d017a929603d80db1831cd3a24082f8137ce19c69e6447f54f5fc8d692f"
-dependencies = [
- "anes",
- "cast",
- "ciborium",
- "clap",
- "criterion-plot",
- "is-terminal",
- "itertools 0.10.5",
- "num-traits",
- "once_cell",
- "oorandom",
- "plotters",
- "rayon",
- "regex",
- "serde",
- "serde_derive",
- "serde_json",
- "tinytemplate",
- "walkdir",
-]
-
-[[package]]
-name = "criterion-plot"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b50826342786a51a89e2da3a28f1c32b06e387201bc2d19791f622c673706b1"
-dependencies = [
- "cast",
- "itertools 0.10.5",
-]
-
-[[package]]
 name = "critical-section"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3084,9 +3009,9 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-queue"
-version = "0.3.14"
+version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03e8bd762f7479489c70ed6c768ddca99d7296857de437a68dcb2a94365b3fae"
+checksum = "803d13fb3b09d88be9f4dbc29062c66b19bf7170867ceb746d2a8689bf6c7a26"
 dependencies = [
  "crossbeam-utils",
 ]
@@ -3659,7 +3584,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "e3-aggregator"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix",
  "alloy",
@@ -3667,6 +3592,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "e3-bfv-client",
+ "e3-committee",
  "e3-committee-hash",
  "e3-config",
  "e3-data",
@@ -3677,6 +3603,7 @@ dependencies = [
  "e3-keyshare",
  "e3-multithread",
  "e3-polynomial",
+ "e3-polynomial-fhe",
  "e3-request",
  "e3-sortition",
  "e3-sync",
@@ -3698,11 +3625,13 @@ dependencies = [
 
 [[package]]
 name = "e3-bfv-client"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "anyhow",
+ "e3-committee",
  "e3-fhe-params",
  "e3-polynomial",
+ "e3-polynomial-fhe",
  "e3-zk-helpers",
  "fhe",
  "fhe-math",
@@ -3715,7 +3644,7 @@ dependencies = [
 
 [[package]]
 name = "e3-ciphernode-builder"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix",
  "alloy",
@@ -3754,7 +3683,7 @@ dependencies = [
 
 [[package]]
 name = "e3-cli"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix",
  "alloy",
@@ -3779,7 +3708,6 @@ dependencies = [
  "e3-support-scripts",
  "e3-trbfv",
  "e3-utils",
- "e3-zk-helpers",
  "e3-zk-prover",
  "hex",
  "opentelemetry",
@@ -3805,8 +3733,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-committee"
+version = "0.19.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "e3-committee-hash"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -3816,7 +3754,7 @@ dependencies = [
 
 [[package]]
 name = "e3-compute-provider"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "ark-bn254 0.4.0",
  "ark-ff 0.4.2",
@@ -3829,6 +3767,7 @@ dependencies = [
  "light-poseidon",
  "num-bigint 0.5.1",
  "num-traits",
+ "openvm-keccak256",
  "rand 0.9.5",
  "rand_chacha 0.9.0",
  "rayon",
@@ -3842,7 +3781,7 @@ dependencies = [
 
 [[package]]
 name = "e3-config"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "alloy-primitives",
  "anyhow",
@@ -3864,14 +3803,14 @@ dependencies = [
 
 [[package]]
 name = "e3-console"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "tokio",
 ]
 
 [[package]]
 name = "e3-crypto"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -3889,7 +3828,7 @@ dependencies = [
 
 [[package]]
 name = "e3-daemon-server"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "anyhow",
  "e3-config",
@@ -3903,7 +3842,7 @@ dependencies = [
 
 [[package]]
 name = "e3-dashboard"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix-web",
  "alloy",
@@ -3925,7 +3864,7 @@ dependencies = [
 
 [[package]]
 name = "e3-data"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix",
  "alloy-primitives",
@@ -3948,7 +3887,7 @@ dependencies = [
 
 [[package]]
 name = "e3-data-availability"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -3964,7 +3903,7 @@ dependencies = [
 
 [[package]]
 name = "e3-entrypoint"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix",
  "actix-web",
@@ -4012,7 +3951,7 @@ dependencies = [
 
 [[package]]
 name = "e3-events"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix",
  "alloy",
@@ -4024,6 +3963,7 @@ dependencies = [
  "chrono",
  "derivative",
  "e3-ciphernode-builder",
+ "e3-committee",
  "e3-committee-hash",
  "e3-crypto",
  "e3-data",
@@ -4048,7 +3988,7 @@ dependencies = [
 
 [[package]]
 name = "e3-evm"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix",
  "alloy",
@@ -4061,6 +4001,7 @@ dependencies = [
  "bloom",
  "e3-bfv-client",
  "e3-ciphernode-builder",
+ "e3-committee",
  "e3-config",
  "e3-crypto",
  "e3-data",
@@ -4092,7 +4033,7 @@ dependencies = [
 
 [[package]]
 name = "e3-evm-helpers"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "alloy",
  "anyhow",
@@ -4109,7 +4050,7 @@ dependencies = [
 
 [[package]]
 name = "e3-fhe"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix",
  "anyhow",
@@ -4132,7 +4073,7 @@ dependencies = [
 
 [[package]]
 name = "e3-fhe-params"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-primitives",
@@ -4143,6 +4084,7 @@ dependencies = [
  "fhe-math",
  "fhe-traits",
  "num-bigint 0.5.1",
+ "num-integer",
  "num-traits",
  "rand 0.9.5",
  "rand_chacha 0.9.0",
@@ -4153,7 +4095,7 @@ dependencies = [
 
 [[package]]
 name = "e3-fs"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4166,11 +4108,11 @@ dependencies = [
 
 [[package]]
 name = "e3-hamt"
-version = "0.19.0-test.2"
+version = "0.19.0"
 
 [[package]]
 name = "e3-indexer"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "alloy",
  "async-trait",
@@ -4190,7 +4132,7 @@ dependencies = [
 
 [[package]]
 name = "e3-init"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -4209,7 +4151,7 @@ dependencies = [
 
 [[package]]
 name = "e3-keyshare"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix",
  "alloy",
@@ -4218,6 +4160,7 @@ dependencies = [
  "bincode",
  "e3-bfv-client",
  "e3-ciphernode-builder",
+ "e3-committee",
  "e3-committee-hash",
  "e3-config",
  "e3-crypto",
@@ -4245,7 +4188,7 @@ dependencies = [
 
 [[package]]
 name = "e3-layout-lock"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "bincode",
  "e3-utils",
@@ -4256,7 +4199,7 @@ dependencies = [
 
 [[package]]
 name = "e3-logger"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix",
  "alloy",
@@ -4271,19 +4214,21 @@ dependencies = [
 
 [[package]]
 name = "e3-multithread"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix",
  "alloy",
  "anyhow",
  "bincode",
  "e3-bfv-client",
+ "e3-committee",
  "e3-committee-hash",
  "e3-crypto",
  "e3-data",
  "e3-events",
  "e3-fhe-params",
  "e3-polynomial",
+ "e3-polynomial-fhe",
  "e3-request",
  "e3-trbfv",
  "e3-utils",
@@ -4305,7 +4250,7 @@ dependencies = [
 
 [[package]]
 name = "e3-net"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix",
  "alloy",
@@ -4341,8 +4286,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-openvm-host"
+version = "0.19.0"
+dependencies = [
+ "anyhow",
+ "e3-bfv-client",
+ "e3-compute-provider",
+ "e3-openvm-types",
+ "libc",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "e3-openvm-types"
+version = "0.19.0"
+dependencies = [
+ "bincode",
+ "e3-compute-provider",
+ "serde",
+]
+
+[[package]]
 name = "e3-parity-matrix"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "num-bigint 0.5.1",
  "num-traits",
@@ -4353,20 +4320,27 @@ dependencies = [
 
 [[package]]
 name = "e3-polynomial"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
- "bincode",
- "criterion",
- "fhe-math",
  "num-bigint 0.5.1",
+ "num-integer",
  "num-traits",
  "serde",
  "thiserror 1.0.69",
 ]
 
 [[package]]
+name = "e3-polynomial-fhe"
+version = "0.19.0"
+dependencies = [
+ "e3-polynomial",
+ "fhe-math",
+ "num-bigint 0.5.1",
+]
+
+[[package]]
 name = "e3-program-server"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix-web",
  "alloy-primitives",
@@ -4375,6 +4349,7 @@ dependencies = [
  "e3-bfv-client",
  "e3-compute-provider",
  "e3-fhe-params",
+ "futures-util",
  "hex",
  "reqwest",
  "serde",
@@ -4384,7 +4359,7 @@ dependencies = [
 
 [[package]]
 name = "e3-request"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix",
  "alloy",
@@ -4392,6 +4367,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "e3-bfv-client",
+ "e3-committee",
  "e3-committee-hash",
  "e3-config",
  "e3-crypto",
@@ -4407,21 +4383,24 @@ dependencies = [
 
 [[package]]
 name = "e3-safe"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
  "hex",
+ "num-bigint 0.4.6",
+ "openvm",
+ "openvm-algebra-guest",
  "rand 0.9.5",
  "rand_chacha 0.9.0",
- "risc0-bigint2",
+ "serde",
  "sha3",
  "taceo-poseidon2",
 ]
 
 [[package]]
 name = "e3-sdk"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "e3-bfv-client",
  "e3-evm-helpers",
@@ -4431,7 +4410,7 @@ dependencies = [
 
 [[package]]
 name = "e3-slashing"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix",
  "alloy",
@@ -4439,6 +4418,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "chrono",
+ "e3-committee",
  "e3-data",
  "e3-events",
  "e3-fhe-params",
@@ -4454,7 +4434,7 @@ dependencies = [
 
 [[package]]
 name = "e3-sortition"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix",
  "alloy",
@@ -4477,7 +4457,7 @@ dependencies = [
 
 [[package]]
 name = "e3-support-scripts"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4488,7 +4468,7 @@ dependencies = [
 
 [[package]]
 name = "e3-sync"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix",
  "anyhow",
@@ -4508,7 +4488,7 @@ dependencies = [
 
 [[package]]
 name = "e3-test-helpers"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix",
  "anyhow",
@@ -4543,7 +4523,7 @@ dependencies = [
 
 [[package]]
 name = "e3-tests"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix",
  "alloy",
@@ -4556,6 +4536,7 @@ dependencies = [
  "e3-aggregator",
  "e3-bfv-client",
  "e3-ciphernode-builder",
+ "e3-committee",
  "e3-config",
  "e3-crypto",
  "e3-data",
@@ -4568,7 +4549,6 @@ dependencies = [
  "e3-logger",
  "e3-multithread",
  "e3-net",
- "e3-polynomial",
  "e3-request",
  "e3-sdk",
  "e3-sortition",
@@ -4598,17 +4578,19 @@ dependencies = [
 
 [[package]]
 name = "e3-trbfv"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "anyhow",
  "bincode",
  "derivative",
  "e3-bfv-client",
+ "e3-committee",
  "e3-crypto",
  "e3-events",
  "e3-fhe",
  "e3-fhe-params",
  "e3-polynomial",
+ "e3-polynomial-fhe",
  "e3-test-helpers",
  "e3-utils",
  "e3-zk-helpers",
@@ -4630,7 +4612,7 @@ dependencies = [
 
 [[package]]
 name = "e3-utils"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "actix",
  "alloy",
@@ -4649,7 +4631,7 @@ dependencies = [
 
 [[package]]
 name = "e3-utils-derive"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "hex",
  "proc-macro2",
@@ -4659,7 +4641,7 @@ dependencies = [
 
 [[package]]
 name = "e3-wasm"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "e3-bfv-client",
  "e3-fhe-params",
@@ -4671,18 +4653,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-zk-artifacts"
+version = "0.19.0"
+dependencies = [
+ "anyhow",
+ "ark-bn254 0.5.0",
+ "ark-ff 0.5.0",
+ "clap",
+ "e3-committee",
+ "e3-fhe-params",
+ "e3-polynomial",
+ "e3-polynomial-fhe",
+ "e3-zk-helpers",
+ "fhe",
+ "hex",
+ "num-bigint 0.5.1",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "e3-zk-helpers"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "alloy-primitives",
  "anyhow",
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
- "clap",
+ "e3-committee",
  "e3-committee-hash",
  "e3-fhe-params",
  "e3-parity-matrix",
  "e3-polynomial",
+ "e3-polynomial-fhe",
  "e3-safe",
  "fhe",
  "fhe-math",
@@ -4705,7 +4708,7 @@ dependencies = [
 
 [[package]]
 name = "e3-zk-prover"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "acir",
  "actix",
@@ -4722,6 +4725,7 @@ dependencies = [
  "directories 5.0.1",
  "e3-bfv-client",
  "e3-ciphernode-builder",
+ "e3-committee",
  "e3-committee-hash",
  "e3-config",
  "e3-crypto",
@@ -4732,6 +4736,7 @@ dependencies = [
  "e3-layout-lock",
  "e3-net",
  "e3-polynomial",
+ "e3-polynomial-fhe",
  "e3-request",
  "e3-slashing",
  "e3-sortition",
@@ -4751,6 +4756,7 @@ dependencies = [
  "ndarray",
  "noirc_abi",
  "num-bigint 0.5.1",
+ "num-integer",
  "num-traits",
  "paste",
  "rand 0.9.5",
@@ -5619,17 +5625,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "half"
-version = "2.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ea2d84b969582b4b1864a92dc5d27cd2b77b622a8d79306834f1be5ba20d84b"
-dependencies = [
- "cfg-if",
- "crunchy",
- "zerocopy",
-]
-
-[[package]]
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6239,12 +6234,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "include_bytes_aligned"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ee796ad498c8d9a1d68e477df8f754ed784ef875de1414ebdaf169f70a6a784"
-
-[[package]]
 name = "indenter"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6341,7 +6330,7 @@ dependencies = [
 
 [[package]]
 name = "interfoldup"
-version = "0.19.0-test.2"
+version = "0.19.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -6408,17 +6397,6 @@ checksum = "c91338f0783edbd6195decb37bae672fd3b165faffb89bf7b9e6942f8b1a731a"
 dependencies = [
  "memchr",
  "serde",
-]
-
-[[package]]
-name = "is-terminal"
-version = "0.4.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
-dependencies = [
- "hermit-abi",
- "libc",
- "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7887,6 +7865,7 @@ checksum = "a5e44f723f1133c9deac646763579fdb3ac745e418f2a7af9cd0c431da1f20b9"
 dependencies = [
  "num-integer",
  "num-traits",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -7963,6 +7942,33 @@ dependencies = [
  "autocfg",
  "num-integer",
  "num-traits",
+]
+
+[[package]]
+name = "num-modular"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64a5fe11d4135c3bcdf3a95b18b194afa9608a5f6ff034f5d857bc9a27fb0119"
+dependencies = [
+ "num-bigint 0.4.6",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "num-prime"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e238432a7881ec7164503ccc516c014bf009be7984cde1ba56837862543bdec3"
+dependencies = [
+ "bitvec",
+ "either",
+ "lru 0.12.5",
+ "num-bigint 0.4.6",
+ "num-integer",
+ "num-modular",
+ "num-traits",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -8071,12 +8077,6 @@ name = "once_cell_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
-
-[[package]]
-name = "oorandom"
-version = "11.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
 
 [[package]]
 name = "opaque-debug"
@@ -8224,6 +8224,113 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tracing",
+]
+
+[[package]]
+name = "openvm"
+version = "2.0.2"
+source = "git+https://github.com/openvm-org/openvm.git?tag=v2.0.2#59a69b8b0cbee7011ac978e4cc07707ee3681944"
+dependencies = [
+ "bytemuck",
+ "getrandom 0.2.17",
+ "getrandom 0.3.4",
+ "num-bigint 0.4.6",
+ "openvm-custom-insn",
+ "openvm-platform",
+ "openvm-rv32im-guest",
+ "serde",
+]
+
+[[package]]
+name = "openvm-algebra-complex-macros"
+version = "2.0.2"
+source = "git+https://github.com/openvm-org/openvm.git?tag=v2.0.2#59a69b8b0cbee7011ac978e4cc07707ee3681944"
+dependencies = [
+ "openvm-macros-common",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "openvm-algebra-guest"
+version = "2.0.2"
+source = "git+https://github.com/openvm-org/openvm.git?tag=v2.0.2#59a69b8b0cbee7011ac978e4cc07707ee3681944"
+dependencies = [
+ "num-bigint 0.4.6",
+ "once_cell",
+ "openvm-algebra-complex-macros",
+ "openvm-algebra-moduli-macros",
+ "openvm-custom-insn",
+ "openvm-rv32im-guest",
+ "serde-big-array",
+ "strum_macros 0.26.4",
+]
+
+[[package]]
+name = "openvm-algebra-moduli-macros"
+version = "2.0.2"
+source = "git+https://github.com/openvm-org/openvm.git?tag=v2.0.2#59a69b8b0cbee7011ac978e4cc07707ee3681944"
+dependencies = [
+ "num-bigint 0.4.6",
+ "num-prime",
+ "openvm-macros-common",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "openvm-custom-insn"
+version = "2.0.2"
+source = "git+https://github.com/openvm-org/openvm.git?tag=v2.0.2#59a69b8b0cbee7011ac978e4cc07707ee3681944"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "openvm-keccak256"
+version = "2.0.2"
+source = "git+https://github.com/openvm-org/openvm.git?tag=v2.0.2#59a69b8b0cbee7011ac978e4cc07707ee3681944"
+dependencies = [
+ "openvm-keccak256-guest",
+ "spin 0.10.1",
+ "tiny-keccak",
+]
+
+[[package]]
+name = "openvm-keccak256-guest"
+version = "2.0.2"
+source = "git+https://github.com/openvm-org/openvm.git?tag=v2.0.2#59a69b8b0cbee7011ac978e4cc07707ee3681944"
+dependencies = [
+ "openvm-platform",
+]
+
+[[package]]
+name = "openvm-macros-common"
+version = "2.0.2"
+source = "git+https://github.com/openvm-org/openvm.git?tag=v2.0.2#59a69b8b0cbee7011ac978e4cc07707ee3681944"
+dependencies = [
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "openvm-platform"
+version = "2.0.2"
+source = "git+https://github.com/openvm-org/openvm.git?tag=v2.0.2#59a69b8b0cbee7011ac978e4cc07707ee3681944"
+dependencies = [
+ "libm",
+ "openvm-custom-insn",
+ "openvm-rv32im-guest",
+]
+
+[[package]]
+name = "openvm-rv32im-guest"
+version = "2.0.2"
+source = "git+https://github.com/openvm-org/openvm.git?tag=v2.0.2#59a69b8b0cbee7011ac978e4cc07707ee3681944"
+dependencies = [
+ "openvm-custom-insn",
+ "strum_macros 0.26.4",
 ]
 
 [[package]]
@@ -8585,34 +8692,6 @@ name = "pkg-config"
 version = "0.3.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
-
-[[package]]
-name = "plotters"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aeb6f403d7a4911efb1e33402027fc44f29b5bf6def3effcc22d7bb75f2b747"
-dependencies = [
- "num-traits",
- "plotters-backend",
- "plotters-svg",
- "wasm-bindgen",
- "web-sys",
-]
-
-[[package]]
-name = "plotters-backend"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df42e13c12958a16b3f7f4386b9ab1f3e7933914ecea48da7139435263a4172a"
-
-[[package]]
-name = "plotters-svg"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51bae2ac328883f7acdfea3d66a7c35751187f870bc81f94563733a154d7a670"
-dependencies = [
- "plotters-backend",
-]
 
 [[package]]
 name = "polling"
@@ -9400,16 +9479,6 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "risc0-bigint2"
-version = "1.4.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b87f5f7494a2242cead2750b7ce2b8522c1be83dee268479f1c12ed521eaf595"
-dependencies = [
- "include_bytes_aligned",
- "stability",
 ]
 
 [[package]]
@@ -10699,6 +10768,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3763264f6b73151db08c50ff20d7d8a0b8796e021cdea7ceedad07b80155fa0e"
 
 [[package]]
+name = "spin"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "023a211cb3138dbc438680b32560ad89f699977624c9f8dbb95a47d5b4c07dd3"
+
+[[package]]
 name = "spki"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10716,16 +10791,6 @@ checksum = "1d9efca8738c78ee9484207732f728b1ef517bbb1833d6fc0879ca898a522f6f"
 dependencies = [
  "base64ct",
  "der 0.8.1",
-]
-
-[[package]]
-name = "stability"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d904e7009df136af5297832a3ace3370cd14ff1546a232f4f185036c2736fcac"
-dependencies = [
- "quote",
- "syn 2.0.117",
 ]
 
 [[package]]
@@ -10770,6 +10835,19 @@ name = "strum"
 version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9628de9b8791db39ceda2b119bbe13134770b56c138ec1d3af810d045c04f9bd"
+
+[[package]]
+name = "strum_macros"
+version = "0.26.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c6bee85a5a24955dc440386795aa378cd9cf82acd5f764469152d2270e581be"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "rustversion",
+ "syn 2.0.117",
+]
 
 [[package]]
 name = "strum_macros"
@@ -11163,16 +11241,6 @@ checksum = "42d3e9c45c09de15d06dd8acf5f4e0e399e85927b7f00711024eb7ae10fa4869"
 dependencies = [
  "displaydoc",
  "zerovec",
-]
-
-[[package]]
-name = "tinytemplate"
-version = "1.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be4d6b5f19ff7664e8c98d03e2139cb510db9b0a60b55f8e8709b689d939b6bc"
-dependencies = [
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -11924,7 +11992,7 @@ dependencies = [
  "num-derive",
  "num-traits",
  "smallvec",
- "spin",
+ "spin 0.9.9",
  "wasmi_collections",
  "wasmi_core",
  "wasmparser-nostd",

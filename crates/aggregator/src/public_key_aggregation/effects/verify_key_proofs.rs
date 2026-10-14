@@ -107,7 +107,7 @@ impl PublicKeyAggregator {
         if self.is_lbfv() {
             return Ok(());
         }
-        self.mark_started_as_aggregator();
+        self.mark_started_as_aggregator(&ec)?;
         let C1Dispatch {
             party_proofs,
             no_proof_parties,

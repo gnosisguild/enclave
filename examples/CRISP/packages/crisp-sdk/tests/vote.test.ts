@@ -6,7 +6,8 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from 'vitest'
 import { Vote } from '../src/types'
 import { MAX_MSG_NON_ZERO_COEFFS, MAX_VOTE_OPTIONS, SIGNATURE_MESSAGE_HASH, SIGNATURE_MESSAGE } from '../src/constants'
-import { decodeTally, verifyProof, encodeVote, generateBFVKeys, encryptVote, decryptVote, destroyBBApi } from '../src/vote'
+import { decodeTally, verifyProof, encodeVote, generateBFVKeys, encryptVote, decryptVote, validateVote, destroyBBApi } from '../src/vote'
+import { getZkInputsGenerator } from '../src/encoding'
 import { publicKeyToAddress, sign, signMessage } from 'viem/accounts'
 import { Hex, concat, keccak256, numberToHex, recoverPublicKey } from 'viem'
 import { CRISP_SERVER_URL, ECDSA_PRIVATE_KEY, SLOT_ADDRESS } from './constants'
@@ -75,27 +76,12 @@ describe('Vote', () => {
   })
 
   describe('decodeTally', () => {
-    it('Should decode an encoded tally into its decimal representation', () => {
-      const expected: Vote = [10000000000, 30000000000]
-      const encoded = encodeVote(expected)
-      const decoded = decodeTally(encoded, 2)
+    it('Should return the first numChoices coefficients exactly', () => {
+      const big = (1n << 60n) + 1n
+      const coefficients = new Array(MAX_MSG_NON_ZERO_COEFFS).fill(0n)
+      coefficients.splice(0, 4, 7n, 0n, big, 99n)
 
-      expect(decoded[0]).toBe(BigInt(expected[0]))
-      expect(decoded[1]).toBe(BigInt(expected[1]))
-    })
-
-    it('Should decode totals above Number.MAX_SAFE_INTEGER without losing precision', () => {
-      // After aggregation a coefficient is a ballot count, not a bit. This models 4096
-      // ballots landing on the top coefficient of option 0 and one on its bottom coefficient,
-      // giving a total that a double cannot represent exactly.
-      const coefficients = new Array(MAX_MSG_NON_ZERO_COEFFS).fill(0)
-      coefficients[0] = 4096
-      coefficients[49] = 1
-
-      const decoded = decodeTally(coefficients, 2)
-
-      expect(decoded[0]).toBe((1n << 61n) + 1n)
-      expect(decoded[0] > BigInt(Number.MAX_SAFE_INTEGER)).toBe(true)
+      expect(decodeTally(coefficients, 3)).toEqual([7n, 0n, big])
     })
 
     it('Should reject a tally shorter than the payload region', () => {
@@ -118,8 +104,6 @@ describe('Vote', () => {
     it('Should reject a non-integer number of choices', () => {
       const coefficients = new Array(MAX_MSG_NON_ZERO_COEFFS).fill(0)
 
-      // A fraction silently decoded `ceil(numChoices)` segments; NaN passed both bound
-      // checks and returned an empty tally.
       expect(() => decodeTally(coefficients, 2.5)).toThrow('must be an integer of at least 2')
       expect(() => decodeTally(coefficients, Number.NaN)).toThrow('must be an integer of at least 2')
       expect(() => decodeTally(coefficients, Number.POSITIVE_INFINITY)).toThrow('must be an integer of at least 2')
@@ -147,58 +131,31 @@ describe('Vote', () => {
       expect(decodeTally(encoded, MAX_VOTE_OPTIONS)).toEqual(new Array(MAX_VOTE_OPTIONS).fill(1n))
     })
 
-    it('Should encode votes correctly with 2 choices', () => {
-      const encoded = encodeVote([10, 2])
-      const decoded = decodeTally(encoded, 2)
+    it('Should place the weight of option o at coefficient o and zero elsewhere, up to t - 1', () => {
+      const { degree, plaintextModulus } = getZkInputsGenerator().getBFVParams()
+      const weights = [Number(plaintextModulus - 1n), 0, 7]
 
-      expect(decoded[0]).toBe(10n)
-      expect(decoded[1]).toBe(2n)
+      expect(encodeVote(weights)).toEqual([...weights, ...new Array(degree - 3).fill(0)])
     })
 
-    it('Should encode zero votes correctly', () => {
-      const encoded = encodeVote([0, 5])
-      const decoded = decodeTally(encoded, 2)
+    it('Should reject a weight that is not a non-negative safe integer below the plaintext modulus', () => {
+      const t = getZkInputsGenerator().getBFVParams().plaintextModulus
 
-      expect(decoded[0]).toBe(0n)
-      expect(decoded[1]).toBe(5n)
+      expect(() => encodeVote([0, Number(t)])).toThrow(
+        `Vote value for choice 1 must be a non-negative integer below the plaintext modulus (${t})`,
+      )
+      expect(() => encodeVote([-1, 0])).toThrow('Vote value for choice 0')
+      expect(() => encodeVote([0, 1.5])).toThrow('Vote value for choice 1')
     })
+  })
 
-    it('Should only contain binary digits (0 or 1)', () => {
-      const encoded = encodeVote([255, 128])
+  describe('validateVote', () => {
+    it('Should reject a choice at or above the plaintext modulus and accept the largest weight below it', () => {
+      const t = getZkInputsGenerator().getBFVParams().plaintextModulus
+      const balance = t * 2n
 
-      expect(Array.from(encoded).every((b) => b === 0 || b === 1)).toBe(true)
-    })
-
-    it('Should encode votes correctly with 3 choices', () => {
-      const encoded = encodeVote([10, 2, 3])
-      const decoded = decodeTally(encoded, 3)
-
-      expect(decoded[0]).toBe(10n)
-      expect(decoded[1]).toBe(2n)
-      expect(decoded[2]).toBe(3n)
-    })
-
-    it('Should encode votes correctly with 5 choices', () => {
-      const encoded = encodeVote([100, 50, 25, 10, 5])
-      const decoded = decodeTally(encoded, 5)
-
-      expect(decoded[0]).toBe(100n)
-      expect(decoded[1]).toBe(50n)
-      expect(decoded[2]).toBe(25n)
-      expect(decoded[3]).toBe(10n)
-      expect(decoded[4]).toBe(5n)
-    })
-
-    it('Should zero-pad unused slots in the first MAX_MSG_NON_ZERO_COEFFS coeffs for 3 choices', () => {
-      const encoded = encodeVote([1, 1, 1])
-      const decoded = decodeTally(encoded, 3)
-
-      expect(decoded[0]).toBe(1n)
-      expect(decoded[1]).toBe(1n)
-      expect(decoded[2]).toBe(1n)
-
-      const segmentSize = Math.floor(MAX_MSG_NON_ZERO_COEFFS / 3)
-      expect(encoded.slice(segmentSize * 3, MAX_MSG_NON_ZERO_COEFFS).every((b) => b === 0)).toBe(true)
+      expect(() => validateVote([Number(t - 1n), 0], balance)).not.toThrow()
+      expect(() => validateVote([0, Number(t)], balance)).toThrow('Vote value for choice 1')
     })
   })
 

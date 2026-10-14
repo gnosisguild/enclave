@@ -67,6 +67,11 @@ export interface ProtocolConfigFile {
    * Omit to count wallet-held FOLD, which is the original behaviour.
    */
   escrowVotesAdapter?: string;
+  /**
+   * Accounts that have no voting power in `BondedVotes`, such as the treasury Safes. Fixed at
+   * construction, so a change needs a new `BondedVotes`. Omit for none.
+   */
+  bondedVotesExcludedAccounts?: string[];
   bondingRegistryProxy: string;
   bondingRegistryProxyAdmin: string;
   feeToken: string;
@@ -119,7 +124,7 @@ export interface ProtocolConfigFile {
     pkVerifier?: string;
     dkgFoldAttestationVerifier?: string;
     /**
-     * The protocol ciphertext verifier for the BFV scheme, e.g. `Risc0BfvCiphertextVerifier`.
+     * The protocol ciphertext verifier for the BFV scheme, such as `OpenVmBfvCiphertextVerifier`.
      *
      * This is the contract that checks the compute receipt before an E3 reaches
      * `CiphertextReady`. Its `imageId` is immutable, so replacing it is a redeployment, not a
@@ -317,6 +322,58 @@ export interface SecureCrispUpgradePlan {
   availBridge: string;
   vectorx: string;
   bfvVerifierRoutes: BfvVerifierRouteDeployment[];
+  safeTransactions: string;
+  governanceSafeBuilder?: string;
+  safeProposal?: SafeProposal;
+}
+
+/** The OpenVM guest identity that a release's CRISP receipt verifier must carry. */
+export interface OpenVmGuestIdentity {
+  appExeCommit: string;
+  appVmCommit: string;
+  /** keccak256 of the Halo2 verifier's runtime code. */
+  halo2RuntimeCodeHash: string;
+}
+
+/** The v0.19 cutover: one paused-protocol batch that `v19Cutover.ts` prepares and validates. */
+export interface V19CutoverPlan {
+  name: string;
+  chainId: number;
+  operator: string;
+  protocolOwner: string;
+  interfoldProxy: string;
+  interfoldProxyAdmin: string;
+  previousInterfoldImplementation: string;
+  interfoldImplementation: string;
+  lifecycleLibrary: string;
+  pricingLibrary: string;
+  /** No contract that `prepare` deployed is older than this block. */
+  deployFromBlock?: number;
+  registryProxy: string;
+  nodeReleaseRegistry: string;
+  nodeRelease: {
+    version: string;
+    protocolVersion: number;
+    nodeGeneration: number;
+    releaseId: string;
+  };
+  nodeReleasePolicyUpdated: boolean;
+  cryptoConfigId: string;
+  paramSet: number;
+  /** The batch registers the parameter set, which the chain does not hold yet. */
+  paramSetRegisteredByBatch: boolean;
+  pkVerifier: string;
+  decryptionVerifier: string;
+  bfvVerifierRoutes: BfvVerifierRouteDeployment[];
+  ciphertextVerifier: string;
+  openVmReceiptVerifier: string;
+  openVmIdentity: OpenVmGuestIdentity;
+  crispProgram: string;
+  crispImageId: string;
+  retiredE3Programs: string[];
+  dataAvailabilityVerifier: string;
+  availDataAvailability: boolean;
+  inputAvailabilitySigner: string;
   safeTransactions: string;
   governanceSafeBuilder?: string;
   safeProposal?: SafeProposal;

@@ -12,9 +12,13 @@ every section.
   `scripts/check-committee.sh` runs in pre-push and in the Agent Harness CI workflow.
 - **Never hand-edit generated files:** parity matrices, `configs/default/mod.nr`,
   `configs/committee/active.nr`, the generated C1/C2 bounds, the generated constants in `utils.ts`,
-  `ActiveCryptoConfig.sol`, verifier contracts (`generate-verifiers.ts` output),
-  `crates/support/contracts/ImageID.sol`, and the ignored local files `.active-preset.json` and
-  `crates/support/tests/Elf.sol`.
+  `ActiveCryptoConfig.sol`, verifier contracts (`generate-verifiers.ts` output), the ignored local
+  file `.active-preset.json`, and prepared OpenVM identity artifacts.
+- **`crates/support/contracts/ImageID.sol` is frozen.** It records the RISC Zero image ID that the
+  existing CRISP deployments verify. The guest build that generated it is gone, so it cannot be
+  regenerated, and the secure CRISP upgrade scripts (`scripts/upgrade/secureCrisp.ts` and
+  `validateSecureCrisp.ts`) still read it to check those deployments. Never edit it; delete it
+  together with those scripts.
 - **Generated verifiers must match the built VKs.** When a pushed branch changes a path in
   `.github/filters/circuits.yml`, pre-push checks the canonical `insecure/minimum` on-chain
   verifiers (`--no-compile`). The check reads the checked-out tree, so the hook stops the push of a
@@ -25,26 +29,29 @@ every section.
 - Complete artifact pairs include `c6_fold.vk_tree_hash`, and `nodes_fold.vk_tree_hash` when the
   pair builds the trBFV path (secure-16384 builds only the l-BFV path and has no
   `nodes_fold.vk_tree_hash`). The builder derives them from the recursive leaf VKs and non-ZK fold
-  VKs after a complete build with keys.
-  Every other build (a `--group` or `--circuit` subset, `--skip-vk`, or a failed circuit) removes
-  these files from the pair and from `circuits/bin/`, because an old anchor can hash a key that the
-  build replaced. Hydration copies them into `circuits/bin/`. Build-cache markers and release
-  validation require every file the pair carries. Deployment uses them as public-input-zero pins and retains the
-  separate C5/C7 VK pins. The C7 pin is per path: the l-BFV decryption routes pin
-  `decrypted_shares_aggregation_wide`, and the router accepts a route only for the E3's parameter
-  set. — `scripts/build-circuits.ts`; `scripts/circuit-artifacts.ts`;
-  `scripts/utils.ts`
+  VKs after a complete build with keys. Every other build (a `--group` or `--circuit` subset,
+  `--skip-vk`, or a failed circuit) removes these files from the pair and from `circuits/bin/`,
+  because an old anchor can hash a key that the build replaced. Hydration copies them into
+  `circuits/bin/`. Build-cache markers and release validation require every file the pair carries.
+  Deployment uses them as public-input-zero pins and retains the separate C5/C7 VK pins. The C7 pin
+  is per path: the l-BFV decryption routes pin `decrypted_shares_aggregation_wide`, and the router
+  accepts a route only for the E3's parameter set. — `scripts/build-circuits.ts`;
+  `scripts/circuit-artifacts.ts`; `scripts/utils.ts`
 - `pnpm store:circuits pull` selects the newest first-parent `circuit-artifacts` commit whose
   `SOURCE_HASH` matches the current source tree. A different build at the branch tip must not
-  replace it. The release workflow archives the branch tip and fails if the tip's hash differs.
-  Release verification still checks the source hash, every required pair, and each pair's build
-  stamp. `crates/zk-prover/supported-configurations.json` owns the release matrix that archive
-  installation and release verification require. Each listed pair must be a build pair in
+  replace it. The release workflow pulls the same way. Release verification checks the source hash,
+  every required pair, each pair's build stamp, and `checksums.json` as nodes check it. CI and the
+  integration tests use `pull --latest` (the branch tip, no `SOURCE_HASH` match), and
+  `--hydrate-bin-only` does not check the stamp's source hash, until the circuit drift workflow is
+  designed (#2249). Only the release workflow enforces the source match.
+  `crates/zk-prover/supported-configurations.json` owns the release matrix that archive installation
+  and release verification require. Each listed pair must be a build pair in
   `scripts/circuit-constants.ts`, and a tooling test checks this. The matrix file is not a
   `SOURCE_HASH` input. CI download fixtures explicitly request the two `minimum` pairs. CI local
-  archive setup selects `insecure/minimum` with `--circuits-configuration`. `SOURCE_HASH` includes
-  the shared Noir library and its dependency manifest (see `02_CRYPTO_CIRCUITS.md` §Noir /
-  Barretenberg compatibility).
+  archive setup selects `insecure/minimum` with `--circuits-configuration` and
+  `--allow-unpinned-archive`. `SOURCE_HASH` includes the shared Noir library, its dependency
+  manifest and the pinned nargo and bb versions (see `02_CRYPTO_CIRCUITS.md` §Noir / Barretenberg
+  compatibility).
 - Network circuit installation requires a version-bound archive SHA-256 compiled into the binary.
   `download-circuits` in `.github/workflows/releases.yml` hashes the exact archive that it uploads.
   Binary and ciphernode image builds depend on that job and pass `E3_CIRCUITS_ARCHIVE_SHA256` to
@@ -56,18 +63,17 @@ every section.
   ciphernode, and DAppNode copies the checked ciphernode image. CI generates a manifest for exactly
   the staged fixture before packaging and hashing it. — `02_CRYPTO_CIRCUITS.md` §Noir / Barretenberg
   compatibility
-- **`Elf.sol` is never committed.** `crates/support/methods/build.rs` writes it with a machine-local
-  guest ELF path, so it is generated per checkout and `.gitignore`d.
+- **Deployment-local OpenVM artifacts are never committed.** Keep executable files, proving keys,
+  proofs, inputs, worker configurations, and benchmark reports under `target/` or outside source.
 - **A release publishes a complete provenance manifest** — `pnpm provenance:manifest`. It ties
-  source commit, lockfile digests, pinned revisions, RISC Zero version, builder image tag **and
-  digest** (the builder tag is mutable and `RISC0_DOCKER_CONTAINER_TAG` overrides it), guest ELF
-  SHA-256, image ID, and the deployed verifier to one record. The generator reports
-  `complete: false` with the unresolved fields rather than emitting a partial record that reads as
-  verified. The ELF SHA-256 is **not** the image ID: SHA-256 checks binary integrity, the image ID
-  is computed from the loaded memory image. Procedure:
-  `docs/pages/build/e3-program/verify-compute-provider.mdx`. **Gap:** the release workflow does not
-  generate or attach this manifest (`.github/workflows/releases.yml`); a maintainer runs
-  `pnpm provenance:manifest` by hand.
+  source commit, lockfile and artifact digests, OpenVM application commitments, worker identity
+  validation, and the deployed protocol, receipt, and Halo2 verifiers to one record. The generator
+  reports `complete: false` with the unresolved fields rather than emitting a partial record that
+  reads as verified. An artifact SHA-256 is **not** an application commitment or receipt identity. A
+  complete record does not establish source reproducibility; retain independent rebuild evidence.
+  Procedure: `docs/pages/build/e3-program/verify-compute-provider.mdx`. **Gap:** the release
+  workflow does not generate or attach this manifest (`.github/workflows/releases.yml`); a
+  maintainer runs `pnpm provenance:manifest` by hand.
 - Upgradeable-contract storage baselines are committed and CI-gated (missing baselines, compiler
   drift, layout incompatibility, bad gap consumption all fail); baseline creation is an explicit
   maintainer command. — INDEX concern #27
@@ -80,9 +86,8 @@ every section.
   `BondingRegistry`, `CiphernodeRegistryOwnable`, and the canonical `insecure/minimum` aggregator
   verifiers. Every deployed verifier variant must fit, but CI does not measure the other variants. —
   `scripts/checkContractSize.ts`; INDEX concern #22
-- BFV circuit-verifier and RISC Zero receipt-verifier constructors require deployed verifier
-  contracts. BFV circuit wrappers also require nonzero recursive VK hashes. — INDEX concerns #21,
-  Z-15
+- BFV circuit-verifier and OpenVM receipt-verifier constructors require deployed verifier contracts.
+  BFV circuit wrappers also require nonzero recursive VK hashes. — INDEX concerns #21, Z-15
 - CLI secrets enter through **stdin or hidden prompts**, never argv or the environment. Wallet keys
   are never stored in plaintext. `password set`, `wallet set`, and `ciphernode setup` reject
   secret-value options and name the stdin or prompt alternative. Repository callers pipe secrets
@@ -114,9 +119,11 @@ every section.
   be built until that batch has executed. `protocol/validate` reads back
   `bonding.bondedCheckpoints()` and `bondedCheckpoints.registry()`, and adds `bondedVotes.token()`,
   `bondedVotes.checkpoints()` and `bondedVotes.registry()` once the adapter exists. Those read-backs
-  cannot tell an adapter from before bonded delegation from a current one, because both take the
-  same constructor arguments. `hasBondedDelegation` probes the code instead: `activate-voting`
-  refuses such a recorded adapter, `validate` prints a `--` line for it, and
+  cannot tell an adapter from before the excluded-account list from a current one, because both can
+  have the same token, votes source and history. `readExcludedAccounts` probes the code instead:
+  `activate-voting` reuses a recorded adapter only when its excluded accounts equal
+  `bondedVotesExcludedAccounts`, `validate` fails on a different list and on an older adapter when
+  the config excludes any account (otherwise it prints a `--` line for an older adapter), and
   `deployAndSaveBondedVotes` deploys a replacement. Upgrading an existing deployment through
   `upgrade/safeProxyUpgrade` deploys and attaches the pair when none is attached yet, and appends a
   `resyncBondedCheckpoint` call for each `bondedResyncOwners` entry — attaching does not backfill,

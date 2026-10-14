@@ -10,6 +10,7 @@ use common::{
     active_bin_preset, compiled_circuit_artifacts_available, extract_field, find_bb,
     require_minimum_circuits_for_preset, setup_compiled_circuit_for_preset, setup_test_prover,
 };
+use e3_committee::CiphernodesCommitteeSize;
 use e3_events::{CircuitName, CircuitVariant, Proof};
 use e3_fhe_params::BfvPreset;
 use e3_utils::utility_types::ArcBytes;
@@ -27,7 +28,7 @@ use e3_zk_helpers::threshold::pk_generation::{
 use e3_zk_helpers::threshold::rlk_aggregation::{
     RlkAggregationCircuit, RlkAggregationCircuitData, RlkAggregationComponent,
 };
-use e3_zk_helpers::{CiphernodesCommitteeSize, CircuitComputation, Computation};
+use e3_zk_helpers::{CircuitComputation, Computation};
 use e3_zk_prover::{c2_chunk_size, prove_lbfv_pk_generation_row, Provable, ZkProver};
 use num_bigint::BigInt;
 

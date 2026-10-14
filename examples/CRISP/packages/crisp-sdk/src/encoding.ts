@@ -7,16 +7,15 @@
 /**
  * Vote encoding and BFV encryption for the CRISP voting protocol.
  *
- * Encodes vote choices (numbers per option) into polynomial coefficient arrays
- * suitable for BFV homomorphic encryption. Each choice is represented as a
- * segment of binary digits within the first MAX_MSG_NON_ZERO_COEFFS coeffs, then
- * zero-padded to the BFV polynomial degree. Supports
- * encoding, encryption, decryption, and tally decoding.
+ * A ballot stores one integer per option: coefficient `o` of the message polynomial is the
+ * weight on option `o`, and every other coefficient up to the BFV degree is zero. BFV adds
+ * ballots coefficient by coefficient, so the decrypted tally holds one total per option in the
+ * same positions. Supports encoding, encryption, decryption, and tally decoding.
  */
 
 import { ZKInputsGenerator } from '@crisp-e3/zk-inputs'
 import { registeredPreset, type CircuitPreset } from './circuits'
-import { toBinary, numberArrayToBigInt64Array, decodeBytesToBigInts, getMaxVoteValue } from './utils'
+import { numberArrayToBigInt64Array, decodeBytesToBigInts } from './utils'
 import { MAX_MSG_NON_ZERO_COEFFS, MAX_VOTE_OPTIONS } from './constants'
 import { hexToBytes } from 'viem'
 import type { Hex } from 'viem'
@@ -51,14 +50,27 @@ export const getZkInputsGenerator = () => {
 }
 
 /**
- * Encodes vote choices into a polynomial coefficient array for BFV encryption.
- * Each choice occupies floor(MAX_MSG_NON_ZERO_COEFFS / n) binary coefficients;
- * remaining slots in the first MAX_MSG_NON_ZERO_COEFFS coeffs are zero; then
- * the vector is padded to the BFV degree.
+ * Checks every choice weight against the plaintext modulus `t`. A weight at or above `t` wraps
+ * around in the plaintext ring and no longer adds as an integer.
  *
- * @param vote - Array of numeric values per choice (e.g. [10, 5] for 2 options)
- * @returns Array of 0s and 1s representing coefficients
- * @throws If vote has fewer than 2 choices, any value exceeds max for its segment, or degree is too small
+ * @throws If a weight is not a non-negative safe integer below `t`
+ */
+export const checkVoteWeights = (vote: Vote, plaintextModulus: bigint): void => {
+  vote.forEach((value, choiceIdx) => {
+    if (!Number.isSafeInteger(value) || value < 0 || BigInt(value) >= plaintextModulus) {
+      throw new Error(`Vote value for choice ${choiceIdx} must be a non-negative integer below the plaintext modulus (${plaintextModulus})`)
+    }
+  })
+}
+
+/**
+ * Encodes vote choices into a polynomial coefficient array for BFV encryption.
+ *
+ * @param vote - Weight per option, for example [10, 0] for 2 options. Each weight is a non-negative
+ *        safe integer below the BFV plaintext modulus.
+ * @returns The coefficients, `degree` entries long
+ * @throws If vote has fewer than 2 or more than MAX_VOTE_OPTIONS choices, any weight is not a
+ *         non-negative safe integer below the plaintext modulus, or the BFV degree is too small
  */
 export const encodeVote = (vote: Vote): number[] => {
   const numChoices = vote.length
@@ -67,47 +79,19 @@ export const encodeVote = (vote: Vote): number[] => {
     throw new Error('Vote must have at least two choices')
   }
 
-  // The Noir circuit asserts num_options <= MAX_OPTIONS, so a vote beyond this can never
-  // produce a valid proof. Reject it here rather than encoding an unprovable vote.
+  // The circuit asserts num_options <= MAX_OPTIONS, so a larger vote can never be proved.
   if (numChoices > MAX_VOTE_OPTIONS) {
     throw new Error(`Number of choices (${numChoices}) exceeds MAX_VOTE_OPTIONS (${MAX_VOTE_OPTIONS})`)
   }
 
-  const bfvParams = getZkInputsGenerator().getBFVParams()
-  const degree = bfvParams.degree
+  const { degree, plaintextModulus } = getZkInputsGenerator().getBFVParams()
   if (degree < MAX_MSG_NON_ZERO_COEFFS) {
     throw new Error(`BFV degree (${degree}) must be at least MAX_MSG_NON_ZERO_COEFFS (${MAX_MSG_NON_ZERO_COEFFS})`)
   }
 
-  const segmentSize = Math.floor(MAX_MSG_NON_ZERO_COEFFS / numChoices)
-  const maxValue = getMaxVoteValue(numChoices)
-  const voteArray: number[] = []
+  checkVoteWeights(vote, plaintextModulus)
 
-  for (let choiceIdx = 0; choiceIdx < numChoices; choiceIdx += 1) {
-    const value = vote[choiceIdx]
-
-    if (value > maxValue) {
-      throw new Error(`Vote value for choice ${choiceIdx} exceeds maximum (${maxValue})`)
-    }
-
-    const binary = toBinary(value).split('')
-
-    for (let i = 0; i < segmentSize; i += 1) {
-      const offset = segmentSize - binary.length
-      voteArray.push(i < offset ? 0 : parseInt(binary[i - offset], 10))
-    }
-  }
-
-  const msgCoeffsUsed = segmentSize * numChoices
-  for (let i = msgCoeffsUsed; i < MAX_MSG_NON_ZERO_COEFFS; i += 1) {
-    voteArray.push(0)
-  }
-
-  for (let i = 0; i < degree - MAX_MSG_NON_ZERO_COEFFS; i += 1) {
-    voteArray.push(0)
-  }
-
-  return voteArray
+  return [...vote, ...new Array(degree - numChoices).fill(0)]
 }
 
 /**
@@ -124,30 +108,23 @@ export const encryptVote = (vote: Vote, publicKey: Uint8Array): Uint8Array => {
 }
 
 /**
- * Decodes raw tally bytes (or coefficients) into a total per choice.
- * Expects the same segment layout as used in encodeVote.
- *
- * Mirrors `crisp_utils::decode_tally` (Rust) and `CRISPProgram.decodeTally` (Solidity):
- * only the first MAX_MSG_NON_ZERO_COEFFS coefficients carry the payload, split into
- * `floor(MAX_MSG_NON_ZERO_COEFFS / numChoices)` binary coefficients per choice, MSB first.
+ * Decodes raw tally bytes (or coefficients) into one total per choice: the first `numChoices` of the
+ * MAX_MSG_NON_ZERO_COEFFS published coefficients, in the layout `encodeVote` produces. Same layout as
+ * `CRISPProgram.decodeTally` (Solidity) and `crisp_utils::decode_tally` (Rust).
  *
  * @param tallyBytes - Hex string, or the polynomial coefficients from tally/decryption
  * @param numChoices - Number of vote options: an integer from 2 to MAX_VOTE_OPTIONS
- * @returns One total per choice
+ * @returns One total per choice, as bigint because each coefficient is a uint64 word
  * @throws If numChoices is outside 2..MAX_VOTE_OPTIONS or not an integer, or there are fewer
- *         coefficients than the payload region
+ *         coefficients than MAX_MSG_NON_ZERO_COEFFS
  */
 export const decodeTally = (tallyBytes: string | number[] | bigint[], numChoices: number): TallyResult => {
-  // `CRISPProgram.validate` rejects a round outside 2..MAX_VOTE_OPTIONS, and `encodeVote` refuses
-  // to encode fewer than two choices, so no tally in that range can exist. `Number.isInteger` also
-  // screens out NaN, Infinity, and fractions: a fractional count silently returns `ceil(numChoices)`
-  // segments, and NaN passes both bound checks to return an empty tally.
+  // CRISPProgram.validate rejects a round outside 2..MAX_VOTE_OPTIONS. Number.isInteger also screens
+  // out NaN, Infinity, and fractions.
   if (!Number.isInteger(numChoices) || numChoices < 2) {
     throw new Error(`Number of choices (${numChoices}) must be an integer of at least 2`)
   }
 
-  // Rounds cannot exceed MAX_VOTE_OPTIONS (the circuit's MAX_OPTIONS), so a larger count
-  // is a caller error rather than a tally to decode.
   if (numChoices > MAX_VOTE_OPTIONS) {
     throw new Error(`Number of choices (${numChoices}) exceeds MAX_VOTE_OPTIONS (${MAX_VOTE_OPTIONS})`)
   }
@@ -164,21 +141,7 @@ export const decodeTally = (tallyBytes: string | number[] | bigint[], numChoices
     throw new Error(`decoded coefficient count (${coefficients.length}) is less than MAX_MSG_NON_ZERO_COEFFS (${MAX_MSG_NON_ZERO_COEFFS})`)
   }
 
-  const segmentSize = Math.floor(MAX_MSG_NON_ZERO_COEFFS / numChoices)
-  const results: TallyResult = []
-
-  for (let choiceIdx = 0; choiceIdx < numChoices; choiceIdx++) {
-    const segmentStart = choiceIdx * segmentSize
-
-    let value = 0n
-    for (let i = 0; i < segmentSize; i++) {
-      value += coefficients[segmentStart + i] << BigInt(segmentSize - 1 - i)
-    }
-
-    results.push(value)
-  }
-
-  return results
+  return coefficients.slice(0, numChoices)
 }
 
 /**

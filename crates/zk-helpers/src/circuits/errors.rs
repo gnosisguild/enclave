@@ -6,7 +6,8 @@
 
 //! Error types for circuit and codegen operations.
 
-use crate::utils::ZkHelpersUtilsError;
+use crate::encoding::ZkHelpersUtilsError;
+use e3_fhe_params::utils::K0Error;
 use e3_polynomial::CrtPolynomialError;
 use thiserror::Error;
 
@@ -19,6 +20,8 @@ pub enum CircuitsErrors {
     Toml(#[from] toml::ser::Error),
     #[error("BFV error: {0}")]
     Fhe(#[from] fhe::Error),
+    #[error(transparent)]
+    K0(#[from] K0Error),
     #[error("CRT polynomial error: {0}")]
     CrtPolynomial(#[from] CrtPolynomialError),
     #[error("ZK helper error: {0}")]

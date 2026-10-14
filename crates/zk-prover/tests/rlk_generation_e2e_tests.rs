@@ -10,6 +10,7 @@ use common::{
     active_bin_preset, compiled_circuit_artifacts_available, extract_field, find_bb,
     require_minimum_circuits_for_preset, setup_compiled_circuit_for_preset, setup_test_prover,
 };
+use e3_committee::CiphernodesCommitteeSize;
 use e3_events::{CircuitName, CircuitVariant};
 use e3_fhe_params::BfvPreset;
 use e3_zk_helpers::circuits::commitments::{
@@ -18,7 +19,7 @@ use e3_zk_helpers::circuits::commitments::{
 };
 use e3_zk_helpers::threshold::lbfv_proof_domain::lbfv_proof_session;
 use e3_zk_helpers::threshold::rlk_generation::{RlkGenerationCircuitData, RlkGenerationConfigs};
-use e3_zk_helpers::{CiphernodesCommitteeSize, Computation};
+use e3_zk_helpers::Computation;
 use e3_zk_prover::{c2_chunk_size, prove_rlk_generation_row, ZkProver};
 use num_bigint::BigInt;
 use std::time::Instant;

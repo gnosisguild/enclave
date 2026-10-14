@@ -331,7 +331,7 @@ for CIRCUIT in $RUN_CIRCUITS; do
         echo "Benchmark [$CURRENT/$TOTAL_BENCHMARKS]: ${CIRCUIT} (${MODE}) with ${ORACLE} oracle"
         echo "────────────────────────────────────────────────"
         
-        # Generate Prover.toml (and configs.nr) via zk_cli so nargo execute has witness
+        # Generate Prover.toml via zk-artifacts generate so nargo execute has witness
         echo "  Generating Prover.toml..."
         if [[ "$CIRCUIT" == threshold/user_data_encryption_ct0 || "$CIRCUIT" == threshold/user_data_encryption_ct1 ]]; then
             if [ "$USER_DATA_ENCRYPTION_INPUTS_READY" = false ]; then

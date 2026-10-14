@@ -60,10 +60,15 @@ flowchart TD
         Logger[e3-logger]
     end
 
+    ZkArtifacts[e3-zk-artifacts] --> ZkHelpers
+    ZkArtifacts --> FheParams
+    ZkArtifacts --> Committee
+
     subgraph Vocabulary[Protocol vocabulary and deterministic rules]
         Events[e3-events]
         Config[e3-config]
         FheParams[e3-fhe-params]
+        Committee[e3-committee]
         ZkHelpers[e3-zk-helpers]
         CommitteeHash[e3-committee-hash]
     end
@@ -71,6 +76,7 @@ flowchart TD
     subgraph Foundations[Foundation crates]
         Crypto[e3-crypto]
         Poly[e3-polynomial]
+        PolyFhe[e3-polynomial-fhe]
         Matrix[e3-parity-matrix]
         Safe[e3-safe]
         Hamt[e3-hamt]
@@ -126,25 +132,31 @@ flowchart TD
     Aggregator --> Prover
     Aggregator --> Evm
     Aggregator --> CommitteeHash
+    Aggregator --> Committee
     Keyshare --> Fhe
     Keyshare --> Multi
     Keyshare --> Trbfv
+    Keyshare --> Committee
     Slashing --> Request
     Slashing --> ZkHelpers
+    Slashing --> Committee
     Prover --> Slashing
     Prover --> ZkHelpers
+    Prover --> Committee
     Multi --> Prover
     Multi --> Trbfv
+    Multi --> Committee
+    Request --> Committee
     Fhe --> BfvClient
     Trbfv --> BfvClient
     BfvClient --> FheParams
-    BfvClient --> Poly
     BfvClient --> ZkHelpers
 
     Evm --> Config
     Evm --> Data
     Evm --> DataAvailability
     Evm --> Events
+    Evm --> Committee
     Net --> Config
     Net --> Data
     Net --> Events
@@ -162,9 +174,14 @@ flowchart TD
     Events --> FheParams
     Events --> Trbfv
     Events --> ZkHelpers
+    Events --> Committee
+    ZkHelpers --> Committee
+    ZkHelpers --> FheParams
     ZkHelpers --> Poly
+    ZkHelpers --> PolyFhe
     ZkHelpers --> Matrix
     ZkHelpers --> Safe
+    PolyFhe --> Poly
     Crypto --> Utils
     Utils --> UtilsDerive
 
@@ -175,10 +192,21 @@ flowchart TD
     TestHelpers --> SDK
 ```
 
+`e3-committee` owns committee configurations and their canonical parameter values. Public-key
+aggregation owns the selection of the lowest distinct verified party IDs for C5's `H` slots, in
+`crates/aggregator/src/public_key_aggregation/workflow.rs`.
+
 The most important current boundary debt is that `e3-events` contains both neutral event transport
 and rich protocol payloads that depend on cryptographic/FHE types. Protocol workflow crates also
 depend directly on Actix and concrete repositories. These are real constraints in the current code
 and are not papered over with empty port traits.
+
+`crates/polynomial` is the `e3-polynomial` package. `Polynomial` owns exact integer coefficient
+arithmetic and transforms; `CrtPolynomial` routes transforms to its ordered residue limbs. The child
+FHE adapter is a separate root-workspace member and reads native ascending coefficients. The ZK
+helper layer owns crate-private negacyclic folding, witness reversal/centering, packing, and JSON
+encoding. Prover test fixtures reconstruct native FHE inputs locally, without a production
+reverse-conversion API in the adapter.
 
 The resulting workflow/actor/effect separation is module-level rather than a clean crate boundary.
 On disk, those roles are grouped by protocol capability; the labels in this diagram describe
@@ -733,6 +761,27 @@ candidate of new queries; a query can still learn it from another peer, and the 
 the dial. An inbound connection from the peer, and a dial by address without a peer ID, are not held
 back.
 
+The 60-second background retry of a configured address stops when that address connects. After that,
+the configured-peer redial dials each disconnected configured peer with a known identity every 15
+seconds, except an identity-quarantined, rejected, or gossip-backoff peer. The QUIC transport is
+wrapped below the DNS layer (`DialGuard`). It refuses a dial that reaches this node: an address that
+this node listens on, or a loopback or unspecified address, also in IPv4-mapped form, on one of its
+UDP ports. Nodes listen on the same default port, and containers on a default bridge network share
+interface addresses, so such an address can arrive as another peer's address, and libp2p keeps the
+first connection that completes: that address would fail the whole dial to the peer with a peer-ID
+mismatch. On mainnet and Sepolia the node also filters loopback addresses before the swarm reports
+its listeners. An identity that comes from the configuration, or from an admitted connection of the
+configured address, is trusted. Each outbound connection to a trusted identity keeps the concrete
+address of its dial, such as the address that a `/dnsaddr` resolved to, as the configured peer's
+fallback. The configured-peer redial dials the fallback beside the configured address, so a node
+that lost every peer in a local outage reaches its bootstrap peer again without DNS: libp2p builds
+its resolver from the system configuration once, when the node starts. A peer-ID mismatch at the
+fallback drops the address only: the configured address still names the peer, so the node neither
+quarantines nor rebinds it. A rebind after a mismatch at another address drops the fallback and the
+trust, so an identity that another peer's routing data supplied never gets a fallback. A key change
+of an unpinned `/dnsaddr` peer after startup is not followed: the redial names the learned identity,
+and libp2p uses only the TXT records of that identity.
+
 `PlaintextAggregated` is excluded from gossip and historical peer sync. It remains a local durable
 publication intent, and canonical chain observations report completion. The request router rejects a
 network event for an E3 that has no chain-admitted or hydrated context, so peer traffic cannot
@@ -796,9 +845,11 @@ stateDiagram-v2
 
 `E3LifecycleService` enforces monotonic progress and freezes terminal states. `E3Router` creates and
 tears down per-request actor contexts. Duplicate and late terminal observations are classified
-before forwarding; side effects are enabled only after recovery. The diagram shows the normal
-progression: the lifecycle observer also accepts a forward jump to a later stage, while reporting a
-lower-stage observation as a regression without changing its tracked stage.
+before forwarding; side effects are enabled only after recovery. For a completed E3, the router
+ignores chain events and late peer messages, such as decryption shares past the threshold, but
+reports a local event as an error. The diagram shows the normal progression: the lifecycle observer
+also accepts a forward jump to a later stage, while reporting a lower-stage observation as a
+regression without changing its tracked stage.
 
 ## Committee, DKG, aggregation, and decryption
 
@@ -932,8 +983,15 @@ correlation ID, the gate republishes the durable response under that ID instead 
 again. It does not cache replayed `ComputeRequestError` events. An old OOM or process failure must
 therefore retry, while completed C1-C4 proof work and randomized TrBFV output are reused exactly.
 Live, a request under a new ID whose result has not reached the gate 10 minutes after it went to the
-worker goes to the worker again, because EventBus fan-out can drop that result. The first success
-answers the waiting IDs and later requests.
+worker goes to the worker again, because EventBus fan-out can drop that result, but only when no run
+of it is left in the worker (`RunningJobs`: from the worker's intake, queued ones included, until
+the run ends, counted per correlation ID). A slow proof under load therefore runs once. A run that
+hangs holds back the re-send until it ends; the prover's own cap (`bb_timeout_secs`, 12 hours by
+default) bounds that. The first success answers the waiting IDs and later requests. Before replay, a
+node raises its correlation IDs above the reservation that its earlier boot recorded
+(`correlation-ids` beside the event log), so a replayed response of an earlier boot never answers a
+new request, also after a clock rollback; the gate also takes an outcome only for the request of the
+same E3.
 
 A restored plaintext recipient can remain dormant while confirmed key authority is missing. It keeps
 the saved actor state and ordered replay inputs, then validates recovery before forwarding them.
@@ -951,11 +1009,12 @@ are rebuilt from replay, coalesce by E3, and release work only after `EffectsEna
 intent has a role gate: failover demotes an aggregator after a fixed budget even while it is still
 proving, so the node that computed the key or the plaintext submits it after a demotion too. A local
 result exists only when the node started that work as the active aggregator. A key result for a
-request that already completed is ignored. The key writer publishes the committee proof only while
-the registry has no commitment, and the plaintext writer submits only while the E3 is at
-`CiphertextReady` with no plaintext, so the first valid result wins. Contract-state preflights
-provide cross-restart idempotency. Terminal outcomes remove the intent; retryable failures retain it
-and retry after 30 seconds.
+request that already completed, or whose whole key the node already assembled from the chain
+(`CommitteePublished`), is ignored, and `CommitteePublished` drops a pending key intent. The key
+writer publishes the committee proof only while the registry has no commitment, and the plaintext
+writer submits only while the E3 is at `CiphertextReady` with no plaintext, so the first valid
+result wins. Contract-state preflights provide cross-restart idempotency. Terminal outcomes remove
+the intent; retryable failures retain it and retry after 30 seconds.
 
 Plaintext admission compares the final-proof domain with confirmed key authority and ciphertext
 hashes before the publication gate retains an intent. Missing authority defers admission. A mismatch
@@ -1430,3 +1489,29 @@ New E3s start from zero; terminal or finalized E3 checkpoints are removed.
 Extension points should be narrow concrete boundaries with an active consumer: repository factories,
 network interfaces, ZK backends, sortition backends, clocks, and task pools. New one-method traits
 are not introduced solely to create layers.
+
+### OpenVM compute support
+
+Each project proves its own E3 program. Its `guest/` crate (its own workspace, built with
+`cargo openvm`) and the `.interfold/support/openvm` service both link the project's `program/`, so
+the guest, the native host, and the contract share one policy source. The service is an
+`e3-program-server` whose runner is `e3-openvm-host`: it runs the shared `SecureProcess` natively,
+writes the guest's input stream (a header, every ciphertext, then the selected ones), and runs the
+separate `interfold-openvm-prover` worker (`crates/openvm-prover`, its own workspace). It accepts
+only a verified OpenVM EVM receipt. The guest reads one ciphertext at a time, so a round is not
+bounded by guest memory. The worker validates the executable, VM identity, aggregation key, Halo2
+key and parameters, verifier artifact, and journal. At startup the host picks the CUDA worker when
+it is configured and can open a GPU, and otherwise the CPU worker; every worker run has a deadline.
+Jobs remain in memory; this service does not provide durable admission or restart recovery.
+`interfold program compile` builds the guest, keys, receipt identity, worker configuration, and
+service; `e3-init` copies the service folder and pins the guest's Interfold crates to the template
+commit. The normal `e3-support-scripts` backend uses `program.openvm`; it no longer selects RISC
+Zero or Boundless. `program.dev` is an explicit, unproved runner.
+
+CRISP's encrypted-input and result-callback routes accept at most 4 MiB of JSON, to contain the
+largest supported DA object after hexadecimal encoding. This limit is scoped to those routes; read
+routes retain their smaller default limit. `CRISP_BIND_ADDR` selects the HTTP listener and defaults
+to `0.0.0.0:4000`. The server starts a multithread Tokio runtime. Input validation and large
+round-record updates must not prevent the RPC transports from receiving WebSocket heartbeats. Actix
+HTTP workers retain their own runtimes; the server does not use Actix actors or
+`actix_web::rt::spawn`.

@@ -87,6 +87,14 @@ pub struct ComputeJob {
     pub domain: ComputeDomain,
 }
 
+/// The default request body limit. Enough for development rounds; a service proving secure-parameter
+/// rounds raises it with [`E3ProgramServerBuilder::with_max_request_bytes`].
+const DEFAULT_MAX_REQUEST_BYTES: usize = 10 * 1024 * 1024;
+
+/// How long an admitted request may take to deliver its body. The request holds a compute slot
+/// while it uploads, so a stalled upload must not keep it.
+const DEFAULT_BODY_TIMEOUT: Duration = Duration::from_secs(120);
+
 #[derive(Clone)]
 pub struct E3ProgramServerBuilder {
     runner: Arc<Runner>,
@@ -94,6 +102,8 @@ pub struct E3ProgramServerBuilder {
     host: Option<String>,
     localhost_rewrite: Option<String>,
     max_concurrent_jobs: usize,
+    max_request_bytes: usize,
+    body_timeout: Duration,
 }
 
 impl E3ProgramServerBuilder {
@@ -109,6 +119,8 @@ impl E3ProgramServerBuilder {
             host: None,
             localhost_rewrite: None,
             max_concurrent_jobs: 1,
+            max_request_bytes: DEFAULT_MAX_REQUEST_BYTES,
+            body_timeout: DEFAULT_BODY_TIMEOUT,
         }
     }
 
@@ -136,11 +148,33 @@ impl E3ProgramServerBuilder {
         self
     }
 
+    /// Bound the size of a `/run_compute` request body (default 10 MiB). The ciphertexts arrive
+    /// hex-encoded, so a round needs about twice its binary size.
+    pub fn with_max_request_bytes(mut self, max_request_bytes: usize) -> Self {
+        self.max_request_bytes = max_request_bytes;
+        self
+    }
+
+    /// Bound how long an admitted request may take to deliver its body (default 120 seconds). A
+    /// request that is still uploading holds a compute slot.
+    pub fn with_body_timeout(mut self, body_timeout: Duration) -> Self {
+        self.body_timeout = body_timeout;
+        self
+    }
+
     /// Build the E3ProgramServer
     pub fn build(self) -> Result<E3ProgramServer> {
         anyhow::ensure!(
             self.max_concurrent_jobs > 0,
             "max concurrent jobs must be greater than zero"
+        );
+        anyhow::ensure!(
+            self.max_request_bytes > 0,
+            "the request size limit must be greater than zero"
+        );
+        anyhow::ensure!(
+            !self.body_timeout.is_zero(),
+            "the request body timeout must be greater than zero"
         );
         let webhook_client = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(5))
@@ -155,6 +189,8 @@ impl E3ProgramServerBuilder {
             localhost_rewrite: self.localhost_rewrite,
             webhook_client,
             jobs: Arc::new(Semaphore::new(self.max_concurrent_jobs)),
+            max_request_bytes: self.max_request_bytes,
+            body_timeout: self.body_timeout,
         })
     }
 }
@@ -167,6 +203,8 @@ pub struct E3ProgramServer {
     localhost_rewrite: Option<String>,
     webhook_client: reqwest::Client,
     jobs: Arc<Semaphore>,
+    max_request_bytes: usize,
+    body_timeout: Duration,
 }
 
 impl E3ProgramServer {
@@ -202,11 +240,12 @@ impl E3ProgramServer {
             localhost_rewrite: self.localhost_rewrite.clone(),
             webhook_client: self.webhook_client.clone(),
             jobs: Arc::clone(&self.jobs),
+            max_request_bytes: self.max_request_bytes,
+            body_timeout: self.body_timeout,
         };
         let server = HttpServer::new(move || {
             App::new()
                 .app_data(web::Data::new(config.clone()))
-                .app_data(web::JsonConfig::default().limit(10 * 1024 * 1024)) // 10MB for prod params
                 .wrap(Logger::default())
                 .route("/run_compute", web::post().to(handle_compute))
                 .route("/health", web::get().to(handle_health_check))
@@ -225,6 +264,29 @@ pub struct AppConfig {
     pub localhost_rewrite: Option<String>,
     webhook_client: reqwest::Client,
     jobs: Arc<Semaphore>,
+    max_request_bytes: usize,
+    body_timeout: Duration,
+}
+
+/// Reads an admitted request's body, refusing one over `limit` bytes (413) or one that does not
+/// arrive within `timeout` (408).
+async fn read_body<S, E>(body: S, limit: usize, timeout: Duration) -> ActixResult<web::Bytes>
+where
+    S: futures_util::Stream<Item = Result<web::Bytes, E>> + 'static,
+    E: Into<Box<dyn std::error::Error>> + 'static,
+{
+    let read = actix_web::body::to_bytes_limited(actix_web::body::BodyStream::new(body), limit);
+    match tokio::time::timeout(timeout, read).await {
+        Err(_) => Err(actix_web::error::ErrorRequestTimeout(
+            "the request body did not arrive in time",
+        )),
+        Ok(Err(exceeded)) => Err(actix_web::error::ErrorPayloadTooLarge(exceeded)),
+        Ok(Ok(Err(error))) => Err(actix_web::error::ErrorBadRequest(format!(
+            "cannot read the request body: {}",
+            error.into()
+        ))),
+        Ok(Ok(Ok(bytes))) => Ok(bytes),
+    }
 }
 
 /// Whether callbacks to addresses only reachable from inside the deployment are permitted.
@@ -391,24 +453,49 @@ async fn call_webhook(
         }
     }
 
-    let response = client
-        .post(callback_url.clone())
-        .json(&payload)
-        .send()
-        .await?;
-
-    println!("Webhook response status: {}", response.status());
-    if !response.status().is_success() {
-        return Err(anyhow::anyhow!(
-            "Webhook failed with status {}",
-            response.status()
-        ));
+    // A proof can take hours, so one dropped connection must not lose its result. Server errors,
+    // timeouts and rate limits are retried with backoff; any other refusal is final.
+    let mut last_error = None;
+    for attempt in 1_u32..=WEBHOOK_ATTEMPTS {
+        match client
+            .post(callback_url.clone())
+            .json(&payload)
+            .send()
+            .await
+        {
+            Ok(response) if response.status().is_success() => {
+                println!("Webhook response status: {}", response.status());
+                println!("✓ Webhook called successfully for E3 {}", e3_id);
+                return Ok(());
+            }
+            Ok(response) => {
+                let status = response.status();
+                let error = anyhow::anyhow!("Webhook failed with status {status}");
+                if !(status.is_server_error()
+                    || status == reqwest::StatusCode::REQUEST_TIMEOUT
+                    || status == reqwest::StatusCode::TOO_MANY_REQUESTS)
+                {
+                    return Err(error);
+                }
+                last_error = Some(error);
+            }
+            Err(error) => last_error = Some(error.into()),
+        }
+        if attempt < WEBHOOK_ATTEMPTS {
+            let delay = Duration::from_secs(1 << (attempt - 1));
+            println!(
+                "Webhook attempt {attempt} failed; retrying in {} seconds",
+                delay.as_secs()
+            );
+            tokio::time::sleep(delay).await;
+        }
     }
 
-    response.error_for_status()?;
-    println!("✓ Webhook called successfully for E3 {}", e3_id);
-    Ok(())
+    Err(last_error.unwrap_or_else(|| anyhow::anyhow!("webhook delivery failed")))
 }
+
+/// How many times a callback is attempted before the result is given up.
+const WEBHOOK_ATTEMPTS: u32 = 5;
 
 async fn handle_webhook_delivery(
     client: &reqwest::Client,
@@ -472,9 +559,20 @@ async fn process_computation_background(
 
 async fn handle_compute(
     config: web::Data<AppConfig>,
-    req: web::Json<ComputeRequest>,
+    body: web::Payload,
 ) -> ActixResult<HttpResponse> {
     println!("Processing computation...");
+    // Admission first. A request body can be hundreds of megabytes, and buffering it only to
+    // refuse it would let a caller exhaust memory while a computation runs. The permit is released
+    // when this handler returns early.
+    let permit = Arc::clone(&config.jobs)
+        .try_acquire_owned()
+        .map_err(|_| actix_web::error::ErrorTooManyRequests("compute capacity exhausted"))?;
+    let body = read_body(body, config.max_request_bytes, config.body_timeout).await?;
+    let mut req: ComputeRequest = serde_json::from_slice(&body)
+        .map_err(|e| actix_web::error::ErrorBadRequest(format!("invalid request: {e}")))?;
+    drop(body);
+
     let e3_id = req
         .e3_id
         .clone()
@@ -558,8 +656,8 @@ async fn handle_compute(
     }
 
     let fhe_inputs = FHEInputs {
-        params: req.params.clone(),
-        ciphertexts: req.ciphertext_inputs.clone(),
+        params: std::mem::take(&mut req.params),
+        ciphertexts: std::mem::take(&mut req.ciphertext_inputs),
         committee_key: req.committee_public_key.clone(),
     };
     let domain = ComputeDomain::new(
@@ -578,9 +676,6 @@ async fn handle_compute(
 
     let callback_url = validated_callback_url(&callback_url, config.localhost_rewrite.as_deref())
         .map_err(actix_web::error::ErrorBadRequest)?;
-    let permit = Arc::clone(&config.jobs)
-        .try_acquire_owned()
-        .map_err(|_| actix_web::error::ErrorTooManyRequests("compute capacity exhausted"))?;
     let runner = config.runner.clone();
     let webhook_client = config.webhook_client.clone();
     let background_e3_id = e3_id.clone();
@@ -670,6 +765,100 @@ mod server_tests {
             .build()
             .unwrap();
         assert_eq!(server.jobs.available_permits(), 2);
+    }
+
+    fn app_config(server: &E3ProgramServer) -> AppConfig {
+        AppConfig {
+            runner: Arc::clone(&server.runner),
+            localhost_rewrite: None,
+            webhook_client: server.webhook_client.clone(),
+            jobs: Arc::clone(&server.jobs),
+            max_request_bytes: server.max_request_bytes,
+            body_timeout: server.body_timeout,
+        }
+    }
+
+    /// The handler applies the body deadline: a stalled upload is refused with 408 and gives its
+    /// slot back, so it cannot hold the server's capacity.
+    #[actix_web::test]
+    async fn a_stalled_upload_is_refused_and_frees_its_slot() {
+        use actix_web::FromRequest;
+        use std::pin::Pin;
+
+        let server = E3ProgramServer::builder(|_| async { Ok((vec![], vec![])) })
+            .with_body_timeout(Duration::from_millis(50))
+            .build()
+            .unwrap();
+        let stalled: Pin<
+            Box<
+                dyn futures_util::Stream<Item = Result<web::Bytes, actix_web::error::PayloadError>>,
+            >,
+        > = Box::pin(futures_util::stream::pending());
+        let mut payload = actix_web::dev::Payload::from(stalled);
+        let request = actix_web::test::TestRequest::post().to_http_request();
+        let body = web::Payload::from_request(&request, &mut payload)
+            .await
+            .unwrap();
+
+        let error = tokio::time::timeout(
+            Duration::from_secs(10),
+            handle_compute(web::Data::new(app_config(&server)), body),
+        )
+        .await
+        .expect("the handler must not wait past its body deadline")
+        .unwrap_err();
+
+        assert_eq!(error.as_response_error().status_code(), 408);
+        assert_eq!(server.jobs.available_permits(), 1);
+    }
+
+    /// A caller over capacity is refused before its body is read, so it cannot make the server
+    /// buffer a round it will not compute.
+    #[actix_web::test]
+    async fn a_full_server_refuses_before_reading_the_body() {
+        let server = E3ProgramServer::builder(|_| async { Ok((vec![], vec![])) })
+            .with_max_request_bytes(16)
+            .build()
+            .unwrap();
+        let _busy = Arc::clone(&server.jobs).try_acquire_owned().unwrap();
+        let app = actix_web::test::init_service(
+            App::new()
+                .app_data(web::Data::new(app_config(&server)))
+                .route("/run_compute", web::post().to(handle_compute)),
+        )
+        .await;
+
+        let request = actix_web::test::TestRequest::post()
+            .uri("/run_compute")
+            .set_payload(vec![b'x'; 1024])
+            .to_request();
+        let response = actix_web::test::call_service(&app, request).await;
+
+        assert_eq!(response.status(), 429);
+    }
+
+    /// With capacity free, a body over the limit is refused and the slot is released.
+    #[actix_web::test]
+    async fn an_oversized_body_is_refused_and_frees_its_slot() {
+        let server = E3ProgramServer::builder(|_| async { Ok((vec![], vec![])) })
+            .with_max_request_bytes(16)
+            .build()
+            .unwrap();
+        let app = actix_web::test::init_service(
+            App::new()
+                .app_data(web::Data::new(app_config(&server)))
+                .route("/run_compute", web::post().to(handle_compute)),
+        )
+        .await;
+
+        let request = actix_web::test::TestRequest::post()
+            .uri("/run_compute")
+            .set_payload(vec![b'x'; 1024])
+            .to_request();
+        let response = actix_web::test::call_service(&app, request).await;
+
+        assert_eq!(response.status(), 413);
+        assert_eq!(server.jobs.available_permits(), 1);
     }
 
     #[test]

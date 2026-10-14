@@ -8,6 +8,7 @@ repository.workspace = true
 
 [dependencies]
 e3-bfv-client.workspace = true
+e3-committee = { workspace = true }
 actix = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }

@@ -43,24 +43,43 @@ pub(super) struct NodeFacts {
     pub(super) key_file: PathBuf,
     /// An event log of the node exists and is in a target.
     pub(super) event_log_in_target: bool,
-    /// The store that the record next to the key file names.
+    /// The stores that the record next to the key file names.
     pub(super) recorded: Recorded,
 }
 
-/// The store that a key file's record names (`store_record`): the store that the node used at
-/// its last start.
+/// The stores that a key file's record names (`store_record`): every store that the node started
+/// with, the store of its last start last.
 #[derive(Debug)]
 pub(super) enum Recorded {
     /// The key file has no record, as for a node that has not started with this release.
     Nothing,
-    /// The record names `db_file`. `store` is the store when it exists.
-    Store {
-        db_file: PathBuf,
-        store: Option<Location>,
-        lock: Location,
-    },
+    /// The record names these stores, the store of the last start last.
+    Stores(Vec<RecordedStore>),
     /// The record exists, and the purge cannot read it.
     Unreadable(PathBuf),
+}
+
+impl Recorded {
+    /// The store of the node's last start.
+    pub(super) fn last(&self) -> Option<&Path> {
+        match self {
+            Recorded::Stores(stores) => stores.last().map(|store| store.db_file.as_path()),
+            Recorded::Nothing | Recorded::Unreadable(_) => None,
+        }
+    }
+}
+
+/// A store that a record names.
+#[derive(Debug)]
+pub(super) struct RecordedStore {
+    pub(super) db_file: PathBuf,
+    /// The store, when it exists.
+    pub(super) store: Option<Location>,
+    /// The lock that `start` takes for the store.
+    pub(super) lock: Location,
+    /// The store is gone, and its folder in the data folder holds the marker of an earlier purge
+    /// that checked it and stopped part of the way.
+    pub(super) purged: bool,
 }
 
 /// A path as the purge uses it, and two forms of it to compare locations.
@@ -140,7 +159,7 @@ pub(super) async fn gather(targets: &PurgeTargets, nodes: &[AppConfig]) -> Resul
     Ok(Facts {
         nodes: node_facts,
         data: data_entries(&targets.data).await?,
-        config: config_entries(&targets.config).await?,
+        config: config_entries(targets).await?,
     })
 }
 
@@ -169,38 +188,47 @@ async fn node_facts_of(targets: &PurgeTargets, node: &AppConfig) -> Result<NodeF
         lock_folder_in_data: resolve(&lock_folder)?.starts_with(&targets.data),
         in_scope,
         key_file_in_target,
-        recorded: recorded(&key_file).await?,
+        recorded: recorded(targets, &key_file).await?,
         key_file,
         event_log_in_target,
         db_file,
     })
 }
 
-/// The store that the record of `key_file` names.
-/// The store that the record of `key_file` names. A record, or a store that it names, that the
+/// The stores that the record of `key_file` names. A record, or a store that it names, that the
 /// purge cannot read or inspect is a refusal, not an error that ends the purge.
-async fn recorded(key_file: &Path) -> Result<Recorded> {
+async fn recorded(targets: &PurgeTargets, key_file: &Path) -> Result<Recorded> {
     let record = crate::store_record::record_path(key_file);
-    let db_file = match crate::store_record::read(key_file) {
-        Ok(Some(db_file)) => db_file,
-        Ok(None) => return Ok(Recorded::Nothing),
+    let db_files = match crate::store_record::read(key_file) {
+        Ok(db_files) if db_files.is_empty() => return Ok(Recorded::Nothing),
+        Ok(db_files) => db_files,
         Err(_) => return Ok(Recorded::Unreadable(record)),
     };
     let inspected = async {
-        let store = if fs::try_exists(&db_file).await? {
-            Some(Location::of(db_file.clone())?)
-        } else {
-            None
-        };
-        anyhow::Ok((store, Location::of(lock_path_for(&db_file))?))
+        let mut stores = Vec::with_capacity(db_files.len());
+        for db_file in db_files {
+            let lock = lock_path_for(&db_file);
+            let lock_folder = lock.parent().map(Path::to_path_buf).unwrap_or_default();
+            let store = if fs::try_exists(&db_file).await? {
+                Some(Location::of(db_file.clone())?)
+            } else {
+                None
+            };
+            let purged = store.is_none()
+                && folder_state(&lock_folder).await? == FolderState::Purging
+                && resolve(&lock_folder)?.starts_with(&targets.data);
+            stores.push(RecordedStore {
+                db_file,
+                store,
+                lock: Location::of(lock)?,
+                purged,
+            });
+        }
+        anyhow::Ok(stores)
     }
     .await;
     Ok(match inspected {
-        Ok((store, lock)) => Recorded::Store {
-            db_file,
-            store,
-            lock,
-        },
+        Ok(stores) => Recorded::Stores(stores),
         Err(_) => Recorded::Unreadable(record),
     })
 }
@@ -293,9 +321,9 @@ async fn data_entries(data: &Path) -> Result<Vec<DataEntry>> {
     Ok(found)
 }
 
-async fn config_entries(config: &Path) -> Result<Vec<ConfigEntry>> {
+async fn config_entries(targets: &PurgeTargets) -> Result<Vec<ConfigEntry>> {
     let mut found = Vec::new();
-    for entry in entries(config).await? {
+    for entry in entries(&targets.config).await? {
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().into_owned();
         // `is_dir` and `is_file` follow a link. A link that points to nothing is neither.
@@ -315,7 +343,7 @@ async fn config_entries(config: &Path) -> Result<Vec<ConfigEntry>> {
                             &name[..name.len() - crate::store_record::RECORD_SUFFIX.len()],
                         );
                         let key_file = record.with_file_name(key_name);
-                        let recorded = recorded(&key_file).await?;
+                        let recorded = recorded(targets, &key_file).await?;
                         records.push((key_file, recorded));
                     }
                 }
@@ -329,7 +357,7 @@ async fn config_entries(config: &Path) -> Result<Vec<ConfigEntry>> {
         } else if path.is_file() && !is_store_record(&path) {
             found.push(ConfigEntry::File {
                 name,
-                recorded: recorded(&path).await?,
+                recorded: recorded(targets, &path).await?,
                 location,
             });
         }

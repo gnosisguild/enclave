@@ -11,7 +11,6 @@ Before getting started, ensure you have installed:
 
 - [Rust](https://rust-lang.org/tools/install/)
 - [NodeJS](https://nodejs.org/en/download)
-- [RiscZero](https://dev.risczero.com/api/zkvm/install)
 - [pnpm](https://pnpm.io)
 - [Metamask](https://metamask.io)
 
@@ -22,26 +21,23 @@ As system requirements:
 
 ## Quick Start
 
-### (optional) Install RISC Zero Toolchain
+### Configure OpenVM
 
-Next, install `rzup` for the `cargo-risczero` toolchain.
-
-```sh
-# Install rzup
-curl -L https://risczero.com/install | bash
-
-# Install RISC Zero toolchain
-rzup install cargo-risczero
-```
-
-Verify the installation was successful by running:
+Real proofs use OpenVM. `guest/` proves your `program/`, with your processor and your input policy,
+and `.interfold/support/openvm` is the proving service. Build the OpenVM workers, set
+`program.openvm` in `interfold.config.yaml`, then run:
 
 ```sh
-cargo risczero --version
+interfold program compile   # the guest, its keys and receipt identity, and the service
 ```
 
-At this point, you should have all the tools required to develop and deploy an application with
-[RISC Zero](https://www.risczero.com).
+A machine with a working CUDA GPU proves on it when `prover_bin_cuda` is set; any other machine
+proves on the CPU. See the OpenVM guide in the Interfold repository
+(`crates/openvm-prover/README.md`) for the workers and the Halo2 artifacts.
+
+Contract deployment reads the receipt identity and verifier artifact that `compile` wrote, unless
+`OPENVM_*` settings name another. Without either, deployment stops; it does not select a mock
+verifier.
 
 ### Install Metamask
 
@@ -89,6 +85,7 @@ cd my-first-e3
 This creates a complete E3 project with:
 
 - **FHE computation logic** (`./program/`)
+- **OpenVM guest** that proves it (`./guest/`)
 - **Smart contracts** (`./contracts/`)
 - **Client application** (`./client/`)
 - **Coordination server** (`./server/`)
@@ -96,21 +93,20 @@ This creates a complete E3 project with:
 
 ### Compile your E3 Program
 
-First, compile your E3 program to build the Risc0 zkvm image:
+The local scripts (`pnpm dev:setup`, `pnpm dev:all`) run the unproved development runner and deploy
+a verifier that accepts every receipt. They set `E3_PROGRAM__DEV=true` and
+`TEMPLATE_UNPROVED_TEST=1`, which only chain ID 31337 accepts. Nothing they produce is evidence of a
+valid OpenVM proof.
+
+For real proofs, set `TEMPLATE_REAL_PROOFS=1` and configure `program.openvm` (see above). Then:
 
 ```bash
 interfold program compile
 ```
 
-This builds the Risc0 zkvm image that will be deployed on the blockchain and used for verification
-of the final proof.
-
-If you want to avoid the proof or you have trouble with Risc0 zkvm installation, you can run it in
-dev mode (no proof).
-
-```bash
-interfold program start --dev true
-```
+builds `./guest` against `./program`, its proving keys and receipt identity, and the proving
+service. A changed program has a new identity, so redeploy the verifier after you rebuild it.
+Without the scripts, `interfold program start --dev true` starts the development runner.
 
 ### Start the Development Environment
 

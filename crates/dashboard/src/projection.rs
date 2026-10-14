@@ -244,12 +244,14 @@ struct E3State {
     last_seen_us: u64,
 }
 
-/// How long after its failure an E3 still needs this node for its slash reports.
+/// How long after its failure the dashboard counts an E3 for its slash reports. They are due until
+/// one day after the E3's lifecycle deadline, which the projection does not know, so this is an
+/// estimate.
 const REPORT_WINDOW_US: u64 = 24 * 60 * 60 * 1_000_000;
 
 impl E3State {
-    /// Whether the E3 still needs this node at `now_us`: the node is in it, and the E3 runs, or
-    /// failed less than a day ago, so its slash reports can still be due.
+    /// Whether the E3 counts as active at `now_us`: the node is in it, and the E3 runs, or failed
+    /// less than a day ago.
     fn needs(&self, local_address: &str, now_us: u64) -> bool {
         let member = if self.committee.is_empty() {
             self.tickets
@@ -347,8 +349,9 @@ impl TelemetryProjection {
                 })
                 .collect(),
             e3_total: summaries.len(),
-            // E3s that still need this node, also a failed E3 whose slash reports can still be
-            // due: a node that stops then cannot send them.
+            // E3s that still need this node, also a failed E3 for a day after the failure, since
+            // its slash reports can be due: a node that stops then cannot send them. For failed
+            // E3s the count is an estimate (`REPORT_WINDOW_US`).
             e3_active: self
                 .e3s
                 .values()
@@ -1314,9 +1317,8 @@ mod tests {
         assert!(rewards.iter().all(|reward| !reward.claimed));
     }
 
-    /// The active count is the E3s that still need this node: the ones that it is in while they
-    /// run, and the failed ones for a day after the failure, while their slash reports can still
-    /// be due. Other nodes' E3s and completed ones do not count.
+    /// The active count is the E3s that this node is in while they run, and the failed ones for a
+    /// day after the failure. Other nodes' E3s and completed ones do not count.
     #[test]
     fn the_active_count_is_the_e3s_that_still_need_this_node() {
         use alloy::primitives::Address;

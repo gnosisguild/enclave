@@ -63,6 +63,9 @@ Run from repo root via pnpm scripts — not raw cargo/nargo/hardhat.
 | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Install / build all         | `pnpm i` · `pnpm build`                                                                                                                            |
 | Build Rust                  | `pnpm rust:build` (cargo `--locked --release`; prebuilds EVM fixtures)                                                                             |
+| Build ZK artifact CLI       | `pnpm rust:build:zk [--release]` (no EVM fixture prebuild)                                                                                         |
+| ZK artifact CLI             | `pnpm zk list\|generate\|vk-hash\|parity-matrices`                                                                                                 |
+| Rust formatting / Clippy    | `pnpm rust:format` · `pnpm rust:lint` · `pnpm rust:clippy [-- -D warnings]`                                                                        |
 | Test everything             | `pnpm test` (EVM, Rust, required proof/slashing suites, SDK, Noir)                                                                                 |
 | Test one layer              | `pnpm evm:test` · `pnpm rust:test` · `pnpm sdk:test` · `pnpm noir:test`                                                                            |
 | SDK proof verification      | `pnpm sdk:test:proofs` (prepare circuits, generate one proof, verify bindings and reject tampering)                                                |
@@ -102,7 +105,7 @@ Two independent settings select what `pnpm build:circuits` compiles into `circui
 - **Preset** (`--preset insecure` [default] | `secure-8192` | `secure-16384`): the BFV parameter
   set.
 - **Committee** (`--committee minimum` [default] | `micro` | `small`): `(N, T, H)` for the
-  secret-sharing committee. Mirrors `e3_zk_helpers::CiphernodesCommitteeSize`.
+  secret-sharing committee. Mirrors `e3_committee::CiphernodesCommitteeSize`.
 
 `scripts/build-circuits.ts` writes the selection. Never hand-edit the values that it writes:
 
@@ -116,8 +119,8 @@ Two independent settings select what `pnpm build:circuits` compiles into `circui
 `scripts/check-committee.sh` (`pnpm check:committee`, pre-push and the Agent Harness CI workflow)
 compares the BFV tuples, committee values, and configuration IDs across TypeScript, Rust, Noir, and
 Solidity. The file list is at the top of the script. It regenerates and compares the parity matrices
-only when `target/release/generate_parity_matrices` is executable and `nargo` is on PATH. A
-different `.active-preset.json` only prints a note. Always switch with
+only when `target/release/zk-artifacts` is executable and `nargo` is on PATH. A different
+`.active-preset.json` only prints a note. Always switch with
 `pnpm build:circuits --committee <name>`. Supported `(preset, committee)` pairs live in
 `scripts/circuit-constants.ts`. See `scripts/README.md#circuit-builder` and
 `circuits/benchmarks/README.md` for the full recipe.
@@ -212,33 +215,34 @@ persistence · opentelemetry/tracing.
   `user_data_encryption_ct0/ct1` (+ wrapper) · C6 `share_decryption` · C7
   `decrypted_shares_aggregation` · secure-16384 l-BFV row proofs `lbfv_pk_generation`
   (`CircuitName::LbfvPkGeneration = 29`), `lbfv_pk_aggregation`
-  (`CircuitName::LbfvPkAggregation = 30`), `rlk_generation` (`CircuitName::RlkGeneration = 27`),
-  and `rlk_aggregation` (`CircuitName::RlkAggregation = 28`). `lbfv_pk_generation` and
-  `rlk_generation` each prove all CRT limbs of one key row in one proof, without recursion.
-  `rlk_aggregation` proves one component (`d0` or `d2`) of one row, so each row takes two proofs.
+  (`CircuitName::LbfvPkAggregation = 30`), `rlk_generation` (`CircuitName::RlkGeneration = 27`), and
+  `rlk_aggregation` (`CircuitName::RlkAggregation = 28`). `lbfv_pk_generation` and `rlk_generation`
+  each prove all CRT limbs of one key row in one proof, without recursion. `rlk_aggregation` proves
+  one component (`d0` or `d2`) of one row, so each row takes two proofs.
   `CircuitName::RlkGenerationLimb = 31` and `CircuitName::LbfvPkGenerationLimb = 40` are retired:
-  nothing produces them, and they stay declared so that later variants keep their encoding. These circuits have helper and prover boundaries. Runtime handlers use stable operation IDs
-  for deterministic row-proof retries. Generation verification accepts C1 followed by complete
-  five-row public-key and RLK families; aggregation accepts the PK row family and the RLK `d0` and
-  `d2` row families without C1. For
-  secure-16384, the per-E3 keyshare actor durably produces and publishes its local bundle. Each
-  public-key aggregator durably collects and verifies remote bundles. The active aggregator verifies
-  the first durable H-party ready quorum. A failed candidate is durably replaced with the next ready
-  party before the aggregator seals the accepted quorum and starts the legacy C5 path. A separate
-  secure-16384 recursive family verifies the generation rows, aggregation rows, and legacy C0-C5
-  chain. Rust recursive request/prover wiring and the local document-to-node-fold handoff are
-  implemented. The active aggregator persists the complete operational public key and RLK. Restart
-  reconstructs a missing key from the durable accepted documents after the row fold completes. A
-  terminal row-aggregation failure suppresses later proof and publication work. The aggregator
-  publishes a version-3 envelope that reconstructs the public key from the RLK. Its SAFE commitment
-  binds both keys and replaces the legacy published-key commitment output. The active aggregator
-  also persists and redrives a secure-16384 `LbfvPublicKeyAggregated` publication intent. The
-  registry writer adapts that local intent to the existing replay-safe publication gate and submits
-  the V2 proof and attestation bundle. The `secure-16384/minimum` PK test generates one row proof
-  with six public fields. The RLK test generates one row proof with eight public fields.
-  At secure-16384 the PK row circuit compiles in about 8 GB and the RLK row circuit in about 15 GB
-  maximum RSS; both use `Polynomial::dot_materialized` to keep the compiler from holding each
-  16,384-term dot product as one expression.
+  nothing produces them, and they stay declared so that later variants keep their encoding. These
+  circuits have helper and prover boundaries. Runtime handlers use stable operation IDs for
+  deterministic row-proof retries. Generation verification accepts C1 followed by complete five-row
+  public-key and RLK families; aggregation accepts the PK row family and the RLK `d0` and `d2` row
+  families without C1. For secure-16384, the per-E3 keyshare actor durably produces and publishes
+  its local bundle. Each public-key aggregator durably collects and verifies remote bundles. The
+  active aggregator verifies the first durable H-party ready quorum. A failed candidate is durably
+  replaced with the next ready party before the aggregator seals the accepted quorum and starts the
+  legacy C5 path. A separate secure-16384 recursive family verifies the generation rows, aggregation
+  rows, and legacy C0-C5 chain. Rust recursive request/prover wiring and the local
+  document-to-node-fold handoff are implemented. The active aggregator persists the complete
+  operational public key and RLK. Restart reconstructs a missing key from the durable accepted
+  documents after the row fold completes. A terminal row-aggregation failure suppresses later proof
+  and publication work. The aggregator publishes a version-3 envelope that reconstructs the public
+  key from the RLK. Its SAFE commitment binds both keys and replaces the legacy published-key
+  commitment output. The active aggregator also persists and redrives a secure-16384
+  `LbfvPublicKeyAggregated` publication intent. The registry writer adapts that local intent to the
+  existing replay-safe publication gate and submits the V2 proof and attestation bundle. The
+  `secure-16384/minimum` PK test generates one row proof with six public fields. The RLK test
+  generates one row proof with eight public fields. At secure-16384 the PK row circuit compiles in
+  about 8 GB and the RLK row circuit in about 15 GB maximum RSS; both use
+  `Polynomial::dot_materialized` to keep the compiler from holding each 16,384-term dot product as
+  one expression.
 - **Recursive aggregation** (`circuits/bin/recursive_aggregation/`): fold kernels
   (`c2ab_chunk_fold`, `c3_fold`, `c6_fold`, `node_fold`, `nodes_fold`, …) and the top-level
   `dkg_aggregator` / `decryption_aggregator`, which produce the on-chain Honk verifiers. A separate
@@ -246,5 +250,5 @@ persistence · opentelemetry/tracing.
   `lbfv_aggregation_fold`, and `dkg_aggregator_v2`. The canonical committed root matches
   `(insecure, minimum)`; other generated pairs live under `honk/<preset>/<committee>/`.
 - `config` circuit validates preset constants (CRT moduli, bounds, parity matrices). Parity matrices
-  for `insecure`, `secure-8192`, and `secure-16384` are generated by the Rust
-  `generate_parity_matrices` binary — never hand-edit.
+  for `insecure`, `secure-8192`, and `secure-16384` are generated by `zk-artifacts parity-matrices`
+  — never hand-edit.

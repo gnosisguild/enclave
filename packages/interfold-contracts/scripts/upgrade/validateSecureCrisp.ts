@@ -39,16 +39,13 @@ import {
   loadConfig,
   requireContract,
 } from "../protocol/values";
+import { PRODUCTION_BFV_CONFIG } from "../utils";
 import {
-  PRODUCTION_BFV_CONFIG,
-  activeBfvConfigForChain,
-  bfvConfigsForChain,
-  bfvPkV2PublicInputLayout,
-  getBfvDecryptionSubCircuitVkHashPaths,
-  getBfvPkSubCircuitVkHashPaths,
-  getBfvV2SubCircuitVkHashPaths,
-  readVkRecursiveHash,
-} from "../utils";
+  equalAddress,
+  equalValue,
+  readContract,
+  validateBfvRoutes,
+} from "./bfvRouteChecks";
 import { proxyImplementation } from "./safeProxyUpgrade";
 import { expectedCrispImageId } from "./secureCrispArtifacts";
 
@@ -81,29 +78,6 @@ function planPath(config: ProtocolConfigFile): string {
   return path.join(protocolDir, `${config.name}.secure-crisp.upgrade.json`);
 }
 
-function equalAddress(actual: string, expected: string, label: string): void {
-  if (actual.toLowerCase() !== expected.toLowerCase()) {
-    throw new Error(`${label} mismatch: expected ${expected}, got ${actual}`);
-  }
-}
-
-function equalValue(actual: unknown, expected: unknown, label: string): void {
-  if (String(actual).toLowerCase() !== String(expected).toLowerCase()) {
-    throw new Error(`${label} mismatch: expected ${expected}, got ${actual}`);
-  }
-}
-
-async function readContract(
-  provider: any,
-  target: string,
-  contractInterface: ethersLib.Interface,
-  functionName: string,
-): Promise<any> {
-  const data = contractInterface.encodeFunctionData(functionName);
-  const result = await provider.call({ to: target, data });
-  return contractInterface.decodeFunctionResult(functionName, result)[0];
-}
-
 export async function validateSecureCrispUpgrade(): Promise<void> {
   const { ethers } = await connect();
   const config = loadConfig();
@@ -123,8 +97,6 @@ export async function validateSecureCrispUpgrade(): Promise<void> {
     );
   }
   const avail = availVectorXForChain(chainId);
-  const verifierDefault = activeBfvConfigForChain(chainId);
-  const verifierConfigs = bfvConfigsForChain(chainId);
   if (plan.name !== config.name) {
     throw new Error(
       `Upgrade plan name mismatch: expected ${config.name}, got ${plan.name}`,
@@ -915,163 +887,12 @@ export async function validateSecureCrispUpgrade(): Promise<void> {
     "CRISP RISC Zero verifier",
   );
 
-  if (plan.bfvVerifierRoutes.length !== verifierConfigs.length) {
-    throw new Error(
-      `Expected ${verifierConfigs.length} BFV routes, got ${plan.bfvVerifierRoutes.length}`,
-    );
-  }
-  const pkRouter = await ethers.getContractAt(
-    "BfvPkVerifierRouter",
-    plan.pkVerifier,
-  );
-  const decryptionRouter = await ethers.getContractAt(
-    "BfvDecryptionVerifierRouter",
-    plan.decryptionVerifier,
-  );
-  equalAddress(
-    await pkRouter.ciphernodeRegistry(),
-    plan.registryProxy,
-    "PK router registry",
-  );
-  equalValue(await pkRouter.h(), verifierDefault.h, "PK router default h");
-  equalValue(
-    await decryptionRouter.threshold(),
-    verifierDefault.t,
-    "decryption router default threshold",
-  );
-  const expectedRouteCount = BigInt(verifierConfigs.length);
-  equalValue(await pkRouter.routeCount(), expectedRouteCount, "PK route count");
-  equalValue(
-    await decryptionRouter.routeCount(),
-    expectedRouteCount,
-    "decryption route count",
-  );
-
-  for (let index = 0; index < verifierConfigs.length; index += 1) {
-    const expected = verifierConfigs[index];
-    const recorded = plan.bfvVerifierRoutes[index];
-    if (
-      recorded.preset !== expected.preset ||
-      recorded.committee !== expected.committee ||
-      recorded.paramSet !== expected.paramSet ||
-      recorded.committeeSize !== expected.committeeSize
-    ) {
-      throw new Error(
-        `Recorded BFV route ${index} does not match the release matrix`,
-      );
-    }
-
-    const pkRoute = await pkRouter.routeAt(index);
-    const decryptionRoute = await decryptionRouter.routeAt(index);
-    const isV2 = expected.preset === "secure-16384";
-    const expectedPkVerifier = isV2
-      ? recorded.pkVerifierV2
-      : recorded.pkVerifier;
-    if (!expectedPkVerifier) {
-      throw new Error(`Recorded BFV route ${index} is missing its V2 verifier`);
-    }
-    equalAddress(pkRoute[0], expectedPkVerifier, `PK route ${index}`);
-    equalValue(
-      pkRoute[3],
-      expected.paramSet,
-      `PK route ${index} parameter set`,
-    );
-    equalValue(
-      pkRoute[1],
-      // secure-16384 compiles five l-BFV rows.
-      isV2
-        ? bfvPkV2PublicInputLayout(expected.h, 5).length
-        : 3 * expected.h + 24,
-      `PK route ${index} public input count`,
-    );
-    equalAddress(
-      decryptionRoute[0],
-      recorded.decryptionVerifier,
-      `decryption route ${index}`,
-    );
-    equalValue(
-      decryptionRoute[1],
-      111 + 3 * expected.t,
-      `decryption route ${index} public input count`,
-    );
-
-    const pkVerifier = await ethers.getContractAt(
-      isV2 ? "BfvPkVerifierV2" : "BfvPkVerifier",
-      expectedPkVerifier,
-    );
-    const decryptionVerifier = await ethers.getContractAt(
-      "BfvDecryptionVerifier",
-      recorded.decryptionVerifier,
-    );
-    equalValue(await pkVerifier.h(), expected.h, `PK route ${index} h`);
-    equalValue(
-      await decryptionVerifier.threshold(),
-      expected.t,
-      `decryption route ${index} threshold`,
-    );
-    const expectedDkgAggregator = isV2
-      ? recorded.dkgAggregatorV2Verifier
-      : recorded.dkgAggregatorVerifier;
-    if (!expectedDkgAggregator) {
-      throw new Error(
-        `Recorded BFV route ${index} is missing its DKG aggregator verifier`,
-      );
-    }
-    equalAddress(
-      await pkVerifier.circuitVerifier(),
-      expectedDkgAggregator,
-      `PK route ${index} aggregator`,
-    );
-    if (isV2) {
-      if (!recorded.dkgAggregatorV2Verifier) {
-        throw new Error(
-          `Recorded BFV route ${index} is missing its V2 DKG aggregator verifier`,
-        );
-      }
-      equalAddress(
-        await pkVerifier.ciphernodeRegistry(),
-        plan.registryProxy,
-        `PK route ${index} registry`,
-      );
-    }
-    equalAddress(
-      await decryptionVerifier.circuitVerifier(),
-      recorded.decryptionAggregatorVerifier,
-      `decryption route ${index} aggregator`,
-    );
-    equalAddress(
-      await decryptionVerifier.ciphernodeRegistry(),
-      plan.registryProxy,
-      `decryption route ${index} registry`,
-    );
-    const pkPaths = getBfvPkSubCircuitVkHashPaths(expected);
-    const nodesFoldPath = isV2
-      ? getBfvV2SubCircuitVkHashPaths(expected).nodesFold
-      : pkPaths.nodesFold;
-    const decryptionPaths = getBfvDecryptionSubCircuitVkHashPaths(expected);
-    equalValue(
-      pkRoute[2],
-      readVkRecursiveHash(nodesFoldPath, expected),
-      `PK route ${index} nodes-fold VK`,
-    );
-    if (!isV2) {
-      equalValue(
-        await pkVerifier.expectedC5KeyHash(),
-        readVkRecursiveHash(pkPaths.c5, expected),
-        `PK route ${index} C5 VK`,
-      );
-    }
-    equalValue(
-      decryptionRoute[2],
-      readVkRecursiveHash(decryptionPaths.c6Fold, expected),
-      `decryption route ${index} C6-fold VK`,
-    );
-    equalValue(
-      decryptionRoute[3],
-      readVkRecursiveHash(decryptionPaths.c7, expected),
-      `decryption route ${index} C7 VK`,
-    );
-  }
+  await validateBfvRoutes(ethers, chainId, {
+    pkVerifier: plan.pkVerifier,
+    decryptionVerifier: plan.decryptionVerifier,
+    bfvVerifierRoutes: plan.bfvVerifierRoutes,
+    registry: plan.registryProxy,
+  });
 
   deployment.interfoldImplementation = plan.interfoldImplementation;
   deployment.interfoldLifecycle = plan.lifecycleLibrary;

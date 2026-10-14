@@ -15,9 +15,9 @@
 use crate::circuits::vk;
 use crate::error::ZkError;
 use crate::prover::ZkProver;
+use e3_committee::CiphernodesCommitteeSize;
 use e3_events::{CircuitName, CircuitVariant, Proof, ProofType};
 use e3_fhe_params::BfvPreset;
-use e3_zk_helpers::CiphernodesCommitteeSize;
 use num_bigint::BigUint;
 
 /// BN254 scalar field modulus `r` (field elements are canonical in `[0, r)`).
@@ -169,10 +169,10 @@ mod tests {
         C2TerminalAnchors,
     };
     use crate::error::ZkError;
+    use e3_committee::CiphernodesCommitteeSize;
     use e3_events::{CircuitName, Proof, ProofType};
     use e3_fhe_params::BfvPreset;
     use e3_utils::ArcBytes;
-    use e3_zk_helpers::CiphernodesCommitteeSize;
     use num_bigint::BigUint;
 
     fn hex_field(value: &BigUint) -> String {

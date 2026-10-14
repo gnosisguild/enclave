@@ -19,9 +19,9 @@ node_modules
 .interfold/noir/
 
 /target
+/guest/target
 
-# Ignore risc0 files
-tests/Elf.sol
+.interfold/generated/
 
 /deployments
 

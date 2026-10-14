@@ -11,12 +11,12 @@ use common::{
     require_minimum_circuits_for_preset, setup_compiled_circuit_for_preset,
     setup_recursive_aggregation_fold_circuit_for_preset, setup_test_prover,
 };
+use e3_committee::CiphernodesCommitteeSize;
 use e3_events::{CircuitName, CircuitVariant, Proof, ProofType};
 use e3_fhe_params::BfvPreset;
 use e3_utils::utility_types::ArcBytes;
 use e3_zk_helpers::computation::DkgInputType;
 use e3_zk_helpers::dkg::share_computation::ShareComputationCircuitData;
-use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_prover::test_utils::{
     fold_witness_field_strings, fold_witness_input_map, load_vk_artifacts,
 };

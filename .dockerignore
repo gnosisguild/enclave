@@ -6,6 +6,13 @@
 !Cargo.toml
 !Cargo.lock
 !crates/**/*
+!examples/CRISP/program/**/*
+# CRISP's OpenVM proving service (crates/support/Dockerfile) builds in the CRISP workspace.
+!examples/CRISP/Cargo.toml
+!examples/CRISP/Cargo.lock
+!examples/CRISP/.interfold/support/**
+!examples/CRISP/server/**/*
+!examples/CRISP/crates/**/*
 !packages/**/*
 !package.json
 !pnpm-workspace.yaml
@@ -24,3 +31,9 @@ target/
 
 # Explicitly ignore node_modules
 **/node_modules/
+
+# Never send local secrets to an image: a checkout's .env files can hold deployment keys. These
+# rules come last so that no allow rule above can bring a .env file back.
+**/.env
+**/.env.*
+!**/.env.example

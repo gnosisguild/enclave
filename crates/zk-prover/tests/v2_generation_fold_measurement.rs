@@ -9,6 +9,7 @@ mod common;
 use std::{env, fs, path::PathBuf};
 
 use common::find_bb;
+use e3_committee::CiphernodesCommitteeSize;
 use e3_config::BBPath;
 use e3_events::{CircuitName, CircuitVariant, Proof};
 use e3_fhe_params::{build_pair_for_preset, lbfv_crs_seed, lbfv_urs_seed, BfvPreset};
@@ -22,7 +23,6 @@ use e3_zk_helpers::threshold::rlk_aggregation::{
     RlkAggregationCircuit, RlkAggregationCircuitData, RlkAggregationComponent,
 };
 use e3_zk_helpers::threshold::rlk_generation::RlkGenerationAdapter;
-use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_prover::test_utils::load_vk_artifacts;
 use e3_zk_prover::{
     prove_lbfv_generation_fold_step, prove_lbfv_pk_generation_row, prove_rlk_generation_row,

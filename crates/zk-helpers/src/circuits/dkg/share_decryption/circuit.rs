@@ -7,8 +7,8 @@
 //! Circuit definition and input type for the share-decryption ZK circuit (CIRCUIT 4a/4b).
 
 use crate::computation::DkgInputType;
-use crate::registry::Circuit;
-use crate::CiphernodesCommittee;
+use crate::metadata::Circuit;
+use e3_committee::CiphernodesCommittee;
 use e3_fhe_params::ParameterType;
 use fhe::bfv::Ciphertext;
 use fhe::bfv::SecretKey;

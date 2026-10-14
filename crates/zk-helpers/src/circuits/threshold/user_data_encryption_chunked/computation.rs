@@ -9,18 +9,20 @@
 //! [`Configs`], [`Bounds`], [`Bits`], and [`Inputs`] are produced from BFV parameters
 //! and (for input) a public key. They implement [`Computation`] and are used by codegen.
 
-use crate::calculate_bit_width;
+use crate::encoding::plaintext_poly_u64;
 use crate::get_zkp_modulus;
-use crate::math::compute_k0is;
-use crate::math::{exact_quotient, negacyclic_mul, plaintext_poly_u64};
+use crate::negacyclic::{exact_quotient, negacyclic_mul};
 use crate::threshold::user_data_encryption_chunked::circuit::UserDataEncryptionCircuit;
 use crate::threshold::user_data_encryption_chunked::circuit::UserDataEncryptionCircuitData;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
+use e3_fhe_params::utils::calculate_bit_width;
+use e3_fhe_params::utils::compute_k0is;
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use fhe::bfv::SecretKey;
 use fhe_math::zq::Modulus;
 use fhe_traits::Serialize as FheSerialize;
@@ -158,28 +160,28 @@ impl Computation for Bits {
     fn compute(_: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let max_pk_bound = data.pk_bounds.iter().max().unwrap();
 
-        let pk_bit = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
+        let pk_bit = calculate_bit_width(max_pk_bound);
         // We can safely assume that the ct bound is the same as the pk bound.
-        let ct_bit = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
-        let u_bit = calculate_bit_width(BigInt::from(data.u_bound.clone()));
-        let e0_bit = calculate_bit_width(BigInt::from(data.e0_bound.clone()));
-        let e1_bit = calculate_bit_width(BigInt::from(data.e1_bound.clone()));
+        let ct_bit = calculate_bit_width(max_pk_bound);
+        let u_bit = calculate_bit_width(&data.u_bound);
+        let e0_bit = calculate_bit_width(&data.e0_bound);
+        let e1_bit = calculate_bit_width(&data.e1_bound);
 
         // For k1, use the maximum of low and up bounds
-        let k1_low_bit = calculate_bit_width(BigInt::from(data.k1_low_bound.clone()));
-        let k1_up_bit = calculate_bit_width(BigInt::from(data.k1_up_bound.clone()));
+        let k1_low_bit = calculate_bit_width(&data.k1_low_bound);
+        let k1_up_bit = calculate_bit_width(&data.k1_up_bound);
         let k_bit = k1_low_bit.max(k1_up_bit);
 
         // For r1, use the maximum of all low and up bounds
         let mut r1_bit = 0;
         for bound in data.r1_low_bounds.iter().chain(data.r1_up_bounds.iter()) {
-            r1_bit = r1_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
+            r1_bit = r1_bit.max(calculate_bit_width(bound));
         }
 
         // For p1, use the maximum of all bounds
         let mut p1_bit = 0;
         for bound in &data.p1_bounds {
-            p1_bit = p1_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
+            p1_bit = p1_bit.max(calculate_bit_width(bound));
         }
 
         Ok(Bits {
@@ -209,11 +211,12 @@ impl Computation for Bounds {
 
         let t = BigInt::from(threshold_params.plaintext());
 
-        let error_bound = crate::utils::error_sampler_bound(threshold_params.get_error1_variance())
-            .to_bigint()
-            .ok_or_else(|| {
-                CircuitsErrors::Other("Failed to convert error bound to BigInt".into())
-            })?;
+        let error_bound =
+            e3_fhe_params::utils::error_sampler_bound(threshold_params.get_error1_variance())
+                .to_bigint()
+                .ok_or_else(|| {
+                    CircuitsErrors::Other("Failed to convert error bound to BigInt".into())
+                })?;
 
         let u_bound = SecretKey::sk_bound() as u128; // u_bound is the same as sk_bound
 
@@ -364,7 +367,7 @@ impl Computation for Inputs {
         pk0.center(moduli)?;
         pk1.center(moduli)?;
 
-        crate::utils::verify_crt_shapes(&[&ct0, &ct1, &pk0, &pk1], moduli.len(), n as usize)
+        crate::encoding::verify_crt_shapes(&[&ct0, &ct1, &pk0, &pk1], moduli.len(), n as usize)
             .map_err(|e| {
                 CircuitsErrors::Other(format!("user-data-encryption CRT shape mismatch: {e}"))
             })?;
@@ -513,7 +516,7 @@ mod tests {
         let bits = Bits::compute(BfvPreset::InsecureThreshold, &bounds).unwrap();
 
         let max_pk_bound = bounds.pk_bounds.iter().max().unwrap();
-        let expected_bits = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
+        let expected_bits = calculate_bit_width(max_pk_bound);
 
         assert_eq!(max_pk_bound.clone(), BigUint::from(36028797018956544u64));
         assert_eq!(bits.pk_bit, expected_bits);

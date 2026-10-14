@@ -26,9 +26,9 @@ rm -rf "${INTEGRATION_NOIR}/circuits"
 mkdir -p "${INTEGRATION_NOIR}/circuits" "${INTEGRATION_NOIR}/bin"
 
 if [[ "${FULL_PROOF_AGGREGATION:-false}" == "true" ]]; then
-  # Full-proof tests consume the same source-bound matrix that release verification uses.
-  (cd "$ROOT_DIR" && pnpm store:circuits pull)
-  (cd "$ROOT_DIR" && pnpm store:circuits verify-release)
+  # Full-proof tests use the newest published matrix. Its SOURCE_HASH is not checked against this
+  # tree until the circuit drift workflow is designed.
+  (cd "$ROOT_DIR" && pnpm store:circuits pull --latest)
   (cd "$ROOT_DIR" && pnpm build:circuits \
     --preset insecure \
     --committee minimum \

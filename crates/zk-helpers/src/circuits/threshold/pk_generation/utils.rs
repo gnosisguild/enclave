@@ -6,8 +6,7 @@
 
 //! Shared utilities for the pk_generation circuit (e.g. CRP matrix constant).
 
-use crate::math::fhe_poly_to_crt_centered;
-use crate::utils::bigint_to_field;
+use crate::encoding::{bigint_to_field, fhe_poly_to_crt_centered};
 use crate::CircuitsErrors;
 use e3_fhe_params::create_deterministic_crp_from_default_seed;
 use e3_polynomial::CrtPolynomial;

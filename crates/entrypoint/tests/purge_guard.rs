@@ -242,6 +242,37 @@ async fn store_recorded_at_start() -> Result<()> {
     Ok(())
 }
 
+/// The node used a store elsewhere, which holds an active share, and then started once with the
+/// stale copy at the configured path. The record keeps both stores, so the purge still checks the
+/// store with the share.
+async fn a_later_start_keeps_the_earlier_store() -> Result<()> {
+    let project = tempfile::tempdir()?;
+    let elsewhere = tempfile::tempdir()?;
+    let targets = PurgeTargets::in_dir(project.path());
+    let configured = project_node(project.path(), "cn1")?;
+    let used = node_with(
+        project.path(),
+        &elsewhere.path().join("data"),
+        &project.path().join(".interfold/config"),
+        "cn1",
+        "",
+    )?;
+    write_state(&configured, E3Stage::Complete).await?;
+    write_state(&used, E3Stage::KeyPublished).await?;
+    e3_entrypoint::store_record::write(&used.key_file(), &used.db_file())?;
+    e3_entrypoint::store_record::write(&configured.key_file(), &configured.db_file())?;
+    let nodes = vec![configured];
+
+    assert_refused(&targets, &nodes, false, &["node `cn1`", "KeyPublished"]).await;
+    assert!(untouched(&[&used]));
+
+    // With the override, the purge deletes the project and keeps the store outside it.
+    execute(&targets, &nodes, true).await?;
+    assert!(purged(project.path()));
+    assert!(used.db_file().exists());
+    Ok(())
+}
+
 /// A key file that no configured node uses is checked through its record. The node of a removed
 /// profile ran with its store elsewhere, which holds an active share, and left a completed stale
 /// store in its node folder: the purge checks the recorded store, also holds its lock, and not the
@@ -682,12 +713,13 @@ async fn decoy_store_removed_after_the_refusal() -> Result<()> {
 }
 
 /// An earlier purge marked the node folder and stopped while it emptied the folder. A second run
-/// finishes without an override.
+/// finishes without an override, also though the node's store record names the deleted store.
 async fn rerun_after_a_partly_emptied_folder() -> Result<()> {
     let project = tempfile::tempdir()?;
     let targets = PurgeTargets::in_dir(project.path());
     let nodes = vec![project_node(project.path(), "cn1")?];
     write_key_file(&nodes[0])?;
+    e3_entrypoint::store_record::write(&nodes[0].key_file(), &nodes[0].db_file())?;
     let node_folder = project.path().join(".interfold/data/cn1");
     std::fs::create_dir_all(&node_folder)?;
     std::fs::write(node_folder.join(MARKER_FILE_NAME), MARKER_TEXT)?;
@@ -1047,6 +1079,7 @@ async fn purge_refuses_to_delete_a_running_node_or_an_active_key_share() -> Resu
     default_layout().await?;
     store_outside_the_project().await?;
     store_recorded_at_start().await?;
+    a_later_start_keeps_the_earlier_store().await?;
     unconfigured_key_file_with_a_record().await?;
     store_behind_a_link().await?;
     key_file_through_a_link().await?;

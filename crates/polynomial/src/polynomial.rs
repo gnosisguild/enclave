@@ -4,560 +4,234 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Polynomial arithmetic implementation.
+//! Exact integer arithmetic on descending polynomial coefficients.
 
-use crate::fhe_poly::ToPowerBasisPoly;
-use crate::utils::{center, reduce};
-use num_bigint::{BigInt, BigUint, ToBigInt};
-use num_traits::{One, ToPrimitive, Zero};
-use std::fmt;
+use num_bigint::BigInt;
+use num_integer::Integer;
+use num_traits::{ToPrimitive, Zero};
 use thiserror::Error;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-/// Errors that can occur during polynomial operations.
 #[derive(Debug, Error)]
 pub enum PolynomialError {
-    /// Division by zero polynomial
     #[error("Division by zero polynomial")]
     DivisionByZero,
-
-    /// Invalid polynomial (e.g., empty coefficients or zero leading coefficient)
     #[error("Invalid polynomial: {message}")]
     InvalidPolynomial { message: String },
-
-    /// Modulus operation error
-    #[error("Modulus error: {message}")]
-    ModulusError { message: String },
-
-    /// Cyclotomic polynomial error
-    #[error("Cyclotomic polynomial error: {message}")]
-    CyclotomicError { message: String },
-
-    /// Range check failure
-    #[error("Range check error: {message}")]
-    RangeCheckError { message: String },
-
-    /// Arithmetic overflow or underflow
-    #[error("Arithmetic error: {message}")]
-    ArithmeticError { message: String },
-
-    /// I/O error
-    #[error("I/O error: {0}")]
-    IoError(#[from] std::io::Error),
-
-    /// Parse error for BigInt
-    #[error("Parse error: {0}")]
-    ParseError(#[from] num_bigint::ParseBigIntError),
 }
 
-/// A polynomial with coefficients stored as `BigInt` for arbitrary precision arithmetic.
+/// Integer coefficients, without implicit modular reduction or normalization.
+/// Arithmetic uses descending order. Constructors preserve leading zeros and length.
+/// FHE coefficient views can retain ascending order until explicitly reversed.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Polynomial {
-    pub(crate) coefficients: Vec<BigInt>,
-}
-
-impl fmt::Display for Polynomial {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.coefficients.is_empty() {
-            return write!(f, "0");
-        }
-
-        let mut first = true;
-        for (i, coeff) in self.coefficients.iter().enumerate() {
-            let degree = self.coefficients.len() - 1 - i;
-
-            if coeff.is_zero() {
-                continue;
-            }
-
-            if first {
-                if coeff < &BigInt::zero() {
-                    write!(f, "-")?;
-                }
-            } else if coeff > &BigInt::zero() {
-                write!(f, " + ")?;
-            } else {
-                write!(f, " - ")?;
-            }
-            first = false;
-
-            let abs_coeff = if coeff < &BigInt::zero() {
-                -coeff
-            } else {
-                coeff.clone()
-            };
-
-            if degree == 0 || !abs_coeff.is_one() {
-                write!(f, "{abs_coeff}")?;
-            }
-
-            if degree > 0 {
-                write!(f, "x")?;
-                if degree > 1 {
-                    write!(f, "^{degree}")?;
-                }
-            }
-        }
-
-        if first {
-            write!(f, "0")?;
-        }
-
-        Ok(())
-    }
+    coefficients: Vec<BigInt>,
 }
 
 impl Polynomial {
-    /// Creates a new polynomial from a vector of coefficients.
-    ///
-    /// # Arguments
-    ///
-    /// * `coefficients` - Vector of coefficients (see [`reverse`](Self::reverse) for ordering).
     pub fn new(coefficients: Vec<BigInt>) -> Self {
         Self { coefficients }
     }
 
-    /// Creates a new polynomial from a vector of u64 coefficients.
     pub fn from_u64_vector(coefficients: Vec<u64>) -> Self {
-        let coefficients = coefficients.iter().map(|&c| BigInt::from(c)).collect();
-
-        Self { coefficients }
+        Self::new(coefficients.into_iter().map(BigInt::from).collect())
     }
 
-    /// Creates a new polynomial from a fhe-math `Poly` (CRT-reconstructed mod Q).
-    pub fn from_fhe_polynomial(p: &impl ToPowerBasisPoly) -> Self {
-        let p = p.to_power_basis_poly();
-
-        let coefficients: Vec<BigUint> = Vec::<BigUint>::from(&p);
-        let bigints: Vec<BigInt> = coefficients
-            .iter()
-            .map(|c| c.to_bigint().unwrap())
-            .collect();
-
-        Self::new(bigints)
-    }
-
-    /// Reverses coefficient order in-place.
-    ///
-    /// **Coefficient ordering:** Converts between **descending** (highest degree first,
-    /// internal storage) and **ascending** (lowest degree first). Calling `reverse()`
-    /// twice restores the original order.
-    pub fn reverse(&mut self) {
-        self.coefficients.reverse()
-    }
-
-    /// Creates a zero polynomial of specified degree.
-    ///
-    /// # Arguments
-    ///
-    /// * `degree` - The degree of the zero polynomial.
-    pub fn zero(degree: usize) -> Self {
-        Self {
-            coefficients: vec![BigInt::zero(); degree + 1],
-        }
-    }
-
-    /// Creates a constant polynomial.
-    ///
-    /// # Arguments
-    ///
-    /// * `constant` - The constant value.
-    pub fn constant(constant: BigInt) -> Self {
-        Self {
-            coefficients: vec![constant],
-        }
-    }
-
-    /// Returns the coefficients of the polynomial.
     pub fn coefficients(&self) -> &[BigInt] {
         &self.coefficients
     }
 
-    /// Returns the degree of the polynomial.
-    ///
-    /// The degree is computed as `self.coefficients.len().saturating_sub(1)`,
-    /// which represents the highest exponent implied by the [`coefficients`](Self::coefficients)
-    /// vector. A coefficients vector of length `n` (including all-zero vectors
-    /// like those created by [`Polynomial::zero`]) yields degree `n - 1`.
-    pub fn degree(&self) -> usize {
-        if self.coefficients.is_empty() {
-            0
-        } else {
-            self.coefficients.len() - 1
-        }
+    /// Convert between ascending and descending coefficient order.
+    pub fn reverse(&mut self) {
+        self.coefficients.reverse();
     }
 
-    /// Checks if the polynomial is zero.
     pub fn is_zero(&self) -> bool {
-        self.coefficients.iter().all(|c| c.is_zero())
+        self.coefficients.iter().all(Zero::is_zero)
     }
 
-    /// Removes leading zero coefficients from the polynomial.
-    ///
-    /// This method removes zero coefficients from the highest degree terms until
-    /// a non-zero coefficient is found or only one coefficient remains.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use e3_polynomial::Polynomial;
-    /// use num_bigint::BigInt;
-    ///
-    /// let poly = Polynomial::new(vec![
-    ///     BigInt::from(0),
-    ///     BigInt::from(0),
-    ///     BigInt::from(1),
-    ///     BigInt::from(2),
-    /// ]);
-    /// let trimmed = poly.trim_leading_zeros();
-    /// assert_eq!(trimmed.coefficients(), &[BigInt::from(1), BigInt::from(2)]);
-    /// ```
-    ///
-    /// # Note
-    ///
-    /// If all coefficients are zero, the result will be a polynomial with a single zero coefficient.
-    pub fn trim_leading_zeros(mut self) -> Self {
-        if let Some(first_non_zero_idx) = self.coefficients.iter().position(|c| !c.is_zero()) {
-            self.coefficients.drain(..first_non_zero_idx);
-        } else {
-            self.coefficients = vec![BigInt::zero()];
-        }
-        self
-    }
-
-    /// Returns the leading coefficient of the polynomial.
-    pub fn leading_coefficient(&self) -> Option<&BigInt> {
-        self.coefficients.first()
-    }
-
-    /// Adds two polynomials together.
-    ///
-    /// This function performs polynomial addition by:
-    /// 1. Finding the maximum length between the two polynomials.
-    /// 2. Creating a new polynomial with the maximum length.
-    /// 3. Adding the coefficients of both polynomials term by term.
-    ///
-    /// # Arguments
-    ///
-    /// * `other` - A reference to the polynomial to add to `self`.
-    ///
-    /// # Returns
-    ///
-    /// A new polynomial containing the sum of the two polynomials.
+    /// Add descending coefficients, aligning equal powers without trimming zeros.
     pub fn add(&self, other: &Self) -> Self {
-        let max_length = std::cmp::max(self.coefficients.len(), other.coefficients.len());
-        let mut result = vec![BigInt::zero(); max_length];
-
-        // Add coefficients from the first polynomial
-        let self_offset = max_length - self.coefficients.len();
-        for (i, coeff) in self.coefficients.iter().enumerate() {
-            result[self_offset + i] = coeff.clone();
+        let len = self.coefficients.len().max(other.coefficients.len());
+        let mut result = vec![BigInt::zero(); len];
+        for (i, coefficient) in self.coefficients.iter().enumerate() {
+            result[len - self.coefficients.len() + i] = coefficient.clone();
         }
-
-        // Add coefficients from the second polynomial
-        let other_offset = max_length - other.coefficients.len();
-        for (i, coeff) in other.coefficients.iter().enumerate() {
-            result[other_offset + i] += coeff;
+        for (i, coefficient) in other.coefficients.iter().enumerate() {
+            result[len - other.coefficients.len() + i] += coefficient;
         }
-
-        Polynomial::new(result)
+        Self::new(result)
     }
 
-    /// Subtracts one polynomial from another.
-    ///
-    /// # Arguments
-    ///
-    /// * `other` - A reference to the polynomial to subtract from `self`.
-    ///
-    /// # Returns
-    ///
-    /// A new polynomial containing the difference.
     pub fn sub(&self, other: &Self) -> Self {
         self.add(&other.neg())
     }
 
-    /// Negates all coefficients of the polynomial.
-    ///
-    /// # Returns
-    ///
-    /// A new polynomial with all coefficients negated.
     pub fn neg(&self) -> Self {
-        Polynomial::new(self.coefficients.iter().map(|x| -x).collect())
+        Self::new(self.coefficients.iter().map(|x| -x).collect())
     }
 
-    /// Multiplies two polynomials.
-    ///
-    /// Both operands are converted to `i128` when every product fits that width, which is the
-    /// case for every circuit witness: one operand is ternary or a small error term and the
-    /// other is centered modulo a 58-bit CRT modulus. Otherwise the schoolbook `BigInt` path
-    /// runs. Both paths produce the same coefficients.
-    ///
-    /// # Arguments
-    ///
-    /// * `other` - A reference to the polynomial to multiply with `self`.
-    ///
-    /// # Returns
-    ///
-    /// A new polynomial containing the product.
+    /// Integer convolution, without reduction modulo a coefficient or ring modulus.
+    /// A zero operand returns the single-coefficient zero polynomial.
     pub fn mul(&self, other: &Self) -> Self {
         if self.is_zero() || other.is_zero() {
-            return Polynomial::zero(0);
+            return Self::new(vec![BigInt::zero()]);
         }
-
         if let Some(product) = self.mul_i128(other) {
             return product;
         }
-
-        let product_len = self.coefficients.len() + other.coefficients.len() - 1;
-        let mut product = vec![BigInt::zero(); product_len];
-
-        for i in 0..self.coefficients.len() {
-            for j in 0..other.coefficients.len() {
-                product[i + j] += &self.coefficients[i] * &other.coefficients[j];
+        let mut result =
+            vec![BigInt::zero(); self.coefficients.len() + other.coefficients.len() - 1];
+        for (i, a) in self.coefficients.iter().enumerate() {
+            for (j, b) in other.coefficients.iter().enumerate() {
+                result[i + j] += a * b;
             }
         }
-
-        Polynomial::new(product)
+        Self::new(result)
     }
 
-    /// Convolves both operands as `i128`, or returns `None` when any coefficient or any
-    /// partial sum could exceed that width.
-    ///
-    /// A product coefficient is a sum of at most `min(len_a, len_b)` terms, so
-    /// `min(len_a, len_b) * max|a| * max|b|` bounds every one of them.
+    /// Use i128 only when every coefficient and partial convolution sum fits.
     fn mul_i128(&self, other: &Self) -> Option<Self> {
-        let lhs = to_i128_vec(&self.coefficients)?;
-        let rhs = to_i128_vec(&other.coefficients)?;
-
+        let lhs: Vec<_> = self
+            .coefficients
+            .iter()
+            .map(BigInt::to_i128)
+            .collect::<Option<_>>()?;
+        let rhs: Vec<_> = other
+            .coefficients
+            .iter()
+            .map(BigInt::to_i128)
+            .collect::<Option<_>>()?;
         let max_lhs = lhs.iter().map(|c| c.unsigned_abs()).max()?;
         let max_rhs = rhs.iter().map(|c| c.unsigned_abs()).max()?;
-        let terms = std::cmp::min(lhs.len(), rhs.len()) as u128;
-        let bound = max_lhs.checked_mul(max_rhs)?.checked_mul(terms)?;
-        if bound > i128::MAX as u128 {
+        let terms = lhs.len().min(rhs.len()) as u128;
+        if max_lhs.checked_mul(max_rhs)?.checked_mul(terms)? > i128::MAX as u128 {
             return None;
         }
-
-        let mut product = vec![0i128; lhs.len() + rhs.len() - 1];
+        let mut result = vec![0i128; lhs.len() + rhs.len() - 1];
         for (i, &a) in lhs.iter().enumerate() {
-            if a == 0 {
-                continue;
-            }
-            for (j, &b) in rhs.iter().enumerate() {
-                product[i + j] += a * b;
-            }
-        }
-
-        Some(Polynomial::new(
-            product.into_iter().map(BigInt::from).collect(),
-        ))
-    }
-
-    /// Remove a coefficient from the polynomial.
-    pub fn remove(&mut self, index: usize) {
-        self.coefficients.remove(index);
-    }
-
-    /// Divides one polynomial by another, returning the quotient and remainder.
-    ///
-    /// # Arguments
-    ///
-    /// * `divisor` - A reference to the divisor polynomial.
-    ///
-    /// # Returns
-    ///
-    /// A result containing a tuple of (quotient, remainder) or an error.
-    ///
-    /// # Errors
-    ///
-    /// Returns `PolynomialError::DivisionByZero` if the divisor is zero.
-    /// Returns `PolynomialError::InvalidPolynomial` if the divisor has zero leading coefficient
-    /// or if exact divisibility is not satisfied (i.e., when a coefficient is not divisible
-    /// by the divisor's leading coefficient).
-    pub fn div(&self, divisor: &Self) -> Result<(Self, Self), PolynomialError> {
-        if divisor.is_zero() {
-            return Err(PolynomialError::DivisionByZero);
-        }
-
-        if divisor.coefficients.is_empty() || divisor.coefficients[0].is_zero() {
-            return Err(PolynomialError::InvalidPolynomial {
-                message: "Leading coefficient of divisor cannot be zero".to_string(),
-            });
-        }
-
-        if self.degree() < divisor.degree() {
-            return Ok((Polynomial::zero(0), self.clone()));
-        }
-
-        let mut quotient =
-            vec![BigInt::zero(); self.coefficients.len() - divisor.coefficients.len() + 1];
-        let mut remainder = self.coefficients.clone();
-
-        for i in 0..quotient.len() {
-            // Check for exact divisibility
-            if !(&remainder[i] % &divisor.coefficients[0]).is_zero() {
-                return Err(PolynomialError::InvalidPolynomial {
-                    message: format!(
-                        "Polynomial division requires exact divisibility: coefficient {} is not divisible by leading coefficient {}",
-                        &remainder[i], &divisor.coefficients[0]
-                    ),
-                });
-            }
-
-            let coeff = &remainder[i] / &divisor.coefficients[0];
-            quotient[i] = coeff.clone();
-
-            for j in 0..divisor.coefficients.len() {
-                if i + j < remainder.len() {
-                    remainder[i + j] = &remainder[i + j] - &divisor.coefficients[j] * &coeff;
+            if a != 0 {
+                for (j, &b) in rhs.iter().enumerate() {
+                    result[i + j] += a * b;
                 }
             }
         }
+        Some(Self::new(result.into_iter().map(BigInt::from).collect()))
+    }
 
-        // Remove leading zero coefficients from remainder
-        while !remainder.is_empty() && remainder[0].is_zero() {
-            remainder.remove(0);
+    /// Divide each coefficient exactly, preserving signs, order, and padding.
+    /// Reject zero divisors and any coefficient with a nonzero remainder.
+    pub fn div_exact(&self, divisor: &BigInt) -> Result<Self, PolynomialError> {
+        if divisor.is_zero() {
+            return Err(PolynomialError::DivisionByZero);
         }
-
-        Ok((Polynomial::new(quotient), Polynomial::new(remainder)))
+        self.coefficients.iter().map(|coefficient| {
+            let (quotient, remainder) = coefficient.div_rem(divisor);
+            if !remainder.is_zero() {
+                return Err(PolynomialError::InvalidPolynomial {
+                    message: format!(
+                        "Polynomial division requires exact divisibility: coefficient {} is not divisible by leading coefficient {}",
+                        coefficient, divisor
+                    ),
+                });
+            }
+            Ok(quotient)
+        }).collect::<Result<Vec<_>, _>>().map(Self::new)
     }
 
-    /// Multiplies each coefficient of the polynomial by a scalar.
-    ///
-    /// # Arguments
-    ///
-    /// * `scalar` - A `BigInt` scalar to multiply with each coefficient.
-    ///
-    /// # Returns
-    ///
-    /// Mutates the polynomial in place.
     pub fn scalar_mul(&self, scalar: &BigInt) -> Self {
-        Polynomial::new(self.coefficients.iter().map(|x| x * scalar).collect())
+        Self::new(self.coefficients.iter().map(|x| x * scalar).collect())
     }
 
-    /// Reduces the polynomial modulo a cyclotomic polynomial.
-    ///
-    /// This function performs polynomial division by the cyclotomic polynomial
-    /// and returns the remainder, padded to length `n = cyclo.len() - 1`.
-    ///
-    /// The result is a polynomial of degree `n-1` where `n` is the degree of the
-    /// cyclotomic polynomial. This is commonly used in lattice-based cryptography
-    /// where polynomials are reduced modulo `x^N + 1` (the 2N-th cyclotomic polynomial).
-    ///
-    /// # Arguments
-    ///
-    /// * `cyclo` - Coefficients of the cyclotomic polynomial in descending order.
-    ///
-    /// # Returns
-    ///
-    /// A new polynomial containing the remainder.
-    ///
-    /// # Errors
-    ///
-    /// Returns `PolynomialError::DivisionByZero` if the cyclotomic polynomial is zero.
-    /// Returns `PolynomialError::InvalidPolynomial` if the cyclotomic polynomial has a zero leading coefficient.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use e3_polynomial::Polynomial;
-    /// use num_bigint::BigInt;
-    ///
-    /// // Reduce modulo x^4 + 1 (cyclotomic polynomial for N=4)
-    /// let poly = Polynomial::new(vec![BigInt::from(1), BigInt::from(0), BigInt::from(0), BigInt::from(0), BigInt::from(1)]);
-    /// let cyclo = vec![BigInt::from(1), BigInt::from(0), BigInt::from(0), BigInt::from(0), BigInt::from(1)];
-    /// let reduced = poly.reduce_by_cyclotomic(&cyclo).unwrap();
-    /// assert_eq!(reduced.degree(), 3);
-    /// ```
-    pub fn reduce_by_cyclotomic(&self, cyclo: &[BigInt]) -> Result<Self, PolynomialError> {
-        let cyclo_poly = Polynomial::new(cyclo.to_vec());
-        let (_, remainder) = self.div(&cyclo_poly)?;
-
-        let n = cyclo.len() - 1;
-        let mut out = vec![BigInt::zero(); n];
-
-        if !remainder.coefficients.is_empty() {
-            let start_idx = n.saturating_sub(remainder.coefficients.len());
-            let end_idx = std::cmp::min(start_idx + remainder.coefficients.len(), n);
-            let src_len = end_idx - start_idx;
-            for (i, coeff) in remainder.coefficients[..src_len].iter().enumerate() {
-                out[start_idx + i] = coeff.clone();
+    /// Center coefficients that are already in `[0, modulus)`.
+    pub fn center(&mut self, modulus: &BigInt) {
+        let midpoint = (modulus - 1u32) / 2u32;
+        for coefficient in &mut self.coefficients {
+            if *coefficient > midpoint {
+                *coefficient -= modulus;
             }
         }
-
-        Ok(Polynomial::new(out))
     }
 
-    /// Centers coefficients already in [0, modulus) into (-modulus/2, modulus/2].
-    ///
-    /// # Arguments
-    ///
-    /// * `modulus` - The modulus.
-    ///
-    /// # Returns
-    ///
-    /// Mutates the polynomial in place.
-    pub fn center(&mut self, modulus: &BigInt) {
-        self.coefficients
-            .iter_mut()
-            .for_each(|x| *x = center(x, modulus));
-    }
-
-    /// Reduces coefficients modulo a modulus (in range [0, modulus)).
+    /// Reduce coefficients into `[0, modulus)`.
     pub fn reduce(&mut self, modulus: &BigInt) {
-        self.coefficients
-            .iter_mut()
-            .for_each(|x| *x = reduce(x, modulus));
-    }
-
-    /// Evaluates the polynomial at a given point using Horner's method.
-    ///
-    /// # Arguments
-    ///
-    /// * `x` - The point at which to evaluate the polynomial.
-    ///
-    /// # Returns
-    ///
-    /// The value of the polynomial at the given point.
-    pub fn evaluate(&self, x: &BigInt) -> BigInt {
-        if self.coefficients.is_empty() {
-            return BigInt::zero();
+        for coefficient in &mut self.coefficients {
+            *coefficient = coefficient.mod_floor(modulus);
         }
-
-        // Use Horner's method for efficient evaluation
-        let mut result = self.coefficients[0].clone();
-        for coeff in &self.coefficients[1..] {
-            result = result * x + coeff;
-        }
-        result
     }
-}
-
-/// Converts coefficients to `i128`, or returns `None` when any one does not fit.
-fn to_i128_vec(coefficients: &[BigInt]) -> Option<Vec<i128>> {
-    coefficients.iter().map(BigInt::to_i128).collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use num_bigint::BigInt;
 
-    /// Deterministic xorshift64* stream; keeps the fixtures reproducible without `rand`.
-    struct Rng(u64);
+    fn poly(coefficients: &[i64]) -> Polynomial {
+        Polynomial::new(coefficients.iter().copied().map(BigInt::from).collect())
+    }
 
-    impl Rng {
-        fn next(&mut self) -> u64 {
-            self.0 ^= self.0 << 13;
-            self.0 ^= self.0 >> 7;
-            self.0 ^= self.0 << 17;
-            self.0
+    #[test]
+    fn arithmetic_preserves_descending_alignment_and_padding() {
+        let a = poly(&[0, 1, -2, 3]);
+        let b = poly(&[4, -5]);
+        assert_eq!(a.add(&b), poly(&[0, 1, 2, -2]));
+        assert_eq!(a.sub(&b), poly(&[0, 1, -6, 8]));
+        assert_eq!(a.sub(&a), poly(&[0, 0, 0, 0]));
+        assert_eq!(a.scalar_mul(&BigInt::from(-2)), poly(&[0, -2, 4, -6]));
+        assert_eq!(poly(&[0, 1, 2]).mul(&poly(&[1, 3])), poly(&[0, 1, 5, 6]));
+        assert_eq!(a.mul(&poly(&[0, 0])), poly(&[0]));
+    }
+
+    #[test]
+    fn signed_residues_preserve_centering_boundaries_and_padding() {
+        for (coefficients, modulus, residues, centered) in [
+            (
+                vec![0, 10, -3, 6, -10, -14, -15, -21, -7, -6, -1, 3, 7],
+                7,
+                vec![0, 3, 4, 6, 4, 0, 6, 0, 0, 1, 6, 3, 0],
+                vec![0, 3, -3, -1, -3, 0, -1, 0, 0, 1, -1, 3, 0],
+            ),
+            (vec![0, 2, 3, -1], 6, vec![0, 2, 3, 5], vec![0, 2, -3, -1]),
+            (vec![0, 2, 3], 5, vec![0, 2, 3], vec![0, 2, -2]),
+        ] {
+            let mut value = poly(&coefficients);
+            let modulus = BigInt::from(modulus);
+            value.reduce(&modulus);
+            assert_eq!(value, poly(&residues));
+            value.center(&modulus);
+            assert_eq!(value, poly(&centered));
         }
     }
 
-    /// Schoolbook convolution over `BigInt`, the reference for [`Polynomial::mul`].
+    #[test]
+    fn exact_scalar_division_preserves_shape_and_rejects_remainders() {
+        let numerator = poly(&[0, -194, 97, 0]);
+        assert_eq!(
+            numerator.div_exact(&BigInt::from(97)).unwrap(),
+            poly(&[0, -2, 1, 0])
+        );
+        assert_eq!(
+            numerator.div_exact(&BigInt::from(-97)).unwrap(),
+            poly(&[0, 2, -1, 0])
+        );
+        assert_eq!(
+            poly(&[0, 0]).div_exact(&BigInt::from(97)).unwrap(),
+            poly(&[0, 0])
+        );
+        assert_eq!(poly(&[]).div_exact(&BigInt::from(97)).unwrap(), poly(&[]));
+        assert!(matches!(
+            numerator.div_exact(&BigInt::zero()),
+            Err(PolynomialError::DivisionByZero)
+        ));
+        assert!(matches!(
+            poly(&[97, 98]).div_exact(&BigInt::from(97)),
+            Err(PolynomialError::InvalidPolynomial { .. })
+        ));
+    }
+
+    /// Independent arbitrary-precision convolution checks the bounded i128 path.
     fn schoolbook(lhs: &Polynomial, rhs: &Polynomial) -> Polynomial {
         let mut product = vec![BigInt::zero(); lhs.coefficients.len() + rhs.coefficients.len() - 1];
         for (i, a) in lhs.coefficients.iter().enumerate() {
@@ -569,286 +243,55 @@ mod tests {
     }
 
     #[test]
-    fn test_mul_matches_schoolbook_on_witness_shapes() {
-        // The circuit shape: one operand centered modulo a 58-bit CRT modulus, one ternary.
-        let mut rng = Rng(0x2545F4914F6CDD1D);
+    fn multiplication_matches_integer_reference_for_witness_coefficients() {
+        let mut seed = 0x2545F4914F6CDD1Du64;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
         let qi = 0x02000000015a0001u64;
         let centered = Polynomial::new(
             (0..256)
-                .map(|_| BigInt::from((rng.next() % qi) as i128 - (qi / 2) as i128))
+                .map(|_| BigInt::from((next() % qi) as i128 - (qi / 2) as i128))
                 .collect(),
         );
-        let ternary = Polynomial::new((0..256).map(|_| BigInt::from(rng.next() % 3) - 1).collect());
-
-        assert!(
-            centered.mul_i128(&ternary).is_some(),
-            "fast path must apply"
-        );
-        assert_eq!(
-            centered.mul(&ternary).coefficients(),
-            schoolbook(&centered, &ternary).coefficients()
-        );
+        let ternary = Polynomial::new((0..256).map(|_| BigInt::from(next() % 3) - 1).collect());
+        assert_eq!(centered.mul(&ternary), schoolbook(&centered, &ternary));
     }
 
     #[test]
-    fn test_mul_falls_back_when_product_exceeds_i128() {
-        // 2^100 coefficients: the coefficients fit i128, their products do not.
-        let huge = Polynomial::new(vec![BigInt::from(1) << 100, BigInt::from(-1) << 100]);
-        assert!(huge.mul_i128(&huge).is_none(), "fallback must apply");
-        assert_eq!(
-            huge.mul(&huge).coefficients(),
-            schoolbook(&huge, &huge).coefficients()
-        );
-
-        // Coefficients wider than i128 cannot even be converted.
-        let wider = Polynomial::new(vec![BigInt::from(1) << 200, BigInt::from(3)]);
-        assert!(wider.mul_i128(&wider).is_none(), "fallback must apply");
-        assert_eq!(
-            wider.mul(&wider).coefficients(),
-            schoolbook(&wider, &wider).coefficients()
-        );
-    }
-
-    #[test]
-    fn test_basic_polynomial_creation() {
-        let poly = Polynomial::new(vec![BigInt::from(1), BigInt::from(2), BigInt::from(3)]);
-        assert_eq!(poly.degree(), 2);
-        assert_eq!(
-            poly.coefficients(),
-            &[BigInt::from(1), BigInt::from(2), BigInt::from(3)]
-        );
-    }
-
-    #[test]
-    fn test_zero_polynomial() {
-        let zero = Polynomial::zero(3);
-        assert_eq!(zero.degree(), 3);
-        assert!(zero.is_zero());
-    }
-
-    #[test]
-    fn test_constant_polynomial() {
-        let const_poly = Polynomial::constant(BigInt::from(42));
-        assert_eq!(const_poly.degree(), 0);
-        assert_eq!(const_poly.coefficients(), &[BigInt::from(42)]);
-    }
-
-    #[test]
-    fn test_polynomial_display() {
-        let poly = Polynomial::new(vec![BigInt::from(2), BigInt::from(-3), BigInt::from(1)]);
-        assert_eq!(poly.to_string(), "2x^2 - 3x + 1");
-    }
-
-    #[test]
-    fn test_polynomial_display_negative_leading() {
-        let poly = Polynomial::new(vec![BigInt::from(-3), BigInt::from(2), BigInt::from(-1)]);
-        assert_eq!(poly.to_string(), "-3x^2 + 2x - 1");
-    }
-
-    #[test]
-    fn test_polynomial_addition() {
-        let poly1 = Polynomial::new(vec![BigInt::from(1), BigInt::from(2)]);
-        let poly2 = Polynomial::new(vec![BigInt::from(3), BigInt::from(4)]);
-        let result = poly1.add(&poly2);
-        assert_eq!(result.coefficients(), &[BigInt::from(4), BigInt::from(6)]);
-    }
-
-    #[test]
-    fn test_polynomial_subtraction() {
-        let poly1 = Polynomial::new(vec![BigInt::from(5), BigInt::from(3)]);
-        let poly2 = Polynomial::new(vec![BigInt::from(2), BigInt::from(1)]);
-        let result = poly1.sub(&poly2);
-        assert_eq!(result.coefficients(), &[BigInt::from(3), BigInt::from(2)]);
-    }
-
-    #[test]
-    fn test_polynomial_negation() {
-        let poly = Polynomial::new(vec![BigInt::from(1), BigInt::from(-2), BigInt::from(3)]);
-        let neg_poly = poly.neg();
-        assert_eq!(
-            neg_poly.coefficients(),
-            &[BigInt::from(-1), BigInt::from(2), BigInt::from(-3)]
-        );
-    }
-
-    #[test]
-    fn test_polynomial_multiplication() {
-        let poly1 = Polynomial::new(vec![BigInt::from(1), BigInt::from(2)]); // x + 2
-        let poly2 = Polynomial::new(vec![BigInt::from(1), BigInt::from(3)]); // x + 3
-        let result = poly1.mul(&poly2); // Should be x^2 + 5x + 6
-        assert_eq!(
-            result.coefficients(),
-            &[BigInt::from(1), BigInt::from(5), BigInt::from(6)]
-        );
-    }
-
-    #[test]
-    fn test_polynomial_division() {
-        let dividend = Polynomial::new(vec![BigInt::from(1), BigInt::from(5), BigInt::from(6)]); // x^2 + 5x + 6
-        let divisor = Polynomial::new(vec![BigInt::from(1), BigInt::from(2)]); // x + 2
-        let (quotient, remainder) = dividend.div(&divisor).unwrap();
-        assert_eq!(quotient.coefficients(), &[BigInt::from(1), BigInt::from(3)]); // x + 3
-        assert!(remainder.is_zero());
-    }
-
-    #[test]
-    fn test_division_by_zero() {
-        let poly = Polynomial::new(vec![BigInt::from(1), BigInt::from(2)]);
-        let zero = Polynomial::zero(0);
-        assert!(matches!(
-            poly.div(&zero),
-            Err(PolynomialError::DivisionByZero)
-        ));
-    }
-
-    #[test]
-    fn test_scalar_multiplication() {
-        let poly = Polynomial::new(vec![BigInt::from(1), BigInt::from(2), BigInt::from(3)]);
-        let scalar = BigInt::from(5);
-        let result = poly.scalar_mul(&scalar);
-        assert_eq!(
-            result.coefficients(),
-            &[BigInt::from(5), BigInt::from(10), BigInt::from(15)]
-        );
-    }
-
-    #[test]
-    fn test_polynomial_evaluation() {
-        let poly = Polynomial::new(vec![BigInt::from(1), BigInt::from(2), BigInt::from(3)]); // x^2 + 2x + 3
-        let result = poly.evaluate(&BigInt::from(2)); // 1*4 + 2*2 + 3 = 11
-        assert_eq!(result, BigInt::from(11));
-    }
-
-    #[test]
-    fn test_trim_leading_zeros() {
-        let poly = Polynomial::new(vec![
-            BigInt::from(0),
-            BigInt::from(0),
-            BigInt::from(1),
-            BigInt::from(2),
-        ]);
-        let trimmed = poly.trim_leading_zeros();
-        assert_eq!(trimmed.coefficients(), &[BigInt::from(1), BigInt::from(2)]);
-    }
-
-    #[test]
-    fn test_trim_leading_zeros_all_zero() {
-        let poly = Polynomial::new(vec![BigInt::from(0), BigInt::from(0), BigInt::from(0)]);
-        let trimmed = poly.trim_leading_zeros();
-        assert_eq!(trimmed.coefficients(), &[BigInt::from(0)]);
-    }
-
-    #[test]
-    fn test_trim_leading_zeros_no_leading_zeros() {
-        let poly = Polynomial::new(vec![BigInt::from(1), BigInt::from(2)]);
-        let trimmed = poly.trim_leading_zeros();
-        assert_eq!(trimmed.coefficients(), &[BigInt::from(1), BigInt::from(2)]);
-    }
-
-    #[test]
-    fn test_trim_leading_zeros_single_zero() {
-        let poly = Polynomial::new(vec![BigInt::from(0)]);
-        let trimmed = poly.trim_leading_zeros();
-        assert_eq!(trimmed.coefficients(), &[BigInt::from(0)]);
-    }
-
-    #[test]
-    fn test_reduce_by_cyclotomic() {
-        // Test reduction modulo x^4 + 1 (cyclotomic polynomial for N=4)
-        // cyclo = [1, 0, 0, 0, 1] represents x^4 + 1
-        let cyclo = vec![
-            BigInt::from(1),
-            BigInt::from(0),
-            BigInt::from(0),
-            BigInt::from(0),
-            BigInt::from(1),
-        ];
-
-        // Test: x^4 + 1 divided by x^4 + 1 should give remainder 0
-        let poly = Polynomial::new(vec![
-            BigInt::from(1),
-            BigInt::from(0),
-            BigInt::from(0),
-            BigInt::from(0),
-            BigInt::from(1),
-        ]);
-        let reduced = poly.reduce_by_cyclotomic(&cyclo).unwrap();
-        assert_eq!(reduced.degree(), 3);
-        assert!(reduced.is_zero());
-
-        // Test: x^5 divided by x^4 + 1 gives remainder -x
-        // x^5 = x * x^4 = x * (x^4 + 1 - 1) = x(x^4 + 1) - x
-        // So remainder is -x, which becomes x^3 - x after padding
-        let poly2 = Polynomial::new(vec![
-            BigInt::from(1),
-            BigInt::from(0),
-            BigInt::from(0),
-            BigInt::from(0),
-            BigInt::from(0),
-            BigInt::from(0),
-        ]);
-        let reduced2 = poly2.reduce_by_cyclotomic(&cyclo).unwrap();
-        assert_eq!(reduced2.degree(), 3);
-        // The remainder should be -x, padded to length 4: [0, 0, 0, -1]
-        // But actually, the algorithm right-aligns, so it should be [0, 0, 0, -1]
-        // Let's just verify it's not zero and has the right degree
-        assert!(!reduced2.is_zero());
-    }
-
-    #[test]
-    fn test_reduce_by_cyclotomic_right_alignment() {
-        // Test that remainder is right-aligned correctly
-        // cyclo = [1, 0, 1] represents x^2 + 1, so n = cyclo.len() - 1 = 2
-        let cyclo = vec![BigInt::from(1), BigInt::from(0), BigInt::from(1)];
-
-        // Test with remainder that fits exactly
-        // x^2 + 2x + 1 divided by x^2 + 1 gives remainder 2x
-        // remainder.coefficients = [2, 0] (2x + 0)
-        // After right-aligning to n=2: we copy [2, 0] to output
-        let poly = Polynomial::new(vec![BigInt::from(1), BigInt::from(2), BigInt::from(1)]);
-        let reduced = poly.reduce_by_cyclotomic(&cyclo).unwrap();
-        // n = cyclo.len() - 1 = 3 - 1 = 2, so output length is 2
-        assert_eq!(reduced.coefficients().len(), 2);
-        // The remainder is 2x = [2, 0], right-aligned to length 2 gives [2, 0]
-        assert_eq!(reduced.coefficients()[0].clone(), BigInt::from(2));
-        assert_eq!(reduced.coefficients()[1].clone(), BigInt::from(0));
-    }
-
-    #[test]
-    fn test_reduce_by_cyclotomic_long_remainder() {
-        // Test with remainder longer than output size (should truncate)
-        // cyclo = [1, 0, 1] represents x^2 + 1, so n = cyclo.len() - 1 = 2
-        let cyclo = vec![BigInt::from(1), BigInt::from(0), BigInt::from(1)];
-
-        // x^4 + 2x^3 + 3x^2 divided by x^2 + 1
-        // This will give a remainder, and we test truncation
-        let poly = Polynomial::new(vec![
-            BigInt::from(1),
-            BigInt::from(2),
-            BigInt::from(3),
-            BigInt::from(0),
-            BigInt::from(0),
-        ]);
-        let reduced = poly.reduce_by_cyclotomic(&cyclo).unwrap();
-        // Output should be length n = 2
-        assert_eq!(reduced.coefficients().len(), 2);
-    }
-
-    #[test]
-    fn test_reduce_by_cyclotomic_error_cases() {
-        // Test division by zero cyclotomic polynomial
-        let cyclo_zero = vec![BigInt::from(0), BigInt::from(0)];
-        let poly = Polynomial::new(vec![BigInt::from(1), BigInt::from(2)]);
-        assert!(matches!(
-            poly.reduce_by_cyclotomic(&cyclo_zero),
-            Err(PolynomialError::DivisionByZero)
-        ));
-
-        // Test zero leading coefficient
-        let cyclo_invalid = vec![BigInt::from(0), BigInt::from(1)];
-        assert!(matches!(
-            poly.reduce_by_cyclotomic(&cyclo_invalid),
-            Err(PolynomialError::InvalidPolynomial { .. })
-        ));
+    fn multiplication_keeps_arbitrary_precision_when_i128_is_insufficient() {
+        for (coefficients, expected) in [
+            (
+                vec![BigInt::from(1) << 100usize, BigInt::from(-1) << 100usize],
+                vec![
+                    BigInt::from(1) << 200usize,
+                    BigInt::from(-1) << 201usize,
+                    BigInt::from(1) << 200usize,
+                ],
+            ),
+            (
+                vec![BigInt::from(1) << 200usize, BigInt::from(3)],
+                vec![
+                    BigInt::from(1) << 400usize,
+                    BigInt::from(6) << 200usize,
+                    BigInt::from(9),
+                ],
+            ),
+            // Each product fits i128; the middle coefficient does not.
+            (
+                vec![BigInt::from(1) << 63usize, BigInt::from(1) << 63usize],
+                vec![
+                    BigInt::from(1) << 126usize,
+                    BigInt::from(1) << 127usize,
+                    BigInt::from(1) << 126usize,
+                ],
+            ),
+        ] {
+            let p = Polynomial::new(coefficients);
+            assert_eq!(p.mul(&p), Polynomial::new(expected));
+        }
     }
 }

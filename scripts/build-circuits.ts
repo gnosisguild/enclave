@@ -39,7 +39,7 @@ import {
   type CircuitPreset,
 } from './circuit-constants'
 
-const CIRCUIT_VERSION = 'interfold-bfv-v4'
+const CIRCUIT_VERSION = 'interfold-bfv-v5'
 // On-chain index of the insecure parameters on the l-BFV path (`BfvPreset::InsecureThresholdLbfv`).
 const INSECURE_LBFV_PARAM_SET = 4
 
@@ -222,6 +222,29 @@ function hydratedCircuitTargetDir(bin: string, group: CircuitGroup, name: string
 }
 
 /**
+ * The circuit toolchain that the repository pins: nargo at the Noir tag of the prover crates, and bb
+ * at the version that nodes install. `undefined` for a tree without these files.
+ */
+export function pinnedToolchain(rootDir: string): { nargo: string; bb: string } | undefined {
+  const cargoPath = join(rootDir, 'crates', 'zk-prover', 'Cargo.toml')
+  const versionsPath = join(rootDir, 'crates', 'zk-prover', 'versions.json')
+  if (!existsSync(cargoPath) || !existsSync(versionsPath)) return undefined
+  const nargo = /noir-lang\/noir", tag = "v([^"]+)"/.exec(readFileSync(cargoPath, 'utf8'))?.[1]
+  const bb: unknown = JSON.parse(readFileSync(versionsPath, 'utf8')).required_bb_version
+  if (!nargo || typeof bb !== 'string') throw new Error('Cannot read the pinned nargo and bb versions')
+  return { nargo, bb }
+}
+
+/**
+ * Whether a tool's `--version` output reports exactly `version`. Build metadata after `+` (nargo's
+ * commit) is the same version; a prerelease suffix after `-` or another component is not.
+ */
+export function reportsToolVersion(output: string, version: string): boolean {
+  const escaped = version.replace(/[.+]/g, '\\$&')
+  return new RegExp(`(^|[\\s=])v?${escaped}(\\+\\S*)?\\r?$`, 'm').test(output)
+}
+
+/**
  * Reduce Cargo.lock to the external crate pins that the circuit generators compile against.
  *
  * Circuit output comes from the Noir sources and from the Rust generators that write the C1/C2
@@ -277,7 +300,7 @@ const COMMITTEE_BOUND_SOURCES = [
 
 // The C2 chunk grid shares the `SHARE_COMPUTATION_` prefix but is written by the config generator's
 // chunk-grid section, at degree 16384 as an expression over the active committee. The committee
-// sync must neither require these from `zk_cli` nor overwrite them with one committee's literals.
+// sync must neither require these from `zk-artifacts generate` nor overwrite them with one committee's literals.
 const GENERATOR_OWNED_GLOBALS = new Set([
   'SHARE_COMPUTATION_CHUNK_SIZE',
   'SHARE_COMPUTATION_N_CHUNKS',
@@ -334,10 +357,11 @@ export function committeeBoundUpdates(rootDir: string, preset: CircuitPreset, co
           'run',
           '--quiet',
           '-p',
-          'e3-zk-helpers',
+          'e3-zk-artifacts',
           '--bin',
-          'zk_cli',
+          'zk-artifacts',
           '--',
+          'generate',
           '--circuit',
           source.circuit,
           '--preset',
@@ -534,7 +558,7 @@ class NoirCircuitBuilder {
       '',
       '/// Max number of non-zero coefficients in the message polynomial.',
       '/// This is a conservative estimate that should be okay for most use cases.',
-      'pub global MAX_MSG_NON_ZERO_COEFFS: u32 = 100;',
+      'pub global MAX_MSG_NON_ZERO_COEFFS: u32 = 50;',
       '',
     ].join('\n')
     writeFileSync(modNrPath, content)
@@ -586,7 +610,7 @@ class NoirCircuitBuilder {
 
   /**
    * Regenerates `circuits/lib/src/configs/committee/<committee>/parity_{insecure,secure_8192,secure_16384}.nr`
-   * by invoking the Rust `generate_parity_matrices` binary. The Reed-Solomon parity matrix is
+   * by invoking `zk-artifacts parity-matrices`. The Reed-Solomon parity matrix is
    * a deterministic function of `(N, T, QIS)` — committing the output keeps `nargo check`
    * working standalone, but the build script always overwrites it so a change in committee
    * or BFV preset constants can never silently desync the on-disk literal from what the
@@ -595,7 +619,7 @@ class NoirCircuitBuilder {
   private regenerateParityMatrices(committee: CircuitCommittee): void {
     const libDir = join(this.rootDir, 'circuits', 'lib')
     try {
-      execSync(`cargo run --quiet --release --bin generate_parity_matrices -- --committee ${committee}`, {
+      execSync(`cargo run --quiet --locked --release -p e3-zk-artifacts --bin zk-artifacts -- parity-matrices --committee ${committee}`, {
         cwd: this.rootDir,
         stdio: ['ignore', 'pipe', 'inherit'],
       })
@@ -604,7 +628,7 @@ class NoirCircuitBuilder {
     } catch (err: any) {
       throw new Error(
         `Failed to regenerate parity matrices for committee=${committee}: ${err.message}\n` +
-          `   Try: cargo run --release --bin generate_parity_matrices -- --committee ${committee}`,
+          `   Try: pnpm zk parity-matrices --committee ${committee}`,
       )
     }
   }
@@ -731,7 +755,7 @@ class NoirCircuitBuilder {
     } catch (err: any) {
       throw new Error(
         `Failed to regenerate BFV config modules for preset=${preset}: ${err.message}\n` +
-          `   Try: cargo run --release --bin generate_config_modules -- --preset ${this.configModuleName(preset)}`,
+          `   Try: pnpm zk config-modules --preset ${this.configModuleName(preset)}`,
       )
     } finally {
       rmSync(generatedRoot, { recursive: true, force: true })
@@ -769,10 +793,14 @@ class NoirCircuitBuilder {
       [
         'run',
         '--quiet',
+        '--locked',
         '--release',
+        '-p',
+        'e3-zk-artifacts',
         '--bin',
-        'generate_config_modules',
+        'zk-artifacts',
         '--',
+        'config-modules',
         '--preset',
         this.configModuleName(preset),
         '--output-root',
@@ -1191,8 +1219,10 @@ library ActiveCryptoConfig {
     console.log(`\n🔮 Building preset: ${preset}, committee: ${committee}...`)
 
     try {
-      this.checkTool('nargo --version', 'nargo')
-      if (!this.options.skipVk) this.checkTool('bb --version', 'bb')
+      const toolchain = pinnedToolchain(this.rootDir)
+      if (!toolchain) throw new Error('The tree pins no circuit toolchain (crates/zk-prover)')
+      this.checkTool('nargo --version', 'nargo', toolchain.nargo)
+      if (!this.options.skipVk) this.checkTool('bb --version', 'bb', toolchain.bb)
 
       const discovered = this.discoverCircuits()
       const circuits = this.circuitsForPreset(discovered, preset)
@@ -1218,14 +1248,21 @@ library ActiveCryptoConfig {
       result.sourceHash = sourceHash
 
       if (this.options.hydrateBinOnly) {
-        if (!this.isDistPresetUpToDate(preset, committee, sourceHash)) {
+        // The stamp's source hash is not checked until the circuit drift workflow is designed. The
+        // active stamp records the hash of the hydrated artifacts, so `--skip-if-built` rebuilds
+        // artifacts from another source.
+        const distStamp = this.readPresetStamp(preset, committee)
+        if (!distStamp?.sourceHash || !this.requiredDistMarkers(preset, committee).every((path) => existsSync(path))) {
           throw new Error(
-            `Cannot hydrate circuits/bin: dist/circuits/${preset}/${committee} is missing or stale. ` +
+            `Cannot hydrate circuits/bin: dist/circuits/${preset}/${committee} is missing. ` +
               `Run: pnpm build:circuits --preset ${preset} --committee ${committee}`,
           )
         }
+        if (distStamp.sourceHash !== sourceHash) {
+          console.log(`   ⚠️  dist/circuits/${preset}/${committee} was built from source hash ${distStamp.sourceHash}, not ${sourceHash}.`)
+        }
         console.log(`   💧 Hydrating circuits/bin from dist/circuits/${preset}/${committee} (no nargo compile)...`)
-        this.hydrateBinFromDist(preset, committee, sourceHash)
+        this.hydrateBinFromDist(preset, committee, distStamp.sourceHash)
         console.log(`\n✅ Hydrated circuits/bin for preset: ${preset}/${committee}`)
         return result
       }
@@ -1298,11 +1335,16 @@ library ActiveCryptoConfig {
     return result
   }
 
-  private checkTool(cmd: string, name: string): void {
+  /** The tool must be installed at the pinned version: another version can write other keys. */
+  private checkTool(cmd: string, name: string, version: string): void {
+    let output: string
     try {
-      execSync(cmd, { stdio: ['pipe', 'pipe', 'pipe'] })
+      output = execSync(cmd, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] })
     } catch {
       throw new Error(`${name} is not installed or not in PATH`)
+    }
+    if (!reportsToolVersion(output, version)) {
+      throw new Error(`${name} must be version ${version}, the pinned toolchain; \`${cmd}\` printed: ${output.trim()}`)
     }
   }
 
@@ -1656,10 +1698,11 @@ library ActiveCryptoConfig {
           '--locked',
           '--release',
           '-p',
-          'e3-zk-helpers',
+          'e3-zk-artifacts',
           '--bin',
-          'compute-vk-hash',
+          'zk-artifacts',
           '--',
+          'vk-hash',
           '--bfv-tree',
           pairDir,
           ...(decryptionOnly ? ['--decryption-tree-only'] : []),
@@ -1818,15 +1861,21 @@ library ActiveCryptoConfig {
       'circuits/lib/src/core',
       'circuits/lib/src/math',
       'crates/zk-helpers/src',
+      'crates/zk/cli/src',
+      'crates/committee/src',
       'crates/fhe-params/src',
       'crates/fhe/src',
       'crates/polynomial/src',
+      'crates/polynomial/fhe-adapter/src',
       'crates/parity-matrix/src',
       'crates/safe/src',
     ]) {
       const path = join(this.rootDir, sourceDir)
       if (existsSync(path)) this.hashDir(path, hash)
     }
+    // The toolchain writes the artifacts: the same sources under another nargo or bb give other keys.
+    const toolchain = pinnedToolchain(this.rootDir)
+    if (toolchain) hash.update(`toolchain:nargo ${toolchain.nargo} bb ${toolchain.bb}\n`)
     for (const sourceFile of [
       'circuits/lib/Nargo.toml',
       'circuits/lib/src/lib.nr',
@@ -1847,8 +1896,8 @@ library ActiveCryptoConfig {
           source = Buffer.from(
             source
               .toString()
-              .replace(/preset: (insecure-512|secure-8192)/g, 'preset: <selected>')
-              .replace(/super::(insecure|secure)::/g, 'super::<selected>::'),
+              .replace(/preset: (insecure|secure[-_]8192|secure[-_]16384)\b/g, 'preset: <selected>')
+              .replace(/super::(insecure|secure_8192|secure_16384)::/g, 'super::<selected>::'),
           )
         }
         hash.update(sourceFile === 'Cargo.lock' ? normalizeCargoLockForCircuitHash(source) : source)
@@ -1896,7 +1945,7 @@ library ActiveCryptoConfig {
         .split('\n')
         .filter(
           (line) =>
-            !line.startsWith('// Auto-generated by build-circuits.ts for preset:') &&
+            !/^\/\/ (Auto-generated by build-circuits\.ts for )?preset:/.test(line) &&
             line !== 'pub use super::committee::active::{H, N_PARTIES, T};' &&
             !/^pub use super::[a-z0-9_]+::(?:dkg|threshold);$/.test(line),
         )
@@ -1918,7 +1967,10 @@ library ActiveCryptoConfig {
       } else if (stat.isFile()) {
         hash.update(entryRelativePath)
         let source = readFileSync(fullPath)
-        const bounds = normalizeBounds ? COMMITTEE_BOUND_SOURCES.find(({ file }) => file === entryRelativePath) : undefined
+        // `entryRelativePath` carries the `configs/<tier>/` label, so match the file inside the tier.
+        const bounds = normalizeBounds
+          ? COMMITTEE_BOUND_SOURCES.find(({ file }) => entryRelativePath === file || entryRelativePath.endsWith(`/${file}`))
+          : undefined
         if (bounds) {
           let text = source.toString()
           for (const [name, declaration] of noirGlobalDeclarations(text)) {

@@ -92,7 +92,7 @@ impl fmt::Display for Reason {
             ),
             Reason::RecordedStoreNotFound(path) => write!(
                 f,
-                "the node last started with the store {}, and the store is not there",
+                "the node started with the store {}, and the store is not there",
                 path.display()
             ),
             Reason::UnreadableRecord(path) => write!(
@@ -158,13 +158,13 @@ impl Planner {
                 self.add_lock(&node.lock, &node.name, false)
             }
         }
-        // The store that the node last started with, which its record names, holds the operator
-        // key; the store at the configured path is then checked for key shares only.
+        // The store that the node last started with, which its record names last, holds the
+        // operator key; the store at the configured path is then checked for key shares only.
         let deletes_state = node.key_file_in_target || node.event_log_in_target;
-        let recorded_elsewhere = matches!(
-            &node.recorded,
-            Recorded::Store { db_file, .. } if *db_file != node.db_file
-        );
+        let recorded_elsewhere = node
+            .recorded
+            .last()
+            .is_some_and(|db_file| db_file != node.db_file);
         if deletes_state {
             self.add_recorded(&node.recorded, &node.name, node.key_file_in_target);
         }
@@ -184,23 +184,28 @@ impl Planner {
         }
     }
 
-    /// Hold the lock of the store that a key file's record names, and check the store.
+    /// Hold the lock of each store that a key file's record names, and check the store. The store
+    /// of the last start holds the operator key; the earlier ones are checked for key shares. A
+    /// store that an earlier purge deleted, which left its marker, needs no check.
     fn add_recorded(&mut self, recorded: &Recorded, node: &str, needs_identity: bool) {
         match recorded {
             Recorded::Nothing => {}
-            Recorded::Store {
-                store: Some(store),
-                lock,
-                ..
-            } => {
-                self.add_lock(lock, node, false);
-                self.add_store(store, node, needs_identity);
+            Recorded::Stores(stores) => {
+                for (index, recorded) in stores.iter().enumerate() {
+                    let last = index + 1 == stores.len();
+                    match &recorded.store {
+                        Some(store) => {
+                            self.add_lock(&recorded.lock, node, false);
+                            self.add_store(store, node, needs_identity && last);
+                        }
+                        None if recorded.purged => self.add_lock(&recorded.lock, node, false),
+                        None => self.add_unchecked(
+                            node,
+                            Reason::RecordedStoreNotFound(recorded.db_file.clone()),
+                        ),
+                    }
+                }
             }
-            Recorded::Store {
-                store: None,
-                db_file,
-                ..
-            } => self.add_unchecked(node, Reason::RecordedStoreNotFound(db_file.clone())),
             Recorded::Unreadable(path) => {
                 self.add_unchecked(node, Reason::UnreadableRecord(path.clone()))
             }
@@ -214,19 +219,22 @@ impl Planner {
                 location,
                 records,
             } => {
-                let configured = facts
-                    .nodes
-                    .iter()
-                    .any(|node| node.key_file.parent() == Some(location.resolved.as_path()));
-                if configured {
-                    return;
-                }
+                let in_folder =
+                    |node: &&NodeFacts| node.key_file.parent() == Some(location.resolved.as_path());
                 // A key file in the folder with a record is checked through the store that the
-                // record names, before the store of a node folder of the same name.
-                if !records.is_empty() {
-                    for (_, recorded) in records {
+                // record names, before the store of a node folder of the same name. A configured
+                // node's key file in the folder does not cover the other key files there.
+                for (key_file, recorded) in records {
+                    let configured = facts
+                        .nodes
+                        .iter()
+                        .filter(in_folder)
+                        .any(|node| node.key_file.file_name() == key_file.file_name());
+                    if !configured {
                         self.add_recorded(recorded, name, true);
                     }
+                }
+                if !records.is_empty() || facts.nodes.iter().any(|node| in_folder(&node)) {
                     return;
                 }
                 // A node folder of the same name must hold the store that the key protects, or be
@@ -357,6 +365,7 @@ fn node_folder_store<'a>(facts: &'a Facts, name: &str) -> Option<&'a Location> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::facts::RecordedStore;
     use super::*;
 
     const DATA: &str = "/p/.interfold/data";
@@ -388,16 +397,22 @@ mod tests {
         }
     }
 
-    /// A record that names the store `db_file`, which exists.
-    fn recorded(db_file: &str) -> Recorded {
-        Recorded::Store {
-            db_file: PathBuf::from(db_file),
-            store: Some(at(db_file)),
-            lock: at(&format!(
-                "{}/interfold.lock",
-                Path::new(db_file).parent().unwrap().display()
-            )),
-        }
+    /// A record that names the stores `db_files`, which exist, the store of the last start last.
+    fn recorded(db_files: &[&str]) -> Recorded {
+        Recorded::Stores(
+            db_files
+                .iter()
+                .map(|db_file| RecordedStore {
+                    db_file: PathBuf::from(db_file),
+                    store: Some(at(db_file)),
+                    lock: at(&format!(
+                        "{}/interfold.lock",
+                        Path::new(db_file).parent().unwrap().display()
+                    )),
+                    purged: false,
+                })
+                .collect(),
+        )
     }
 
     fn node_folder(name: &str, stores: &[&str]) -> DataEntry {
@@ -689,7 +704,7 @@ mod tests {
     #[test]
     fn the_store_that_the_record_names_is_locked_and_holds_the_identity() {
         let mut moved = node("cn1");
-        moved.recorded = recorded("/elsewhere/cn1/db");
+        moved.recorded = recorded(&["/elsewhere/cn1/db"]);
         let plan = plan(&facts(
             vec![moved],
             vec![node_folder("cn1", &["db"])],
@@ -711,17 +726,48 @@ mod tests {
         assert!(plan.unchecked.is_empty());
     }
 
+    /// A node that started with a stale copy after it used another store: the purge holds the lock
+    /// of each recorded store and checks each, and only the last start's store holds the identity.
+    #[test]
+    fn every_store_that_the_record_names_is_checked() {
+        let mut moved = node("cn1");
+        moved.recorded = recorded(&["/active/cn1/db", "/stale/cn1/db"]);
+        let plan = plan(&facts(
+            vec![moved],
+            vec![node_folder("cn1", &["db"])],
+            vec![],
+        ));
+
+        for lock in ["/active/cn1/interfold.lock", "/stale/cn1/interfold.lock"] {
+            assert!(plan
+                .locks
+                .iter()
+                .any(|planned| planned.path == Path::new(lock)));
+        }
+        let store = |path: &str| {
+            plan.stores
+                .iter()
+                .find(|store| store.db_file == Path::new(path))
+                .unwrap()
+        };
+        assert!(!store("/active/cn1/db").needs_identity);
+        assert!(store("/stale/cn1/db").needs_identity);
+        assert!(!store(&format!("{DATA}/cn1/db")).needs_identity);
+        assert!(plan.unchecked.is_empty());
+    }
+
     /// A record that names a store that is not there, or that the purge cannot read, is a
     /// refusal; a node without a store at its configured path then needs no store there.
     #[test]
     fn a_missing_recorded_store_or_an_unreadable_record_is_a_refusal() {
         let mut gone = node("cn1");
         gone.store = None;
-        gone.recorded = Recorded::Store {
+        gone.recorded = Recorded::Stores(vec![RecordedStore {
             db_file: PathBuf::from("/elsewhere/cn1/db"),
             store: None,
             lock: at("/elsewhere/cn1/interfold.lock"),
-        };
+            purged: false,
+        }]);
         assert_eq!(
             plan(&facts(vec![gone], vec![], vec![])).unchecked,
             vec![unchecked(
@@ -747,13 +793,61 @@ mod tests {
         );
     }
 
+    /// A recorded store that an earlier purge deleted, which left its marker, is no refusal: the
+    /// purge holds its lock and finishes.
+    #[test]
+    fn a_recorded_store_that_an_earlier_purge_deleted_is_finished() {
+        let mut rerun = node("cn1");
+        rerun.store = None;
+        rerun.lock_folder = FolderState::Purging;
+        rerun.recorded = Recorded::Stores(vec![RecordedStore {
+            db_file: PathBuf::from(format!("{DATA}/cn1/db")),
+            store: None,
+            lock: at(&format!("{DATA}/cn1/interfold.lock")),
+            purged: true,
+        }]);
+        let plan = plan(&facts(vec![rerun], vec![], vec![]));
+        assert!(plan.unchecked.is_empty());
+        assert_eq!(plan.locks.len(), 1);
+    }
+
+    /// A folder holds a configured node's key file and the key file of a removed profile: the
+    /// removed profile's key is checked through its record too.
+    #[test]
+    fn a_configured_key_file_does_not_cover_the_other_key_files_in_its_folder() {
+        let folder = ConfigEntry::Folder {
+            name: "cn1".to_string(),
+            location: at(&format!("{CONFIG}/cn1")),
+            records: vec![(
+                PathBuf::from(format!("{CONFIG}/cn1/old.key")),
+                recorded(&["/elsewhere/old/db"]),
+            )],
+        };
+        let plan = plan(&facts(
+            vec![node("cn1")],
+            vec![node_folder("cn1", &["db"])],
+            vec![folder],
+        ));
+
+        let old = plan
+            .stores
+            .iter()
+            .find(|store| store.db_file == Path::new("/elsewhere/old/db"))
+            .expect("the removed profile's store is checked");
+        assert!(old.needs_identity);
+        assert!(plan
+            .locks
+            .iter()
+            .any(|lock| lock.path == Path::new("/elsewhere/old/interfold.lock")));
+    }
+
     /// A key file that no configured node uses is checked through its record, instead of refused.
     #[test]
     fn an_unconfigured_key_file_is_checked_through_its_record() {
         let file = ConfigEntry::File {
             name: "old.key".to_string(),
             location: at(&format!("{CONFIG}/old.key")),
-            recorded: recorded("/elsewhere/old/db"),
+            recorded: recorded(&["/elsewhere/old/db"]),
         };
         let plan = plan(&facts(vec![], vec![], vec![file]));
         assert!(plan.unchecked.is_empty());

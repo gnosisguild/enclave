@@ -63,44 +63,34 @@ chains:
       rpc_url: "https://turing-rpc.avail.so/rpc"
     contracts:
       e3_program:
-        address: "0xc6b6f740C85878D046A50f203A3Aa379150bF8C7"
-        deploy_block: 11855813
+        address: "0xA9894A39061EC33f8550a2B63A66Be59fb9fa443"
+        deploy_block: 11873424
       interfold:
-        address: "0xc5DD9418A0aBF15678F974D2348B4be4D3832B54"
-        deploy_block: 11855915
+        address: "0xBD5B6D1aDA9e0eB248B678469C9Cd6a63507E42b"
+        deploy_block: 11873232
       ciphernode_registry:
-        address: "0xfa0fCE6afd9b59E2Ac69DC53A128ee5835346B5e"
-        deploy_block: 11855915
+        address: "0xb1E8640CF8D0A927290E3d9E1b01c4899B5225Ef"
+        deploy_block: 11873232
       bonding_registry:
-        address: "0x55Cf62396e1CAE6Fcc380CfE0b4C48103C4a3711"
-        deploy_block: 11855915
+        address: "0x8687bC7C8f055b41aD2C2447c04aCBD76C1075b2"
+        deploy_block: 11873232
       slashing_manager:
-        address: "0xd467290E57fa84FAE42A737a83B42a6786175d79"
-        deploy_block: 11855915
+        address: "0x5F9D21751aA24bc3D67C9B9D6ceEf2b62AAdac6d"
+        deploy_block: 11873232
       fee_token:
         address: "0xE2e534F7Cb95777eD870CDCaCb80B1E9E2aD555B"
         deploy_block: 11856062
       faucet:
-        address: "0xA7f0A637Af62fA4E0b46E397D1b85E9b4807f019"
-        deploy_block: 11856142
+        address: "0x1B4340A65BB669267BF5DE37385B139987C3F09c"
+        deploy_block: 11873271
 program:
-  dev: true
-  # risc0:
-  #   risc0_dev_mode: 0 # 0 = production (Boundless), 1 = dev mode (fake proofs)
-  #   boundless:
-  #     rpc_url: "https://sepolia.infura.io/v3/YOUR_KEY"
-  #     private_key: "PRIVATE_KEY" # Use env vars for secrets
-  #     pinata_jwt: "PINATA_JWT" # For uploading programs
-  #     ipfs_gateway_url: "https://gateway.pinata.cloud" # Public full-download gateway for programs and inputs
-  #     program_url: "https://gateway.pinata.cloud/ipfs/QmdSmZPD9ArQYY754pbvji9bfiqAmG1rmoLci1fN9vMPdF" # Guest for ImageID.sol
-  #     onchain: true # true = onchain requests, false = offchain
-  #     Optional — custom auction parameters (defaults shown):
-  #     min_price_eth: 0.00005
-  #     max_price_eth: 0.004
-  #     timeout_secs: 28800
-  #     lock_timeout_secs: 14400
-  #     ramp_up_secs: 7200
-  #     lock_collateral_zkc: 100.0
+  dev: false
+  # Real proofs use program.openvm, with absolute paths local to the deployment:
+  # openvm:
+  #   prover_bin: /path/to/interfold-openvm-prover            # the CPU worker
+  #   prover_bin_cuda: /path/to/interfold-openvm-prover-cuda  # optional; used when a GPU works
+  #   backend: auto                                           # auto, cpu or cuda
+  # See crates/openvm-prover/README.md.
   # The scheduler defaults to 2 concurrent jobs and reserves 2 logical CPUs for Actix / libp2p.
   # It reduces concurrency when the host or cgroup memory limit is too small.
   # Example override on a dedicated 64 GB host:

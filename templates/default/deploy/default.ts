@@ -4,9 +4,16 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { getDeploymentChain, readDeploymentArgs, storeDeploymentArgs, updateE3Config } from '@interfold/contracts/scripts'
+import {
+  compiledOpenVmEnvironment,
+  deployOpenVmReceiptVerifier,
+  getDeploymentChain,
+  readDeploymentArgs,
+  storeDeploymentArgs,
+  updateE3Config,
+} from '@interfold/contracts/scripts'
 import { Interfold__factory as InterfoldFactory } from '@interfold/contracts/types'
-import { ensureTemplateCwd, INTERFOLD_CONFIG_FILE } from '../scripts/template-paths'
+import { ensureTemplateCwd, INTERFOLD_CONFIG_FILE, TEMPLATE_ROOT } from '../scripts/template-paths'
 import { MyProgram__factory as MyProgramFactory } from '../types/factories/contracts'
 import hre from 'hardhat'
 
@@ -38,23 +45,28 @@ export const deployTemplate = async () => {
     throw new Error('PoseidonT3 address not found, it must be deployed first')
   }
 
-  const verifier = await ethers.deployContract('MockRISC0Verifier')
+  const unprovedTest = process.env.TEMPLATE_UNPROVED_TEST === '1'
+  if (unprovedTest && (await ethers.provider.getNetwork()).chainId !== 31337n) {
+    throw new Error('TEMPLATE_UNPROVED_TEST requires the isolated local chain')
+  }
+  let verifier
+  let verifierConstructorArgs: Record<string, unknown> = {}
+  if (unprovedTest) {
+    verifier = await ethers.deployContract('MockOpenVmReceiptVerifier')
+  } else {
+    // The identity `interfold program compile` wrote, unless OPENVM_* settings name one.
+    const deployed = await deployOpenVmReceiptVerifier(ethers, compiledOpenVmEnvironment(TEMPLATE_ROOT))
+    verifier = deployed.receipt
+    verifierConstructorArgs = { verifier: deployed.halo2Verifier, appExeCommit: deployed.appExeCommit, appVmCommit: deployed.appVmCommit }
+  }
   await verifier.waitForDeployment()
-
-  const imageId = await ethers.deployContract('ImageID')
-  await imageId.waitForDeployment()
-
+  const programId = await verifier.imageId()
   storeDeploymentArgs(
-    {
-      address: await imageId.getAddress(),
-      blockNumber: await ethers.provider.getBlockNumber(),
-    },
-    'ImageID',
+    { address: await verifier.getAddress(), blockNumber: await ethers.provider.getBlockNumber(), constructorArgs: verifierConstructorArgs },
+    unprovedTest ? 'MockOpenVmReceiptVerifier' : 'OpenVmReceiptVerifier',
     chain,
   )
-
-  const programId = await imageId.PROGRAM_ID()
-  const ciphertextVerifier = await ethers.deployContract('Risc0BfvCiphertextVerifier', [await verifier.getAddress(), programId])
+  const ciphertextVerifier = await ethers.deployContract('OpenVmBfvCiphertextVerifier', [await verifier.getAddress(), programId])
   await ciphertextVerifier.waitForDeployment()
   const encryptionSchemeId = ethers.keccak256(ethers.toUtf8Bytes('fhe.rs:BFV'))
   await (await interfold.setCiphertextVerifier(encryptionSchemeId, await ciphertextVerifier.getAddress())).wait()
@@ -83,7 +95,7 @@ export const deployTemplate = async () => {
   console.log(
     `
       Deployed MyProgram at address: ${await e3Program.getAddress()}
-      Deployed MockRISC0Verifier at address: ${await verifier.getAddress()}
+      Deployed ${unprovedTest ? 'local unproved test verifier' : 'OpenVmReceiptVerifier'} at address: ${await verifier.getAddress()}
     `,
   )
 

@@ -10,7 +10,6 @@
 //! and (for input) secret plus shares. Input values are normalized to [0, q_j) per modulus
 //! and then to the ZKP field modulus so the Noir circuit's range check and parity check succeed.
 
-use crate::bigint_3d_to_json_values;
 use crate::circuits::commitments::{
     compute_sc_esm_secret_root_commitment, compute_sc_sk_secret_root_commitment,
     compute_share_computation_e_sm_commitment, compute_share_computation_sk_commitment,
@@ -18,17 +17,19 @@ use crate::circuits::commitments::{
 use crate::computation::DkgInputType;
 use crate::dkg::share_computation::ShareComputationCircuit;
 use crate::dkg::share_computation::ShareComputationCircuitData;
+use crate::encoding::bigint_3d_to_json_values;
+use crate::encoding::{crt_polynomial_to_toml_json, poly_coefficients_to_toml_json};
 use crate::CircuitsErrors;
-use crate::{
-    calculate_bit_width, compute_modulus_bit, crt_polynomial_to_toml_json,
-    poly_coefficients_to_toml_json,
-};
 use crate::{CircuitComputation, Computation};
+use e3_fhe_params::utils::{
+    calculate_bit_width, compute_modulus_bit, compute_native_crt_coeff_bit,
+};
 use e3_fhe_params::BfvPreset;
 use e3_fhe_params::{build_pair_for_preset, calculate_smudging_bound};
-use e3_polynomial::{reduce, CrtPolynomial};
+use e3_polynomial::CrtPolynomial;
 use fhe::bfv::SecretKey;
 use num_bigint::{BigInt, BigUint};
+use num_integer::Integer;
 use serde::{Deserialize, Serialize};
 
 /// Output of [`CircuitComputation::compute`] for [`ShareComputationCircuit`]: bounds, bit widths, and input.
@@ -105,6 +106,15 @@ pub struct Inputs {
     pub e_sm_lift: Option<(Vec<BigInt>, Vec<Vec<BigInt>>)>,
 }
 
+/// Center a residue already in `[0, modulus)` around zero.
+fn center(residue: &BigInt, modulus: &BigInt) -> BigInt {
+    if residue > &((modulus - 1u32) / 2u32) {
+        residue - modulus
+    } else {
+        residue.clone()
+    }
+}
+
 /// The smudging noise lifted to one integer per coefficient, and the CRT quotient that ties it to
 /// each centered residue: `lifted[i] == center(residue_l[i], q_l) + quotients[l][i] * q_l`.
 ///
@@ -142,11 +152,11 @@ pub fn e_sm_crt_lift(
         let mut sum = BigInt::from(0);
         for (mod_idx, &q) in moduli.iter().enumerate() {
             let q = BigInt::from(q);
-            let residue = reduce(&secret_crt.limb(mod_idx).coefficients()[coeff_idx], &q);
+            let residue = secret_crt.limb(mod_idx).coefficients()[coeff_idx].mod_floor(&q);
             sum += &residue * &basis[mod_idx];
-            residues.push(e3_polynomial::center(&residue, &q));
+            residues.push(center(&residue, &q));
         }
-        let value = e3_polynomial::center(&reduce(&sum, &q_product), &q_product);
+        let value = center(&sum.mod_floor(&q_product), &q_product);
         for (mod_idx, &q) in moduli.iter().enumerate() {
             let q = BigInt::from(q);
             let difference = &value - &residues[mod_idx];
@@ -189,21 +199,16 @@ impl Computation for Configs {
 impl Computation for Bits {
     type Preset = BfvPreset;
     type Data = Bounds;
-    type Error = crate::utils::ZkHelpersUtilsError;
+    type Error = crate::encoding::ZkHelpersUtilsError;
 
     fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) = build_pair_for_preset(preset)
-            .map_err(|e| crate::utils::ZkHelpersUtilsError::ParseBound(e.to_string()))?;
+            .map_err(|e| crate::encoding::ZkHelpersUtilsError::ParseBound(e.to_string()))?;
 
-        let mut bit_share = 0;
-        for &qi in threshold_params.moduli() {
-            let share_bound = BigUint::from(qi - 1);
-            let bit_width = calculate_bit_width(BigInt::from(share_bound));
-            bit_share = bit_share.max(bit_width);
-        }
+        let bit_share = compute_native_crt_coeff_bit(threshold_params.moduli());
 
         Ok(Bits {
-            bit_sk_secret: calculate_bit_width(BigInt::from(data.sk_bound.clone())),
+            bit_sk_secret: calculate_bit_width(&data.sk_bound),
             // The e_sm secret is held as centered CRT residues, so it shares the modulus width
             // with C1's committed limbs. C1 range-checks the smudging bound on its lifted
             // witness; that bound exceeds every q_i and is not the width of what is hashed here.
@@ -296,7 +301,7 @@ impl Computation for Inputs {
                 y_mod.push(secret_crt.limb(mod_idx).coefficients()[coeff_idx].clone());
                 for party_idx in 0..n_parties {
                     let share_value = &sss[mod_idx][[party_idx, coeff_idx]];
-                    y_mod.push(reduce(share_value, &q_j));
+                    y_mod.push(share_value.mod_floor(&q_j));
                 }
                 y_coeff.push(y_mod);
             }
@@ -429,9 +434,9 @@ impl Computation for Inputs {
 mod tests {
     use super::*;
 
-    use crate::ciphernodes_committee::CiphernodesCommitteeSize;
     use crate::computation::DkgInputType;
     use crate::dkg::share_computation::ShareComputationCircuitData;
+    use e3_committee::CiphernodesCommitteeSize;
     use e3_fhe_params::BfvPreset;
     use e3_polynomial::Polynomial;
 
@@ -446,7 +451,7 @@ mod tests {
         .unwrap();
         let bounds = Bounds::compute(BfvPreset::InsecureThreshold, &sample).unwrap();
         let bits = Bits::compute(BfvPreset::InsecureThreshold, &bounds).unwrap();
-        let expected_sk_bits = calculate_bit_width(BigInt::from(bounds.sk_bound.clone()));
+        let expected_sk_bits = calculate_bit_width(&bounds.sk_bound);
 
         assert_eq!(bits.bit_sk_secret, expected_sk_bits);
     }
@@ -520,8 +525,8 @@ mod tests {
             assert!(value.magnitude() <= bound.magnitude());
             for (mod_idx, &q) in moduli.iter().enumerate() {
                 let q = BigInt::from(q);
-                let residue = e3_polynomial::center(
-                    &reduce(&sample.secret.limb(mod_idx).coefficients()[coeff_idx], &q),
+                let residue = center(
+                    &sample.secret.limb(mod_idx).coefficients()[coeff_idx].mod_floor(&q),
                     &q,
                 );
                 assert_eq!(*value, residue + &quotients[mod_idx][coeff_idx] * q);

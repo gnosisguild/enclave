@@ -7,11 +7,13 @@
 //! Versioned transport and proof-backed validation for operational l-BFV keys.
 
 use anyhow::{anyhow, ensure, Context, Result};
+use e3_fhe_params::utils::compute_modulus_bit;
 use e3_fhe_params::{build_pair_for_preset, lbfv_crs_seed, lbfv_urs_seed, BfvPreset};
 use e3_polynomial::CrtPolynomial;
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use e3_zk_helpers::{
     compute_lbfv_key_envelope_commitment, compute_lbfv_public_key_commitment,
-    compute_lbfv_rlk_commitment, compute_modulus_bit, compute_pk_aggregation_commitment,
+    compute_lbfv_rlk_commitment, compute_pk_aggregation_commitment,
     compute_rlk_aggregation_commitment, fhe_poly_to_crt_centered_checked,
 };
 use fhe::bfv::{CommonRandomPolyVec, PublicKey};
@@ -341,6 +343,7 @@ fn field_bytes(value: &BigInt) -> Result<[u8; 32]> {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use e3_committee::CiphernodesCommitteeSize;
     use e3_zk_helpers::circuits::threshold::lbfv_pk_aggregation::{
         LbfvPkAggregationCircuitData, LbfvPkAggregationInputs,
     };
@@ -349,7 +352,7 @@ pub(crate) mod tests {
     use e3_zk_helpers::circuits::threshold::rlk_aggregation::{
         RlkAggregationCircuitData, RlkAggregationComponent, RlkAggregationInputs,
     };
-    use e3_zk_helpers::{CiphernodesCommitteeSize, Computation};
+    use e3_zk_helpers::Computation;
     use fhe::aggregate::AggregateIter;
     use fhe::bfv::SecretKey;
     use fhe::trlbfv::{aggregate_relinearization_key, PublicKeyShare, RelinKeyShare};

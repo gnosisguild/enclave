@@ -6,12 +6,8 @@
 
 import { network } from 'hardhat'
 import type { HardhatEthers } from '@nomicfoundation/hardhat-ethers/types'
-import { zeroHash } from 'viem'
-import { CRISPProgram, HonkVerifier, MockInterfold, MockRISC0Verifier, PoseidonT3 } from '../types'
+import { CRISPProgram, HonkVerifier, MockInterfold, MockComputeReceiptVerifier, PoseidonT3 } from '../types'
 import { verifierNames } from '../scripts/verifiers'
-
-// Non-zero address used in the tests.
-export const nonZeroAddress = '0xc6e7DF5E7b4f2A278906862b61205850344D4e7d'
 
 const connection = await network.connect()
 export const ethers: HardhatEthers = connection.ethers
@@ -140,10 +136,10 @@ export async function deployMockInterfold() {
   return contract as unknown as MockInterfold
 }
 
-export async function deployMockRISC0Verifier() {
-  const contract = await deployContract('MockRISC0Verifier')
+export async function deployMockComputeReceiptVerifier() {
+  const contract = await deployContract('MockComputeReceiptVerifier')
 
-  return contract as unknown as MockRISC0Verifier
+  return contract as unknown as MockComputeReceiptVerifier
 }
 
 /**
@@ -200,7 +196,7 @@ export async function deployCRISPProgram(
     honkVerifier?: HonkVerifier
     onchainHonkVerifier?: HonkVerifier
     poseidonT3?: PoseidonT3
-    risc0Verifier?: MockRISC0Verifier
+    computeVerifier?: MockComputeReceiptVerifier
     bindInterfold?: boolean
     availabilityFinalizationWindow?: number
     inputAvailabilitySigner?: string
@@ -213,7 +209,9 @@ export async function deployCRISPProgram(
   // must pass the real one.
   const onchainHonkVerifier = contracts.onchainHonkVerifier || honkVerifier
   const mockInterfold = contracts.mockInterfold || (await deployMockInterfold())
-  const risc0Verifier = contracts.risc0Verifier ? await contracts.risc0Verifier.getAddress() : nonZeroAddress
+  // CRISPProgram refuses a receipt identity that its verifier does not accept, so every program
+  // gets a verifier that reports one. Without `computeVerifier`, it accepts every journal.
+  const computeVerifier = contracts.computeVerifier || (await deployMockComputeReceiptVerifier())
   const dataAvailabilityVerifier = await deployContract('MockCrispDataAvailabilityVerifier')
 
   const programFactory = await ethers.getContractFactory('CRISPProgram', {
@@ -225,13 +223,13 @@ export async function deployCRISPProgram(
 
   const program = await programFactory.deploy(
     await owner.getAddress(),
-    risc0Verifier,
+    await computeVerifier.getAddress(),
     await honkVerifier.getAddress(),
     await onchainHonkVerifier.getAddress(),
     await dataAvailabilityVerifier.getAddress(),
     contracts.availabilityFinalizationWindow ?? 0,
     contracts.inputAvailabilitySigner ?? (await owner.getAddress()),
-    zeroHash,
+    await computeVerifier.imageId(),
   )
 
   await program.waitForDeployment()

@@ -77,7 +77,7 @@ export const ALL_COMMITTEES: CircuitCommittee[] = [CIRCUIT_COMMITTEES.MINIMUM, C
 
 /**
  * `(N, T, H)` per committee. Mirrors `circuits/lib/src/configs/committee/{name}/mod.nr`
- * and Rust `e3_zk_helpers::CiphernodesCommitteeSize::values()`. The build script writes
+ * and Rust `e3_committee::CiphernodesCommitteeSize::values()`. The build script writes
  * `H` and `T` into `packages/interfold-contracts/scripts/utils.ts` so the EVM gas benchmark
  * deploys verifiers with the matching public-input layout.
  */

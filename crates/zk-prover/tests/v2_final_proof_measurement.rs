@@ -14,6 +14,7 @@ use std::{env, fs, path::PathBuf};
 
 use alloy::primitives::Address;
 use common::find_bb;
+use e3_committee::CiphernodesCommitteeSize;
 use e3_config::BBPath;
 use e3_events::{CircuitName, CircuitVariant, Proof};
 use e3_fhe_params::{build_pair_for_preset, lbfv_crs_seed, lbfv_urs_seed, BfvPreset};
@@ -32,7 +33,6 @@ use e3_zk_helpers::threshold::rlk_aggregation::{
     RlkAggregationCircuit, RlkAggregationCircuitData, RlkAggregationComponent,
 };
 use e3_zk_helpers::threshold::rlk_generation::RlkGenerationAdapter;
-use e3_zk_helpers::CiphernodesCommitteeSize;
 use e3_zk_prover::{
     prove_chunked_share_computation, prove_dkg_aggregation_v2, prove_lbfv_aggregation_fold_step,
     prove_lbfv_generation_fold_step, prove_lbfv_pk_generation_row, prove_node_dkg_fold,
@@ -132,7 +132,7 @@ fn c4_data_for_recipient(
     dkg_secret_key: &SecretKey,
     recipient: usize,
     input_type: DkgInputType,
-    committee: e3_zk_helpers::CiphernodesCommittee,
+    committee: e3_committee::CiphernodesCommittee,
     threshold_moduli: &[u64],
 ) -> ShareDecryptionCircuitData {
     let mut honest_ciphertexts = Vec::with_capacity(committee.h);
@@ -180,7 +180,7 @@ fn c4_data_for_recipient(
 fn prove_c3_chain(
     prover: &ZkProver,
     preset: BfvPreset,
-    committee: e3_zk_helpers::CiphernodesCommittee,
+    committee: e3_committee::CiphernodesCommittee,
     share_inputs: &ShareComputationInputs,
     dkg_secret_key: &SecretKey,
     dkg_public_key: &PublicKey,
@@ -234,7 +234,7 @@ fn prove_c3_chain(
 fn prove_generation_fold(
     prover: &ZkProver,
     preset: BfvPreset,
-    committee: e3_zk_helpers::CiphernodesCommittee,
+    committee: e3_committee::CiphernodesCommittee,
     party_id: u32,
     secret_key: &SecretKey,
     lbfv_pk_share: &LbfvPublicKeyShare,
@@ -308,7 +308,7 @@ fn prove_generation_fold(
 fn build_node(
     prover: &ZkProver,
     preset: BfvPreset,
-    committee: e3_zk_helpers::CiphernodesCommittee,
+    committee: e3_committee::CiphernodesCommittee,
     dkg_secret_key: &SecretKey,
     dkg_public_key: &PublicKey,
     party_id: usize,

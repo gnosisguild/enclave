@@ -6,20 +6,21 @@
 
 //! Conversion of l-BFV relinearization-key rows into Noir witnesses.
 
-use crate::math::{
-    exact_quotient, fhe_poly_to_crt_centered_checked, fhe_secret_key_to_crt_centered,
-    negacyclic_mul, validate_fhe_poly_context,
+use crate::encoding::{
+    fhe_poly_to_crt_centered_checked, fhe_secret_key_to_crt_centered, validate_fhe_poly_context,
 };
+use crate::encoding::{validate_crt_shape, verify_crt_shapes};
+use crate::negacyclic::{exact_quotient, negacyclic_mul};
 use crate::threshold::lbfv_proof_domain::{
     lbfv_proof_session, sample_lbfv_proof_domain, validate_lbfv_generation_party_id,
 };
-use crate::utils::{validate_crt_shape, verify_crt_shapes};
 use crate::{
-    calculate_bit_width, crt_polynomial_to_toml_json, polynomial_to_toml_json, Artifacts,
-    CiphernodesCommittee, Circuit, CircuitCodegen, CircuitComputation, CircuitsErrors,
-    CodegenConfigs, CodegenToml, Computation,
+    crt_polynomial_to_toml_json, polynomial_to_toml_json, Artifacts, Circuit, CircuitCodegen,
+    CircuitComputation, CircuitsErrors, CodegenConfigs, CodegenToml, Computation,
 };
+use e3_committee::CiphernodesCommittee;
 use e3_committee_hash::LbfvProofDomainContext;
+use e3_fhe_params::utils::{calculate_bit_width, compute_modulus_bit};
 use e3_fhe_params::{build_pair_for_preset, lbfv_crs_seed, lbfv_urs_seed, BfvPreset};
 use e3_polynomial::{CrtPolynomial, Polynomial};
 use fhe::bfv::{BfvParameters, CommonRandomPolyVec, SecretKey};
@@ -227,22 +228,17 @@ impl Computation for RlkGenerationBits {
     fn compute(preset: Self::Preset, bounds: &Self::Data) -> Result<Self, Self::Error> {
         let (params, _) = build_pair_for_preset(preset)
             .map_err(|error| CircuitsErrors::Other(error.to_string()))?;
-        let max_bit = |values: &[BigUint]| {
-            values
-                .iter()
-                .map(|value| calculate_bit_width(BigInt::from(value.clone())))
-                .max()
-                .unwrap_or(0)
-        };
+        let max_bit =
+            |values: &[BigUint]| values.iter().map(calculate_bit_width).max().unwrap_or(0);
 
         Ok(Self {
-            r_bit: calculate_bit_width(BigInt::from(bounds.r_bound.clone())),
-            sk_bit: calculate_bit_width(BigInt::from(bounds.sk_bound.clone())),
-            e0_bit: calculate_bit_width(BigInt::from(bounds.e0_bound.clone())),
-            e2_bit: calculate_bit_width(BigInt::from(bounds.e2_bound.clone())),
+            r_bit: calculate_bit_width(&bounds.r_bound),
+            sk_bit: calculate_bit_width(&bounds.sk_bound),
+            e0_bit: calculate_bit_width(&bounds.e0_bound),
+            e2_bit: calculate_bit_width(&bounds.e2_bound),
             rd0_bit: max_bit(&bounds.rd0_bounds),
             rd2_bit: max_bit(&bounds.rd2_bounds),
-            d_bit: crate::compute_modulus_bit(&params),
+            d_bit: compute_modulus_bit(&params),
         })
     }
 }
@@ -299,9 +295,9 @@ pub fn generate_toml(inputs: RlkGenerationInputs) -> Result<CodegenToml, Circuit
 /// Generate standalone Noir constants for the RLK generation circuit.
 pub fn generate_configs(configs: &RlkGenerationConfigs) -> CodegenConfigs {
     let prefix = <RlkGenerationCircuit as Circuit>::PREFIX;
-    let moduli = crate::utils::join_display(&configs.moduli, ", ");
-    let rd0 = crate::utils::join_display(&configs.bounds.rd0_bounds, ", ");
-    let rd2 = crate::utils::join_display(&configs.bounds.rd2_bounds, ", ");
+    let moduli = crate::encoding::join_display(&configs.moduli, ", ");
+    let rd0 = crate::encoding::join_display(&configs.bounds.rd0_bounds, ", ");
+    let rd2 = crate::encoding::join_display(&configs.bounds.rd2_bounds, ", ");
 
     format!(
         r#"use crate::core::threshold::rlk_generation::Configs as RlkGenerationConfigs;
@@ -755,7 +751,7 @@ impl RlkGenerationCircuitData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::CiphernodesCommitteeSize;
+    use e3_committee::CiphernodesCommitteeSize;
     use fhe::aggregate::AggregateIter;
     use fhe::bfv::{BfvParametersBuilder, Encoding, Plaintext};
     use fhe::trlbfv::{aggregate_relinearization_key, LBFVPublicKey, PublicKeyShare};
@@ -787,7 +783,6 @@ mod tests {
             &mut rng,
         )?;
         let committee = CiphernodesCommitteeSize::Minimum.values();
-        let cyclotomic = crate::math::cyclotomic_polynomial(params.degree() as u64);
 
         let rows = adapter.all_rows_data(
             committee,
@@ -814,25 +809,23 @@ mod tests {
                 // cyclotomic reduction rather than the fold the witness uses. `d0`/`d2` come from
                 // the FHE share, which applies the full Garner coefficient, so this also checks
                 // that `delta` reproduces it modulo q_i.
-                let d0_expected = adapter.d1_rows[row_index]
-                    .limb(i)
-                    .mul(&data.sk)
-                    .reduce_by_cyclotomic(&cyclotomic)
-                    .map_err(|error| CircuitsErrors::Other(error.to_string()))?
-                    .neg()
-                    .add(&data.e0)
-                    .add(&data.r.scalar_mul(&delta))
-                    .add(&data.rd0.limb(i).scalar_mul(&qi));
+                let d0_expected = crate::negacyclic::reduce_reference(
+                    &adapter.d1_rows[row_index].limb(i).mul(&data.sk),
+                    params.degree(),
+                )
+                .neg()
+                .add(&data.e0)
+                .add(&data.r.scalar_mul(&delta))
+                .add(&data.rd0.limb(i).scalar_mul(&qi));
                 assert!(data.d0.limb(i).sub(&d0_expected).is_zero());
 
-                let d2_expected = adapter.a_rows[row_index]
-                    .limb(i)
-                    .mul(&data.r)
-                    .reduce_by_cyclotomic(&cyclotomic)
-                    .map_err(|error| CircuitsErrors::Other(error.to_string()))?
-                    .add(&data.e2)
-                    .add(&data.sk.scalar_mul(&delta))
-                    .add(&data.rd2.limb(i).scalar_mul(&qi));
+                let d2_expected = crate::negacyclic::reduce_reference(
+                    &adapter.a_rows[row_index].limb(i).mul(&data.r),
+                    params.degree(),
+                )
+                .add(&data.e2)
+                .add(&data.sk.scalar_mul(&delta))
+                .add(&data.rd2.limb(i).scalar_mul(&qi));
                 assert!(data.d2.limb(i).sub(&d2_expected).is_zero());
             }
         }

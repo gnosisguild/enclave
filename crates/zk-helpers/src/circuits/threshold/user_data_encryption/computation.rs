@@ -9,20 +9,22 @@
 //! [`Configs`], [`Bounds`], [`Bits`], and [`Inputs`] are produced from BFV parameters
 //! and (for input) a public key. They implement [`Computation`] and are used by codegen.
 
-use crate::calculate_bit_width;
-use crate::get_zkp_modulus;
-use crate::math::compute_k0is;
-use crate::math::{fold_negacyclic, plaintext_poly_u64};
+use crate::encoding::get_zkp_modulus;
+use crate::negacyclic::fold_negacyclic;
+
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitData;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
+use e3_fhe_params::utils::{calculate_bit_width, compute_k0is};
 use e3_fhe_params::BfvPreset;
 use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;
-use fhe::bfv::SecretKey;
+use e3_polynomial_fhe::FromFhePolynomial as _;
+use fhe::bfv::{Encoding, SecretKey};
 use fhe_math::zq::Modulus;
+use fhe_traits::FheDecoder;
 use fhe_traits::Serialize as FheSerialize;
 use itertools::izip;
 use num_bigint::BigInt;
@@ -150,26 +152,26 @@ impl Computation for Bits {
     fn compute(_: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
         let max_pk_bound = data.pk_bounds.iter().max().unwrap();
 
-        let pk_bit = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
+        let pk_bit = calculate_bit_width(max_pk_bound);
         // We can safely assume that the ct bound is the same as the pk bound.
-        let ct_bit = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
-        let u_bit = calculate_bit_width(BigInt::from(data.u_bound.clone()));
-        let e0_bit = calculate_bit_width(BigInt::from(data.e0_bound.clone()));
-        let e1_bit = calculate_bit_width(BigInt::from(data.e1_bound.clone()));
+        let ct_bit = calculate_bit_width(max_pk_bound);
+        let u_bit = calculate_bit_width(&data.u_bound);
+        let e0_bit = calculate_bit_width(&data.e0_bound);
+        let e1_bit = calculate_bit_width(&data.e1_bound);
 
         // For k1, use the maximum of low and up bounds
-        let k1_low_bit = calculate_bit_width(BigInt::from(data.k1_low_bound.clone()));
-        let k1_up_bit = calculate_bit_width(BigInt::from(data.k1_up_bound.clone()));
+        let k1_low_bit = calculate_bit_width(&data.k1_low_bound);
+        let k1_up_bit = calculate_bit_width(&data.k1_up_bound);
         let k_bit = k1_low_bit.max(k1_up_bit);
 
         // Each `r` is two-sided, so take the widest bound across the CRT bases.
         let mut ct0_r_bit = 0;
         for bound in &data.ct0_r_bounds {
-            ct0_r_bit = ct0_r_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
+            ct0_r_bit = ct0_r_bit.max(calculate_bit_width(bound));
         }
         let mut ct1_r_bit = 0;
         for bound in &data.ct1_r_bounds {
-            ct1_r_bit = ct1_r_bit.max(calculate_bit_width(BigInt::from(bound.clone())));
+            ct1_r_bit = ct1_r_bit.max(calculate_bit_width(bound));
         }
 
         Ok(Bits {
@@ -321,7 +323,7 @@ impl Computation for Inputs {
         e0_mod_q.center(&modulus_q);
 
         // Reconstruct k1 from plaintext polynomial.
-        let mut k1_u64 = plaintext_poly_u64(&pt)?; // m
+        let mut k1_u64 = Vec::<u64>::try_decode(&pt, Encoding::poly())?; // m
 
         Modulus::new(t)
             .map_err(|e| CircuitsErrors::Fhe(fhe::Error::from(e)))?
@@ -387,15 +389,9 @@ impl Computation for Inputs {
 
             // Compute e0_quotients[i] = (e0 - e0i) / qi for each coefficient
             // This is used for CRT consistency check: e0[j] = e0i[j] + e0_quotients[i][j] * qi
-            // Polynomial div by constant yields coefficient-wise division.
+            // Each difference must be exactly divisible by qi.
             let diff = e0_mod_q.sub(&e0i);
-            let qi_poly = Polynomial::constant(qi_bigint.clone());
-            let (e0_quotient, remainder) = diff.div(&qi_poly).expect("CRT requires exact division");
-
-            assert!(
-                remainder.is_zero(),
-                "e0 - e0i must be divisible by qi (CRT consistency)"
-            );
+            let e0_quotient = diff.div_exact(&qi_bigint).expect("CRT requires exact division");
 
             // k0qi = -t^{-1} mod qi
             let k0qi = BigInt::from(k0is[i]);
@@ -435,41 +431,27 @@ impl Computation for Inputs {
             //
             // The ct0 hat carries the residue `e0i`, while the identity reads the lifted `e0`.
             // Substituting the CRT split `e0 = e0i + e0_quotient * qi` moves that difference into
-            // the quotient, so `ct0_r` is the folded quotient minus `e0_quotient`. That is how `r`
-            // comes to carry what `e0is`, `r1i` and `r2i` carried between them.
-            //
-            // Everything here is O(N). Going through `decompose_residue` plus
-            // `Polynomial::reduce_by_cyclotomic` ran four generic long divisions per limb, each
-            // (N-1)(N+1) BigInt multiply-subtracts, and recomputed both products for the
-            // self-checks. This generator runs in the voter's browser, where that was about ten
-            // seconds per ballot at secure-8192.
+            // the quotient, so `ct0_r` is the folded quotient minus `e0_quotient`.
+            // Both folds run in O(N) without recomputing their convolutions.
             let ct0_reduced_hat = fold_negacyclic(&ct0i_hat, n as usize);
             let ct1_reduced_hat = fold_negacyclic(&ct1i_hat, n as usize);
 
-            // Exact division is the identity: `div` rejects any coefficient that is not a multiple
+            // Exact division rejects any coefficient that is not a multiple
             // of qi, so a successful division proves an integer quotient closes the reduced
             // equation and a wrong fold surfaces as a divisibility failure.
-            let (ct0_folded_quotient, ct0_remainder) = ct0i
+            let ct0_folded_quotient = ct0i
                 .sub(&ct0_reduced_hat)
-                .div(&qi_poly)
+                .div_exact(&qi_bigint)
                 .expect("ct0i - (pk0i * u + e0i + k0qi * k1 mod X^N + 1) must be divisible by qi");
-            assert!(
-                ct0_remainder.is_zero(),
-                "reduced ct0 identity must divide exactly by qi"
-            );
             let ct0_r = ct0_folded_quotient.sub(&e0_quotient);
 
-            let (ct1_r, ct1_remainder) = ct1i
+            let ct1_r = ct1i
                 .sub(&ct1_reduced_hat)
-                .div(&qi_poly)
+                .div_exact(&qi_bigint)
                 .expect("ct1i - (pk1i * u + e1 mod X^N + 1) must be divisible by qi");
-            assert!(
-                ct1_remainder.is_zero(),
-                "reduced ct1 identity must divide exactly by qi"
-            );
 
             // Restate both identities on the derived witnesses, with the lifted `e0` the circuit
-            // reads. O(N), and independent of `div`.
+            // reads. This checks the derived quotients against the integer equations.
             let ct0_reduced = ct0_reduced_hat
                 .sub(&e0i)
                 .add(&e0_mod_q)
@@ -535,8 +517,8 @@ impl Computation for Inputs {
 
     // Used as input for Nargo execution. Coefficients are JSON numbers when they fit in i64, else strings.
     fn to_json(&self) -> serde_json::Result<serde_json::Value> {
-        use crate::crt_polynomial_to_toml_json;
-        use crate::polynomial_to_toml_json;
+        use crate::encoding::crt_polynomial_to_toml_json;
+        use crate::encoding::polynomial_to_toml_json;
 
         let pk0is = crt_polynomial_to_toml_json(&self.pk0is);
         let pk1is = crt_polynomial_to_toml_json(&self.pk1is);
@@ -580,7 +562,7 @@ mod tests {
         let bits = Bits::compute(BfvPreset::InsecureThreshold, &bounds).unwrap();
 
         let max_pk_bound = bounds.pk_bounds.iter().max().unwrap();
-        let expected_bits = calculate_bit_width(BigInt::from(max_pk_bound.clone()));
+        let expected_bits = calculate_bit_width(max_pk_bound);
 
         assert_eq!(max_pk_bound.clone(), BigUint::from(36028797018956544u64));
         assert_eq!(bits.pk_bit, expected_bits);

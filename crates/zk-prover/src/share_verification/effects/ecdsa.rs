@@ -19,7 +19,7 @@ impl ShareVerificationActor {
         pre_dishonest: BTreeSet<u64>,
         ec: EventContext<Sequenced>,
         params_preset: e3_fhe_params::BfvPreset,
-        committee_size: e3_zk_helpers::CiphernodesCommitteeSize,
+        committee_size: e3_committee::CiphernodesCommitteeSize,
         lbfv_context: Option<&e3_events::LbfvVerificationContext>,
         verification_id: Option<B256>,
         store_passed_proofs: impl FnOnce(&mut PendingConsistencyCheck, Vec<P>),

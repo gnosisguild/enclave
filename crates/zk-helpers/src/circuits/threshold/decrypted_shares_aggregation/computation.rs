@@ -6,31 +6,31 @@
 
 //! Bounds, configs, bits, and input computation for the Decryption Share Aggregation TRBFV circuit.
 //!
-//! Uses [`crate::threshold::decrypted_shares_aggregation::utils`] for Q/delta, modular inverses,
-//! Lagrange-at-zero recovery, and scalar CRT reconstruction. Decryption shares are normalized
+//! Uses [`e3_fhe_params::utils`] for centered residues and coefficient widths. Decryption shares are normalized
 //! with [`e3_polynomial::CrtPolynomial::reduce`]; all input coefficients are reduced to
-//! [0, zkp_modulus) with [`e3_polynomial::reduce`] inside [`Inputs::compute`].
+//! [0, zkp_modulus) with [`num_integer::Integer::mod_floor`] inside [`Inputs::compute`].
 
 /// Max message coefficients in the C7 circuit (matches Noir's MAX_MSG_NON_ZERO_COEFFS).
-pub const MAX_MSG_NON_ZERO_COEFFS: usize = 100;
+pub const MAX_MSG_NON_ZERO_COEFFS: usize = 50;
 
-use crate::calculate_bit_width;
 use crate::circuits::commitments::compute_threshold_decryption_share_commitment;
-use crate::compute_q_mod_t;
-use crate::compute_q_mod_t_centered;
-use crate::get_zkp_modulus;
+use crate::encoding::get_zkp_modulus;
 use crate::threshold::decrypted_shares_aggregation::circuit::DecryptedSharesAggregationCircuit;
 use crate::threshold::decrypted_shares_aggregation::circuit::DecryptedSharesAggregationCircuitData;
 use crate::threshold::decrypted_shares_aggregation::utils;
 use crate::CircuitsErrors;
 use crate::{CircuitComputation, Computation};
 use e3_fhe_params::build_pair_for_preset;
+use e3_fhe_params::utils::{
+    calculate_bit_width, compute_native_crt_coeff_bit, compute_q_mod_t_centered,
+};
 use e3_fhe_params::BfvPreset;
-use e3_polynomial::reduce;
 use e3_polynomial::{CrtPolynomial, Polynomial};
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use fhe_math::rq::{Poly, PowerBasis};
 use num_bigint::{BigInt, BigUint};
-use num_traits::Zero;
+use num_integer::Integer;
+use num_traits::{ToPrimitive, Zero};
 use serde::{Deserialize, Serialize};
 /// Output of [`CircuitComputation::compute`] for [`DecryptedSharesAggregationCircuit`].
 #[derive(Debug)]
@@ -88,7 +88,6 @@ pub struct Bits {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Configs {
     pub l: usize,
-    pub threshold: usize,
     pub moduli: Vec<u64>,
     pub plaintext_modulus: u64,
     pub q_mod_t: BigUint,
@@ -123,11 +122,10 @@ impl Computation for Bounds {
     fn compute(preset: Self::Preset, _: &Self::Data) -> Result<Self, Self::Error> {
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
-        let moduli = threshold_params.moduli();
         let t = threshold_params.plaintext();
-        let q = utils::compute_q_product(moduli);
-        let delta = utils::compute_delta(&q, t);
-        let delta_half = utils::compute_delta_half(&delta);
+        let q = threshold_params.context_at_level(0)?.modulus();
+        let delta = q / t;
+        let delta_half = &delta >> 1usize;
         Ok(Bounds { delta, delta_half })
     }
 }
@@ -138,26 +136,20 @@ impl Computation for Bits {
     type Error = CircuitsErrors;
 
     fn compute(preset: Self::Preset, data: &Self::Data) -> Result<Self, Self::Error> {
-        let noise_bit = calculate_bit_width(BigInt::from(data.delta_half.clone()));
+        let noise_bit = calculate_bit_width(&data.delta_half);
         let (threshold_params, _) =
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
         let ctx = threshold_params
             .context_at_level(0)
             .map_err(|e| CircuitsErrors::Other(format!("context_at_level: {:?}", e)))?;
-        let mut d_native_bit = 0u32;
-        let mut modulus_product = BigInt::from(1u32);
-        for qi in ctx.moduli_operators() {
-            let q = BigInt::from(**qi);
-            d_native_bit = d_native_bit.max(calculate_bit_width(q.clone() - 1));
-            modulus_product *= q;
-        }
+        let d_native_bit = compute_native_crt_coeff_bit(threshold_params.moduli());
         // A residue fits `bits(q_l - 1)`; `d_native_bit` is already that maximum.
         let q_bit = d_native_bit;
         // Reduction quotients: the widest reduced input is the interpolation sum, under `H * q^2`,
         // so its quotient is under `H * q`. Six spare bits cover any committee up to 64 parties.
         let k_bit = q_bit + 6;
-        let t_bit = calculate_bit_width(BigInt::from(threshold_params.plaintext()));
-        let q_total_bit = calculate_bit_width(modulus_product.clone());
+        let t_bit = calculate_bit_width(&BigUint::from(threshold_params.plaintext()));
+        let q_total_bit = calculate_bit_width(ctx.modulus());
         Ok(Bits {
             noise_bit,
             d_native_bit,
@@ -179,14 +171,20 @@ impl Computation for Configs {
             build_pair_for_preset(preset).map_err(|e| CircuitsErrors::Other(e.to_string()))?;
         let moduli = threshold_params.moduli().to_vec();
         let t = threshold_params.plaintext();
-        let q = utils::compute_q_product(&moduli);
-        let q_mod_t = compute_q_mod_t(&q, t);
-        let q_mod_t_centered = compute_q_mod_t_centered(&moduli, t);
-        let q_inverse_mod_t = utils::compute_q_inverse_mod_t(&q, t)?;
+        let q = threshold_params.context_at_level(0)?.modulus();
+        let q_mod_t = q % t;
+        let q_mod_t_centered = compute_q_mod_t_centered(&q_mod_t, t);
+        let t_big = BigUint::from(t);
+        let q_inverse_mod_t = q
+            .modinv(&t_big)
+            .ok_or_else(|| {
+                CircuitsErrors::Other(format!("Q and t are not coprime, gcd = {}", q.gcd(&t_big)))
+            })?
+            .to_u64()
+            .expect("inverse below a u64 modulus must fit u64");
         let bounds = Bounds::compute(preset, &())?;
         let bits = Bits::compute(preset, &bounds)?;
         Ok(Configs {
-            threshold: 0, // Not derived from preset; set by caller if needed.
             l: moduli.len(),
             moduli,
             plaintext_modulus: t,
@@ -195,7 +193,8 @@ impl Computation for Configs {
             q_inverse_mod_t,
             bits,
             bounds,
-            // TODO: make this configurable based on the application (e.g., CRISP = 80).
+            // The circuit's message width. Every application shares it, because the width is
+            // compiled into the circuit.
             max_msg_non_zero_coeffs: MAX_MSG_NON_ZERO_COEFFS,
         })
     }
@@ -250,17 +249,21 @@ impl Computation for Inputs {
             )));
         }
 
+        // The circuit takes exactly T+1 shares and T+1 party IDs, and the Lagrange weights pair
+        // them by position. One polynomial more would copy into the witness unpaired and make it
+        // the wrong shape; one party ID more would weight a share that does not exist.
         if d_share_polys.len() != threshold + 1 {
             return Err(CircuitsErrors::Other(format!(
-                "d_share_polys.len() {} != threshold + 1 ({}); the C7 circuit requires exactly T + 1 shares",
+                "d_share_polys.len() {} != threshold + 1 ({}); the circuit takes exactly {} polynomials",
                 d_share_polys.len(),
+                threshold + 1,
                 threshold + 1
             )));
         }
         let reconstructing_parties = &data.reconstructing_parties;
         if reconstructing_parties.len() != threshold + 1 {
             return Err(CircuitsErrors::Other(format!(
-                "reconstructing_parties.len() {} != threshold + 1 ({}); must match the d_share_polys count",
+                "reconstructing_parties.len() {} != threshold + 1 ({}); one party ID per polynomial",
                 reconstructing_parties.len(),
                 threshold + 1
             )));
@@ -288,7 +291,7 @@ impl Computation for Inputs {
         }
         // Validate committee shape against the canonical table (T, N, H must match the
         // compiled Noir committee).
-        crate::ciphernodes_committee::canonical_committee_for_circuit(&data.committee)
+        crate::committee::canonical_committee_for_circuit(&data.committee)
             .map_err(|e| CircuitsErrors::Other(e.to_string()))?;
 
         // Decryption shares: one CrtPolynomial per party (from_fhe + reduce)
@@ -340,11 +343,14 @@ impl Computation for Inputs {
 
         let zkp_modulus = get_zkp_modulus();
 
-        let party_ids: Vec<BigInt> = party_ids.iter().map(|c| reduce(c, &zkp_modulus)).collect();
+        let party_ids: Vec<BigInt> = party_ids
+            .iter()
+            .map(|c| c.mod_floor(&zkp_modulus))
+            .collect();
         let message = Polynomial::new(
             message_trunc
                 .iter()
-                .map(|c| reduce(c, &zkp_modulus))
+                .map(|c| c.mod_floor(&zkp_modulus))
                 .collect(),
         );
 
@@ -368,9 +374,9 @@ impl Computation for Inputs {
     }
 
     fn to_json(&self) -> serde_json::Result<serde_json::Value> {
-        use crate::bigint_1d_to_json_values;
-        use crate::crt_polynomial_to_toml_json;
-        use crate::polynomial_to_toml_json;
+        use crate::encoding::bigint_1d_to_json_values;
+        use crate::encoding::crt_polynomial_to_toml_json;
+        use crate::encoding::polynomial_to_toml_json;
 
         let decryption_shares_json: Vec<Vec<serde_json::Value>> = self
             .decryption_shares
@@ -396,7 +402,7 @@ impl Computation for Inputs {
 mod tests {
     use super::*;
     use crate::threshold::decrypted_shares_aggregation::DecryptedSharesAggregationCircuitData;
-    use crate::CiphernodesCommitteeSize;
+    use e3_committee::CiphernodesCommitteeSize;
 
     #[test]
     fn test_bounds_and_bits_consistency() {
@@ -413,11 +419,46 @@ mod tests {
 
     #[test]
     fn test_configs_compute() {
-        let preset = BfvPreset::InsecureThreshold;
-        let configs = Configs::compute(preset, &()).unwrap();
+        for preset in [BfvPreset::InsecureThreshold, BfvPreset::SecureThreshold8192] {
+            let configs = Configs::compute(preset, &()).unwrap();
+            // Full CRT product is independent of the cached context used by the computation.
+            let q: BigUint = configs.moduli.iter().map(|&m| BigUint::from(m)).product();
+            let t = configs.plaintext_modulus;
+            assert_eq!(configs.moduli.len(), configs.l);
+            assert_eq!((&q * configs.q_inverse_mod_t) % t, BigUint::from(1u32));
+            assert_eq!(configs.q_mod_t, &q % t);
+            assert_eq!(configs.bounds.delta, &q / t);
+            assert_eq!(configs.bounds.delta_half, &configs.bounds.delta / 2u32);
+            assert_eq!(configs.bits.q_total_bit, q.bits() as u32);
+        }
+    }
 
-        assert_eq!(configs.moduli.len(), configs.l);
-        assert!(configs.q_inverse_mod_t > 0);
+    #[test]
+    fn an_extra_polynomial_or_party_id_is_refused() {
+        let preset = BfvPreset::InsecureThreshold;
+        let committee = CiphernodesCommitteeSize::Small.values();
+        let sample =
+            DecryptedSharesAggregationCircuitData::generate_sample(preset, committee).unwrap();
+
+        // T+2 polynomials with T+1 party IDs: the old check accepted this and copied every
+        // polynomial into the witness.
+        let mut oversized = sample.clone();
+        oversized
+            .d_share_polys
+            .push(oversized.d_share_polys[0].clone());
+        let error = Inputs::compute(preset, &oversized).unwrap_err().to_string();
+        assert!(error.contains("d_share_polys.len()"), "{error}");
+
+        // T+1 polynomials with T+2 party IDs.
+        let mut extra_party = sample.clone();
+        extra_party.reconstructing_parties.push(99);
+        let error = Inputs::compute(preset, &extra_party)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("reconstructing_parties.len()"), "{error}");
+
+        // Exactly T+1 of each still computes.
+        Inputs::compute(preset, &sample).unwrap();
     }
 
     #[test]

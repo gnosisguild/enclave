@@ -1,0 +1,1814 @@
+{
+  "group": "contracts",
+  "units": [
+    {
+      "id": "Interfold",
+      "kind": "contract",
+      "path": "packages/interfold-contracts/contracts/Interfold.sol",
+      "one_line": "Main E3 coordinator: takes requests and fees, moves each E3 through its stages, and handles failure, cancellation and pull-payment claims.",
+      "explain": "Interfold owns the E3 lifecycle state. A request escrows the fee, has the E3 program validate it and asks the registry for a committee; registry callbacks then move the E3 to committee finalized and key published, and the ciphertext and plaintext outputs complete it. Rewards, refunds and slashed funds go to InterfoldPricing and E3RefundManager, and payouts are pull claims. Without it no E3 can move from request to output, and no fee is escrowed or paid out.",
+      "analogy": "A job desk with numbered tickets: each E3 gets a ticket and a stage stamp, and only the right desk (registry, slashing manager, requester or a verified proof) can move it on.",
+      "actors": [],
+      "consumes": [
+        { "name": "request", "by": "requester", "ref": "packages/interfold-contracts/contracts/Interfold.sol@290@function request(" },
+        {
+          "name": "publishCiphertextOutput",
+          "by": "anyone (output checked by InterfoldLifecycle)",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@425@function publishCiphertextOutput("
+        },
+        {
+          "name": "publishPlaintextOutput",
+          "by": "anyone (decryption proof required)",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@441@function publishPlaintextOutput("
+        },
+        {
+          "name": "onCommitteeFinalized",
+          "by": "CiphernodeRegistryOwnable",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@765@function onCommitteeFinalized("
+        },
+        {
+          "name": "onCommitteePublished",
+          "by": "CiphernodeRegistryOwnable",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@789@function onCommitteePublished("
+        },
+        {
+          "name": "onE3Failed",
+          "by": "CiphernodeRegistryOwnable or SlashingManager",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@821@function onE3Failed("
+        },
+        {
+          "name": "markE3Failed",
+          "by": "anyone (after deadline and grace period)",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@854@function markE3Failed("
+        },
+        { "name": "cancelE3", "by": "requester", "ref": "packages/interfold-contracts/contracts/Interfold.sol@883@function cancelE3(" },
+        {
+          "name": "processE3Failure",
+          "by": "anyone",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@731@function processE3Failure("
+        },
+        {
+          "name": "escrowSlashedFunds",
+          "by": "SlashingManager",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@743@function escrowSlashedFunds("
+        },
+        {
+          "name": "claimReward",
+          "by": "ciphernode (pending reward holder)",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@1167@function claimReward("
+        },
+        {
+          "name": "treasuryClaim",
+          "by": "treasury account",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@1214@function treasuryClaim("
+        },
+        {
+          "name": "registerE3Program",
+          "by": "owner/governance",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@612@function registerE3Program("
+        }
+      ],
+      "emits": [
+        { "name": "E3Requested", "by": "Interfold", "ref": "packages/interfold-contracts/contracts/Interfold.sol@420@emit E3Requested(" },
+        {
+          "name": "PlaintextOutputPublished",
+          "by": "Interfold",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@476@emit PlaintextOutputPublished("
+        },
+        {
+          "name": "CommitteeFinalized",
+          "by": "Interfold",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@780@emit CommitteeFinalized("
+        },
+        {
+          "name": "CommitteeFormed",
+          "by": "Interfold",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@812@emit CommitteeFormed("
+        },
+        {
+          "name": "SlashedFundsEscrowed",
+          "by": "Interfold",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@761@emit SlashedFundsEscrowed("
+        },
+        { "name": "E3Failed", "by": "Interfold", "ref": "packages/interfold-contracts/contracts/Interfold.sol@909@emit E3Failed(" },
+        {
+          "name": "CiphertextOutputReferencePublished",
+          "by": "InterfoldLifecycle (called by Interfold)",
+          "ref": "packages/interfold-contracts/contracts/lib/InterfoldLifecycle.sol@428@emit IInterfold.CiphertextOutputReferencePublished("
+        }
+      ],
+      "state": [
+        {
+          "name": "e3s: request record and committee key per E3",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@100@mapping(uint256 e3Id => E3 e3) public e3s"
+        },
+        {
+          "name": "_e3Stages: current E3Stage per E3",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@122@mapping(uint256 e3Id => E3Stage stage) internal _e3Stages"
+        },
+        {
+          "name": "e3Payments: fee left after the randomness fee, awaiting rewards",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@119@mapping(uint256 e3Id => uint256 e3Payment) public e3Payments"
+        },
+        {
+          "name": "_pendingRewards: pull-payment reward balances per E3 and account",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@166@internal _pendingRewards;"
+        },
+        {
+          "name": "e3Programs: allow-listed E3 program contracts",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@96@mapping(IE3Program e3Program => bool allowed) public e3Programs"
+        },
+        {
+          "name": "ciphernodeRegistry: the committee registry address",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@68@ICiphernodeRegistry public ciphernodeRegistry;"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "E3",
+          "what": "the E3 record: request data, program, pricing and committee fields",
+          "ref": "packages/interfold-contracts/contracts/interfaces/IE3.sol@34@struct E3 {"
+        },
+        {
+          "name": "E3Stage",
+          "what": "None, Requested, CommitteeFinalized, KeyPublished, CiphertextReady, Complete, Failed",
+          "ref": "packages/interfold-contracts/contracts/interfaces/IInterfold.sol@51@enum E3Stage {"
+        },
+        {
+          "name": "FailureReason",
+          "what": "why an E3 failed or was cancelled",
+          "ref": "packages/interfold-contracts/contracts/interfaces/IInterfold.sol@63@enum FailureReason {"
+        },
+        {
+          "name": "E3RequestParams",
+          "what": "the argument struct of request()",
+          "ref": "packages/interfold-contracts/contracts/interfaces/IInterfold.sol@623@struct E3RequestParams {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "the entry point: inheritance and the wiring of registry, refund and slashing managers",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@34@contract Interfold is"
+        },
+        {
+          "why": "the request path: fee escrow, program validation, committee request",
+          "ref": "packages/interfold-contracts/contracts/Interfold.sol@290@function request("
+        },
+        {
+          "why": "the stage and proof rules that the callbacks and output functions delegate to",
+          "ref": "packages/interfold-contracts/contracts/lib/InterfoldLifecycle.sol@42@library InterfoldLifecycle {"
+        },
+        { "why": "the stage vocabulary", "ref": "packages/interfold-contracts/contracts/interfaces/IInterfold.sol@51@enum E3Stage {" }
+      ],
+      "rust_patterns": [],
+      "depends_on": [
+        "CiphernodeRegistryOwnable",
+        "BondingRegistry",
+        "E3RefundManager",
+        "SlashingManager",
+        "NodeReleaseRegistry",
+        "Verifiers",
+        "Interfold libraries"
+      ],
+      "tests": "packages/interfold-contracts/test/Interfold.spec.ts and test/E3Lifecycle/E3Integration.spec.ts; run with pnpm evm:test (README.md line 77)",
+      "unverified": [
+        "pnpm evm:test comes from README.md line 77; the package.json that defines it is not in the snapshot.",
+        "Input publishing: IInterfold declares InputPublished, but Interfold never emits it in this snapshot (only test/MockE3Program.sol does).",
+        "Which registry, verifier, manager and E3 program addresses are live is set by owner calls and deploy scripts that are not in the snapshot."
+      ]
+    },
+    {
+      "id": "CiphernodeRegistryOwnable",
+      "kind": "contract",
+      "path": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol",
+      "one_line": "Committee registry: keeps the ciphernode set, runs ticket-based sortition per E3, and records the committee and its public key.",
+      "explain": "This contract picks the committee for each E3. BondingRegistry adds and removes ciphernodes, enabled nodes submit sortition tickets, and finalizeCommittee keeps the top-ranked nodes once the submission window closes. The registry asks the randomness provider for the seed, records the DKG proof and committee public key, and reports stage changes to Interfold. Without it no E3 gets a committee, and no member can be expelled after a slash.",
+      "analogy": "A lottery drum: each enabled ciphernode drops a numbered ticket in during the window, the drum ranks them by score, and the best-ranked nodes are sealed in as the committee.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "requestCommittee",
+          "by": "Interfold (onlyInterfold)",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@287@function requestCommittee("
+        },
+        {
+          "name": "publishCommittee",
+          "by": "anyone (DKG proof checked on-chain)",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@355@function publishCommittee("
+        },
+        {
+          "name": "publishCommitteePublicKey",
+          "by": "ciphernode (active committee member)",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@397@function publishCommitteePublicKey("
+        },
+        {
+          "name": "submitTicket",
+          "by": "ciphernode (enabled node)",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@618@function submitTicket("
+        },
+        {
+          "name": "finalizeCommittee",
+          "by": "anyone (after submission window)",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@717@function finalizeCommittee("
+        },
+        {
+          "name": "releaseCommittee",
+          "by": "anyone (once the E3 is terminal)",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@770@function releaseCommittee("
+        },
+        {
+          "name": "addCiphernode",
+          "by": "owner/governance or BondingRegistry",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@553@function addCiphernode("
+        },
+        {
+          "name": "removeCiphernode",
+          "by": "owner/governance or BondingRegistry",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@592@function removeCiphernode("
+        },
+        {
+          "name": "expelCommitteeMember",
+          "by": "SlashingManager",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@1170@function expelCommitteeMember("
+        }
+      ],
+      "emits": [
+        {
+          "name": "CommitteeProofPublished",
+          "by": "CiphernodeRegistryOwnable",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@393@emit CommitteeProofPublished("
+        },
+        {
+          "name": "CiphernodeAdded",
+          "by": "CiphernodeRegistryOwnable",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@583@emit CiphernodeAdded("
+        },
+        {
+          "name": "TicketSubmitted",
+          "by": "CiphernodeRegistryOwnable",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@658@emit TicketSubmitted("
+        },
+        {
+          "name": "SortitionCommitteeFinalized",
+          "by": "CiphernodeRegistryOwnable",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@764@emit SortitionCommitteeFinalized("
+        },
+        {
+          "name": "CommitteeFormationFailed",
+          "by": "CiphernodeRegistryOwnable",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@740@emit CommitteeFormationFailed("
+        },
+        {
+          "name": "CommitteeMemberExpelled",
+          "by": "CiphernodeRegistryOwnable",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@1196@emit CommitteeMemberExpelled("
+        }
+      ],
+      "state": [
+        {
+          "name": "ciphernodes: zk-kit lazy incremental Merkle tree (LazyIMTData) of ciphernodes",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@124@LazyIMTData public ciphernodes;"
+        },
+        {
+          "name": "ciphernodeEnabled: per-node enabled flag",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@127@mapping(address node => bool enabled) public ciphernodeEnabled"
+        },
+        {
+          "name": "committees: per-E3 committee record",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@139@mapping(uint256 e3Id => Committee committee) internal committees"
+        },
+        {
+          "name": "roots: tree root snapshot per E3",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@133@mapping(uint256 e3Id => uint256 root) public roots"
+        },
+        {
+          "name": "publicKeyHashes: committee public key hash per E3",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@136@mapping(uint256 e3Id => bytes32 publicKeyHash) public publicKeyHashes"
+        },
+        {
+          "name": "sortitionTicketPrices: ticket price frozen per E3",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@200@mapping(uint256 e3Id => uint256 ticketPrice) public sortitionTicketPrices"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "Committee",
+          "what": "per-E3 committee record: stage, top nodes, active count, threshold, public key and member status",
+          "ref": "packages/interfold-contracts/contracts/interfaces/ICiphernodeRegistry.sol@58@struct Committee {"
+        },
+        {
+          "name": "CommitteeStage",
+          "what": "lifecycle stage of one committee request (None, Requested, Finalized, ...)",
+          "ref": "packages/interfold-contracts/contracts/interfaces/ICiphernodeRegistry.sol@38@enum CommitteeStage {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "the entry point and the access modifiers (onlyInterfold, onlyOwnerOrBondingVault)",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@38@contract CiphernodeRegistryOwnable is"
+        },
+        {
+          "why": "how Interfold starts a committee",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@287@function requestCommittee("
+        },
+        {
+          "why": "the sortition entry point for ciphernodes",
+          "ref": "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@618@function submitTicket("
+        },
+        {
+          "why": "the ranking, randomness and release logic the registry delegates to",
+          "ref": "packages/interfold-contracts/contracts/lib/RegistrySortitionLib.sol@23@library RegistrySortitionLib {"
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": [
+        "Interfold",
+        "BondingRegistry",
+        "SlashingManager",
+        "ChainlinkVrfRandomnessProvider",
+        "Verifiers",
+        "Interfold libraries"
+      ],
+      "tests": "packages/interfold-contracts/test/Registry/CiphernodeRegistryOwnable.spec.ts, test/Registry/CiphernodeRegistryVerifierLifecycle.spec.ts and test/E3Lifecycle/E3Integration.spec.ts; run with pnpm evm:test (README.md line 77)",
+      "unverified": [
+        "The randomness provider is owner-set (setRandomnessProvider); the snapshot shows ChainlinkVrfRandomnessProvider as an implementation, not the live choice.",
+        "publishCommittee also calls the DKG fold attestation verifier, which is outside this unit."
+      ]
+    },
+    {
+      "id": "BondingRegistry",
+      "kind": "contract",
+      "path": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol",
+      "one_line": "Operator collateral: registration, ciphernode bond and ticket balances, exit queues, slash execution, bans and reward payout.",
+      "explain": "This is the stake behind a committee seat. An operator registers under a bond owner, posts the ciphernode bond and buys tickets held in InterfoldTicketToken; the registry tells CiphernodeRegistryOwnable when a node is added or removed. Exits wait out a delay in ExitQueueLib, and SlashingManager calls it to slash tickets and bond, reserve funds for routing and set bans. Without it a committee seat has no stake to slash.",
+      "analogy": "A safe-deposit desk: each operator leaves a bond and tickets in a locked box, withdrawals wait out a notice period, and the desk takes a share of the box when the slasher signs an order.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "registerOperatorFor",
+          "by": "operator (bond owner)",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@603@function registerOperatorFor("
+        },
+        {
+          "name": "deregisterOperatorFor",
+          "by": "operator or bond owner",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@629@function deregisterOperatorFor("
+        },
+        {
+          "name": "addTicketBalanceFor",
+          "by": "operator (bond owner)",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@667@function addTicketBalanceFor("
+        },
+        {
+          "name": "bondCiphernodeFor",
+          "by": "operator (bond owner)",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@725@function bondCiphernodeFor("
+        },
+        {
+          "name": "unbondCiphernodeFor",
+          "by": "operator (bond owner)",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@733@function unbondCiphernodeFor("
+        },
+        {
+          "name": "claimExitsFor",
+          "by": "anyone (bond part needs the bond owner)",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@771@function claimExitsFor("
+        },
+        {
+          "name": "slashTicketBalance",
+          "by": "SlashingManager (authorized)",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@821@function slashTicketBalance("
+        },
+        {
+          "name": "slashCiphernodeBond",
+          "by": "SlashingManager (authorized)",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@876@function slashCiphernodeBond("
+        },
+        {
+          "name": "reserveSlashedTicketFunds",
+          "by": "SlashingManager (authorized)",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@1005@function reserveSlashedTicketFunds("
+        },
+        {
+          "name": "setCommitteeObligation",
+          "by": "CiphernodeRegistryOwnable",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@782@function setCommitteeObligation("
+        },
+        {
+          "name": "distributeRewards",
+          "by": "reward distributor (owner-authorized)",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@1076@function distributeRewards("
+        },
+        {
+          "name": "setRegistry",
+          "by": "owner/governance",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@1255@function setRegistry("
+        }
+      ],
+      "emits": [
+        {
+          "name": "CiphernodeDeregistrationRequested",
+          "by": "BondingRegistry",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@662@emit CiphernodeDeregistrationRequested("
+        },
+        {
+          "name": "TicketBalanceUpdated",
+          "by": "BondingRegistry",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@680@emit TicketBalanceUpdated("
+        },
+        {
+          "name": "CiphernodeBondUpdated",
+          "by": "BondingRegistry",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@756@emit CiphernodeBondUpdated("
+        },
+        {
+          "name": "SlashedTicketFundsReserved",
+          "by": "BondingRegistry",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@1032@emit SlashedTicketFundsReserved("
+        },
+        {
+          "name": "ReservedSlashedTicketFundsRouted",
+          "by": "BondingRegistry",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@1063@emit ReservedSlashedTicketFundsRouted("
+        },
+        {
+          "name": "SlashedFundsWithdrawn",
+          "by": "BondingRegistry",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@1358@emit SlashedFundsWithdrawn("
+        }
+      ],
+      "state": [
+        {
+          "name": "operators: per-operator bond, tickets and status",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@168@mapping(address operator => Operator data) internal operators"
+        },
+        {
+          "name": "_exits: time-locked exit tranches (ExitQueueLib state)",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@181@ExitQueueLib.ExitQueueState private _exits;"
+        },
+        {
+          "name": "ticketToken: InterfoldTicketToken holding ticket balances",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@94@InterfoldTicketToken public ticketToken;"
+        },
+        {
+          "name": "registry: CiphernodeRegistryOwnable told about adds and removes",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@100@ICiphernodeRegistry public registry;"
+        },
+        {
+          "name": "slashedTicketBalance: slashed tickets available for treasury withdrawal (reserved funds excluded)",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@171@uint256 public slashedTicketBalance;"
+        },
+        {
+          "name": "authorized slashing managers (index map)",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@196@mapping(address manager => uint256 indexPlusOne)"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "Operator",
+          "what": "per-operator record: bond, tickets, registration and status",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@158@struct Operator {"
+        },
+        {
+          "name": "SlashedTicketReservation",
+          "what": "funds reserved for one slash proposal, awaiting routing",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@67@struct SlashedTicketReservation {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "the entry point: inheritance and the bonding asset configuration",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@53@contract BondingRegistry is"
+        },
+        {
+          "why": "the registration path",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@603@function registerOperatorFor("
+        },
+        {
+          "why": "the slash path that SlashingManager drives",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@821@function slashTicketBalance("
+        },
+        {
+          "why": "registration logic delegated to the library",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingRegistrationLib.sol@28@library BondingRegistrationLib {"
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": [
+        "CiphernodeRegistryOwnable",
+        "InterfoldTicketToken",
+        "NodeReleaseRegistry",
+        "Bonding libraries",
+        "Interfold libraries"
+      ],
+      "tests": "packages/interfold-contracts/test/Registry/BondingRegistry.spec.ts, test/Slashing/SlashingLanes.spec.ts and test/Registry/ExitQueueLib.spec.ts; run with pnpm evm:test (README.md line 77)",
+      "unverified": [
+        "The authorized reward distributor is set by setRewardDistributor; the deployed distributor is not in the snapshot.",
+        "The ciphernode bond token and ticket underlying are set through setBondingAssetConfig; deployed values are not in the snapshot.",
+        "BondedCheckpoints (registry/BondedCheckpoints.sol) is attached through setBondedCheckpoints and is not part of this unit."
+      ]
+    },
+    {
+      "id": "BondedVotes",
+      "kind": "contract",
+      "path": "packages/interfold-contracts/contracts/registry/BondedVotes.sol",
+      "one_line": "Governance vote-weight adapter that adds FOLD bonded as an operator to a delegate's voting power, without holding any funds.",
+      "explain": "This is the governance side of the bond, not part of the E3 lifecycle. Bonding moves FOLD into BondingRegistry, which does not delegate it, so this contract adds bonded FOLD to the voting power of the delegate chosen by the bonded holder, reading wallet votes and bonded history at the same timepoint. It holds no tokens or privileges, and its constructor checks that the registry's ciphernode bond token is the same FOLD token. Without it, bonded delegations add no votes.",
+      "analogy": "A proxy register kept next to the shareholder register: it copies the bonded shares as of the same date and credits them to the delegate, without owning any shares itself.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "delegateBonded",
+          "by": "bonded token holder (own bonded votes)",
+          "ref": "packages/interfold-contracts/contracts/registry/BondedVotes.sol@513@function delegateBonded("
+        },
+        {
+          "name": "acceptBonded",
+          "by": "pending bonded delegate",
+          "ref": "packages/interfold-contracts/contracts/registry/BondedVotes.sol@531@function acceptBonded("
+        },
+        {
+          "name": "dropBonded",
+          "by": "current bonded delegate",
+          "ref": "packages/interfold-contracts/contracts/registry/BondedVotes.sol@554@function dropBonded("
+        }
+      ],
+      "emits": [
+        {
+          "name": "BondedDelegationRequested",
+          "by": "BondedVotes",
+          "ref": "packages/interfold-contracts/contracts/registry/BondedVotes.sol@522@emit BondedDelegationRequested("
+        },
+        {
+          "name": "BondedDelegateChanged",
+          "by": "BondedVotes",
+          "ref": "packages/interfold-contracts/contracts/registry/BondedVotes.sol@545@emit BondedDelegateChanged("
+        }
+      ],
+      "state": [
+        {
+          "name": "token: FOLD, the quorum denominator and metadata",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/BondedVotes.sol@122@IVotes public immutable token;"
+        },
+        {
+          "name": "votesSource: per-account numerator source (token or escrow adapter)",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/BondedVotes.sol@126@IVotes public immutable votesSource;"
+        },
+        {
+          "name": "checkpoints: bonded-total history from the registry",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/BondedVotes.sol@134@IBondedCheckpoints public immutable checkpoints;"
+        },
+        {
+          "name": "pendingBondedDelegate: delegations awaiting acceptance",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/BondedVotes.sol@145@mapping(address owner => address delegatee) public pendingBondedDelegate"
+        },
+        {
+          "name": "_bondedDelegates: delegate history per owner",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/BondedVotes.sol@148@mapping(address owner => Checkpoints.Trace208) private _bondedDelegates"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "IBondedCheckpoints",
+          "what": "interface for the registry's bonded-total history",
+          "ref": "packages/interfold-contracts/contracts/interfaces/IBondedCheckpoints.sol@12@interface IBondedCheckpoints {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "the contract header and the purpose of the two token references",
+          "ref": "packages/interfold-contracts/contracts/registry/BondedVotes.sol@43@title BondedVotes"
+        },
+        {
+          "why": "the contract declaration and its immutables",
+          "ref": "packages/interfold-contracts/contracts/registry/BondedVotes.sol@118@contract BondedVotes is IERC5805 {"
+        },
+        {
+          "why": "how the votes source is bound to the token at construction",
+          "ref": "packages/interfold-contracts/contracts/registry/BondedVotes.sol@289@function _bindVotesSource("
+        },
+        {
+          "why": "the delegation entry point",
+          "ref": "packages/interfold-contracts/contracts/registry/BondedVotes.sol@513@function delegateBonded("
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": ["InterfoldToken", "BondingRegistry"],
+      "tests": "packages/interfold-contracts/test/Registry/BondedVotes.spec.ts (also Deployment/ProtocolDeployment.spec.ts); run with pnpm evm:test (README.md line 77)",
+      "unverified": [
+        "The escrow, votes source and BondedCheckpoints addresses are constructor arguments; the deployed values are not in the snapshot.",
+        "The token argument is FOLD, which this package names InterfoldToken (ERC20 \"Interfold\", \"FOLD\"); the deployment argument itself is not in the snapshot.",
+        "It also calls BondedCheckpoints (registry/BondedCheckpoints.sol), which is not a unit in this group."
+      ]
+    },
+    {
+      "id": "SlashingManager",
+      "kind": "contract",
+      "path": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol",
+      "one_line": "Runs the slashing pipeline for E3 committee members: proposals with evidence, appeals, execution against bonds and tickets, and bans.",
+      "explain": "A slash starts as a proposal backed by signed attestation evidence (or a slasher-role proposal), which the accused can appeal and governance can resolve. Execution debits ticket and bond in BondingRegistry, expels the member from the committee, and escrows the seized funds through Interfold to E3RefundManager. Governance also sets slash policies and bans. Without it a faulty committee member cannot be punished or removed.",
+      "analogy": "A disciplinary panel: a complaint needs signed evidence before a case opens, the accused can appeal, and a confirmed ruling debits the account at BondingRegistry and clears the seat.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "proposeSlash",
+          "by": "anyone (attestation proof required)",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@596@function proposeSlash("
+        },
+        {
+          "name": "proposeSlashByDkgParty",
+          "by": "anyone (attestation proof required)",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@607@function proposeSlashByDkgParty("
+        },
+        {
+          "name": "proposeSlashEvidence",
+          "by": "slasher role (SLASHER_ROLE)",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@715@function proposeSlashEvidence("
+        },
+        {
+          "name": "executeSlash",
+          "by": "anyone",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@779@function executeSlash("
+        },
+        {
+          "name": "fileAppeal",
+          "by": "operator or bond owner",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@1053@function fileAppeal("
+        },
+        {
+          "name": "resolveAppeal",
+          "by": "owner/governance",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@1078@function resolveAppeal("
+        },
+        {
+          "name": "expireAppeal",
+          "by": "anyone (after the appeal grace period)",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@1116@function expireAppeal("
+        },
+        {
+          "name": "snapshotE3Dependencies",
+          "by": "Interfold or CiphernodeRegistryOwnable",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@421@function snapshotE3Dependencies("
+        },
+        {
+          "name": "setSlashPolicy",
+          "by": "owner/governance",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@476@function setSlashPolicy("
+        },
+        {
+          "name": "proposeBan",
+          "by": "owner/governance",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@1154@function proposeBan("
+        }
+      ],
+      "emits": [
+        {
+          "name": "SlashProposed",
+          "by": "SlashingManager",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@673@emit SlashProposed("
+        },
+        {
+          "name": "AppealFiled",
+          "by": "SlashingManager",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@1074@emit AppealFiled("
+        },
+        {
+          "name": "AppealResolved",
+          "by": "SlashingManager",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@1106@emit AppealResolved("
+        },
+        {
+          "name": "SlashExecuted",
+          "by": "SlashingManager",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@992@emit SlashExecuted("
+        },
+        {
+          "name": "SlashRouteCompleted",
+          "by": "SlashingManager",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@1030@emit SlashRouteCompleted("
+        },
+        {
+          "name": "NodeBanUpdated",
+          "by": "SlashingManager",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@1227@emit NodeBanUpdated("
+        }
+      ],
+      "state": [
+        {
+          "name": "_proposals: slash proposals by id",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@131@mapping(uint256 proposalId => SlashProposal proposal) internal _proposals"
+        },
+        {
+          "name": "slashPolicies: policy per slash reason",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@128@mapping(bytes32 reason => SlashPolicy policy) public slashPolicies"
+        },
+        {
+          "name": "evidenceConsumed: evidence keys already used",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@143@mapping(bytes32 evidenceKey => bool consumed) public evidenceConsumed"
+        },
+        {
+          "name": "banned: nodes banned through this manager",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@137@mapping(address node => bool banned) public banned"
+        },
+        {
+          "name": "activeBanCount: number of active bans",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@174@uint256 public activeBanCount;"
+        },
+        {
+          "name": "bondingRegistry: the registry that executes slashes",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@86@IBondingRegistry public bondingRegistry;"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "SlashProposal",
+          "what": "one slash case: operator, E3, reason, amounts and appeal and execution flags",
+          "ref": "packages/interfold-contracts/contracts/interfaces/ISlashingManager.sol@98@struct SlashProposal {"
+        },
+        {
+          "name": "SlashPolicy",
+          "what": "per-reason policy: enabled, proof required, amounts",
+          "ref": "packages/interfold-contracts/contracts/interfaces/ISlashingManager.sol@62@struct SlashPolicy {"
+        },
+        {
+          "name": "E3Dependencies",
+          "what": "the registry, bonding and refund addresses snapshotted for one E3",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@97@struct E3Dependencies {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "the entry point and the slasher, governance and admin roles",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@31@contract SlashingManager is"
+        },
+        {
+          "why": "the proposal path and its proof checks",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@596@function proposeSlash("
+        },
+        {
+          "why": "the execution path against BondingRegistry and the registry",
+          "ref": "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@779@function executeSlash("
+        },
+        {
+          "why": "the attestation evidence check the proposal path uses",
+          "ref": "packages/interfold-contracts/contracts/lib/SlashingEvidenceLib.sol@43@function verifyAttestationEvidence("
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": ["Interfold", "BondingRegistry", "CiphernodeRegistryOwnable", "E3RefundManager", "Interfold libraries"],
+      "tests": "packages/interfold-contracts/test/Slashing/SlashingManager.spec.ts, test/Slashing/SlashingLanes.spec.ts, test/Slashing/CommitteeExpulsion.spec.ts and test/Slashing/SlashingManagerProbe.spec.ts; run with pnpm evm:test (README.md line 77)",
+      "unverified": ["Which addresses hold SLASHER_ROLE in a deployment is not in the snapshot."]
+    },
+    {
+      "id": "E3RefundManager",
+      "kind": "contract",
+      "path": "packages/interfold-contracts/contracts/E3RefundManager.sol",
+      "one_line": "Money after an E3 ends: computes requester refunds and honest-node rewards, holds slashed funds, and pays everything out by pull claims.",
+      "explain": "After Interfold snapshots the E3 policy and reward recipients, this contract computes the requester refund and the honest-node amounts (calculateRefund) and holds slashed funds and expulsion state. Every payout is a pull claim: the requester, an honest operator or the treasury withdraws its own balance. Without it a completed or failed E3 has no way to return the fee or pay the committee.",
+      "analogy": "A payroll and refund office: the ledger is closed once per job, each person presents a claim for their own share, and disputed money waits in a holding account until the ruling.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "snapshotE3Policy",
+          "by": "Interfold (onlyInterfold)",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@1090@function snapshotE3Policy("
+        },
+        {
+          "name": "snapshotRewardRecipients",
+          "by": "Interfold (onlyE3Interfold)",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@1127@function snapshotRewardRecipients("
+        },
+        {
+          "name": "calculateRefund",
+          "by": "Interfold (via InterfoldPricing)",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@240@function calculateRefund("
+        },
+        {
+          "name": "escrowSlashedFunds",
+          "by": "Interfold (which SlashingManager calls)",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@557@function escrowSlashedFunds("
+        },
+        {
+          "name": "settleSlashedFunds",
+          "by": "anyone",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@593@function settleSlashedFunds("
+        },
+        {
+          "name": "openExpulsionProposal",
+          "by": "SlashingManager",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@1192@function openExpulsionProposal("
+        },
+        {
+          "name": "resolveExpulsionProposal",
+          "by": "SlashingManager",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@1223@function resolveExpulsionProposal("
+        },
+        {
+          "name": "claimRequesterRefund",
+          "by": "requester",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@457@function claimRequesterRefund("
+        },
+        {
+          "name": "claimHonestNodeReward",
+          "by": "anyone (paid to the operator's recorded recipient)",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@489@function claimHonestNodeReward("
+        },
+        {
+          "name": "claimSlashedFunds",
+          "by": "operator (own credit)",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@1506@function claimSlashedFunds("
+        },
+        {
+          "name": "treasuryClaim",
+          "by": "treasury account",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@1554@function treasuryClaim("
+        }
+      ],
+      "emits": [
+        {
+          "name": "RefundDistributionCalculated",
+          "by": "E3RefundManager",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@325@emit RefundDistributionCalculated("
+        },
+        {
+          "name": "E3PolicySnapshotted",
+          "by": "E3RefundManager",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@1114@emit E3PolicySnapshotted("
+        },
+        {
+          "name": "SlashedFundsEscrowed",
+          "by": "E3RefundManager",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@589@emit SlashedFundsEscrowed("
+        },
+        {
+          "name": "ExpulsionProposalStatusChanged",
+          "by": "E3RefundManager",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@1213@emit ExpulsionProposalStatusChanged("
+        },
+        {
+          "name": "RefundClaimed",
+          "by": "E3RefundManager",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@485@emit RefundClaimed("
+        },
+        {
+          "name": "SlashedFundsClaimed",
+          "by": "E3RefundManager",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@1519@emit SlashedFundsClaimed("
+        }
+      ],
+      "state": [
+        {
+          "name": "_distributions: refund split per E3",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@87@mapping(uint256 e3Id => RefundDistribution distribution)"
+        },
+        {
+          "name": "_e3PolicySnapshots: policy snapshot per E3",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@108@mapping(uint256 e3Id => E3PolicySnapshot snapshot)"
+        },
+        {
+          "name": "_pendingExpulsions: open expulsion proposals",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@132@mapping(uint256 e3Id => mapping(uint256 proposalId => PendingExpulsion proposal))"
+        },
+        {
+          "name": "_operatorEntitlements: per-operator eligibility and held amounts",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@135@mapping(uint256 e3Id => mapping(address operator => OperatorEntitlement entitlement))"
+        },
+        {
+          "name": "interfold: the Interfold that drives this contract",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@79@IInterfold public interfold;"
+        },
+        {
+          "name": "bondingRegistry: registry consulted for operator bonds",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@81@IBondingRegistry public bondingRegistry;"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "RefundDistribution",
+          "what": "per-E3 refund split: calculated flag, fee token and per-node amounts",
+          "ref": "packages/interfold-contracts/contracts/interfaces/IE3RefundManager.sol@60@struct RefundDistribution {"
+        },
+        {
+          "name": "OperatorEntitlement",
+          "what": "per-operator reward eligibility and held entitlements",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@64@struct OperatorEntitlement {"
+        },
+        {
+          "name": "PendingExpulsion",
+          "what": "an expulsion proposal waiting for SlashingManager's resolution",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@58@struct PendingExpulsion {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "the entry point and the modifiers that bind calls to Interfold and SlashingManager",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@34@contract E3RefundManager is"
+        },
+        {
+          "why": "how the refund split is computed",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@240@function calculateRefund("
+        },
+        {
+          "why": "the requester claim path",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@457@function claimRequesterRefund("
+        },
+        {
+          "why": "the policy snapshot taken when an E3 is requested",
+          "ref": "packages/interfold-contracts/contracts/E3RefundManager.sol@1090@function snapshotE3Policy("
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": ["Interfold", "BondingRegistry"],
+      "tests": "packages/interfold-contracts/test/Interfold.spec.ts, test/E3Lifecycle/E3Integration.spec.ts and test/Slashing/SlashingManager.spec.ts; run with pnpm evm:test (README.md line 77)",
+      "unverified": [
+        "Honest-node claim validation is delegated to RefundClaimLib (contracts/lib/RefundClaimLib.sol), which is not in this unit."
+      ]
+    },
+    {
+      "id": "InterfoldToken",
+      "kind": "contract",
+      "path": "packages/interfold-contracts/contracts/token/InterfoldToken.sol",
+      "one_line": "FOLD, the governance and utility ERC-20, with allocation minting, a TGE switch and time-based lock policies on transfers.",
+      "explain": "FOLD is the protocol's governance and utility token. Before the TGE, only the admin and minter can create allocations, and transfers are limited to allowed movements (whitelist and claim source); anyone can call tge() once the auction window and cooldown have passed. Tokens received from the claim source can be locked under lock policies, and bonded FOLD counts toward locked balances through BondingRegistry. Without it there is no FOLD supply, vesting schedule or lock enforcement.",
+      "analogy": "A share register with vesting: shares are issued into named allocations, trading opens on a fixed date, and some shares carry a release schedule that the register checks on every transfer.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "mint",
+          "by": "admin (DEFAULT_ADMIN_ROLE, before TGE)",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@369@function mint("
+        },
+        {
+          "name": "mintAllocations",
+          "by": "MINTER_ROLE (before TGE)",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@385@function mintAllocations("
+        },
+        {
+          "name": "tge",
+          "by": "anyone (after auction end and cooldown)",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@405@function tge()"
+        },
+        {
+          "name": "setClaimSource",
+          "by": "owner/governance (once)",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@415@function setClaimSource("
+        },
+        {
+          "name": "setTransferWhitelisted",
+          "by": "WHITELIST_ROLE",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@442@function setTransferWhitelisted("
+        },
+        {
+          "name": "createLockPolicy",
+          "by": "LOCK_MANAGER_ROLE",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@477@function createLockPolicy("
+        },
+        {
+          "name": "linkClaim",
+          "by": "LOCK_MANAGER_ROLE",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@510@function linkClaim("
+        },
+        {
+          "name": "relinkActiveLock",
+          "by": "LOCK_MANAGER_ROLE",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@529@function relinkActiveLock("
+        }
+      ],
+      "emits": [
+        {
+          "name": "AllocationMinted",
+          "by": "InterfoldToken",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@376@emit AllocationMinted("
+        },
+        {
+          "name": "TgeTriggered",
+          "by": "InterfoldToken",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@411@emit TgeTriggered("
+        },
+        {
+          "name": "ClaimSourceSet",
+          "by": "InterfoldToken",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@420@emit ClaimSourceSet("
+        },
+        {
+          "name": "TransferWhitelistUpdated",
+          "by": "InterfoldToken",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@448@emit TransferWhitelistUpdated("
+        },
+        {
+          "name": "PolicyDefined",
+          "by": "InterfoldToken",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@492@emit PolicyDefined("
+        },
+        {
+          "name": "ActiveLockRelinked",
+          "by": "InterfoldToken",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@559@emit ActiveLockRelinked("
+        }
+      ],
+      "state": [
+        {
+          "name": "CLAIM_SOURCE: the auction contract that distributes FOLD",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@231@address public CLAIM_SOURCE;"
+        },
+        {
+          "name": "BONDING_REGISTRY: registry whose bonded FOLD counts toward locks",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@234@IBondingRegistry public immutable BONDING_REGISTRY;"
+        },
+        {
+          "name": "tgeTimestamp: set once by tge()",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@241@uint64 public tgeTimestamp;"
+        },
+        {
+          "name": "transferWhitelist: accounts allowed to move FOLD before TGE",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@250@mapping(address account => bool whitelisted) public transferWhitelist"
+        },
+        {
+          "name": "lockPolicies: write-once lock policies by id",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@256@mapping(bytes32 policyId => LockPolicy policy) internal lockPolicies"
+        },
+        {
+          "name": "locks: active locks per account",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@259@mapping(address account => Lock[] entries) public locks"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "Phase",
+          "what": "Virtual, CCA, Cooldown or Live, derived from the auction window and the TGE",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@47@enum Phase {"
+        },
+        {
+          "name": "LockPolicy",
+          "what": "a lock's unlock curve and policy parameters",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@79@struct LockPolicy {"
+        },
+        {
+          "name": "Lock",
+          "what": "an amount locked under one policy",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@84@struct Lock {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "the entry point and the roles that gate each admin path",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@32@contract InterfoldToken is"
+        },
+        { "why": "the TGE switch", "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@405@function tge()" },
+        {
+          "why": "the transfer rules: locks, pre-TGE restriction and bonded balance",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldToken.sol@651@function _update("
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": ["BondingRegistry"],
+      "tests": "packages/interfold-contracts/test/Token/InterfoldToken.spec.ts and test/Token/InterfoldTokenSaleDeployer.spec.ts; run with pnpm evm:test (README.md line 77)",
+      "unverified": [
+        "The auction (claim source) is outside this package; the snapshot has only test/MockCCA.sol.",
+        "The deployed CCA window, cooldown and cap values are constructor arguments and are not in the snapshot."
+      ]
+    },
+    {
+      "id": "InterfoldTicketToken",
+      "kind": "contract",
+      "path": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol",
+      "one_line": "tFOLD: a non-transferable ERC20Votes wrapper over a stablecoin that holds operator tickets, moved only by the registry.",
+      "explain": "Operators deposit the stablecoin through BondingRegistry and receive tFOLD tickets, a balance that BondingRegistry checks and slashes. Transfers and approvals between holders are blocked, and only the registry can deposit, withdraw, burn or pay out. Without it the ticket balance behind eligibility and slash payouts has no ledger.",
+      "analogy": "A prepaid meter card: money goes in, a non-transferable balance comes out, and only the utility office (BondingRegistry) can add to it, use it or cash it out.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "depositFor",
+          "by": "BondingRegistry (onlyRegistry)",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@273@function depositFor("
+        },
+        {
+          "name": "depositFrom",
+          "by": "BondingRegistry (onlyRegistry)",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@295@function depositFrom("
+        },
+        {
+          "name": "withdrawTo",
+          "by": "BondingRegistry (onlyRegistry)",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@320@function withdrawTo("
+        },
+        {
+          "name": "burnTickets",
+          "by": "BondingRegistry (onlyRegistry)",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@345@function burnTickets("
+        },
+        {
+          "name": "payout",
+          "by": "BondingRegistry (onlyRegistry)",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@360@function payout("
+        },
+        {
+          "name": "requestRegistryChange",
+          "by": "owner/governance",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@223@function requestRegistryChange("
+        },
+        {
+          "name": "activateRegistryChange",
+          "by": "owner/governance (after the one-day delay)",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@237@function activateRegistryChange("
+        },
+        {
+          "name": "rescueERC20",
+          "by": "owner/governance",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@419@function rescueERC20("
+        }
+      ],
+      "emits": [
+        {
+          "name": "Payout",
+          "by": "InterfoldTicketToken",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@377@emit Payout("
+        },
+        {
+          "name": "RegistryChangeRequested",
+          "by": "InterfoldTicketToken",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@231@emit RegistryChangeRequested("
+        },
+        {
+          "name": "RegistryChanged",
+          "by": "InterfoldTicketToken",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@208@emit RegistryChanged("
+        },
+        {
+          "name": "ERC20Rescued",
+          "by": "InterfoldTicketToken",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@429@emit ERC20Rescued("
+        }
+      ],
+      "state": [
+        {
+          "name": "registry: the only caller allowed to move tickets",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@118@address public registry;"
+        },
+        {
+          "name": "pendingRegistry: registry change waiting out the delay",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@121@address public pendingRegistry;"
+        },
+        {
+          "name": "registryLocked: whether the registry can still be changed directly",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@127@bool public registryLocked;"
+        },
+        {
+          "name": "payableBalance: amount available to pay out",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@131@uint256 public payableBalance;"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "REGISTRY_CHANGE_DELAY",
+          "what": "one-day timelock on registry changes",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@114@uint64 public constant REGISTRY_CHANGE_DELAY = 1 days;"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "the entry point and the security notes in its NatSpec",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@53@contract InterfoldTicketToken is"
+        },
+        {
+          "why": "the deposit path used by BondingRegistry",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@273@function depositFor("
+        },
+        {
+          "why": "the transfer block that makes tickets non-transferable",
+          "ref": "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@457@function _update("
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": [],
+      "tests": "packages/interfold-contracts/test/Token/InterfoldTicketToken.spec.ts; run with pnpm evm:test (README.md line 77)",
+      "unverified": ["The wrapped stablecoin is passed at construction; the deployed token is not in the snapshot."]
+    },
+    {
+      "id": "ChainlinkVrfRandomnessProvider",
+      "kind": "contract",
+      "path": "packages/interfold-contracts/contracts/randomness/ChainlinkVrfRandomnessProvider.sol",
+      "one_line": "Adapts one Chainlink VRF v2.5 subscription to the ciphernode registry: requests a random seed per E3 and stores the coordinator's reply.",
+      "explain": "The registry asks this contract for a random seed per E3 instead of choosing one. The contract pays the VRF request from its subscription; when the coordinator calls back, the reply is stored, and the registry reads it with getRandomness. The owner can release a request that never got a reply. Without it the registry cannot seed committee selection.",
+      "analogy": "A sealed-envelope lottery: the registry orders one draw per round, the randomness is written once into a sealed reply, and the owner can void a draw that never returned.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "requestRandomness",
+          "by": "requester (the ciphernode registry in the spec wiring)",
+          "ref": "packages/interfold-contracts/contracts/randomness/ChainlinkVrfRandomnessProvider.sol@105@function requestRandomness("
+        },
+        {
+          "name": "fulfillRandomWords",
+          "by": "VRF coordinator callback (inherited base)",
+          "ref": "packages/interfold-contracts/contracts/randomness/ChainlinkVrfRandomnessProvider.sol@192@function fulfillRandomWords("
+        },
+        {
+          "name": "releaseAbandonedRequest",
+          "by": "owner/governance",
+          "ref": "packages/interfold-contracts/contracts/randomness/ChainlinkVrfRandomnessProvider.sol@180@function releaseAbandonedRequest("
+        }
+      ],
+      "emits": [
+        {
+          "name": "RandomnessRequested",
+          "by": "ChainlinkVrfRandomnessProvider",
+          "ref": "packages/interfold-contracts/contracts/randomness/ChainlinkVrfRandomnessProvider.sol@148@emit RandomnessRequested("
+        },
+        {
+          "name": "RandomnessFulfilled",
+          "by": "ChainlinkVrfRandomnessProvider",
+          "ref": "packages/interfold-contracts/contracts/randomness/ChainlinkVrfRandomnessProvider.sol@215@emit RandomnessFulfilled("
+        },
+        {
+          "name": "RandomnessResponseIgnored",
+          "by": "ChainlinkVrfRandomnessProvider",
+          "ref": "packages/interfold-contracts/contracts/randomness/ChainlinkVrfRandomnessProvider.sol@198@emit RandomnessResponseIgnored("
+        },
+        {
+          "name": "RandomnessRequestReleased",
+          "by": "ChainlinkVrfRandomnessProvider",
+          "ref": "packages/interfold-contracts/contracts/randomness/ChainlinkVrfRandomnessProvider.sol@187@emit RandomnessRequestReleased("
+        }
+      ],
+      "state": [
+        {
+          "name": "requester: the only account allowed to request randomness",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/randomness/ChainlinkVrfRandomnessProvider.sol@56@address public immutable override requester"
+        },
+        {
+          "name": "pendingRequestCount: requests with no recorded response",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/randomness/ChainlinkVrfRandomnessProvider.sol@65@uint256 public pendingRequestCount;"
+        },
+        {
+          "name": "requestIdByE3Id: VRF request per E3",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/randomness/ChainlinkVrfRandomnessProvider.sol@68@mapping(uint256 e3Id => uint256 requestId) public requestIdByE3Id"
+        },
+        {
+          "name": "e3IdByRequestId: reverse map from request to E3",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/randomness/ChainlinkVrfRandomnessProvider.sol@69@mapping(uint256 requestId => uint256 e3Id) public e3IdByRequestId"
+        },
+        {
+          "name": "_results: stored reply per request",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/randomness/ChainlinkVrfRandomnessProvider.sol@70@mapping(uint256 requestId => RandomnessResult result) private _results"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "RandomnessResult",
+          "what": "the stored reply for one request, with exists, fulfilled and released flags",
+          "ref": "packages/interfold-contracts/contracts/randomness/ChainlinkVrfRandomnessProvider.sol@25@struct RandomnessResult {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "the entry point and the constructor-fixed VRF settings",
+          "ref": "packages/interfold-contracts/contracts/randomness/ChainlinkVrfRandomnessProvider.sol@21@contract ChainlinkVrfRandomnessProvider is"
+        },
+        {
+          "why": "the request path the registry calls",
+          "ref": "packages/interfold-contracts/contracts/randomness/ChainlinkVrfRandomnessProvider.sol@105@function requestRandomness("
+        },
+        {
+          "why": "the callback that stores the reply",
+          "ref": "packages/interfold-contracts/contracts/randomness/ChainlinkVrfRandomnessProvider.sol@192@function fulfillRandomWords("
+        },
+        {
+          "why": "the interface the registry sees",
+          "ref": "packages/interfold-contracts/contracts/interfaces/IRandomnessProvider.sol@12@event RandomnessRequested("
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": [],
+      "tests": "packages/interfold-contracts/test/Randomness/ChainlinkVrfRandomnessProvider.spec.ts (also test/Deployment/ProtocolDeployment.spec.ts); run with pnpm evm:test (README.md line 77)",
+      "unverified": [
+        "The coordinator-only check on the callback comes from VRFConsumerBaseV2Plus, which is imported from Chainlink and not in the snapshot.",
+        "The spec deploys this contract with MockCiphernodeRegistry as requester; the production requester is set at deploy time and is not in the snapshot."
+      ]
+    },
+    {
+      "id": "NodeReleaseRegistry",
+      "kind": "contract",
+      "path": "packages/interfold-contracts/contracts/registry/NodeReleaseRegistry.sol",
+      "one_line": "Owner-set required node release (protocol version and generation); operators acknowledge it, and eligibility reads whether they are ready.",
+      "explain": "Governance sets the required protocol version and node generation; each operator records the release it runs with acknowledgeNodeRelease. BondingRegistry eligibility asks isNodeReleaseReady before admitting an operator, and activate (callable only by Interfold) checks the wiring to the current Interfold, BondingRegistry and CiphernodeRegistry before refreshing operator status. Without it no gate ties operators to the required release.",
+      "analogy": "A minimum-version notice board at a checkpoint: the authority posts the required version, each operator signs in with the version they run, and the gate reads the board before admitting them.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "setRequiredNodeRelease",
+          "by": "owner/governance",
+          "ref": "packages/interfold-contracts/contracts/registry/NodeReleaseRegistry.sol@50@function setRequiredNodeRelease("
+        },
+        {
+          "name": "acknowledgeNodeRelease",
+          "by": "operator (msg.sender)",
+          "ref": "packages/interfold-contracts/contracts/registry/NodeReleaseRegistry.sol@79@function acknowledgeNodeRelease("
+        },
+        {
+          "name": "activate",
+          "by": "Interfold only",
+          "ref": "packages/interfold-contracts/contracts/registry/NodeReleaseRegistry.sol@134@function activate()"
+        }
+      ],
+      "emits": [
+        {
+          "name": "RequiredNodeReleaseUpdated",
+          "by": "NodeReleaseRegistry",
+          "ref": "packages/interfold-contracts/contracts/registry/NodeReleaseRegistry.sol@71@emit RequiredNodeReleaseUpdated("
+        },
+        {
+          "name": "OperatorNodeReleaseAcknowledged",
+          "by": "NodeReleaseRegistry",
+          "ref": "packages/interfold-contracts/contracts/registry/NodeReleaseRegistry.sol@96@emit OperatorNodeReleaseAcknowledged("
+        }
+      ],
+      "state": [
+        {
+          "name": "bondingRegistry: registry whose operator status is refreshed",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/NodeReleaseRegistry.sol@21@IBondingRegistry public immutable bondingRegistry;"
+        },
+        {
+          "name": "ciphernodeRegistry: committee registry this release is bound to",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/NodeReleaseRegistry.sol@23@ICiphernodeRegistry public immutable ciphernodeRegistry;"
+        },
+        {
+          "name": "requiredProtocolVersion: minimum protocol version",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/NodeReleaseRegistry.sol@25@uint32 public requiredProtocolVersion;"
+        },
+        {
+          "name": "requiredNodeGeneration: minimum node generation",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/NodeReleaseRegistry.sol@26@uint32 public requiredNodeGeneration;"
+        },
+        {
+          "name": "_operatorNodeReleases: release each operator acknowledged",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/registry/NodeReleaseRegistry.sol@28@mapping(address operator => OperatorNodeRelease release)"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "OperatorNodeRelease",
+          "what": "the release id, protocol version and generation an operator acknowledged",
+          "ref": "packages/interfold-contracts/contracts/interfaces/INodeReleaseRegistry.sol@15@struct OperatorNodeRelease {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "the entry point and the immutable bindings",
+          "ref": "packages/interfold-contracts/contracts/registry/NodeReleaseRegistry.sol@19@contract NodeReleaseRegistry is"
+        },
+        {
+          "why": "the operator acknowledgement path",
+          "ref": "packages/interfold-contracts/contracts/registry/NodeReleaseRegistry.sol@79@function acknowledgeNodeRelease("
+        },
+        {
+          "why": "the binding check Interfold runs when it activates this registry",
+          "ref": "packages/interfold-contracts/contracts/registry/NodeReleaseRegistry.sol@134@function activate()"
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": ["BondingRegistry", "CiphernodeRegistryOwnable", "Interfold"],
+      "tests": "packages/interfold-contracts/test/Registry/NodeReleaseRegistry.spec.ts and test/Deployment/V19Cutover.spec.ts; run with pnpm evm:test (README.md line 77)",
+      "unverified": [
+        "The live required protocol version and node generation are set by governance; the snapshot does not show their deployed values."
+      ]
+    },
+    {
+      "id": "Verifiers",
+      "kind": "contract",
+      "path": "packages/interfold-contracts/contracts/verifiers",
+      "one_line": "On-chain checks of the BFV DKG and decryption proofs, each delegating the Honk proof check to a generated verifier.",
+      "explain": "BfvPkVerifier checks the DKG aggregator proof behind a committee public key, and BfvDecryptionVerifier checks the decryption aggregator proof behind a plaintext output. Each reads the proof's public inputs (committee hash, party IDs, ciphertext commitment, expected key), checks them against the E3 context and the verifying-key anchors, then calls its generated Honk verifier. The registry (DKG path) and Interfold (plaintext path) call these view checks, and the two routers pick among verifier builds by those anchors. Without them the registry and Interfold cannot accept a committee key or a plaintext output.",
+      "analogy": "A seal inspector at a sealed-envelope desk: the Honk proof is the wax seal, and the inspector also checks the printed names on the envelope against the expected ceremony before accepting it.",
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [
+        {
+          "name": "BfvPkVerifier.circuitVerifier: generated Honk verifier for the DKG circuit",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/verifiers/bfv/BfvPkVerifier.sol@64@ICircuitVerifier public immutable circuitVerifier;"
+        },
+        {
+          "name": "BfvPkVerifier.expectedNodesFoldKeyHash: VK anchor checked against public input 0",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/verifiers/bfv/BfvPkVerifier.sol@69@bytes32 public immutable expectedNodesFoldKeyHash;"
+        },
+        {
+          "name": "BfvDecryptionVerifier.ciphernodeRegistry: source of the DKG anchors",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/verifiers/bfv/BfvDecryptionVerifier.sol@108@ICiphernodeRegistry public immutable ciphernodeRegistry;"
+        },
+        {
+          "name": "BfvDecryptionVerifier.expectedC6FoldKeyHash: VK anchor for the decryption circuit",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/verifiers/bfv/BfvDecryptionVerifier.sol@113@bytes32 public immutable expectedC6FoldKeyHash;"
+        },
+        {
+          "name": "BfvPkVerifierRouter.routes: verifier builds the router can dispatch to",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/verifiers/bfv/BfvPkVerifierRouter.sol@30@Route[] private routes;"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "Route",
+          "what": "one verifier build with its expected input length and VK anchors",
+          "ref": "packages/interfold-contracts/contracts/verifiers/bfv/BfvPkVerifierRouter.sol@20@struct Route {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "the DKG (public key) proof check and its public input layout",
+          "ref": "packages/interfold-contracts/contracts/verifiers/bfv/BfvPkVerifier.sol@41@contract BfvPkVerifier is IPkVerifier {"
+        },
+        {
+          "why": "the decryption proof check and its public input layout",
+          "ref": "packages/interfold-contracts/contracts/verifiers/bfv/BfvDecryptionVerifier.sol@54@contract BfvDecryptionVerifier is IDecryptionVerifier {"
+        },
+        {
+          "why": "how the router chooses a build by VK anchors",
+          "ref": "packages/interfold-contracts/contracts/verifiers/bfv/BfvPkVerifierRouter.sol@16@contract BfvPkVerifierRouter is IPkVerifier {"
+        },
+        {
+          "why": "a generated Honk verifier header (read to line 40 only)",
+          "ref": "packages/interfold-contracts/contracts/verifiers/bfv/honk/DkgAggregatorVerifier.sol@10@uint256 constant NUMBER_OF_PUBLIC_INPUTS = 20;"
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": ["CiphernodeRegistryOwnable"],
+      "tests": "packages/interfold-contracts/test/BfvPkVerifier.spec.ts, test/BfvDecryptionVerifier.spec.ts, test/BfvVerifierRouter.spec.ts and test/BfvVkBindingIntegration.spec.ts; run with pnpm evm:test (README.md line 77)",
+      "unverified": [
+        "The contract names DkgAggregatorVerifier and DecryptionAggregatorVerifier come from the file names; their declarations lie past line 40 of the generated files, which were not read.",
+        "Generated Honk variants also exist under verifiers/bfv/honk/insecure-512 and secure-8192; they were not read.",
+        "Which verifier builds are registered on-chain (setPkVerifier, setDecryptionVerifier) is set at deploy time and is not in the snapshot."
+      ]
+    },
+    {
+      "id": "Interfold libraries",
+      "kind": "contract",
+      "path": "packages/interfold-contracts/contracts/lib",
+      "one_line": "Linked library code for Interfold's stage rules and pricing, registry sortition, exit queues and slashing evidence checks.",
+      "explain": "Interfold's stage rules, failure checks and proof checks live in InterfoldLifecycle, and fee quoting, payments and reward credits in InterfoldPricing; InterfoldPricing was split out to stay under the EIP-170 bytecode cap, as its NatSpec says. RegistrySortitionLib holds the ticket ranking, randomness request and committee release checks for CiphernodeRegistryOwnable, ExitQueueLib keeps time-locked exit tranches for BondingRegistry, and SlashingEvidenceLib verifies signed attestation evidence for SlashingManager. Without them the contracts that call these functions have no rules to run.",
+      "analogy": "A shared reference binder that each desk opens for its own rule: the stage desk, the money desk, the sortition desk, the exit desk and the evidence desk each read only their own section.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "InterfoldLifecycle.publishCiphertext",
+          "by": "Interfold.publishCiphertextOutput",
+          "ref": "packages/interfold-contracts/contracts/lib/InterfoldLifecycle.sol@365@function publishCiphertext("
+        },
+        {
+          "name": "InterfoldLifecycle.verifyPlaintext",
+          "by": "Interfold.publishPlaintextOutput",
+          "ref": "packages/interfold-contracts/contracts/lib/InterfoldLifecycle.sol@307@function verifyPlaintext("
+        },
+        {
+          "name": "InterfoldLifecycle.validateAndSnapshotCommitteeFinalization",
+          "by": "Interfold.onCommitteeFinalized",
+          "ref": "packages/interfold-contracts/contracts/lib/InterfoldLifecycle.sol@259@function validateAndSnapshotCommitteeFinalization("
+        },
+        {
+          "name": "InterfoldLifecycle.reportFailure",
+          "by": "Interfold.onE3Failed",
+          "ref": "packages/interfold-contracts/contracts/lib/InterfoldLifecycle.sol@614@function reportFailure("
+        },
+        {
+          "name": "InterfoldLifecycle.cancelE3",
+          "by": "Interfold.cancelE3",
+          "ref": "packages/interfold-contracts/contracts/lib/InterfoldLifecycle.sol@851@function cancelE3("
+        },
+        {
+          "name": "InterfoldPricing.recordRequestPayment",
+          "by": "Interfold.request",
+          "ref": "packages/interfold-contracts/contracts/lib/InterfoldPricing.sol@117@function recordRequestPayment("
+        },
+        {
+          "name": "InterfoldPricing.processE3Failure",
+          "by": "Interfold.processE3Failure",
+          "ref": "packages/interfold-contracts/contracts/lib/InterfoldPricing.sol@143@function processE3Failure("
+        },
+        {
+          "name": "InterfoldPricing.distributeRewards",
+          "by": "Interfold (on plaintext output)",
+          "ref": "packages/interfold-contracts/contracts/lib/InterfoldPricing.sol@259@function distributeRewards("
+        },
+        {
+          "name": "InterfoldPricing.claimReward",
+          "by": "ciphernode (via Interfold.claimReward)",
+          "ref": "packages/interfold-contracts/contracts/lib/InterfoldPricing.sol@67@function claimReward("
+        },
+        {
+          "name": "RegistrySortitionLib.publishCommitteePublicKeyChunk",
+          "by": "ciphernode (active member, via CiphernodeRegistryOwnable)",
+          "ref": "packages/interfold-contracts/contracts/lib/RegistrySortitionLib.sol@118@function publishCommitteePublicKeyChunk("
+        },
+        {
+          "name": "RegistrySortitionLib.requestRandomness",
+          "by": "CiphernodeRegistryOwnable.requestCommittee",
+          "ref": "packages/interfold-contracts/contracts/lib/RegistrySortitionLib.sol@506@function requestRandomness("
+        },
+        {
+          "name": "RegistrySortitionLib.validateCommitteeRelease",
+          "by": "CiphernodeRegistryOwnable.releaseCommittee",
+          "ref": "packages/interfold-contracts/contracts/lib/RegistrySortitionLib.sol@616@function validateCommitteeRelease("
+        },
+        {
+          "name": "ExitQueueLib.queueCiphernodeBondsForExit",
+          "by": "BondingRegistry (unbond)",
+          "ref": "packages/interfold-contracts/contracts/lib/ExitQueueLib.sol@278@function queueCiphernodeBondsForExit("
+        },
+        {
+          "name": "SlashingEvidenceLib.verifyAttestationEvidence",
+          "by": "SlashingManager (proposal path)",
+          "ref": "packages/interfold-contracts/contracts/lib/SlashingEvidenceLib.sol@43@function verifyAttestationEvidence("
+        }
+      ],
+      "emits": [
+        {
+          "name": "CiphertextOutputReferencePublished",
+          "by": "InterfoldLifecycle",
+          "ref": "packages/interfold-contracts/contracts/lib/InterfoldLifecycle.sol@428@emit IInterfold.CiphertextOutputReferencePublished("
+        },
+        {
+          "name": "E3FailureReclassified",
+          "by": "InterfoldLifecycle",
+          "ref": "packages/interfold-contracts/contracts/lib/InterfoldLifecycle.sol@685@emit IInterfold.E3FailureReclassified("
+        },
+        {
+          "name": "TreasuryCredited",
+          "by": "InterfoldPricing",
+          "ref": "packages/interfold-contracts/contracts/lib/InterfoldPricing.sol@139@emit IInterfold.TreasuryCredited("
+        },
+        {
+          "name": "RewardsDistributed",
+          "by": "InterfoldPricing",
+          "ref": "packages/interfold-contracts/contracts/lib/InterfoldPricing.sol@316@emit IInterfold.RewardsDistributed("
+        },
+        {
+          "name": "CommitteeRandomnessRequested",
+          "by": "RegistrySortitionLib",
+          "ref": "packages/interfold-contracts/contracts/lib/RegistrySortitionLib.sol@546@emit ICiphernodeRegistry.CommitteeRandomnessRequested("
+        },
+        {
+          "name": "AssetsQueuedForExit",
+          "by": "ExitQueueLib",
+          "ref": "packages/interfold-contracts/contracts/lib/ExitQueueLib.sol@206@emit AssetsQueuedForExit("
+        }
+      ],
+      "state": [
+        {
+          "name": "ExitQueueState: tranches and pending totals, held in BondingRegistry storage",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/lib/ExitQueueLib.sol@51@struct ExitQueueState {"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "ExitTranche",
+          "what": "one set of queued assets with its unlock timestamp",
+          "ref": "packages/interfold-contracts/contracts/lib/ExitQueueLib.sol@23@struct ExitTranche {"
+        },
+        {
+          "name": "PricingConfig",
+          "what": "the fee, protocol-share and randomness-fee settings that pricing reads",
+          "ref": "packages/interfold-contracts/contracts/interfaces/IInterfold.sol@111@struct PricingConfig {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "the stage and proof rules that Interfold calls",
+          "ref": "packages/interfold-contracts/contracts/lib/InterfoldLifecycle.sol@42@library InterfoldLifecycle {"
+        },
+        {
+          "why": "fee quoting, payments and reward credits",
+          "ref": "packages/interfold-contracts/contracts/lib/InterfoldPricing.sol@26@library InterfoldPricing {"
+        },
+        {
+          "why": "ticket ranking and committee randomness for the registry",
+          "ref": "packages/interfold-contracts/contracts/lib/RegistrySortitionLib.sol@23@library RegistrySortitionLib {"
+        },
+        {
+          "why": "time-locked exit tranches for BondingRegistry",
+          "ref": "packages/interfold-contracts/contracts/lib/ExitQueueLib.sol@15@library ExitQueueLib {"
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": ["CiphernodeRegistryOwnable", "E3RefundManager", "SlashingManager", "Verifiers", "ChainlinkVrfRandomnessProvider"],
+      "tests": "packages/interfold-contracts/test/Registry/ExitQueueLib.spec.ts (ExitQueueLib), test/Registry/CiphernodeRegistryOwnable.spec.ts (RegistrySortitionLib), test/Slashing/SlashingManagerProbe.spec.ts (SlashingEvidenceLib), test/Standards/StandardsAndUpgrades.spec.ts (InterfoldLifecycle, InterfoldPricing); run with pnpm evm:test (README.md line 77)",
+      "unverified": [
+        "How these libraries are linked into Interfold, the registry and BondingRegistry is decided by deploy scripts that are not in the snapshot.",
+        "ExitQueueState is held in BondingRegistry's state variable _exits; the full BondingRegistry storage layout is not checked here."
+      ]
+    },
+    {
+      "id": "Bonding libraries",
+      "kind": "contract",
+      "path": "packages/interfold-contracts/contracts/lib",
+      "one_line": "Delegatecalled pieces of BondingRegistry for registration, asset moves, eligibility, bond ownership, slash locks and admission.",
+      "explain": "BondingRegistry delegates parts of its work to six files: BondingRegistrationLib (register and deregister), BondingAssetLib (exits, reward payouts and exact-amount transfers), BondingEligibilityLib (eligibility history by request boundary), BondingOwnershipLib (bond-owner transfers), BondingSlashingLib (slash locks, bans and committee obligations) and BondingAdmissionLib (admission windows, internal helpers). BondingAssetLib's NatSpec says it keeps bonding-asset checks outside the size-constrained registry. Without them BondingRegistry cannot run its registration, exit, transfer or slash paths.",
+      "analogy": "The back-office departments of a bank: accounts, cash movements, the eligibility ledger, account-holder records, account freezes and new-customer admission, each with its own cabinet, all run for the teller at BondingRegistry.",
+      "actors": [],
+      "consumes": [
+        {
+          "name": "BondingRegistrationLib.register",
+          "by": "BondingRegistry (registerOperatorFor)",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingRegistrationLib.sol@52@function register("
+        },
+        {
+          "name": "BondingRegistrationLib.markDeregistered",
+          "by": "BondingRegistry (deregisterOperatorFor)",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingRegistrationLib.sol@93@function markDeregistered("
+        },
+        {
+          "name": "BondingAssetLib.claimExits",
+          "by": "BondingRegistry (claimExitsFor)",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingAssetLib.sol@81@function claimExits("
+        },
+        {
+          "name": "BondingAssetLib.distributeRewards",
+          "by": "BondingRegistry (distributeRewards)",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingAssetLib.sol@57@function distributeRewards("
+        },
+        {
+          "name": "BondingAssetLib.sweepCiphernodeBondSurplus",
+          "by": "BondingRegistry (owner)",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingAssetLib.sol@440@function sweepCiphernodeBondSurplus("
+        },
+        {
+          "name": "BondingOwnershipLib.proposeTransfer",
+          "by": "BondingRegistry (proposeBondOwner)",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingOwnershipLib.sol@110@function proposeTransfer("
+        },
+        {
+          "name": "BondingOwnershipLib.completeTransfer",
+          "by": "BondingRegistry (acceptBondOwner)",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingOwnershipLib.sol@73@function completeTransfer("
+        },
+        {
+          "name": "BondingEligibilityLib.updateOperator",
+          "by": "BondingRegistry (status refresh and register/ticket changes)",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingEligibilityLib.sol@78@function updateOperator("
+        },
+        {
+          "name": "BondingSlashingLib.openLock",
+          "by": "SlashingManager (via BondingRegistry.openSlashLock)",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingSlashingLib.sol@175@function openLock("
+        },
+        {
+          "name": "BondingSlashingLib.setBan",
+          "by": "SlashingManager (via BondingRegistry.setOperatorBan)",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingSlashingLib.sol@229@function setBan("
+        },
+        {
+          "name": "BondingSlashingLib.setCommitteeObligation",
+          "by": "CiphernodeRegistryOwnable (msg.sender must be the registry)",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingSlashingLib.sol@51@function setCommitteeObligation("
+        }
+      ],
+      "emits": [
+        {
+          "name": "TicketBalanceUpdated",
+          "by": "BondingRegistrationLib",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingRegistrationLib.sol@134@emit IBondingRegistry.TicketBalanceUpdated("
+        },
+        {
+          "name": "CiphernodeBondUpdated",
+          "by": "BondingRegistrationLib",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingRegistrationLib.sol@143@emit IBondingRegistry.CiphernodeBondUpdated("
+        },
+        {
+          "name": "CiphernodeBondSurplusSwept",
+          "by": "BondingAssetLib",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingAssetLib.sol@453@emit IBondingRegistry.CiphernodeBondSurplusSwept("
+        },
+        {
+          "name": "OperatorActivationChanged",
+          "by": "BondingEligibilityLib",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingEligibilityLib.sol@130@emit IBondingRegistry.OperatorActivationChanged("
+        },
+        {
+          "name": "BondOwnerTransferProposed",
+          "by": "BondingOwnershipLib",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingOwnershipLib.sol@121@emit IBondingRegistry.BondOwnerTransferProposed("
+        },
+        {
+          "name": "SlashLockUpdated",
+          "by": "BondingSlashingLib",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingSlashingLib.sol@198@emit IBondingRegistry.SlashLockUpdated("
+        },
+        {
+          "name": "ManagerBanUpdated",
+          "by": "BondingSlashingLib",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingSlashingLib.sol@246@emit IBondingRegistry.ManagerBanUpdated("
+        }
+      ],
+      "state": [
+        {
+          "name": "BondingSlashingStorage.Layout: slash locks, bans and committee obligations",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/storage/BondingSlashingStorage.sol@26@struct Layout {"
+        },
+        {
+          "name": "BondingEligibilityStorage: eligibility history by request boundary",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/storage/BondingEligibilityStorage.sol@14@abstract contract BondingEligibilityStorage {"
+        },
+        {
+          "name": "BondOwnerHistoryStorage: bond-owner history per operator",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/storage/BondOwnerHistoryStorage.sol@9@abstract contract BondOwnerHistoryStorage {"
+        },
+        {
+          "name": "BondingAdmissionStorage: admission policy and windows",
+          "where": "chain",
+          "ref": "packages/interfold-contracts/contracts/storage/BondingAdmissionStorage.sol@13@abstract contract BondingAdmissionStorage {"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "AdmissionPolicy",
+          "what": "the admission policy struct used by the admission helpers",
+          "ref": "packages/interfold-contracts/contracts/interfaces/IBondingAdmission.sol@10@struct AdmissionPolicy {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "registration, the first thing an operator does",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingRegistrationLib.sol@28@library BondingRegistrationLib {"
+        },
+        {
+          "why": "slash locks and bans",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingSlashingLib.sol@23@library BondingSlashingLib {"
+        },
+        {
+          "why": "asset moves, exits and reward distribution; its NatSpec explains why checks live outside the registry",
+          "ref": "packages/interfold-contracts/contracts/lib/BondingAssetLib.sol@27@library BondingAssetLib {"
+        },
+        {
+          "why": "the caller that delegates into these libraries",
+          "ref": "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@603@function registerOperatorFor("
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": ["CiphernodeRegistryOwnable", "InterfoldTicketToken", "NodeReleaseRegistry", "Interfold libraries"],
+      "tests": "packages/interfold-contracts/test/Registry/BondingRegistry.spec.ts, test/Registry/BondingAdmission.spec.ts and test/Registry/BondOwnerSortition.spec.ts; run with pnpm evm:test (README.md line 77)",
+      "unverified": ["The four storage layouts are named from their file and contract names; their fields were not read."]
+    }
+  ]
+}

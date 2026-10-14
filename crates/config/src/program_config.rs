@@ -4,117 +4,148 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Program execution configuration (RISC Zero / Boundless).
+//! OpenVM program execution configuration.
 //!
 //! Extracted from [`AppConfig`] — these types configure external program
 //! execution, not the ciphernode itself.
 
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct BoundlessConfig {
-    pub rpc_url: String,
-    pub private_key: String,
-    #[serde(default)]
-    pub pinata_jwt: Option<String>,
-    /// Public gateway base URL used in Boundless program and input references.
-    ///
-    /// Use a dedicated gateway for production. The shared Pinata gateway can accept a HEAD
-    /// request and then rate-limit the full object download that a prover needs.
-    #[serde(default)]
-    pub ipfs_gateway_url: Option<String>,
-    #[serde(default)]
-    pub program_url: Option<String>,
-    #[serde(default = "default_true")]
-    pub onchain: bool,
-    // --- Offer parameters (all optional; the support host supplies the defaults) ---
-    /// Minimum price in ETH (default: 0.00005).
-    #[serde(default)]
-    pub min_price_eth: Option<f64>,
-    /// Maximum price in ETH (default: 0.004).
-    #[serde(default)]
-    pub max_price_eth: Option<f64>,
-    /// Total timeout in seconds (default: 28800 = 8 hours).
-    #[serde(default)]
-    pub timeout_secs: Option<u64>,
-    /// Lock timeout in seconds (default: 14400 = 4 hours).
-    #[serde(default)]
-    pub lock_timeout_secs: Option<u64>,
-    /// Ramp-up period in seconds (default: 7200 = 2 hours).
-    #[serde(default)]
-    pub ramp_up_secs: Option<u64>,
-    /// Lock collateral in ZKC (default: 100.0).
-    #[serde(default)]
-    pub lock_collateral_zkc: Option<f64>,
+/// Which OpenVM worker proves.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum OpenVmBackend {
+    /// The CUDA worker when one is configured and can open a GPU, otherwise the CPU worker.
+    #[default]
+    Auto,
+    Cpu,
+    /// The CUDA worker. The service refuses to start when it cannot open a GPU.
+    Cuda,
 }
 
-fn default_true() -> bool {
-    true
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct Risc0Config {
-    #[serde(default = "default_risc0_dev_mode")]
-    pub risc0_dev_mode: u8,
-    #[serde(default)]
-    pub boundless: Option<BoundlessConfig>,
-}
-
-fn default_risc0_dev_mode() -> u8 {
-    1
-}
-
-impl Default for Risc0Config {
-    fn default() -> Self {
-        Risc0Config {
-            risc0_dev_mode: 1,
-            boundless: None,
+impl OpenVmBackend {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::Cpu => "cpu",
+            Self::Cuda => "cuda",
         }
     }
 }
 
+/// The OpenVM proving service. Every path is absolute and local to the deployment.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct OpenVmConfig {
+    /// The CPU build of `interfold-openvm-prover`.
+    #[serde(default)]
+    pub prover_bin: Option<PathBuf>,
+    /// The CUDA build of `interfold-openvm-prover`.
+    #[serde(default)]
+    pub prover_bin_cuda: Option<PathBuf>,
+    #[serde(default)]
+    pub backend: OpenVmBackend,
+    /// The directory `cargo openvm setup --evm` wrote the Halo2 key, parameters and verifier to.
+    /// Defaults to `~/.openvm`.
+    #[serde(default)]
+    pub setup_dir: Option<PathBuf>,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ProgramConfig {
-    risc0: Option<Risc0Config>,
+    openvm: Option<OpenVmConfig>,
     dev: Option<bool>,
+    /// The removed RISC Zero and Boundless settings. A config that still has them loads, so that a
+    /// ciphernode sharing the file keeps starting after the upgrade; `interfold program` refuses
+    /// them (see [`ProgramConfig::ensure_supported`]).
+    #[serde(default, rename = "risc0", skip_serializing)]
+    legacy_risc0: Option<figment::value::Value>,
 }
 
 impl ProgramConfig {
-    pub fn risc0(&self) -> Option<&Risc0Config> {
-        self.risc0.as_ref()
+    pub fn openvm(&self) -> Option<&OpenVmConfig> {
+        self.openvm.as_ref()
     }
 
     pub fn dev(&self) -> bool {
         self.dev.unwrap_or(false)
     }
+
+    /// Refuse the removed `program.risc0` section, which no program backend reads any more.
+    pub fn ensure_supported(&self) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            self.legacy_risc0.is_none(),
+            "program.risc0 is no longer supported: OpenVM replaced RISC Zero and Boundless. \
+             Remove program.risc0 and configure program.openvm, or set program.dev for unproved \
+             local runs"
+        );
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::ProgramConfig;
+    use super::{OpenVmBackend, ProgramConfig};
+    use std::path::PathBuf;
 
     #[test]
-    fn deserializes_dedicated_ipfs_gateway() {
+    fn deserializes_openvm_worker_configuration() {
+        let config: ProgramConfig = serde_yaml::from_str(
+            r#"
+openvm:
+  prover_bin: "/deployment/bin/interfold-openvm-prover"
+  prover_bin_cuda: "/deployment/bin/interfold-openvm-prover-cuda"
+  backend: cuda
+"#,
+        )
+        .expect("program config must deserialize");
+
+        let openvm = config.openvm().expect("OpenVM config must be present");
+        assert_eq!(
+            openvm.prover_bin,
+            Some(PathBuf::from("/deployment/bin/interfold-openvm-prover"))
+        );
+        assert_eq!(openvm.backend, OpenVmBackend::Cuda);
+        assert!(!config.dev());
+    }
+
+    /// Without a backend, a GPU is used when there is one.
+    #[test]
+    fn the_backend_defaults_to_auto() {
+        let config: ProgramConfig =
+            serde_yaml::from_str("openvm:\n  prover_bin: /deployment/bin/worker\n").unwrap();
+        assert_eq!(config.openvm().unwrap().backend, OpenVmBackend::Auto);
+        assert!(serde_yaml::from_str::<ProgramConfig>("openvm:\n  backend: gpu\n").is_err());
+    }
+
+    #[test]
+    fn rejects_unknown_backend_configuration() {
+        assert!(serde_yaml::from_str::<ProgramConfig>("unknown_backend: {}").is_err());
+    }
+
+    /// A config written for the RISC Zero backend still loads, so a ciphernode that shares the file
+    /// keeps starting, but no program command accepts it.
+    #[test]
+    fn loads_the_removed_risc0_section_and_refuses_it_for_programs() {
         let config: ProgramConfig = serde_yaml::from_str(
             r#"
 risc0:
   risc0_dev_mode: 0
   boundless:
     rpc_url: "https://base.example"
-    private_key: "demo"
-    pinata_jwt: "demo"
-    ipfs_gateway_url: "https://dedicated.example"
 "#,
         )
-        .expect("program config must deserialize");
+        .expect("a config with the removed section must still load");
+        assert!(config.ensure_supported().is_err());
+        assert!(ProgramConfig::default().ensure_supported().is_ok());
+    }
 
-        let boundless = config
-            .risc0()
-            .and_then(|risc0| risc0.boundless.as_ref())
-            .expect("Boundless config must be present");
-        assert_eq!(
-            boundless.ipfs_gateway_url.as_deref(),
-            Some("https://dedicated.example")
-        );
+    #[test]
+    fn development_execution_requires_explicit_selection() {
+        assert!(!ProgramConfig::default().dev());
+        let config: ProgramConfig = serde_yaml::from_str("dev: true").unwrap();
+        assert!(config.dev());
     }
 }

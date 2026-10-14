@@ -10,6 +10,7 @@ use std::collections::BTreeMap;
 
 use alloy::primitives::{keccak256, Address, B256, U256};
 use anyhow::{anyhow, ensure, Result};
+use e3_committee::CiphernodesCommitteeSize;
 use e3_committee_hash::{
     hash_lbfv_accepted_party_set, hash_lbfv_proof_session, validate_and_hash_finalized_committee,
     LbfvProofDomainContext,
@@ -21,7 +22,6 @@ use e3_events::{
     LbfvKeyShareManifest, SignedLbfvKeyShareManifest,
 };
 use e3_fhe_params::{lbfv_row_count, BfvPreset};
-use e3_zk_helpers::CiphernodesCommitteeSize;
 use serde::{Deserialize, Serialize};
 
 pub const LBFV_CONTRIBUTION_COLLECTION_SCHEMA_VERSION: u32 = 3;

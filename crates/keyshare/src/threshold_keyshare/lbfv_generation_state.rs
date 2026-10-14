@@ -193,7 +193,7 @@ impl LbfvGenerationStateV1 {
                     .with_context(|| format!("invalid finalized committee address {address}"))
             })
             .collect::<Result<Vec<_>>>()?;
-        e3_zk_helpers::CiphernodesCommitteeSize::from_threshold(
+        e3_committee::CiphernodesCommitteeSize::from_threshold(
             selection.threshold_m,
             selection.threshold_n,
         )?;
@@ -621,8 +621,8 @@ impl LbfvGenerationStateV1 {
         Ok(())
     }
 
-    fn committee_size(&self) -> Result<e3_zk_helpers::CiphernodesCommitteeSize> {
-        e3_zk_helpers::CiphernodesCommitteeSize::from_threshold(
+    fn committee_size(&self) -> Result<e3_committee::CiphernodesCommitteeSize> {
+        e3_committee::CiphernodesCommitteeSize::from_threshold(
             self.committee.len().saturating_sub(1) / 2,
             self.committee.len(),
         )

@@ -15,8 +15,8 @@
 
 use crate::{E3id, PartyProofsToVerify, PartyShareDecryptionProofsToVerify, ProofType};
 use alloy::primitives::B256;
+use e3_committee::CiphernodesCommitteeSize;
 use e3_committee_hash::LbfvProofDomainContext;
-use e3_zk_helpers::CiphernodesCommitteeSize;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 

@@ -5,11 +5,11 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 pragma solidity 0.8.28;
 
-import { IRiscZeroVerifier } from "risc0/IRiscZeroVerifier.sol";
+import { IOpenVmReceiptVerifier } from "@interfold/contracts/contracts/interfaces/IOpenVmReceiptVerifier.sol";
 import { IE3Program } from "@interfold/contracts/contracts/interfaces/IE3Program.sol";
 import { IInterfold } from "@interfold/contracts/contracts/interfaces/IInterfold.sol";
 import { E3 } from "@interfold/contracts/contracts/interfaces/IE3.sol";
-import { Risc0ComputeProof } from "@interfold/contracts/contracts/lib/Risc0ComputeProof.sol";
+import { OpenVmComputeProof } from "@interfold/contracts/contracts/lib/OpenVmComputeProof.sol";
 import { IDataAvailabilityVerifier, IE3ProgramDataAvailability } from "@interfold/contracts/contracts/interfaces/IDataAvailabilityVerifier.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
@@ -24,7 +24,7 @@ contract MyProgram is IE3Program, IE3ProgramDataAvailability, IERC165, Ownable {
 
   // State variables
   IInterfold public interfold;
-  IRiscZeroVerifier public verifier;
+  IOpenVmReceiptVerifier public verifier;
   bytes32 public imageId;
 
   // Mappings
@@ -37,6 +37,7 @@ contract MyProgram is IE3Program, IE3ProgramDataAvailability, IERC165, Ownable {
   error E3AlreadyInitialized();
   error E3DoesNotExist();
   error VerifierAddressZero();
+  error InvalidImageId();
   error AlreadyRegistered();
   error EmptyInputData();
   error InputDeadlineReached();
@@ -45,12 +46,15 @@ contract MyProgram is IE3Program, IE3ProgramDataAvailability, IERC165, Ownable {
 
   event InputPublished(uint256 indexed e3Id, bytes data, uint256 index);
 
-  /// @notice Initialize the contract, binding it to a specified RISC Zero verifier.
+  /// @notice Bind the program to its OpenVM receipt verifier.
   /// @param _interfold The Interfold contract address
-  /// @param _verifier The RISC Zero verifier address
-  /// @param _imageId The image ID for the guest program
-  constructor(IInterfold _interfold, IRiscZeroVerifier _verifier, bytes32 _imageId) Ownable(msg.sender) {
+  /// @param _verifier The OpenVM receipt verifier address
+  /// @param _imageId The receipt identity: `imageId()` of the OpenVM receipt verifier, which derives it
+  /// from the Halo2 verifier and the guest's executable and VM commitments. The constructor refuses
+  /// any other value, because `verify` would then reject every proof.
+  constructor(IInterfold _interfold, IOpenVmReceiptVerifier _verifier, bytes32 _imageId) Ownable(msg.sender) {
     require(address(_verifier) != address(0), VerifierAddressZero());
+    require(_imageId == _verifier.imageId(), InvalidImageId());
 
     interfold = _interfold;
     verifier = _verifier;
@@ -118,9 +122,9 @@ contract MyProgram is IE3Program, IE3ProgramDataAvailability, IERC165, Ownable {
     E3 memory e3 = interfold.getE3(e3Id);
     bytes32 paramsHash = paramsHashes[e3Id];
     bytes32 inputRoot = bytes32(inputs[e3Id]._root());
-    Risc0ComputeProof.Proof memory computeProof = Risc0ComputeProof.decode(proof);
+    OpenVmComputeProof.Proof memory computeProof = OpenVmComputeProof.decode(proof);
     if (computeProof.paramsHash != paramsHash || computeProof.inputRoot != inputRoot) revert InvalidComputeContext();
-    bytes memory journal = Risc0ComputeProof.journal(
+    bytes memory journal = OpenVmComputeProof.journal(
       bytes32(block.chainid),
       bytes32(uint256(uint160(address(interfold)))),
       bytes32(e3Id),
