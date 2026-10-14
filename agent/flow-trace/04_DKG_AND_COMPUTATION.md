@@ -346,11 +346,12 @@ Both GenPkShareAndSkSss and GenEsiSss complete
 ProofRequestActor receives ThresholdSharePending
 │
 ├─ 1. Creates PendingThresholdProofs tracker:
-│     expected = 1 (C1) + 1 (C2a) + 1 (C2b) + SK_ENC_COUNT (C3a) + ESM_ENC_COUNT (C3b)
+│     expected = 1 (C1, trBFV only) + 1 (C2a) + 1 (C2b) + SK_ENC_COUNT (C3a) + ESM_ENC_COUNT (C3b)
 │     → All proofs must complete before publishing ThresholdShareCreated
+│     → The l-BFV path has no C1: its PK and RLK row proofs carry key generation
 │
 ├─ 2. Dispatches ALL proof requests in parallel:
-│     ├─ C1:  ComputeRequest::zk(ZkRequest::PkGeneration {...})
+│     ├─ C1:  ComputeRequest::zk(ZkRequest::PkGeneration {...})   (trBFV only)
 │     ├─ C2a: ComputeRequest::zk(ZkRequest::ShareComputation { kind: SK })
 │     ├─ C2b: ComputeRequest::zk(ZkRequest::ShareComputation { kind: ESM })
 │     ├─ C3a[i]: ComputeRequest::zk(ZkRequest::ShareEncryption { recipient, row })
@@ -366,7 +367,7 @@ ProofRequestActor receives ThresholdSharePending
 ├─ 4. As each ComputeResponse arrives:
 │     ├─ Store proof in PendingThresholdProofs map
 │     ├─ Check is_complete():
-│     │   all of: pk_generation_proof(C1), sk_share_computation_proof(C2a),
+│     │   all of: pk_generation_proof(C1, trBFV only), sk_share_computation_proof(C2a),
 │     │           e_sm_share_computation_proof(C2b),
 │     │           ALL sk_share_encryption_proofs(C3a),
 │     │           ALL e_sm_share_encryption_proofs(C3b)
@@ -377,7 +378,7 @@ ProofRequestActor receives ThresholdSharePending
 │     → C3a/C3b proofs indexed by (real recipient_party_id, row_index)
 │
 ├─ 6. Publish events:
-│     ├─ PkGenerationProofSigned { e3_id, party_id, signed_proof(C1) }
+│     ├─ PkGenerationProofSigned { e3_id, party_id, signed_proof(C1) }   (trBFV only)
 │     ├─ DkgProofSigned { signed_proof } × (C2a, C2b, each C3a, each C3b)
 │     └─ ThresholdShareCreated for each recipient with a collected C0 key {
 │          e3_id, party_id, target_party_id,
@@ -414,15 +415,14 @@ The chunked C2 path keeps the same signed proof multiplicity. For each C2a/C2b r
 generates one type-bound recursive proof per chunk. The default chunk size is
 `c2_chunk_size(degree, n_parties)`. At degree 16384 it depends on the committee: 8192 coefficients
 for up to 4 parties, 1024 for up to 12, and 512 above. At 8192 the secure-16384/minimum leaves have
-2,090,591 (C2a) and 2,619,131 (C2b) gates. Other degrees use the smaller of 512 and the
-degree, so the insecure degree-128 preset uses 128 coefficients per chunk. A batch holds up to four
-chunks. The `--chunk-size` option accepts any nonzero divisor of the preset
-polynomial degree for generated circuit configuration. The production multithread path selects the
-preset default chunk size. Rust groups the chunk proofs into fixed recursive batches and verifies
-all batches in a type-bound terminal circuit. The terminal circuits reconstruct a root commitment
-for the secret and for each recipient share. The signed response contains only the type-bound
-terminal `SkC2ChunkFinalize` or `ESmC2ChunkFinalize` proof. `C2ChunkBatch` binds the ordered chunk
-indices and chunk commitments.
+2,090,591 (C2a) and 2,619,131 (C2b) gates. Other degrees use the smaller of 512 and the degree, so
+the insecure degree-128 preset uses 128 coefficients per chunk. A batch holds up to four chunks. The
+`--chunk-size` option accepts any nonzero divisor of the preset polynomial degree for generated
+circuit configuration. The production multithread path selects the preset default chunk size. Rust
+groups the chunk proofs into fixed recursive batches and verifies all batches in a type-bound
+terminal circuit. The terminal circuits reconstruct a root commitment for the secret and for each
+recipient share. The signed response contains only the type-bound terminal `SkC2ChunkFinalize` or
+`ESmC2ChunkFinalize` proof. `C2ChunkBatch` binds the ordered chunk indices and chunk commitments.
 
 The chunk size is one value across the DKG pipeline: it threads from the sample into the C2 (share
 computation), C3 (share encryption), and C4 (share decryption) witness computation and into the
@@ -611,10 +611,12 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   │   ├─ Evaluates all registered CommitmentLinks:
 │   │   │     C0→C3   (SourceMustExistInTargets): local-cache absence accusations are disabled;
 │   │   │                                          each recipient checks its own C0 against C3
-│   │   │     C1→C2a  (SameParty):                C1's sk_commitment == C2a's expected_secret_commitment
-│   │   │     C1→C2b  (SameParty):                C1's e_sm_commitment == C2b's expected_secret_commitment
-│   │   │     C1→C5   (CrossParty):               C1's pk_commitment ∈ C5 expected pk inputs
-│   │   │     l-BFV→C1 (SameParty):               each l-BFV PK row uses C1's sk_commitment
+│   │   │     C1→C2a  (SameParty, trBFV):         C1's sk_commitment == C2a's expected_secret_commitment
+│   │   │     C1→C2b  (SameParty, trBFV):         C1's e_sm_commitment == C2b's expected_secret_commitment
+│   │   │     C1→C5   (CrossParty, trBFV):        C1's pk_commitment ∈ C5 expected pk inputs
+│   │   │     PK row→RLK row (SameParty, l-BFV):  the PK and RLK proofs of one row have one sk_commitment
+│   │   │     C2a→l-BFV rows (SameParty):         C2a's secret root == every PK and RLK row's sk_commitment
+│   │   │                                          (one C2a per party, so all rows commit one sk)
 │   │   │     C2→C3   (SameParty):                C3's expected_message_commitment ∈ C2's share commitments
 │   │   │     C2→C4   (SourceMustExistInTargets): after all selected C4 targets arrive,
 │   │   │                                          C2's L share commitments for recipient R match
@@ -626,7 +628,10 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   │   │                                      the final decryption proof exposes the SAFE commitment and the wrapper compares it with
 │   │   │                                      the commitment stored at ciphertext publication. Keccak(raw output) remains separate.
 │   │   │
-│   │   ├─ NOTE: Production C1 still proves one summation-only public-key share per party. The
+│   │   ├─ NOTE: The l-BFV path has no C1 and no C5. Its row proofs carry key generation, and
+│   │   │   each C2b chunk leaf (`esm_share_computation_chunk`) carries the `e_sm_bound` check and
+│   │   │   the CRT lift (`e_sm_lifted_chunk`, `e_sm_quotients_chunk`) for its own coefficients.
+│   │   │   The finalizer's chunk-index checks make the leaves cover every coefficient. The
 │   │   │   `lbfv_pk_generation` circuit proves all `L` CRT limbs of one fixed public-key row in one
 │   │   │   proof, without recursion. It takes the row's CRS polynomials as a witness and opens
 │   │   │   them against `LBFV_CRS_ROW_COMMITMENTS[row]` with checked packing. It binds `sk` and
@@ -640,7 +645,7 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   │   │   aggregates exactly `H` generation-bound rows. It uses the generated commitment of the
 │   │   │   fixed CRS row (`LBFV_CRS_ROW_COMMITMENTS`) instead of hashing the row. Both
 │   │   │   aggregation circuits bind the proof session, aggregator party, accepted-party-set hash,
-│   │   │   and row. The legacy C5 ABI remains unchanged. Remote contribution collection verifies
+│   │   │   and row. The trBFV C5 ABI is unchanged. Remote contribution collection verifies
 │   │   │   the generation rows. The separate V2 recursive family consumes these proofs.
 │   │   │   `rlk_generation` proves both reduced RLK identities of all `L` CRT limbs of one row in
 │   │   │   one proof, without recursion. It takes the row's URS (`d1`) and CRS (`a`) polynomials as
@@ -657,21 +662,22 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   │   │   encoding. The externally signed row proof families use append-only `ProofType`
 │   │   │   discriminants 11 through 14.
 │   │   │   Append-only TrBFV compute variants generate local public-key and RLK
-│   │   │   shares from the C1 secret contribution. The response encrypts the RLK witness at rest.
+│   │   │   shares from the party's secret contribution. The response encrypts the RLK witness at rest.
 │   │   │   Append-only `ZkRequest` handlers build and prove each row. Each handler recomputes the
 │   │   │   stable operation ID from the session, party role, family, row, canonical accepted set,
 │   │   │   and public artifacts before witness work. Retries use an encrypted 32-byte seed and one
-│   │   │   operation-ID Barretenberg namespace. Generation verification requires C1, five
-│   │   │   public-key rows, and five RLK rows in canonical order. Aggregation requires only the ten
-│   │   │   l-BFV rows. The generation consistency payload includes C1, so one decision checks every
-│   │   │   l-BFV SK commitment against C1. Verification also checks exact public-input shape and
+│   │   │   operation-ID Barretenberg namespace. Generation verification requires exactly five
+│   │   │   public-key rows and five RLK rows in canonical order, and no C1. Aggregation requires the
+│   │   │   same ten l-BFV rows. The C2a link requires every row's SK commitment to equal the C2a
+│   │   │   secret root (`lbfv_generation_sk.rs`), and `node_fold_v2` proves the same equality. Verification also checks exact public-input shape and
 │   │   │   uses the versioned dispatch context as the authoritative session. Aggregation requires
 │   │   │   exactly `H` unique ascending parties, one accepted-set hash for both families, and PK,
 │   │   │   RLK D0, and RLK D2 input commitments that match accepted generation results.
 │   │   │   Versioned DHT transport stores each party's public-key
-│   │   │   contribution and RLK contribution in separate `LbfvKeyShareDocument` records. The PK
-│   │   │   document carries C1 and five signed PK row proofs. The RLK document carries five signed
-│   │   │   terminal RLK row proofs. A compact `SignedLbfvKeyShareManifest` binds the complete proof
+│   │   │   contribution and RLK contribution in separate `LbfvKeyShareDocument` records. The
+│   │   │   version-3 PK document carries five signed PK row proofs and no C1 proof. The RLK document
+│   │   │   carries five signed terminal RLK row proofs. Both documents take the expected signer from
+│   │   │   row 0. A compact `SignedLbfvKeyShareManifest` binds the complete proof
 │   │   │   domain, party slot, and the SHA-256 hash of each exact DHT payload. Generic l-BFV DHT
 │   │   │   notifications are ignored. A versioned targeted fetch request identifies the exact E3,
 │   │   │   proof session, party, document role, hash, and attempt. The bounded fetch handler checks
@@ -682,8 +688,8 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   │   │   enforces the 16 MiB record limit and forwards only manifests with a recoverable
 │   │   │   signature. For `secure-16384`, `ThresholdKeyshare` persists the generation request and
 │   │   │   encrypted seed in `//threshold_keyshare_lbfv_generation/v1/{e3_id}`. It dispatches share
-│   │   │   generation, derives and redrives missing row requests by stable operation ID, and collects the signed C1
-│   │   │   proof, signs ten returned row proofs, and commits both documents plus the manifest before
+│   │   │   generation, derives and redrives missing row requests by stable operation ID, signs ten
+│   │   │   returned row proofs, and commits both documents plus the manifest before
 │   │   │   publishing them.
 │   │   │   It checks the injected signer against the canonical committee slot and delays
 │   │   │   `KeyshareCreated` until the local bundle is durable. Completion clears the stored secret,
@@ -696,16 +702,18 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   │   │   commitments match the fixed-shape row statements.
 │   │   │   `lbfv_generation_fold` verifies five ordered PK/RLK row-proof pairs.
 │   │   │   `node_fold_v2` verifies a
-│   │   │   legacy `NodeFold` proof and the terminal generation fold. The legacy fold exports C1's
-│   │   │   SK root; `node_fold_v2` requires the generation SK commitment to equal it and returns
-│   │   │   the legacy node statement as a prefix. `nodes_fold_v2`
+│   │   │   `node_fold_chunked` proof and the terminal generation fold. `node_fold_chunked` verifies
+│   │   │   C0, C2AB, C3AB, and C4AB (no C1) and exports the C2a secret root; `node_fold_v2` requires
+│   │   │   the generation SK commitment to equal it and returns the node statement as a prefix. `nodes_fold_v2`
 │   │   │   folds exactly H parties in ascending order. `lbfv_aggregation_fold` verifies five
 │   │   │   ordered aggregation pairs.
 │   │   │   `dkg_aggregator_v2` verifies those folds and compares every generation commitment. It
-│   │   │   keeps `c5_key_hash` as a pinned public input but does not verify C5. It recomputes the accepted-set hash from the folded canonical party IDs.
-│   │   │   A NodeFoldV2 public statement contains four public-prefix fields and an 86-field return,
-│   │   │   for 90 fields in total. NodesFoldV2 preserves that full statement for each of H parties;
-│   │   │   its secure-16384/minimum accumulator statement therefore contains 186 fields.
+│   │   │   has no C5 input: `legacy_key_hash = H(nodes_fold_key_hash)` and
+│   │   │   `v2_key_hash = H(nodes_fold_key_hash, aggregation_fold_key_hash)`. Its legacy VK binding
+│   │   │   has 15 entries (no C1). It recomputes the accepted-set hash from the folded canonical party IDs.
+│   │   │   A NodeFoldV2 public statement contains three public-prefix fields and an 84-field return,
+│   │   │   for 87 fields in total. NodesFoldV2 preserves that full statement for each of H parties;
+│   │   │   its secure-16384/minimum accumulator statement therefore contains 180 fields.
 │   │   │   Rust recursive request dispatch, the local document-to-node-fold handoff, row aggregation,
 │   │   │   and operational key storage are wired. The active aggregator persists and redrives a
 │   │   │   secure-16384 `LbfvPublicKeyAggregated` publication intent. The registry writer adapts the
@@ -811,8 +819,9 @@ from every peer Ready report, it starts the existing 10-minute active-aggregator
 DKG-roster phase. If the active aggregator does not publish a roster, the selector promotes the
 next eligible committee member and publishes its new party ID. The promoted member uses the
 accepted dealer list or its saved Ready map; there is no second leader election. Roster acceptance
-ends that phase and clears its local failover skips. The later C5 public-key aggregation starts a
-new failover budget only after its own inputs are durable.
+ends that phase and clears its local failover skips. The later public-key aggregation (C5 on
+trBFV, the l-BFV row aggregation on secure-16384) starts a new failover budget only after its own
+inputs are durable.
 
 The network actor keeps the latest local Ready and Roster message for each open E3. It sends the
 same signed protocol event in a fresh transport envelope 30 seconds after the message is cached,
@@ -994,8 +1003,8 @@ phase.
 
 ## Phase 2: Public Key Aggregation (Committee-Buffered, Active Aggregator Submits)
 
-For `secure-16384`, remote l-BFV collection extends the persisted-input gate before the existing C5
-path.
+For `secure-16384`, remote l-BFV collection extends the persisted-input gate. The l-BFV path has no
+C1 verification and no C5 proof.
 
 **Files:**
 
@@ -1023,8 +1032,7 @@ SignedLbfvKeyShareManifest arrives at every PublicKeyAggregator
 ├─ On invalid data or CommitteeMemberExcluded:
 │  ├─ Persist a terminal party status
 │  └─ Invalidate an unsealed candidate set that included the party
-├─ When both documents are durable and KeyshareCreated supplies C1:
-│  ├─ Require the document C1 payload to equal the submitted C1 payload
+├─ When both documents are durable and the party has submitted KeyshareCreated:
 │  ├─ Validate all five PK, RLK D0, and RLK D2 row commitments
 │  └─ Persist Ready or InvalidData
 ├─ After every member of the accepted H-party roster submits KeyshareCreated:
@@ -1036,31 +1044,31 @@ SignedLbfvKeyShareManifest arrives at every PublicKeyAggregator
    ├─ Reuse the persisted H-party candidate set
    ├─ Persist Ready(candidate_party_ids), then Dispatched(candidate_party_ids)
    ├─ Derive verification_id from the proof session and complete candidate set
-   ├─ Dispatch C1 + five PK rows + five RLK rows for every candidate
+   ├─ Dispatch five PK rows + five RLK rows for every candidate (no C1)
    ├─ Ignore ShareVerificationComplete with another verification_id
    ├─ Reject an ineligible candidate without attributing a late non-candidate failure
    ├─ If a candidate proof fails, persist InvalidData and promote the next exact-H ready set
    ├─ Persist Sealed with the exact validated commitments for the candidate parties
-   ├─ Persist the l-BFV aggregation sidecar with both accepted document families
-   └─ Persist the legacy C5 state before publishing PkAggregationProofPending
+   └─ Persist the l-BFV aggregation sidecar with both accepted document families
 ```
 
 Hydration reconstructs only a missing initial sidecar from the durable E3 and committee context. It
 does not replace an existing record. After `EffectsEnabled`, recovery validates each submitted party
 left at `DocumentsDurable`, publishes due fetches, re-arms the earliest retry, redrives a persisted
 verification dispatch with the same candidate ID, or applies the immutable sealed set. Every standby
-stores the same inputs and collection outcomes. Only the active aggregator dispatches proof or C5
-work.
+stores the same inputs and collection outcomes. Only the active aggregator dispatches proof work.
 
-The active secure-16384 aggregator dispatches five PK aggregation proofs and five RLK aggregation
-proofs from the accepted documents. It folds each ordered proof pair into one five-row accumulator.
+The active secure-16384 aggregator dispatches five PK aggregation proofs and ten RLK aggregation
+proofs from the accepted documents: one `d0` and one `d2` proof per row, as independent compute
+requests. It folds each row's PK proof and its two RLK component proofs into one five-row
+accumulator.
 After the fold completes, it derives both operational keys from the same accepted PK and RLK shares.
 It persists both keys in `//publickey_lbfv_aggregation/v1/{e3_id}` before final V2 proof dispatch.
-If C5 completes before both keys are available, the aggregator waits and retries publication after
-the keys are persisted. Restart clears process-local correlations. It resumes missing row or fold
-work only from a non-terminal aggregation state. Persisted aggregation failures and other terminal
-aggregation snapshots do not resume this work. If the fold is complete but either operational key is
-absent, restart derives and persists the same keys again.
+If the final V2 proof inputs are ready before both keys are available, the aggregator waits and
+retries after the keys are persisted. Restart clears process-local correlations. It resumes missing
+row or fold work only from a non-terminal aggregation state. Persisted aggregation failures and
+other terminal aggregation snapshots do not resume this work. If the fold is complete but either
+operational key is absent, restart derives and persists the same keys again.
 
 An l-BFV aggregation worker error persists one immutable terminal failure before it publishes
 `E3Failed { failed_at_stage: CommitteeFinalized, reason: DKGInvalidShares }`. Restart republishes
@@ -1080,17 +1088,18 @@ only that failure. It does not resume row, fold, final V2 proof, or publication 
   │
   ├─ When every member of the accepted H roster has submitted a keyshare:
 │   │   → The live count can fall below N after a confirmed fault, but it must still be at least H
-│   │   → Persist VerifyingC1
+│   │   → Legacy presets persist VerifyingC1
 │   │   → For secure-16384, persist the first H-party ready quorum
 │   │   → Then publish AggregationInputsReady(PublicKey)
 │   │   → CiphernodeSelector starts the 10-minute roster/C5 failover budgets only now
 │   │   → Secure-16384 additionally runs its durable 60-minute l-BFV ready-work deadline
 │   │
-│   ├─ Only the active aggregator starts C1 verification and later proof/compute effects
+│   ├─ Only the active aggregator starts verification (C1 on legacy presets, l-BFV rows on
+│   │   secure-16384) and later proof/compute effects
 │   │   → A promoted standby resumes from its persisted phase; it does not need a RAM buffer
-│   │   → A demoted node that dispatched C1 verification finishes that work and publishes its
+│   │   → A demoted node that dispatched verification finishes that work and publishes its
 │   │     key; the first valid committee publication on chain wins. Once a key is on chain,
-│   │     the demoted node stops, and any node ignores a late C1 result: it neither fails the
+│   │     the demoted node stops, and any node ignores a late verification result: it neither fails the
 │   │     E3 nor accuses a dealer. A node that did not start the work ignores worker results
 │   │     File: crates/aggregator/src/public_key_aggregation/actor.rs (started_as_aggregator)
 │   ├─ Legacy presets verify all collected non-excluded C1 proofs, then keep the H lowest valid IDs
@@ -1101,8 +1110,11 @@ only that failure. It does not resume row, fold, final V2 proof, or publication 
 │   ├─ C1 verification runs over the exact H selected submitters; on legacy presets, failures stop DKG
 │   │
 │   ├─ Honest-set selection (compile-time H from `committee::active`, may be < N):
-│   │     • Require valid C1 proofs from all H roster members; otherwise E3Failed
+│   │     • Legacy presets require valid C1 proofs from all H roster members; otherwise E3Failed
 │   │     • Preserve the accepted roster order for NodeFold and C5 inputs
+│   │
+│   ├─ Secure-16384 skips steps 2-4 below: it proves no C5. It keeps the step-1 aggregate only in
+│   │   its local state and publishes no legacy aggregate key
 │   │
 │   ├─ 1. Aggregate public key shares (H honest keyshares):
 │   │     aggregate_pk = Fhe::get_aggregate_public_key(
@@ -1149,8 +1161,8 @@ only that failure. It does not resume row, fold, final V2 proof, or publication 
 │   │     │   → exactly N ordered committee addresses from `CommitteeFinalized` (`topNodes`),
 │   │     │     including a member excluded before it submitted a keyshare
 │   │     │   → Rust validates both dimensions before invoking the compiled circuit
-│   │     │   → secure-16384 dispatches DkgAggregationV2 with NodesFoldV2, C5, and the
-│   │     │     completed l-BFV aggregation fold
+│   │     │   → secure-16384 dispatches DkgAggregationV2 with NodesFoldV2 and the
+│   │     │     completed l-BFV aggregation fold (no C5 proof)
 │   │     │   → secure-16384 also requires both persisted operational keys before dispatch
 │   │     │   → every V2 readiness probe first re-dispatches missing l-BFV row and
 │   │     │     fold requests, so a request the chain never published cannot stall
@@ -1253,7 +1265,7 @@ this incompatible byte-codec boundary.
         │  │       ), InvalidProof())                            │
         │  │       → BFV route selects one verifier per config   │
         │  │         • route must match the E3 parameter set,    │
-        │  │           public-input count, and both VK anchors   │
+        │  │           public-input count, and nodes-fold anchor │
         │  │         • legacy: `BfvPkVerifier`                   │
         │  │           ◦ M-34: nodes tree / C5 VK pins           │
         │  │             vs publicInputs[0..1]                   │
@@ -1261,7 +1273,8 @@ this incompatible byte-codec boundary.
         │  │             ([2+H], [3+H]) vs committeeHash         │
         │  │           ◦ last PI == pkCommitment                 │
         │  │         • secure-16384/minimum: `BfvPkVerifierV2`   │
-        │  │         • V2 requires exactly 62 public inputs      │
+        │  │         • V2 requires exactly 60 public inputs      │
+        │  │           (39 + 3H + 3 rows; no C5 anchor)          │
         │  │         • V2 checks both independent VK manifests   │
         │  │         • V2 checks session, accepted set, registry,│
         │  │           committee, and key-envelope commitment    │
@@ -1320,12 +1333,11 @@ RLK, CRS, URS, levels, and ordered row commitments. They reverse and center each
 the circuit CRT representation before they recompute the combined envelope commitment. They require
 equality with the proven on-chain `pkCommitment`. Encryption uses public-key component 0. Only
 proof-bound computation exposes the RLK. Invalid candidates do not consume another committee
-member's candidate. Production verifies the C5-backed legacy final DKG proof or the
-`DkgAggregatorV2` final proof on-chain; the explicit test/CI skip mode works only with mock
-verifiers. The SDK assembler tracks at most 19 candidates for each E3. By default, it tracks 128 E3s
-and retains at most 64 MiB of incomplete chunks. It checks the byte budget before it stores a chunk.
-It releases the accounted bytes when an assembly completes, becomes invalid, is cleared, or is
-evicted.
+member's candidate. Production verifies the C5-backed trBFV final DKG proof or the `DkgAggregatorV2`
+final proof on-chain; the explicit test/CI skip mode works only with mock verifiers. The SDK
+assembler tracks at most 19 candidates for each E3. By default, it tracks 128 E3s and retains at
+most 64 MiB of incomplete chunks. It checks the byte budget before it stores a chunk. It releases
+the accounted bytes when an assembly completes, becomes invalid, is cleared, or is evicted.
 
 > **C-08 (BfvPkVerifier domain binding) — implemented** The wrapper exposes a
 > `verify(e3Id, committeeRoot, sortedNodes, pkCommitment, committeeHash, proof)` signature.
@@ -1938,7 +1950,7 @@ InterfoldSolReader decodes CiphertextOutputPublished event
 │      │                            │                   │ correctly                    │
 ├──────┼────────────────────────────┼───────────────────┼──────────────────────────────┤
 │ C1   │ TrBFV PK Generation        │ DKG: Share Gen    │ Threshold pk_share derived   │
-│      │                            │                   │ correctly from sk; bounds    │
+│      │ (trBFV only)               │                   │ correctly from sk; bounds    │
 │      │                            │                   │ e_sm over the integers via   │
 │      │                            │                   │ e_sm_lifted + CRT quotients; │
 │      │                            │                   │ outputs sk_commitment,       │
@@ -1949,7 +1961,9 @@ InterfoldSolReader decodes CiphertextOutputPublished event
 │      │                            │                   │ correctly                    │
 ├──────┼────────────────────────────┼───────────────────┼──────────────────────────────┤
 │ C2b  │ ESM Share Computation      │ DKG: Share Gen    │ Shamir shares of smudging    │
-│      │                            │                   │ noise computed correctly     │
+│      │                            │                   │ noise computed correctly;    │
+│      │                            │                   │ l-BFV chunk leaves also bound│
+│      │                            │                   │ e_sm via the CRT lift        │
 ├──────┼────────────────────────────┼───────────────────┼──────────────────────────────┤
 │ C3a  │ SK Share Encryption        │ DKG: Share Gen    │ sk_sss encrypted correctly   │
 │      │                            │                   │ under recipient's BFV key;   │
@@ -1972,7 +1986,7 @@ InterfoldSolReader decodes CiphertextOutputPublished event
 │      │                            │                   │ by C6                        │
 ├──────┼────────────────────────────┼───────────────────┼──────────────────────────────┤
 │ C5   │ PK Aggregation             │ Aggregation       │ Aggregate PK correctly       │
-│      │                            │                   │ computed from H canonical    │
+│      │ (trBFV only)               │                   │ computed from H canonical    │
 │      │                            │                   │ honest keyshares (not all N) │
 ├──────┼────────────────────────────┼───────────────────┼──────────────────────────────┤
 │ C6   │ Threshold Share Decryption │ Decryption        │ Decryption share correctly   │
@@ -2127,11 +2141,11 @@ or audit state. If restart gives the same compute operation a new correlation ID
 the work once and sends its response or error to each waiting ID. A later duplicate receives the
 saved outcome.
 
-A crash can leave the public-key snapshot in `Collecting` while the durable C1 verification request
-has already entered the event log. Its replayed result can then arrive before historical keyshares
-restore `VerifyingC1`. The active aggregator holds one such result with the saved selected roster
-and applies it when the same roster's keyshares are ready. It discards the result if the roster
-changed, and it ignores duplicate C1 results after C1 completed.
+On legacy presets, a crash can leave the public-key snapshot in `Collecting` while the durable C1
+verification request has already entered the event log. Its replayed result can then arrive before
+historical keyshares restore `VerifyingC1`. The active aggregator holds one such result with the
+saved selected roster and applies it when the same roster's keyshares are ready. It discards the
+result if the roster changed, and it ignores duplicate C1 results after C1 completed.
 
 A terminal E3 event also cancels that E3's compute jobs that have already reached the shared task
 pool but have not started. The cancellation key includes the local ciphernode address, so one node's

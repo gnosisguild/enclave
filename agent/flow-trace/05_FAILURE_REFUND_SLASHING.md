@@ -1262,7 +1262,8 @@ Lane A reason keys and stable runtime categories:
   └──────────────────────────────────┴─────────────────────────────────┘
 
   The retired `RlkGenerationLimb` and `LbfvPkGenerationLimb` circuits are never produced and have
-  no ProofType.
+  no ProofType. The l-BFV path produces no C1 or C5 proof, so those rows apply to trBFV only. On
+  l-BFV, a bad `e_sm` share fails its C2b chunk proof (`E3_BAD_DKG_PROOF`).
 ```
 
 ### End-to-End: Proof Failure → On-Chain Slash
@@ -1416,7 +1417,8 @@ When CommitteeMemberExpelled event arrives from EVM:
 │   │   ├─ A selected roster member's removal publishes E3Failed at CommitteeFinalized
 │   │   │   → InsufficientCommitteeMembers: the fixed H-row proof needs every selected member
 │   │   └─ Other removals in Collecting remove buffered keyshares and reduce threshold_n
-│   │       → C1 verification still requires the accepted dealer roster
+│   │       → verification (C1 on legacy presets, l-BFV rows on secure-16384) still requires
+│   │         the accepted dealer roster
 │   └─ After canonical key publication:
 │       ├─ Skips DKG failure, threshold changes, and aggregation from this removal
 │       ├─ Applies even to a standby still in VerifyingC1

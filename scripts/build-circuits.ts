@@ -56,14 +56,13 @@ const SECURE_16384_ONLY_RECURSIVE_CIRCUITS = new Set([
   'dkg_aggregator_v2',
 ])
 
-// The l-BFV path's own versions of shared steps: chunked C2, chunk-root C1/C3/C4 and their folds,
+// The l-BFV path's own versions of shared steps: chunked C2, chunk-root C3/C4 and their folds,
 // and the wide C7. Leaf circuits get every variant; folds get the non-ZK default only.
 const LBFV_PATH_LEAF_CIRCUITS: { name: string; group: CircuitGroup }[] = [
   { name: 'sk_share_computation_chunk', group: CIRCUIT_GROUPS.DKG },
   { name: 'esm_share_computation_chunk', group: CIRCUIT_GROUPS.DKG },
   { name: 'share_encryption_chunked', group: CIRCUIT_GROUPS.DKG },
   { name: 'share_decryption_chunked', group: CIRCUIT_GROUPS.DKG },
-  { name: 'pk_generation_chunked', group: CIRCUIT_GROUPS.THRESHOLD },
   { name: 'decrypted_shares_aggregation_wide', group: CIRCUIT_GROUPS.THRESHOLD },
   // C2 terminal projections are ZK leaves for `c2ab_chunk_fold`, not non-ZK accumulators.
   { name: 'sk_c2_chunk_finalize', group: CIRCUIT_GROUPS.AGGREGATION },
@@ -92,8 +91,6 @@ const ALL_LBFV_CIRCUITS = new Set([
 const LBFV_SHARED_CIRCUITS = new Set([
   // C0: `node_fold_chunked` verifies it, and `dkg_aggregator_v2` binds its VK.
   `${CIRCUIT_GROUPS.DKG}/pk`,
-  // C5: the l-BFV aggregator proves it, and `dkg_aggregator_v2` pins its VK hash.
-  `${CIRCUIT_GROUPS.THRESHOLD}/pk_aggregation`,
   // C6 and its fold chain. The decryption aggregator verifies them, and `c6_fold.vk_tree_hash`
   // anchors them.
   `${CIRCUIT_GROUPS.THRESHOLD}/share_decryption`,
@@ -1077,7 +1074,10 @@ library ActiveCryptoConfig {
     const dist = join(this.options.outputDir!, preset, committee)
     return [
       join(dist, CIRCUIT_VARIANTS.DEFAULT, CIRCUIT_GROUPS.DKG, 'pk', 'pk.json'),
-      join(dist, CIRCUIT_VARIANTS.DEFAULT, CIRCUIT_GROUPS.THRESHOLD, 'pk_aggregation', 'pk_aggregation.json'),
+      // C5 is trBFV only, so secure-16384 does not build it.
+      ...(preset === CIRCUIT_PRESETS.SECURE_16384
+        ? []
+        : [join(dist, CIRCUIT_VARIANTS.DEFAULT, CIRCUIT_GROUPS.THRESHOLD, 'pk_aggregation', 'pk_aggregation.json')]),
       join(dist, CIRCUIT_VARIANTS.DEFAULT, CIRCUIT_GROUPS.AGGREGATION, 'dkg_aggregator', 'dkg_aggregator.json'),
       join(dist, CIRCUIT_VARIANTS.DEFAULT, CIRCUIT_GROUPS.AGGREGATION, 'dkg_aggregator', 'dkg_aggregator.vk'),
       join(dist, CIRCUIT_VARIANTS.DEFAULT, CIRCUIT_GROUPS.AGGREGATION, 'decryption_aggregator', 'decryption_aggregator.json'),
@@ -1100,7 +1100,9 @@ library ActiveCryptoConfig {
       join(hydratedCircuitTargetDir(bin, CIRCUIT_GROUPS.AGGREGATION, 'decryption_aggregator'), 'decryption_aggregator.json'),
       join(hydratedCircuitTargetDir(bin, CIRCUIT_GROUPS.AGGREGATION, 'decryption_aggregator'), 'decryption_aggregator.vk_recursive'),
       join(hydratedCircuitTargetDir(bin, CIRCUIT_GROUPS.DKG, 'pk'), 'pk.json'),
-      join(hydratedCircuitTargetDir(bin, CIRCUIT_GROUPS.THRESHOLD, 'pk_aggregation'), 'pk_aggregation.json'),
+      ...(preset === CIRCUIT_PRESETS.SECURE_16384
+        ? []
+        : [join(hydratedCircuitTargetDir(bin, CIRCUIT_GROUPS.THRESHOLD, 'pk_aggregation'), 'pk_aggregation.json')]),
       ...requiredLbfvBinMarkers(bin, preset),
       ...(preset === CIRCUIT_PRESETS.SECURE_16384
         ? []

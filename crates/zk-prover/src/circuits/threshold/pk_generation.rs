@@ -17,20 +17,8 @@ impl Provable for PkGenerationCircuit {
     type Input = PkGenerationCircuitData;
     type Inputs = Inputs;
 
+    /// C1 exists on the trBFV path only; the l-BFV path proves no C1.
     fn circuit(&self) -> CircuitName {
         CircuitName::PkGeneration
-    }
-
-    /// The l-BFV path proves C1 with its chunk-root variant.
-    fn resolve_circuit_name(&self, params: &Self::Params, _input: &Self::Input) -> CircuitName {
-        if e3_fhe_params::is_lbfv_path(*params) {
-            CircuitName::PkGenerationChunked
-        } else {
-            CircuitName::PkGeneration
-        }
-    }
-
-    fn valid_circuits(&self) -> Vec<CircuitName> {
-        vec![CircuitName::PkGeneration, CircuitName::PkGenerationChunked]
     }
 }

@@ -17,8 +17,8 @@ use e3_events::{
     CorrelationId, DKGInnerProofReady, DKGRecursiveAggregationComplete, DkgFoldAttestationContext,
     DkgFoldAttestationContextEstablished, DkgFoldAttestationPayload, E3Failed, E3Stage,
     E3StageChanged, E3id, EventContext, EventPublisher, EventSubscriber, EventType, FailureReason,
-    InterfoldEvent, InterfoldEventData, LbfvKeyShareDocument, LbfvKeyShareDocumentCreated, Proof,
-    Sequenced, SignedDkgFoldAttestation, ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
+    InterfoldEvent, InterfoldEventData, LbfvKeyShareDocumentCreated, Proof, Sequenced,
+    SignedDkgFoldAttestation, ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
     DKG_FOLD_ATTESTATION_CONTEXT_SCHEMA_VERSION,
 };
 use e3_fhe_params::build_pair_for_preset;
@@ -301,7 +301,7 @@ mod tests {
         let request = ComputeRequest::zk(
             ZkRequest::NodeDkgFold(NodeDkgFoldRequest {
                 c0_proof: dummy_proof(1),
-                c1_proof: dummy_proof(2),
+                c1_proof: Some(dummy_proof(2)),
                 c2a_proof: dummy_proof(3),
                 c2b_proof: dummy_proof(4),
                 c3a_inner_proofs: Vec::new(),

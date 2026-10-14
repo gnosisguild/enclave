@@ -109,7 +109,8 @@ impl PublicKeyAggregator {
                     Ok(state)
                 })?;
 
-                if c5_proof_pending.is_none() {
+                // The l-BFV path proves no C5.
+                if c5_proof_pending.is_none() && !self.is_lbfv() {
                     self.bus.publish(
                         PkAggregationProofPending {
                             e3_id: self.e3_id.clone(),

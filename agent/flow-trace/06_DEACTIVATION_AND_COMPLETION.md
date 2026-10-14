@@ -519,8 +519,8 @@ entering the EventBus or EventStore as another logical selection event.
 
 `PublicKeyAggregatorExtension` reads the existing lifecycle projection during hydration. It seeds
 the actor's in-memory publication flag from `KeyPublished`, `CiphertextReady`, or `Complete`, even
-when a standby's saved DKG phase is still `VerifyingC1`. A later expulsion or exclusion cannot
-produce a DKG failure after that publication. This flag adds no persisted field.
+when a standby's saved DKG phase on a legacy preset is still `VerifyingC1`. A later expulsion or
+exclusion cannot produce a DKG failure after that publication. This flag adds no persisted field.
 
 For crashes after key publication but before ciphertext publication, the recovered active aggregator
 may not have a `ThresholdPlaintextAggregator` actor yet. The plaintext extension starts with the

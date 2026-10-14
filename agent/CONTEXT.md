@@ -215,10 +215,12 @@ persistence · opentelemetry/tracing.
   (`CircuitName::LbfvPkAggregation = 30`), `rlk_generation` (`CircuitName::RlkGeneration = 27`),
   and `rlk_aggregation` (`CircuitName::RlkAggregation = 28`). `lbfv_pk_generation` and
   `rlk_generation` each prove all CRT limbs of one key row in one proof, without recursion.
+  `rlk_aggregation` proves one component (`d0` or `d2`) of one row, so each row takes two proofs.
   `CircuitName::RlkGenerationLimb = 31` and `CircuitName::LbfvPkGenerationLimb = 40` are retired:
   nothing produces them, and they stay declared so that later variants keep their encoding. These circuits have helper and prover boundaries. Runtime handlers use stable operation IDs
   for deterministic row-proof retries. Generation verification accepts C1 followed by complete
-  five-row public-key and RLK families; aggregation accepts the two row families without C1. For
+  five-row public-key and RLK families; aggregation accepts the PK row family and the RLK `d0` and
+  `d2` row families without C1. For
   secure-16384, the per-E3 keyshare actor durably produces and publishes its local bundle. Each
   public-key aggregator durably collects and verifies remote bundles. The active aggregator verifies
   the first durable H-party ready quorum. A failed candidate is durably replaced with the next ready

@@ -12,8 +12,8 @@ use e3_data::{AutoPersist, DataStore, InMemStore, PersistableData, Repositories,
 use e3_events::EventConstructorWithTimestamp;
 use e3_events::{
     CircuitName, CommitteeMemberExpelled, ComputeRequestErrorKind, EffectsEnabled, GetEvents,
-    HistoryCollector, LbfvKeyShareDocument, LbfvKeyShareDocumentFetchFailureClass,
-    LbfvKeyShareDocumentRole, ProofPayload, ProofType, Seed, TakeEvents, Unsequenced, ZkError,
+    HistoryCollector, LbfvKeyShareDocumentFetchFailureClass, LbfvKeyShareDocumentRole,
+    ProofPayload, ProofType, Seed, TakeEvents, Unsequenced, ZkError,
 };
 use e3_test_helpers::get_common_setup;
 use std::collections::{BTreeSet, HashMap};
@@ -74,6 +74,18 @@ fn generating_c5_state(correlation_id: CorrelationId) -> PublicKeyAggregatorStat
         nodes_fold_completed_slots: 0,
         nodes_fold_step_correlation: None,
     }
+}
+
+/// The aggregation state that the l-BFV path enters: it proves no C5.
+fn lbfv_generating_state(correlation_id: CorrelationId) -> PublicKeyAggregatorState {
+    let mut state = generating_c5_state(correlation_id);
+    if let PublicKeyAggregatorState::GeneratingC5Proof {
+        c5_proof_pending, ..
+    } = &mut state
+    {
+        *c5_proof_pending = None;
+    }
+    state
 }
 
 fn complete_state() -> PublicKeyAggregatorState {
@@ -534,18 +546,12 @@ async fn secure_16384_restart_redrives_publication_intent() -> Result<()> {
 }
 
 #[actix::test]
-async fn secure_16384_waits_for_both_operational_keys_after_c5() -> Result<()> {
+async fn secure_16384_waits_for_both_operational_keys() -> Result<()> {
     use crate::domain::lbfv_contribution_collection::tests::fixture;
 
     let fixture = fixture();
     let e3_id = fixture.state.e3_id.clone();
-    let mut initial_state = generating_c5_state(CorrelationId::new());
-    if let PublicKeyAggregatorState::GeneratingC5Proof {
-        c5_proof_pending, ..
-    } = &mut initial_state
-    {
-        *c5_proof_pending = None;
-    }
+    let initial_state = lbfv_generating_state(CorrelationId::new());
     let aggregation = LbfvAggregationStateV1::new(
         e3_id.clone(),
         fixture.state.proof_domain,
@@ -574,28 +580,11 @@ async fn secure_16384_waits_for_both_operational_keys_after_c5() -> Result<()> {
         },
         test_state(initial_state),
     );
-    let ec = test_ctx(EffectsEnabled::new());
-    aggregator.handle_pk_aggregation_proof_signed(TypedEvent::new(
-        PkAggregationProofSigned {
-            e3_id: e3_id.clone(),
-            signed_proof: SignedProofPayload {
-                payload: ProofPayload {
-                    e3_id: e3_id.clone(),
-                    proof_type: ProofType::C5PkAggregation,
-                    proof: dummy_proof(CircuitName::PkAggregation),
-                },
-                signature: ArcBytes::from_bytes(&[0; 65]),
-            },
-        },
-        ec,
-    ))?;
+    aggregator.try_publish_complete()?;
 
     assert!(matches!(
         aggregator.state.get(),
-        Some(PublicKeyAggregatorState::GeneratingC5Proof {
-            c5_proof_pending: Some(_),
-            ..
-        })
+        Some(PublicKeyAggregatorState::GeneratingC5Proof { .. })
     ));
     assert!(aggregator.lbfv_aggregation_state()?.is_some_and(|state| {
         state.operational_public_key.is_none() && state.operational_rlk.is_none()
@@ -1342,9 +1331,6 @@ async fn restart_validates_documents_durable_lbfv_bundles() -> Result<()> {
         .publickey_lbfv_collection(&state.e3_id)
         .load()
         .await?;
-    let LbfvKeyShareDocument::PublicKeyV1(public_key_document) = public_key.document else {
-        unreachable!();
-    };
     let (bus, rng, _seed, params, crp, _errors, _history) =
         get_common_setup(Some(BfvPreset::InsecureThreshold.into()))?;
     let actor = PublicKeyAggregator::new(
@@ -1374,7 +1360,7 @@ async fn restart_validates_documents_durable_lbfv_bundles() -> Result<()> {
             threshold_m: 1,
             circuit_committee_n: 3,
             circuit_committee_h: 2,
-            c1_proofs: vec![Some(public_key_document.signed_c1_proof)],
+            c1_proofs: vec![None],
             no_proof_parties: Vec::new(),
             canonical_party_nodes: state
                 .committee
@@ -1890,8 +1876,9 @@ async fn sealed_sidecar_recovery_applies_the_exact_accepted_set() -> Result<()> 
             ..
         }) if honest_party_ids == BTreeSet::from([0, 2]) && dishonest_parties.is_empty()
     ));
+    // The l-BFV path proves no C5.
     let events = history.send(GetEvents::<InterfoldEvent>::new()).await?;
-    assert!(events.iter().any(|event| matches!(
+    assert!(!events.iter().any(|event| matches!(
         event.get_data(),
         InterfoldEventData::PkAggregationProofPending(_)
     )));

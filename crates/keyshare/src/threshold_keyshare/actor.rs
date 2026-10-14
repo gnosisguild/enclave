@@ -342,6 +342,12 @@ impl ThresholdKeyshare {
         })
     }
 
+    /// Whether this E3 proves C1. The l-BFV path proves none, so its `KeyshareCreated` carries
+    /// no C1 proof.
+    pub(in crate::actors::threshold_keyshare) fn proves_c1(&self) -> bool {
+        !e3_fhe_params::is_lbfv_path(self.share_enc_preset)
+    }
+
     fn keyshare_created_fields(
         state: &KeyshareState,
     ) -> Option<(&ArcBytes, &Option<SignedProofPayload>)> {
@@ -361,7 +367,7 @@ impl ThresholdKeyshare {
         let Some((_, signed)) = Self::keyshare_created_fields(&state.state) else {
             return Ok(());
         };
-        if signed.is_none() {
+        if signed.is_none() && self.proves_c1() {
             return Ok(());
         }
         self.pending.keyshare_publish = false;

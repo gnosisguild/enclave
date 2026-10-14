@@ -191,10 +191,10 @@ the code does not meet yet.
 - A live randomized TrBFV request can retry only before it publishes a successful response. A failed
   attempt is not a durable protocol contribution. After success becomes durable, replay must reuse
   that exact response and must not regenerate the contribution. — `flow-trace/04`; INDEX concern #57
-- A replayed C1 verification result can arrive before replayed keyshares restore `VerifyingC1`. Hold
-  at most one result, bind it to the saved selected roster, and apply it when those inputs are
-  ready. Never apply it to a replacement roster. A result received after C1 is complete is an
-  idempotent duplicate. — `flow-trace/04`; INDEX concern #58
+- On legacy presets, a replayed C1 verification result can arrive before replayed keyshares restore
+  `VerifyingC1`. Hold at most one result, bind it to the saved selected roster, and apply it when
+  those inputs are ready. Never apply it to a replacement roster. A result received after C1 is
+  complete is an idempotent duplicate. — `flow-trace/04`; INDEX concern #58
 - On restart in `ReadyForDecryption`, rebuild the C4 collector from the saved roster and replay
   saved peer C4 shares. A restored C4 proof job cannot advance DKG if its peer-share collector is
   absent. After collection is complete, a duplicate C4 share must not start another collector. Saved
@@ -233,7 +233,8 @@ the code does not meet yet.
 - Secure-16384 local l-BFV generation uses the separate
   `//threshold_keyshare_lbfv_generation/v1/{e3_id}` snapshot. It persists the encrypted generation
   seed and source before dispatch, derives missing row requests by stable operation ID, and commits
-  both documents plus the signed manifest before publication. `KeyshareCreated` cannot publish until
+  both documents plus the signed manifest before publication. The l-BFV path proves no C1, so the
+  snapshot and the version-3 PK document hold no C1 proof. `KeyshareCreated` cannot publish until
   that bundle is durable. Completion or terminal failure removes the stored generation secret, seed,
   response, and encrypted RLK witness. The main `KeyshareState::Failed` snapshot is authoritative if
   a process exit interrupts a cross-repository failure update. Recovery removes pending l-BFV
@@ -249,13 +250,13 @@ the code does not meet yet.
   binds the proof domain, the immutable ascending accepted-party set, both accepted document
   families, five PK proofs, five RLK proofs, the fold cursor, both operational keys, and the final
   V2 proof. The active aggregator derives the operational public key and RLK only from those
-  accepted documents after the five-row fold completes. If C5 completes first, publication waits for
-  both persisted keys. Restart must derive a missing operational key from the same durable documents
-  before it dispatches the final V2 proof. Schema 4 rejects schema-1 through schema-3 sidecars
-  because their operational-key bytes use the pre-cutover fhe.rs codec. A persisted aggregation
-  failure is terminal and immutable. Restart must clear process-local correlations, publish
-  `E3Failed(DKGInvalidShares)`, and suppress all proof and publication work. —
-  `LbfvAggregationStateV1`; `aggregate_lbfv.rs`; `flow-trace/04`
+  accepted documents after the five-row fold completes. The l-BFV path proves no C5. If the other
+  final-proof inputs are ready first, publication waits for both persisted keys. Restart must derive
+  a missing operational key from the same durable documents before it dispatches the final V2 proof.
+  Schema 4 rejects schema-1 through schema-3 sidecars because their operational-key bytes use the
+  pre-cutover fhe.rs codec. A persisted aggregation failure is terminal and immutable. Restart must
+  clear process-local correlations, publish `E3Failed(DKGInvalidShares)`, and suppress all proof and
+  publication work. — `LbfvAggregationStateV1`; `aggregate_lbfv.rs`; `flow-trace/04`
 
 ### Ordering, backpressure, effects
 

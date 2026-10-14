@@ -195,7 +195,6 @@ impl PublicKeyAggregator {
             party_nodes,
             honest_party_ids,
             dkg_fold_attestations,
-            c5_proof_pending,
             last_ec,
             ..
         } = state
@@ -218,9 +217,6 @@ impl PublicKeyAggregator {
             return self.mark_lbfv_complete(committee_addresses, honest_committee_addresses, ec);
         }
 
-        if c5_proof_pending.is_none() {
-            return Ok(());
-        }
         let Some(aggregation) = self.lbfv_aggregation_state()? else {
             return Ok(());
         };

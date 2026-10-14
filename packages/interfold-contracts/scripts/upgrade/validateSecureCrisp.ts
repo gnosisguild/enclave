@@ -43,6 +43,7 @@ import {
   PRODUCTION_BFV_CONFIG,
   activeBfvConfigForChain,
   bfvConfigsForChain,
+  bfvPkV2PublicInputLayout,
   getBfvDecryptionSubCircuitVkHashPaths,
   getBfvPkSubCircuitVkHashPaths,
   getBfvV2SubCircuitVkHashPaths,
@@ -971,13 +972,16 @@ export async function validateSecureCrispUpgrade(): Promise<void> {
     }
     equalAddress(pkRoute[0], expectedPkVerifier, `PK route ${index}`);
     equalValue(
-      pkRoute[4],
+      pkRoute[3],
       expected.paramSet,
       `PK route ${index} parameter set`,
     );
     equalValue(
       pkRoute[1],
-      isV2 ? 64 : 3 * expected.h + 24,
+      // secure-16384 compiles five l-BFV rows.
+      isV2
+        ? bfvPkV2PublicInputLayout(expected.h, 5).length
+        : 3 * expected.h + 24,
       `PK route ${index} public input count`,
     );
     equalAddress(
@@ -1050,11 +1054,13 @@ export async function validateSecureCrispUpgrade(): Promise<void> {
       readVkRecursiveHash(nodesFoldPath, expected),
       `PK route ${index} nodes-fold VK`,
     );
-    equalValue(
-      pkRoute[3],
-      readVkRecursiveHash(pkPaths.c5, expected),
-      `PK route ${index} C5 VK`,
-    );
+    if (!isV2) {
+      equalValue(
+        await pkVerifier.expectedC5KeyHash(),
+        readVkRecursiveHash(pkPaths.c5, expected),
+        `PK route ${index} C5 VK`,
+      );
+    }
     equalValue(
       decryptionRoute[2],
       readVkRecursiveHash(decryptionPaths.c6Fold, expected),

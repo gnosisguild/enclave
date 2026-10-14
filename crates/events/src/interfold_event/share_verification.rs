@@ -33,7 +33,8 @@ pub enum VerificationKind {
     PkGenerationProofs,
     /// C1 followed by five public-key and five RLK generation row proofs from one party.
     LbfvGenerationProofs,
-    /// Five public-key and five RLK aggregation row proofs from one aggregator.
+    /// One public-key aggregation proof per row, then one RLK aggregation proof per row for `d0`
+    /// and one per row for `d2`, from one aggregator.
     LbfvAggregationProofs,
 }
 

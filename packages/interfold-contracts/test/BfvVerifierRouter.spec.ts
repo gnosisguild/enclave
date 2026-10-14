@@ -24,8 +24,14 @@ function proofWithAnchors(
   return abiCoder.encode(["bytes", "bytes32[]"], ["0x1234", inputs]);
 }
 
+function pkProofWithAnchor(length: number, nodesFoldKeyHash: string): string {
+  const inputs = Array.from({ length }, () => ethers.ZeroHash);
+  inputs[0] = nodesFoldKeyHash;
+  return abiCoder.encode(["bytes", "bytes32[]"], ["0x1234", inputs]);
+}
+
 describe("BFV verifier routers", function () {
-  it("routes PK proofs by public-input length and VK anchors", async function () {
+  it("routes PK proofs by public-input length and nodes-fold VK anchor", async function () {
     const interfold = await ethers.deployContract("MockBfvV2Interfold", [0]);
     const registry = await ethers.deployContract("MockCiphernodeRegistry");
     await registry.setInterfold(await interfold.getAddress());
@@ -44,19 +50,16 @@ describe("BFV verifier routers", function () {
     const minimum = await ethers.deployContract("MockBfvPkVerifierRoute", [
       2,
       HASH_A,
-      HASH_B,
       false,
     ]);
     const sameLength = await ethers.deployContract("MockBfvPkVerifierRoute", [
       10,
       HASH_A,
-      HASH_B,
       false,
     ]);
     const small = await ethers.deployContract("MockBfvPkVerifierRoute", [
       10,
       HASH_C,
-      HASH_D,
       true,
     ]);
     const router = await ethers.deployContract("BfvPkVerifierRouter", [
@@ -69,7 +72,7 @@ describe("BFV verifier routers", function () {
       [0, 0, 0],
       10,
     ]);
-    const smallProof = proofWithAnchors(54, HASH_C, HASH_D);
+    const smallProof = pkProofWithAnchor(54, HASH_C);
     // The selected route rejects any call other than this exact forwarding.
     await small.expectCall(
       small.interface.encodeFunctionData("verify", [...context, smallProof]),
@@ -80,17 +83,14 @@ describe("BFV verifier routers", function () {
     expect(await router.h()).to.equal(10);
     expect(await router.routeCount()).to.equal(3);
     expect(await verify(smallProof)).to.equal(true);
-    expect(await verify(proofWithAnchors(54, HASH_A, HASH_B))).to.equal(false);
-    expect(await verify(proofWithAnchors(30, HASH_A, HASH_B))).to.equal(false);
+    expect(await verify(pkProofWithAnchor(54, HASH_A))).to.equal(false);
+    expect(await verify(pkProofWithAnchor(30, HASH_A))).to.equal(false);
 
     await expect(
-      verify(proofWithAnchors(54, HASH_A, HASH_D)),
+      verify(pkProofWithAnchor(54, HASH_B)),
     ).to.be.revertedWithCustomError(router, "VkHashMismatch");
     await expect(
-      verify(proofWithAnchors(54, HASH_C, HASH_A)),
-    ).to.be.revertedWithCustomError(router, "VkHashMismatch");
-    await expect(
-      verify(proofWithAnchors(55, HASH_A, HASH_B)),
+      verify(pkProofWithAnchor(55, HASH_A)),
     ).to.be.revertedWithCustomError(router, "InvalidPublicInputsLength");
   });
 
@@ -101,13 +101,11 @@ describe("BFV verifier routers", function () {
     const legacy = await ethers.deployContract("MockBfvPkVerifierRoute", [
       2,
       HASH_A,
-      HASH_B,
       true,
     ]);
     const secure16384 = await ethers.deployContract("MockBfvPkVerifierRoute", [
       2,
       HASH_C,
-      HASH_D,
       true,
     ]);
     const router = await ethers.deployContract("BfvPkVerifierRouter", [
@@ -117,7 +115,7 @@ describe("BFV verifier routers", function () {
       2,
     ]);
 
-    expect((await router.routeAt(1))[4]).to.equal(2);
+    expect((await router.routeAt(1))[3]).to.equal(2);
     expect(
       await router.verify.staticCall(
         1,
@@ -125,7 +123,7 @@ describe("BFV verifier routers", function () {
         [],
         ethers.ZeroHash,
         ethers.ZeroHash,
-        proofWithAnchors(30, HASH_C, HASH_D),
+        pkProofWithAnchor(30, HASH_C),
       ),
     ).to.equal(true);
     await expect(
@@ -135,7 +133,7 @@ describe("BFV verifier routers", function () {
         [],
         ethers.ZeroHash,
         ethers.ZeroHash,
-        proofWithAnchors(30, HASH_A, HASH_B),
+        pkProofWithAnchor(30, HASH_A),
       ),
     )
       .to.be.revertedWithCustomError(router, "ParamSetRouteMismatch")

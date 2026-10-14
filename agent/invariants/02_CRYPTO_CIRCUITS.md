@@ -29,14 +29,15 @@ every section.
 - Canonical sizes: `minimum` (3,1,2) · `micro` (9,4,5) · `small` (19,9,14) — must mirror `mod.nr`
   and `CiphernodesCommitteeSize::values()`. — `scripts/circuit-constants.ts`
 - Each supported `(preset, committee)` pair has its own `BfvPkVerifier` (public-input layout set by
-  H) and `BfvDecryptionVerifier` (layout set by T). `BfvPkVerifierRouter` and
-  `BfvDecryptionVerifierRouter` dispatch by public-input length and VK anchors, and their routes are
-  fixed at construction. `BfvPkVerifierRouter` also requires a route with the E3's parameter set.
-  Selecting another committee needs no redeployment if the installed verifier mappings already
-  support that pair. Otherwise, register matching verifiers, and deploy any missing wrappers or
-  replacement routers first. A changed circuit or VK needs new wrappers and, where a router is used,
-  a new router and new `setPkVerifier` / `setDecryptionVerifier` calls. —
-  `protocol/deployContracts.ts`; `BfvPkVerifierRouter.sol`
+  H) and `BfvDecryptionVerifier` (layout set by T). `BfvPkVerifierRouter` dispatches by public-input
+  length and the nodes-fold VK anchor at input 0; `BfvDecryptionVerifierRouter` dispatches by
+  public-input length and both VK anchors. Their routes are fixed at construction.
+  `BfvPkVerifierRouter` also requires a route with the E3's parameter set. Selecting another
+  committee needs no redeployment if the installed verifier mappings already support that pair.
+  Otherwise, register matching verifiers, and deploy any missing wrappers or replacement routers
+  first. A changed circuit or VK needs new wrappers and, where a router is used, a new router and
+  new `setPkVerifier` / `setDecryptionVerifier` calls. — `protocol/deployContracts.ts`;
+  `BfvPkVerifierRouter.sol`
 - Parity matrices (`parity_{insecure,secure_8192,secure_16384}.nr`) are derived artifacts
   regenerated from preset `QIS` + committee `(N, T)`. Do not hand-edit them.
   `scripts/check-committee.sh` regenerates and diffs them only when
@@ -146,10 +147,10 @@ every section.
   `AggregationInputsReady` confirms that the phase can resume from durable state. Standbys keep
   their local C6 outcomes for failover. Only the active party can launch aggregation effects. Only
   it applies their results, except that an aggregator demoted by failover finishes the work that it
-  started (public key: C1 verification onward; plaintext: C6 verification onward) and publishes the
-  result; the first valid result on chain wins. A demoted public-key aggregator stops once a key is
-  on chain, and a C1 result after key publication changes nothing. — `flow-trace/04`; INDEX concerns
-  #42, #68
+  started (public key: C1 or l-BFV row verification onward; plaintext: C6 verification onward) and
+  publishes the result; the first valid result on chain wins. A demoted public-key aggregator stops
+  once a key is on chain, and a verification result after key publication changes nothing. —
+  `flow-trace/04`; INDEX concerns #42, #68
 - The active aggregator proposes a canonical H-dealer DKG roster only after it derives `H` mutually
   ready dealers from signed Ready reports; a promoted aggregator reuses an already accepted roster.
   A receiver keeps one authenticated roster per proposer. It accepts a roster only from a proposer
@@ -217,9 +218,10 @@ every section.
 - Mainnet secure parameter-set index 1 contains the old tuple. Version 7 registers the new tuple at
   index 2 and must not reinterpret old index-1 E3s as version-7 secure requests. — `flow-trace/07`;
   `crates/fhe-params/src/presets.rs`; `ActiveCryptoConfig.sol`
-- The local C1, C2a, C2b, and every C3a and C3b proof must complete and be signed before any
-  `ThresholdShareCreated` is published. C4 through C7 belong to later phases. —
-  `crates/zk-prover/src/proof_request/effects/publish_threshold_shares.rs`; `flow-trace/04`
+- The local C1 (trBFV only; the l-BFV path has no C1), C2a, C2b, and every C3a and C3b proof must
+  complete and be signed before any `ThresholdShareCreated` is published. C4 through C7 belong to
+  later phases. — `crates/zk-prover/src/proof_request/effects/publish_threshold_shares.rs`;
+  `flow-trace/04`
 - The decrypted plaintext is exactly 100 u64 coefficients in every layer: `MAX_MSG_NON_ZERO_COEFFS`
   in Noir (`configs/default/mod.nr`, written by `scripts/build-circuits.ts`) and in `zk-helpers`,
   and `MESSAGE_COEFFS_COUNT` in `BfvDecryptionVerifier.sol`. **Gap:** no gate compares these copies.
@@ -227,18 +229,26 @@ every section.
   nothing on its own: `q_i` is invertible modulo the proof-system prime, so every limb admits a
   quotient that satisfies it. It binds the witnesses only when the lifted value, the limbs **and**
   the quotients all carry range checks that keep the term sum far below the prime, which is what
-  makes the equation hold over the integers. C1's `e_sm` lift relies on all three bounds. ct0 and C3
-  use `e0` directly in reduced encryption identities. Their reduction quotients and all operands
-  carry bounds that prevent field wraparound. — `flow-trace/04`
+  makes the equation hold over the integers. The `e_sm` lift relies on all three bounds, in C1 on
+  trBFV and in each C2b chunk leaf on l-BFV. ct0 and C3 use `e0` directly in reduced encryption
+  identities. Their reduction quotients and all operands carry bounds that prevent field wraparound.
+  — `flow-trace/04`
 - Apply a bound where the quantity it describes actually lives. The smudging bound `e_sm_bound` is
-  an integer bound and belongs on C1's lifted `e_sm_lifted` witness; on secure presets it exceeds
-  every `q_i`, so checking a CRT residue against it is satisfied for free. Limbs carry the modulus
-  bound `(q_i - 1) / 2` instead. — `flow-trace/04`
-- C1 commits to the `e_sm` **residues**, not the lifted value, so C2b keeps hashing what it
-  Shamir-splits. The integer bound reaches C2b through that commitment: C1 proves the limbs are
+  an integer bound and belongs on the lifted witness (C1's `e_sm_lifted` on trBFV, each C2b chunk
+  leaf's `e_sm_lifted_chunk` on l-BFV); on secure presets it exceeds every `q_i`, so checking a CRT
+  residue against it is satisfied for free. Limbs carry the modulus bound `(q_i - 1) / 2` instead. —
+  `flow-trace/04`
+- On trBFV, C1 commits to the `e_sm` **residues**, not the lifted value, so C2b keeps hashing what
+  it Shamir-splits. The integer bound reaches C2b through that commitment: C1 proves the limbs are
   bounded and hash to it, C2b proves its own limbs hash to the same value. `PK_GENERATION_BIT_E_SM`
   and `SHARE_COMPUTATION_E_SM_BIT_SECRET` are the same modulus width and must move together. —
   `flow-trace/04`
+- On l-BFV no C1 exists, so each C2b chunk leaf (`esm_share_computation_chunk`) bounds its own
+  coefficients: it range-checks `e_sm_lifted_chunk` to `e_sm_bound`, bounds each quotient, and
+  checks `centered_residue(residue, q_l) == lifted - q_l * quotient` for the residues that it shares
+  and commits. The bound is per coefficient, so it chunks exactly; the C2b finalizer's chunk-index
+  checks make the leaves cover every coefficient. The C2b secret commitment keeps its value and
+  packing, so C3b and C4b are unchanged. — `flow-trace/04`
 - A circuit that re-opens a commitment from a private witness must constrain that witness, because
   the commitment packs `BIT`-wide coefficients into shared carriers
   (`acc = acc * radix + (v + base)`). An unbounded coefficient overflows its slot and cancels
@@ -252,10 +262,10 @@ every section.
   range check. A value that no upstream commitment bounds still needs its own bound: C1's `pk0`,
   because C1 originates it and the key equation absorbs `+q` against `r1`; and C5's `pk0_agg`,
   because `verify_pk_for_basis` pins it only modulo `q_l`. — `flow-trace/04`
-- Every prover-chosen modular quotient needs a bound. This includes C1's `e_sm` CRT lift, the
-  reduced encryption quotients in ct0, ct1, and C3, and the reduced key quotients `r` of
-  `lbfv_pk_generation` and `rd0`/`rd2` of `rlk_generation`. Bounds on the other operands
-  must also prevent field wraparound. — `flow-trace/04`
+- Every prover-chosen modular quotient needs a bound. This includes the `e_sm` CRT lift (C1 on
+  trBFV, the C2b chunk leaves on l-BFV), the reduced encryption quotients in ct0, ct1, and C3, and
+  the reduced key quotients `r` of `lbfv_pk_generation` and `rd0`/`rd2` of `rlk_generation`. Bounds
+  on the other operands must also prevent field wraparound. — `flow-trace/04`
 - `rlk_generation` uses `delta_l = (row_index == l)` for limb `l` in place of the row's Garner
   coefficient. This is correct only because each Garner coefficient is `1 mod q_row` and `0 mod`
   every other modulus; `garner_coefficient_is_the_crt_unit_vector` checks this for each l-BFV
@@ -630,20 +640,27 @@ every section.
   both the current accumulator VK and each prior accumulator's expected kernel or fold VK hash.
   `BfvPkVerifier` checks these values against deployment-time anchors before it calls the Honk
   verifier. — `dkg_aggregator`, `BfvPkVerifier`
-- **Secure-16384 recursive families are versioned:** `node_fold_v2` verifies a legacy `NodeFold`
-  proof and the terminal generation fold. It requires the l-BFV SK commitment to equal the C1 SK
-  root that the legacy fold exports, and preserves the legacy node statement as a prefix. `dkg_aggregator_v2` preserves the legacy DKG statement as a
-  prefix and appends the l-BFV statement. Its V2 VK manifest binds the generation and aggregation
-  folds, both kernels, both row circuits, `node_fold_v2`, and both
-  `nodes_fold_v2` circuits. Legacy recursive circuits and ABIs remain unchanged. The V2 DKG circuit
-  recomputes the accepted-set hash from its canonical party IDs. It binds the outer `NodeFoldV2` and
-  `NodesFoldV2` VK slots separately from the embedded legacy `NodeFold` anchor. A `NodeFoldV2` proof
-  has four verifier-prefix fields and 86 returned fields. Its 90-field statement takes the session
-  limbs from generation-fold fields 8 and 9. `DkgAggregatorV2` does not verify a C5 proof. It keeps
-  `c5_key_hash` as a pinned public input, and `legacy_key_hash` and `v2_key_hash` still fold it in,
-  so the statement layout and `BfvPkVerifierV2` anchors are unchanged; the anchor attests to no
-  verified proof. `DkgAggregatorV2` binds the legacy and V2 recursive VK
-  manifests independently. It must not require corresponding legacy and V2 VK hashes to be equal.
+- **Secure-16384 recursive families are versioned:** `node_fold_v2` verifies a `node_fold_chunked`
+  proof and the terminal generation fold. `node_fold_chunked` verifies no C1; it exports the C2a
+  secret root. `node_fold_v2` requires the l-BFV SK commitment to equal that root, and preserves the
+  node statement as a prefix. The rows range-check `sk` and commit one root, and C2a opens its `sk`
+  chunks with checked packing, so equal roots mean C2a shares the rows' bounded `sk`. Off chain, the
+  C2a→l-BFV rows commitment link checks the same equality. `dkg_aggregator_v2` carries the legacy
+  chunked DKG fields and appends the l-BFV statement. Its V2 VK manifest binds the generation and
+  aggregation folds, both kernels, both row circuits, `node_fold_v2`, and both `nodes_fold_v2`
+  circuits. Legacy recursive circuits and ABIs remain unchanged. The V2 DKG circuit recomputes the
+  accepted-set hash from its canonical party IDs. It binds the outer `NodeFoldV2` and `NodesFoldV2`
+  VK slots separately from the embedded legacy `NodeFold` anchor. A `NodeFoldV2` proof has three
+  verifier-prefix fields and 84 returned fields. Its 87-field statement takes the session limbs from
+  generation-fold fields 8 and 9. The l-BFV path has no C5: `DkgAggregatorV2` has no C5 input,
+  `legacy_key_hash = H(nodes_fold_key_hash)`, and
+  `v2_key_hash = H(nodes_fold_key_hash, aggregation_fold_key_hash)`. Its legacy VK binding has 15
+  entries and no C1. Its public inputs are `nodes_fold_key_hash`, `party_ids[H]`, the committee-hash
+  limbs and `vk_binding[15]`, then the return values: `39 + 3H + 3 * rows` fields, with the party
+  IDs at index 1 and the SK aggregate commitments at `21 + H`. `BfvPkVerifierV2` and
+  `DkgFoldAttestationVerifier` read these offsets, and `BfvPkVerifierV2` has no C5 anchor.
+  `DkgAggregatorV2` binds the legacy and V2 recursive VK manifests independently. It must not
+  require corresponding legacy and V2 VK hashes to be equal.
 - **Secure-16384 key publication binds all operational key material:** `dkg_aggregator_v2` computes
   ordered SAFE commitments for all public-key rows and all RLK D0 and D2 rows. It combines these
   commitments into the version-3 key-envelope commitment. The existing on-chain `pkCommitment` field
@@ -666,23 +683,27 @@ every section.
   bind one in-range committee party ID across the aggregation rows. `BfvPkVerifierV2` checks the
   range but does not require that party to submit the transaction. `publishCommittee` remains
   permissionless and replay-safe.
-- **l-BFV row bundles are complete identities:** generation verification requires C1 followed by
-  exactly five public-key rows and five RLK rows. Aggregation verification requires the
-  corresponding ten l-BFV rows without C1. Rows are ordered from 0 through 4 within each family and
-  are keyed by `ProofIdentity`, not only `ProofType`. A versioned dispatch context is authoritative
-  for the proof session. Aggregation requires exactly `H` unique ascending parties, and every public
-  expected-commitment array must match the accepted PK, RLK D0, and RLK D2 generation commitments.
-  PK and RLK aggregation rows use the same accepted-set hash. Before heavy verification, the
-  verifier rejects a missing or incompatible context or a mixed identity.
-- **l-BFV generation rows:** the PK row proof (`lbfv_pk_generation`) proves all `L` limbs of one
-  row directly. It must open its CRS row against `LBFV_CRS_ROW_COMMITMENTS[row]` with checked
-  packing, so that the prover cannot substitute another `a`. It must absorb `sk`, `eek`, `r` and
-  `pk0` (directly or through binding commitments) before it derives the challenge. The RLK row
-  proof (`rlk_generation`) proves both identities of all `L` limbs directly. It must open its URS
-  and CRS rows against `LBFV_URS_ROW_COMMITMENTS[row]` and `LBFV_CRS_ROW_COMMITMENTS[row]` with
-  checked packing, and absorb `sk`, `r`, `e0`, `e2`, `rd0`, `rd2`, `d0` and `d2` before it derives
-  the challenge. Each row proof commits the row as a hash of its limb commitments. Aggregation opens
-  a row by recomputing its checked limb commitments, which carries the centered bounds.
+- **l-BFV row bundles are complete identities:** generation verification requires exactly five
+  public-key rows and five RLK rows, all with one SK commitment, and no C1. Aggregation verification
+  requires the five PK rows, then the five RLK `d0` rows, then the five RLK `d2` rows; each RLK
+  aggregation proof must carry its family's public `component` (0 or 1), and its `ProofIdentity`
+  instance is `component * rows + row`. The version-3 PK document carries the five signed PK
+  row proofs and no C1 proof; the expected signer comes from row 0. Validation rejects version-1
+  and version-2 PK documents, which carry a C1 proof. Rows are ordered from 0 through
+  4 within each family and are keyed by `ProofIdentity`, not only `ProofType`. A versioned dispatch
+  context is authoritative for the proof session. Aggregation requires exactly `H` unique ascending
+  parties, and every public expected-commitment array must match the accepted PK, RLK D0, and RLK D2
+  generation commitments. PK and RLK aggregation rows use the same accepted-set hash. Before heavy
+  verification, the verifier rejects a missing or incompatible context or a mixed identity.
+- **l-BFV generation rows:** the PK row proof (`lbfv_pk_generation`) proves all `L` limbs of one row
+  directly. It must open its CRS row against `LBFV_CRS_ROW_COMMITMENTS[row]` with checked packing,
+  so that the prover cannot substitute another `a`. It must absorb `sk`, `eek`, `r` and `pk0`
+  (directly or through binding commitments) before it derives the challenge. The RLK row proof
+  (`rlk_generation`) proves both identities of all `L` limbs directly. It must open its URS and CRS
+  rows against `LBFV_URS_ROW_COMMITMENTS[row]` and `LBFV_CRS_ROW_COMMITMENTS[row]` with checked
+  packing, and absorb `sk`, `r`, `e0`, `e2`, `rd0`, `rd2`, `d0` and `d2` before it derives the
+  challenge. Each row proof commits the row as a hash of its limb commitments. Aggregation opens a
+  row by recomputing its checked limb commitments, which carries the centered bounds.
 - **l-BFV recursive row folds are bounded:** each generation and aggregation kernel accepts row 0.
   Each fold accepts only the next row. `node_fold_v2` and `dkg_aggregator_v2` require terminal
   row 4. Therefore, each terminal fold contains exactly five ordered proof pairs. `nodes_fold_v2`
@@ -702,16 +723,16 @@ every section.
   persisted candidate set and accepts a result only when its stable candidate-set ID matches. A
   failed candidate becomes durably invalid before the collector selects and dispatches the next
   exact-`H` ready set. A successful result seals those exact `H` parties with commitments equal to
-  their validated records before the C5 state or effect can advance. A late failure from a
-  non-candidate does not mark that party dishonest. Restart reconstructs only a missing initial
-  sidecar, validates any `DocumentsDurable` bundle, re-arms the earliest retry, redrives a persisted
-  dispatch, or applies an immutable sealed set. Persisted V1 candidate sets of `H..=N` remain valid;
-  all new V1 candidate sets contain exactly `H`. — `flow-trace/04`
-- **Complete user-data-encryption recursive VK binding:** each ciphertext leg is a tree of
-  circuits, and every VK in the tree must reach an anchor. The identity circuit
-  (`*_eval_chunk_identity`) verifies the leaf and outputs its key hash first. Each top-level
-  circuit (`user_data_encryption_ct0/ct1`) folds the identity, leaf and ciphertext key hashes, in
-  that order, into `compute_ude_vk_manifest`. The `user_data_encryption` wrapper outputs
+  their validated records before the l-BFV aggregation state or effect can advance. A late failure
+  from a non-candidate does not mark that party dishonest. Restart reconstructs only a missing
+  initial sidecar, validates any `DocumentsDurable` bundle, re-arms the earliest retry, redrives a
+  persisted dispatch, or applies an immutable sealed set. Persisted V1 candidate sets of `H..=N`
+  remain valid; all new V1 candidate sets contain exactly `H`. — `flow-trace/04`
+- **Complete user-data-encryption recursive VK binding:** each ciphertext leg is a tree of circuits,
+  and every VK in the tree must reach an anchor. The identity circuit (`*_eval_chunk_identity`)
+  verifies the leaf and outputs its key hash first. Each top-level circuit
+  (`user_data_encryption_ct0/ct1`) folds the identity, leaf and ciphertext key hashes, in that
+  order, into `compute_ude_vk_manifest`. The `user_data_encryption` wrapper outputs
   `compute_ude_vk_chain(top_key_hash, manifest)` per leg, in the positions that held the bare ct0
   and ct1 key hashes. The verifier must compare both chain values to anchors. Do not drop a key hash
   at any layer: a key hash that no layer passes up lets a prover replace that circuit with any
