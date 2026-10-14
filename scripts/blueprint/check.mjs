@@ -21,7 +21,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { checkRef, fileLines, loadData, ROOT } from './lib/data.mjs'
-import { LAYERS, MISSING } from './lib/inventory.mjs'
+import { LAYERS, MISSING, members } from './lib/inventory.mjs'
 import { CURATED } from './curated.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -68,9 +68,8 @@ for (const f of factFiles)
         }
 
 // ---- workspace crates that the inventory does not list ------------------------------------
-const members = (readFileSync(join(ROOT, 'Cargo.toml'), 'utf8').match(/members\s*=\s*\[([\s\S]*?)\]/) || ['', ''])[1]
 const mapped = new Set(Object.values(LAYERS).flat())
-const unmapped = [...members.matchAll(/"crates\/([^"]+)"/g)].map((m) => m[1]).filter((d) => !mapped.has(d))
+const unmapped = members().filter((d) => !mapped.has(d))
 
 // ---- the build, in a temporary folder ------------------------------------------------------
 function tryBuild(env = {}) {
