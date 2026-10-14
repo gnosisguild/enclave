@@ -1,0 +1,237 @@
+[
+  {
+    "id": "A1",
+    "supported": true,
+    "refs": [
+      "packages/interfold-contracts/contracts/Interfold.sol@399@InterfoldPricing.recordRequestPayment(",
+      "packages/interfold-contracts/contracts/lib/InterfoldPricing.sol@130@safeTransferFrom(msg.sender"
+    ],
+    "line_text": ["InterfoldPricing.recordRequestPayment(", "token.safeTransferFrom(msg.sender, address(this), quotedFee);"],
+    "note": "request() calls InterfoldPricing.recordRequestPayment, which pulls the quoted fee from msg.sender with safeTransferFrom."
+  },
+  {
+    "id": "A2",
+    "supported": true,
+    "refs": [
+      "packages/interfold-sdk/src/crypto/encrypt.ts@53@bfv_encrypt_number(data, pk",
+      "packages/interfold-sdk/src/committee-public-key.ts@36@class CommitteePublicKeyAssembler"
+    ],
+    "line_text": [
+      "return bfv_encrypt_number(data, pk, params.degree, params.plaintextModulus, BigUint64Array.from(params.moduli))",
+      "export class CommitteePublicKeyAssembler {"
+    ],
+    "note": "encryptNumber passes the public key it is given to the WASM bfv_encrypt_number, and committee-public-key.ts assembles that committee key from chain chunk events."
+  },
+  {
+    "id": "A3",
+    "supported": true,
+    "refs": ["packages/interfold-sdk/src/crypto/encrypt.ts@7@initializeWasm", "crates/wasm/src/lib.rs@15@#[wasm_bindgen]"],
+    "line_text": ["import initializeWasm from '@interfold/wasm/init'", "#[wasm_bindgen]"],
+    "note": "The SDK imports the @interfold/wasm build (encrypt.ts lines 7 and 17), and crates/wasm exports bfv_encrypt_number through wasm-bindgen."
+  },
+  {
+    "id": "A4",
+    "supported": true,
+    "refs": ["crates/wasm/src/lib.rs@7@use e3_bfv_client::client", "crates/wasm/Cargo.toml@13@e3-bfv-client.workspace"],
+    "line_text": ["use e3_bfv_client::client::{", "e3-bfv-client.workspace = true"],
+    "note": "crates/wasm depends on the e3-bfv-client crate (Cargo.toml line 13) and imports its client functions in lib.rs line 7."
+  },
+  {
+    "id": "A5",
+    "supported": true,
+    "refs": [
+      "examples/CRISP/server/src/server/data_availability.rs@2277@contract.publish_input(e3_id, payload)",
+      "examples/CRISP/crates/evm_helpers/src/lib.rs@633@contract.publishInput(e3_id, data)"
+    ],
+    "line_text": ["match contract.publish_input(e3_id, payload).await {", "contract.publishInput(e3_id, data),"],
+    "note": "submit_input_commitment_payload calls publish_input, which sends publishInput to the CRISPProgram contract."
+  },
+  {
+    "id": "A6",
+    "supported": true,
+    "refs": [
+      "examples/CRISP/server/src/server/data_availability.rs@1953@publisher.publish(&object)",
+      "crates/data-availability/src/avail.rs@119@submit_data(bytes)"
+    ],
+    "line_text": ["let publication = publisher.publish(&object).await?;", "let tx = client.tx().data_availability().submit_data(bytes);"],
+    "note": "start_availability calls AvailPublisher::publish, which submits the bytes to Avail with submit_data."
+  },
+  {
+    "id": "A7",
+    "supported": true,
+    "refs": [
+      "examples/CRISP/server/src/server/data_availability.rs@1824@.publish_ciphertext_output(",
+      "crates/evm-helpers/src/contracts.rs@550@contract.publishCiphertextOutput("
+    ],
+    "line_text": [".publish_ciphertext_output(", "contract.publishCiphertextOutput(e3_id, output_reference.abi_encode().into()),"],
+    "note": "The server calls publish_ciphertext_output on the Interfold address, and evm-helpers binds Interfold and calls publishCiphertextOutput."
+  },
+  {
+    "id": "A8",
+    "supported": true,
+    "refs": [
+      "examples/CRISP/server/src/server/indexer.rs@857@run_compute(&e3_id, e3, snapshot)",
+      "examples/CRISP/server/src/server/program_server_request.rs@97@/run_compute"
+    ],
+    "line_text": [
+      "if let Err(error) = run_compute(&e3_id, e3, snapshot).await {",
+      ".post(format!(\"{}/run_compute\", CONFIG.program_server_url))"
+    ],
+    "note": "At the input deadline (handle_e3_input_deadline_expiration), run_compute POSTs the round to the program server at /run_compute."
+  },
+  {
+    "id": "A9",
+    "supported": true,
+    "refs": [
+      "crates/program-server/src/lib.rs@111@pub fn new<F, Fut>(callback: F)",
+      "crates/support-scripts/dev/src/main.rs@61@ComputeManager::with_published("
+    ],
+    "line_text": ["pub fn new<F, Fut>(callback: F) -> Self", "let mut manager = ComputeManager::with_published("],
+    "note": "program-server hosts /run_compute and hands each job to the callback it is built with; the shipped runners call compute-provider (dev runner ComputeManager, OpenVM service via openvm-host)."
+  },
+  {
+    "id": "A10",
+    "supported": true,
+    "refs": [
+      "crates/compute-provider/src/secure_process.rs@225@let output = processor(FHEProcessorInput {",
+      "examples/CRISP/program/src/lib.rs@23@pub fn fhe_processor("
+    ],
+    "line_text": ["let output = processor(FHEProcessorInput {", "pub fn fhe_processor(fhe_inputs: FHEProcessorInput<'_>) -> Vec<u8> {"],
+    "note": "Selected::finish calls whichever FHEProcessor it is given, and CRISP supplies its fhe_processor from the e3-user-program crate."
+  },
+  {
+    "id": "A11",
+    "supported": true,
+    "refs": ["crates/openvm-host/src/lib.rs@274@pub async fn prove(", "crates/openvm-host/src/lib.rs@303@input_path.as_os_str()"],
+    "line_text": ["pub async fn prove(", "input_path.as_os_str(),"],
+    "note": "Prover::prove runs ComputeInput natively with compute-provider, then passes the input file to the OpenVM worker's prove command."
+  },
+  {
+    "id": "A12",
+    "supported": true,
+    "refs": [
+      "examples/CRISP/server/src/server/routes/rounds.rs@374@.request_e3(",
+      "crates/evm-helpers/src/contracts.rs@499@contract.request(e3_request)"
+    ],
+    "line_text": [".request_e3(", "let receipt = send_with_next_nonce(contract.request(e3_request), wallet_addr)"],
+    "note": "rounds.rs calls request_e3 on an InterfoldContract bound to interfold_address, and that method calls Interfold.request."
+  },
+  {
+    "id": "A13",
+    "supported": true,
+    "refs": [
+      "packages/interfold-sdk/src/events/types.ts@13@PlaintextOutputPublished",
+      "packages/interfold-sdk/src/events/event-listener.ts@217@publicClient.watchContractEvent({"
+    ],
+    "line_text": ["PLAINTEXT_OUTPUT_PUBLISHED = 'PlaintextOutputPublished',", "const unwatch = this.publicClient.watchContractEvent({"],
+    "note": "The SDK defines the PlaintextOutputPublished event type, and its listener watches contract events by event name."
+  },
+  {
+    "id": "A14",
+    "supported": true,
+    "refs": [
+      "crates/indexer/src/indexer.rs@415@create_contract_listener(rpc_url, addresses)",
+      "crates/indexer/src/indexer.rs@1138@event_listener.listen()"
+    ],
+    "line_text": [
+      "let event_listener = EventListener::create_contract_listener(rpc_url, addresses).await?;",
+      "res = self.ctx.event_listener.listen() => {"
+    ],
+    "note": "The indexer builds an EventListener whose first address is the Interfold contract, and listens to its logs."
+  },
+  {
+    "id": "A15",
+    "supported": true,
+    "refs": [
+      "examples/CRISP/packages/crisp-contracts/contracts/CRISPProgram.sol@780@function validateInputProof(",
+      "examples/CRISP/packages/crisp-contracts/contracts/CRISPProgram.sol@882@verifier.verify(noirProof, noirPublicInputs)"
+    ],
+    "line_text": ["function validateInputProof(", "if (!verifier.verify(noirProof, noirPublicInputs)) {"],
+    "note": "validateInputProof runs _verifyInputProof, which checks each ballot's Noir proof with an IHonkVerifier."
+  },
+  {
+    "id": "A16",
+    "supported": true,
+    "refs": [
+      "examples/CRISP/packages/crisp-contracts/contracts/CRISPProgram.sol@996@function verify(",
+      "examples/CRISP/packages/crisp-contracts/contracts/CRISPProgram.sol@1022@openVmVerifier.verify(computeProof.seal"
+    ],
+    "line_text": ["function verify(", "openVmVerifier.verify(computeProof.seal, imageId, sha256(journal));"],
+    "note": "verify decodes the OpenVM compute proof and checks its seal against imageId and the journal digest."
+  },
+  {
+    "id": "A17",
+    "supported": true,
+    "refs": [
+      "crates/cli/src/cli.rs@194@start::execute(config, peers, bootstrap)",
+      "crates/cli/src/start.rs@167@e3_entrypoint::start::start::execute(config, bootstrap)"
+    ],
+    "line_text": [
+      "start::execute(config, peers, bootstrap).await?",
+      "let node = e3_entrypoint::start::start::execute(config, bootstrap).await?;"
+    ],
+    "note": "The Start subcommand calls start::execute, which calls the e3-entrypoint start that launches the node."
+  },
+  {
+    "id": "A18",
+    "supported": true,
+    "refs": [
+      "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@605@onlyBondOwner(operator) {",
+      "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@670@onlyBondOwner(operator) {",
+      "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@1374@require(msg.sender == bondOwner"
+    ],
+    "line_text": [
+      ") external noExitInProgress(operator) onlyBondOwner(operator) {",
+      ") external noExitInProgress(operator) onlyBondOwner(operator) {",
+      "require(msg.sender == bondOwner, NotBondOwner(msg.sender, operator));"
+    ],
+    "note": "registerOperatorFor and addTicketBalanceFor are gated by onlyBondOwner, and bondCiphernodeFor reaches _bondCiphernode, which requires msg.sender to be the bond owner."
+  },
+  {
+    "id": "A19",
+    "supported": true,
+    "refs": [
+      "packages/interfold-contracts/contracts/randomness/ChainlinkVrfRandomnessProvider.sol@209@result.randomWord = randomWords[0]",
+      "packages/interfold-contracts/contracts/lib/RegistrySortitionLib.sol@482@request.provider.getRandomness(request.requestId)"
+    ],
+    "line_text": ["result.randomWord = randomWords[0];", "try request.provider.getRandomness(request.requestId) returns ("],
+    "note": "fulfillRandomWords stores one word per E3 request, and the registry pulls it through getRandomness; the provider never calls the registry."
+  },
+  {
+    "id": "A20",
+    "supported": true,
+    "refs": [
+      "packages/interfold-contracts/contracts/verifiers/bfv/honk/DkgAggregatorVerifier.sol@3248@contract DkgAggregatorVerifier is",
+      "packages/interfold-contracts/contracts/verifiers/bfv/honk/DecryptionAggregatorVerifier.sol@3248@contract DecryptionAggregatorVerifier is"
+    ],
+    "line_text": ["contract DkgAggregatorVerifier is", "contract DecryptionAggregatorVerifier is"],
+    "note": "Both generated Honk verifier contracts are declared at line 3248 of their generated files."
+  },
+  {
+    "id": "A21",
+    "supported": false,
+    "refs": ["crates/zk-prover/src/prover.rs@104@StdCommand::new(bb)", "crates/zk-prover/src/witness.rs@59@execute_program("],
+    "line_text": ["let mut child = StdCommand::new(bb)", "execute_program("],
+    "note": "bb runs as a spawned child process, but nargo is a linked Rust library called in-process (witness.rs line 59), not a child process."
+  },
+  {
+    "id": "A22",
+    "supported": true,
+    "refs": [
+      "crates/evm/src/event_decoding/catalog.rs@33@pub(crate) fn find(",
+      "crates/evm/src/event_decoding/observation.rs@15@pub(crate) fn observe("
+    ],
+    "line_text": ["pub(crate) fn find(contract: &str, topic0: B256) -> Option<&'static EvmEventDefinition> {", "pub(crate) fn observe("],
+    "note": "catalog.rs names a log by its topic0, observation.rs turns it into an EvmLogObserved node event, and protocol events use typed decoders."
+  },
+  {
+    "id": "A23",
+    "supported": true,
+    "refs": [
+      "crates/net/src/net_interface.rs@415@gossipsub: GossipBehaviour,",
+      "crates/net/src/net_interface.rs@485@libp2p::quic::tokio::Transport::new("
+    ],
+    "line_text": ["gossipsub: GossipBehaviour,", "libp2p::quic::tokio::Transport::new(libp2p::quic::Config::new(key)),"],
+    "note": "NodeBehaviour (derived at line 411) holds gossipsub (line 415) and Kademlia (line 416), and the swarm adds a QUIC transport (line 485)."
+  }
+]
