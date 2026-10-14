@@ -2,6 +2,14 @@
 
 This directory contains utility scripts for the Interfold project.
 
+## Blueprint
+
+`node scripts/blueprint/build.mjs` builds an interactive map of the architecture from the code:
+`scripts/blueprint/out/interfold-blueprint.html`. `node scripts/blueprint/check.mjs` lists the
+hand-drawn references that moved or broke. `node scripts/blueprint/diff/diff.mjs` draws the
+architecture change of a branch on the blueprint, and an experimental workflow posts it on each pull
+request. See [`blueprint/README.md`](blueprint/README.md).
+
 ## CRISP end-to-end test
 
 `bash scripts/run-crisp-test.sh [test args]` tests committed `HEAD` in a temporary Git worktree and
@@ -326,9 +334,9 @@ not need a circuit rebuild.
   branch tip does not replace this match. If no match exists, the command fails before it changes
   local artifacts. `verify-release` still checks every required pair and build stamp. With
   `--latest`, the command takes the branch tip and does not check `SOURCE_HASH`. CI and the
-  integration tests use `--latest` until the circuit drift workflow is designed (#2249). In that period,
-  `--hydrate-bin-only` does not check the stamp's source hash either. It reports a mismatch and
-  continues
+  integration tests use `--latest` until the circuit drift workflow is designed (#2249). In that
+  period, `--hydrate-bin-only` does not check the stamp's source hash either. It reports a mismatch
+  and continues
 - **Replace**: `pnpm store:circuits push --replace` rewrites the branch from local `dist/circuits/`;
   use only when intentionally deleting old artifact sets
 - **Restamp**: `pnpm store:circuits restamp --expect-source-hash <previous hash>` rewrites the build

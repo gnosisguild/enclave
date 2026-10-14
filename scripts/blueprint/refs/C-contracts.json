@@ -1,0 +1,236 @@
+[
+  {
+    "id": "C1",
+    "supported": true,
+    "refs": ["packages/interfold-contracts/contracts/Interfold.sol@412@requestCommittee("],
+    "line_text": ["dependencies.registry.requestCommittee("],
+    "note": "Interfold.request calls dependencies.registry.requestCommittee, and that registry is an ICiphernodeRegistry."
+  },
+  {
+    "id": "C2",
+    "supported": true,
+    "refs": ["packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@763@onCommitteeFinalized("],
+    "line_text": ["_interfoldFor(e3Id).onCommitteeFinalized(e3Id);"],
+    "note": "finalizeCommittee calls _interfoldFor(e3Id).onCommitteeFinalized once it marks the committee Finalized."
+  },
+  {
+    "id": "C3",
+    "supported": true,
+    "refs": ["packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@391@onCommitteePublished("],
+    "line_text": ["_interfoldFor(e3Id).onCommitteePublished(e3Id, pkCommitment);"],
+    "note": "publishCommittee calls _interfoldFor(e3Id).onCommitteePublished after the DKG anchors are stored."
+  },
+  {
+    "id": "C4",
+    "supported": true,
+    "refs": ["packages/interfold-contracts/contracts/Interfold.sol@361@e3Program.validate("],
+    "line_text": ["bytes32 encryptionSchemeId = requestParams.e3Program.validate("],
+    "note": "Interfold.request calls requestParams.e3Program.validate and binds the encryptionSchemeId it returns."
+  },
+  {
+    "id": "C5",
+    "supported": true,
+    "refs": [
+      "packages/interfold-contracts/contracts/Interfold.sol@429@InterfoldLifecycle.publishCiphertext(",
+      "packages/interfold-contracts/contracts/lib/InterfoldLifecycle.sol@526@e3.e3Program.verify("
+    ],
+    "line_text": ["InterfoldLifecycle.publishCiphertext(", "e3.e3Program.verify("],
+    "note": "publishCiphertext reaches e3Program.verify through _isValidCiphertextHash, after the ciphertext verifier check."
+  },
+  {
+    "id": "C6",
+    "supported": true,
+    "refs": [
+      "packages/interfold-contracts/contracts/Interfold.sol@471@_verifyPlaintext(e3Id",
+      "packages/interfold-contracts/contracts/lib/InterfoldLifecycle.sol@332@IDecryptionVerifier(verifierAddress).verify("
+    ],
+    "line_text": ["_verifyPlaintext(e3Id, keccak256(plaintextOutput), proof);", "!IDecryptionVerifier(verifierAddress).verify("],
+    "note": "publishPlaintextOutput calls _verifyPlaintext, which runs InterfoldLifecycle.verifyPlaintext and then the decryption verifier's verify."
+  },
+  {
+    "id": "C7",
+    "supported": true,
+    "refs": [
+      "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@380@_verifyAndStoreDkgAnchors(",
+      "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@431@e3.pkVerifier.verify("
+    ],
+    "line_text": ["_verifyAndStoreDkgAnchors(", "!e3.pkVerifier.verify("],
+    "note": "publishCommittee calls _verifyAndStoreDkgAnchors, which runs e3.pkVerifier.verify on the DKG proof before storing anchors."
+  },
+  {
+    "id": "C8",
+    "supported": true,
+    "refs": [
+      "packages/interfold-contracts/contracts/Interfold.sol@732@InterfoldPricing.processE3Failure(",
+      "packages/interfold-contracts/contracts/lib/InterfoldPricing.sol@162@refundManager.calculateRefund(",
+      "packages/interfold-contracts/contracts/Interfold.sol@754@escrowSlashedFunds("
+    ],
+    "line_text": [
+      "InterfoldPricing.processE3Failure(",
+      "refundManager.calculateRefund(e3Id, payment, honestNodes, paymentToken);",
+      "_refundManagerFor(e3Id).escrowSlashedFunds("
+    ],
+    "note": "A failed E3's payment goes through InterfoldPricing.processE3Failure, which calls refundManager.calculateRefund, and Interfold also calls escrowSlashedFunds directly."
+  },
+  {
+    "id": "C9",
+    "supported": true,
+    "refs": [
+      "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@319@eligibilityAt(",
+      "packages/interfold-contracts/contracts/lib/RegistrySortitionLib.sol@354@ticketToken().getPastVotes("
+    ],
+    "line_text": [
+      "(, uint256 activeCount) = dependencies.bonding.eligibilityAt(",
+      "uint256 availableTickets = bondingRegistry.ticketToken().getPastVotes("
+    ],
+    "note": "requestCommittee reads the bonding registry's eligibilityAt, and RegistrySortitionLib.validateTicket reads ticket balances with getPastVotes."
+  },
+  {
+    "id": "C10",
+    "supported": true,
+    "refs": [
+      "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@881@slashTicketBalance(",
+      "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@891@slashCiphernodeBond("
+    ],
+    "line_text": ["actualTicketSlashed = dependencies.bonding.slashTicketBalance(", ".slashCiphernodeBond("],
+    "note": "_executeSlash calls slashTicketBalance and slashCiphernodeBond on the bonding registry."
+  },
+  {
+    "id": "C11",
+    "supported": true,
+    "refs": [
+      "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@678@ticketToken.depositFrom(",
+      "packages/interfold-contracts/contracts/token/InterfoldTicketToken.sol@306@_mint(to, amount)",
+      "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@711@ticketToken.burnTickets("
+    ],
+    "line_text": [
+      "ticketToken.depositFrom(msg.sender, operator, amount);",
+      "_mint(to, amount);",
+      "ticketToken.burnTickets(operator, amount);"
+    ],
+    "note": "BondingRegistry mints tFOLD through ticketToken.depositFrom (which calls _mint) and burns it through ticketToken.burnTickets."
+  },
+  {
+    "id": "C12",
+    "supported": true,
+    "refs": [
+      "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@1374@require(msg.sender == bondOwner",
+      "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@1379@BondingAssetLib.transferFromExact(",
+      "packages/interfold-contracts/contracts/lib/BondingAssetLib.sol@426@token.safeTransferFrom(sender",
+      "packages/interfold-contracts/contracts/lib/BondingAssetLib.sol@380@ILockAwareCiphernodeBondToken.lockedBalanceOf"
+    ],
+    "line_text": [
+      "require(msg.sender == bondOwner, NotBondOwner(msg.sender, operator));",
+      "BondingAssetLib.transferFromExact(",
+      "token.safeTransferFrom(sender, address(this), amount);",
+      "ILockAwareCiphernodeBondToken.lockedBalanceOf,"
+    ],
+    "note": "_bondCiphernode requires msg.sender to be the bond owner, then pulls the configured ciphernodeBondToken, which must expose the lock-aware FOLD interface, with transferFromExact."
+  },
+  {
+    "id": "C13",
+    "supported": true,
+    "refs": [
+      "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@337@RegistrySortitionLib.requestRandomness(",
+      "packages/interfold-contracts/contracts/lib/RegistrySortitionLib.sol@541@provider.requestRandomness(e3Id)"
+    ],
+    "line_text": [
+      "(, uint256 randomnessDeadline) = RegistrySortitionLib.requestRandomness(",
+      "requestId = provider.requestRandomness(e3Id);"
+    ],
+    "note": "requestCommittee calls RegistrySortitionLib.requestRandomness, which calls provider.requestRandomness(e3Id)."
+  },
+  {
+    "id": "C14",
+    "supported": false,
+    "refs": [
+      "packages/interfold-contracts/contracts/lib/RegistrySortitionLib.sol@482@request.provider.getRandomness(",
+      "packages/interfold-contracts/contracts/randomness/ChainlinkVrfRandomnessProvider.sol@209@result.randomWord = randomWords[0]"
+    ],
+    "line_text": ["try request.provider.getRandomness(request.requestId) returns (", "result.randomWord = randomWords[0];"],
+    "note": "The provider never calls the registry; it stores the VRF word, and the registry pulls it with provider.getRandomness."
+  },
+  {
+    "id": "C15",
+    "supported": true,
+    "refs": [
+      "packages/interfold-contracts/contracts/registry/NodeReleaseRegistry.sol@50@setRequiredNodeRelease(",
+      "packages/interfold-contracts/contracts/registry/NodeReleaseRegistry.sol@53@onlyOwner",
+      "packages/interfold-contracts/contracts/registry/NodeReleaseRegistry.sol@79@acknowledgeNodeRelease("
+    ],
+    "line_text": ["function setRequiredNodeRelease(", ") external onlyOwner {", "function acknowledgeNodeRelease("],
+    "note": "setRequiredNodeRelease is onlyOwner, and acknowledgeNodeRelease records the caller's own release under msg.sender."
+  },
+  {
+    "id": "C16",
+    "supported": true,
+    "refs": [
+      "packages/interfold-contracts/contracts/lib/BondingEligibilityLib.sol@97@isNodeReleaseReady(",
+      "packages/interfold-contracts/contracts/registry/BondingRegistry.sol@1428@updateOperator("
+    ],
+    "line_text": ["INodeReleaseRegistry(releaseRegistry).isNodeReleaseReady(", ".updateOperator("],
+    "note": "BondingRegistry._updateOperatorStatus calls BondingEligibilityLib.updateOperator, which reads isNodeReleaseReady."
+  },
+  {
+    "id": "C17",
+    "supported": true,
+    "refs": [
+      "packages/interfold-contracts/contracts/registry/BondedVotes.sol@645@IBondingRegistry(registry)",
+      "packages/interfold-contracts/contracts/registry/BondedVotes.sol@646@totalCiphernodeBondLiability",
+      "packages/interfold-contracts/contracts/registry/BondedVotes.sol@672@checkpoints.bonded(account)"
+    ],
+    "line_text": [
+      "uint256 custodied = IBondingRegistry(registry)",
+      ".totalCiphernodeBondLiability();",
+      "return held + checkpoints.bonded(account);"
+    ],
+    "note": "BondedVotes.balanceOf reads the registry's totalCiphernodeBondLiability directly; per-holder bonded totals come via BondedCheckpoints."
+  },
+  {
+    "id": "C18",
+    "supported": true,
+    "refs": [
+      "packages/interfold-contracts/contracts/E3RefundManager.sol@457@claimRequesterRefund(",
+      "packages/interfold-contracts/contracts/E3RefundManager.sol@483@_transferPreservingSlashedLiability(dist.feeToken",
+      "packages/interfold-contracts/contracts/E3RefundManager.sol@489@claimHonestNodeReward(",
+      "packages/interfold-contracts/contracts/E3RefundManager.sol@535@_transferPreservingSlashedLiability(token, recipient"
+    ],
+    "line_text": [
+      "function claimRequesterRefund(",
+      "_transferPreservingSlashedLiability(dist.feeToken, msg.sender, amount);",
+      "function claimHonestNodeReward(",
+      "_transferPreservingSlashedLiability(token, recipient, amount);"
+    ],
+    "note": "Both claim functions transfer the fee token only when a claim is made, so refunds are paid on pull."
+  },
+  {
+    "id": "C19",
+    "supported": true,
+    "refs": [
+      "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@596@proposeSlash(",
+      "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@715@proposeSlashEvidence(",
+      "packages/interfold-contracts/contracts/slashing/SlashingManager.sol@1053@fileAppeal("
+    ],
+    "line_text": [
+      "function proposeSlash(",
+      "function proposeSlashEvidence(",
+      "function fileAppeal(uint256 proposalId, string calldata evidence) external {"
+    ],
+    "note": "proposeSlash takes an evidence proof, proposeSlashEvidence takes evidence bytes, and fileAppeal lets the accused operator or bond owner appeal; resolveAppeal is governance-only."
+  },
+  {
+    "id": "C20",
+    "supported": true,
+    "refs": [
+      "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@618@submitTicket(",
+      "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@717@finalizeCommittee(",
+      "packages/interfold-contracts/contracts/registry/CiphernodeRegistryOwnable.sol@355@publishCommittee("
+    ],
+    "line_text": [
+      "function submitTicket(uint256 e3Id, uint256 ticketNumber) external {",
+      "function finalizeCommittee(uint256 e3Id) external returns (bool success) {",
+      "function publishCommittee("
+    ],
+    "note": "submitTicket is restricted to the enabled node in msg.sender, while finalizeCommittee and publishCommittee have no caller check."
+  }
+]
