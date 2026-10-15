@@ -347,7 +347,7 @@ impl Handler<InterfoldEvent> for NetEventTranslator {
 mod tests {
     use super::*;
     use crate::net_interface_handle::NetEventChannel;
-    use e3_ciphernode_builder::EventSystem;
+    use e3_event_system::EventSystem;
     use e3_events::{E3id, EventConstructorWithTimestamp, KeyshareCreated, Unsequenced};
     use e3_utils::ArcBytes;
     use libp2p::gossipsub::MessageId;

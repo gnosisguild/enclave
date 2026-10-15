@@ -518,7 +518,7 @@ mod tests {
         use e3_events::{E3Requested, EventPublisher, TicketGenerated, TicketId};
         use e3_sortition::SortitionRecoveryState;
         let aggregate = AggregateId::from_chain_id(Some(1));
-        let system = crate::EventSystem::new()
+        let system = e3_event_system::EventSystem::new()
             .with_fresh_bus()
             .with_aggregate_config(e3_events::AggregateConfig::new(HashMap::from([(
                 aggregate,
@@ -636,7 +636,7 @@ mod tests {
         use e3_events::{AdmissionChange, AdmissionPolicy, AdmissionUpdated, EventPublisher};
         use e3_sortition::{BondOwnerState, NodeState, NodeStateStore};
         let aggregate = AggregateId::from_chain_id(None);
-        let system = crate::EventSystem::new()
+        let system = e3_event_system::EventSystem::new()
             .with_fresh_bus()
             .with_aggregate_config(e3_events::AggregateConfig::new(HashMap::from([(
                 aggregate,
@@ -714,7 +714,7 @@ mod tests {
         use e3_sortition::NodeStateRepositoryFactory;
 
         let chain = AggregateId::from_chain_id(None);
-        let system = crate::EventSystem::new()
+        let system = e3_event_system::EventSystem::new()
             .with_fresh_bus()
             .with_aggregate_config(e3_events::AggregateConfig::new(HashMap::from([(
                 chain,
@@ -801,7 +801,7 @@ mod tests {
         use e3_events::{BondOwnerSet, EventPublisher};
 
         let aggregate = AggregateId::from_chain_id(None);
-        let system = crate::EventSystem::new()
+        let system = e3_event_system::EventSystem::new()
             .with_fresh_bus()
             .with_aggregate_config(e3_events::AggregateConfig::new(HashMap::from([(
                 aggregate,

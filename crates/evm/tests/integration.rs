@@ -14,7 +14,8 @@ use alloy::{
     sol_types::SolEvent,
 };
 use anyhow::Result;
-use e3_ciphernode_builder::{EventSystem, EvmSystemChainBuilder};
+use e3_ciphernode_builder::EvmSystemChainBuilder;
+use e3_event_system::EventSystem;
 use e3_events::{
     prelude::*, trap, BusHandle, EType, EvmEventConfig, EvmEventConfigChain, GetEvents,
     HistoricalEvmEventsReceived, HistoricalEvmSyncStart, InterfoldEvent, InterfoldEventData,

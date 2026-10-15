@@ -617,7 +617,7 @@ mod tests {
 
         // Events of an E3 belong to the aggregate of its chain.
         let aggregate_id = AggregateId::from_chain_id(Some(anvil.chain_id()));
-        let system = crate::EventSystem::new()
+        let system = e3_event_system::EventSystem::new()
             .with_fresh_bus()
             .with_aggregate_config(e3_events::AggregateConfig::new(HashMap::from([(
                 aggregate_id,

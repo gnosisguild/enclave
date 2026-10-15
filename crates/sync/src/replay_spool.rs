@@ -461,7 +461,7 @@ impl RunMerger {
 mod tests {
     use super::*;
     use actix::{Actor, Handler, Message};
-    use e3_ciphernode_builder::EventSystem;
+    use e3_event_system::EventSystem;
     use e3_events::{
         EventPublisher, FlushPendingSnapshots, InsertBatch, TestEvent, UpdateDestination,
     };

@@ -17,7 +17,7 @@ use crate::{
     net_interface::EVENT_CHANNEL_SIZE,
     ContentHash, NetEventSender,
 };
-use e3_ciphernode_builder::EventSystem;
+use e3_event_system::EventSystem;
 use e3_events::{CorrelationId, EventPublisher, SyncEnded};
 use e3_utils::ArcBytes;
 use libp2p::{

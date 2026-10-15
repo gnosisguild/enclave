@@ -18,9 +18,9 @@
 //! The chain cannot restore a key share.
 
 use anyhow::{bail, Context, Result};
-use e3_ciphernode_builder::get_interfold_bus_handle;
 use e3_config::AppConfig;
 use e3_data::{Repositories, RepositoriesFactory, SledDb};
+use e3_event_system::get_interfold_bus_handle;
 use e3_evm::EthPrivateKeyRepositoryFactory;
 use e3_net::NetRepositoryFactory;
 use serde::{Deserialize, Serialize};
@@ -534,7 +534,7 @@ mod tests {
     /// operator's data directory.
     #[actix::test]
     async fn finds_every_log_the_real_event_system_creates() {
-        use e3_ciphernode_builder::EventSystem;
+        use e3_event_system::EventSystem;
 
         let tmp = tempfile::tempdir().expect("tempdir");
         let log_path = tmp.path().join("log");

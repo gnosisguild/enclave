@@ -14,7 +14,7 @@ use libp2p::PeerId;
 use std::{future::Future, time::Duration};
 use tracing::info;
 
-use crate::global_eventstore_cache::EventStoreReader;
+use e3_event_system::global_eventstore_cache::EventStoreReader;
 
 async fn enforce_shutdown_deadline<F>(deadline: Duration, shutdown: F) -> Result<()>
 where

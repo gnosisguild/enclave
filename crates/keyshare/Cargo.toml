@@ -39,4 +39,4 @@ zeroize = { workspace = true }
 [dev-dependencies]
 e3-zk-prover = { workspace = true }
 e3-evm.workspace = true
-e3-ciphernode-builder.workspace = true
+e3-event-system.workspace = true

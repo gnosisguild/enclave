@@ -4,14 +4,18 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+mod ciphernode_system;
+
 use actix::Actor;
 use alloy::primitives::{Address, FixedBytes, I256, U256};
 use alloy::signers::local::PrivateKeySigner;
 use anyhow::{bail, Context, Result};
+use ciphernode_system::{CiphernodeHistory, CiphernodeSystem, CiphernodeSystemBuilder};
 use e3_bfv_client::decode_bytes_to_vec_u64;
-use e3_ciphernode_builder::{CiphernodeBuilder, EventSystem};
+use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_config::BBPath;
 use e3_crypto::Cipher;
+use e3_event_system::EventSystem;
 use e3_events::{
     hlc::HlcTimestamp, prelude::*, AggregateConfig, AggregateId, BusHandle,
     CiphertextOutputPublished, CommitteeFinalized, CommitteeRequested, ComputeRequestKind,
@@ -26,9 +30,6 @@ use e3_multithread::{Multithread, MultithreadReport, ToReport};
 use e3_net::events::{GossipData, NetEvent};
 use e3_net::NetEventTranslator;
 use e3_sortition::{calculate_buffer_size, RegisteredNode, ScoreSortition, Ticket};
-use e3_test_helpers::ciphernode_system::{
-    CiphernodeHistory, CiphernodeSystem, CiphernodeSystemBuilder,
-};
 use e3_test_helpers::{
     create_seed_from_u64, derive_shared_rng, find_bb, with_tracing, AddToCommittee,
 };
@@ -3143,7 +3144,8 @@ async fn test_p2p_actor_stores_a_replayed_event_at_most_once_more() -> Result<()
     let (tx, rx) = tokio::sync::oneshot::channel();
     let collector = StoredEvents(Some(tx)).start();
     system
-        .in_mem_eventstore_router()?
+        .eventstore_reader()?
+        .ts()
         .send(EventStoreQueryBy::<TsAgg>::new(
             CorrelationId::new(),
             HashMap::from([(AggregateId::new(1), 0)]),

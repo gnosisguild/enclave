@@ -8,12 +8,13 @@
 
 use anyhow::Result;
 use commitlog::{CommitLog, LogOptions};
-use e3_ciphernode_builder::{CiphernodeBuilder, EventSystem};
+use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_config::{AppConfig, UnscopedAppConfig};
 use e3_crypto::Cipher;
 use e3_data::SledDb;
 use e3_entrypoint::helpers::datastore::get_eventstore_reader;
 use e3_entrypoint::validate::{validate_node, Severity};
+use e3_event_system::EventSystem;
 use e3_events::{Get, Insert, InterfoldEvent, StoreKeys, Unsequenced};
 use e3_sync::SCHEMA_VERSION;
 use std::collections::BTreeMap;
