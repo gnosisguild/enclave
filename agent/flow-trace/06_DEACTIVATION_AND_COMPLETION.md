@@ -699,7 +699,7 @@ E3 at?". It never emits protocol events and never drives subsystems; it records 
 restart-resume and shutdown awareness subject to the asynchronous persistence caveats above.
 
 ```text
-E3LifecycleCoordinator::attach(bus, store)   (wired in ciphernode_builder.build())
+E3LifecycleCoordinator::attach(bus, store)   (wired in CiphernodeBuilder::build(), builder/startup.rs)
 │
 ├─ Loads persisted stage map from Repository(StoreKeys::e3_lifecycle())
 │   → on restart, every successfully persisted in-flight stage is rehydrated

@@ -363,7 +363,7 @@ InterfoldSolReader decodes IInterfold::E3Requested log
 `crates/request/src/routing/event_size.rs`, `crates/utils/src/utility_types.rs`,
 `crates/events/src/interfold_event/mod.rs` (`compact_shared_collections`),
 `crates/request/src/routing/effects/build_context.rs`,
-`crates/ciphernode-builder/src/ciphernode_builder.rs` (`setup_extensions`).
+`crates/ciphernode-builder/src/builder/extensions.rs` (`setup_extensions`).
 
 `E3RouterBuilder::with_recipient` installs an extension with its expected recipient key. `E3Context`
 derives missing recipients from those extensions, both at creation and hydration. Dependency-only

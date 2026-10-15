@@ -4,9 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+mod builder;
 mod ciphernode;
-mod ciphernode_builder;
 mod finalized_lifecycle;
 mod recovery;
+pub use builder::CiphernodeBuilder;
 pub use ciphernode::*;
-pub use ciphernode_builder::*;

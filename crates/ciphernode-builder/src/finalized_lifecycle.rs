@@ -6,12 +6,12 @@
 
 //! Startup reconciliation of the local E3 lifecycle with the finalized chain lifecycle.
 
-use crate::ciphernode_builder::validate_chain_id;
 use alloy::primitives::Address;
 use anyhow::{anyhow, bail, Context, Result};
 use e3_config::chain_config::ChainConfig;
 use e3_events::{AggregateId, E3Stage, E3id, EventStoreQueryBy, FailureReason, SeqAgg};
-use e3_evm::{read_finalized_e3_lifecycles, FinalizedE3Lifecycle, ProviderCache};
+use e3_evm::{read_finalized_e3_lifecycles, FinalizedE3Lifecycle};
+use e3_evm::{validate_chain_id, ProviderCache};
 use e3_request::E3LifecycleRepositoryFactory;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},

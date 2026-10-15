@@ -8,6 +8,7 @@ use anyhow::{bail, Context, Result};
 use e3_ciphernode_builder::{CiphernodeBuilder, CiphernodeHandle};
 use e3_config::AppConfig;
 use e3_crypto::Cipher;
+use e3_utils::SharedRng;
 use e3_zk_prover::ZkBackend;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
@@ -81,30 +82,33 @@ pub async fn execute(config: &AppConfig, bootstrap: bool) -> Result<CiphernodeHa
         "Ciphernode startup deadline configured"
     );
 
-    if bootstrap {
+    let builder = if bootstrap {
         info!(
             "Bootstrap mode: networking and chain reads only; no committee work, proofs, or \
              transactions"
         );
-        let builder = CiphernodeBuilder::new(rng, cipher)
-            .with_name(&config.name())
-            .with_bootstrap_role()
-            .with_logging()
-            .with_persistence(&config.log_file(), &config.db_file())
-            .with_chains(config.chains())
-            .with_contract_interfold_reader()
-            .with_max_buffered_evm_events(config.max_buffered_evm_events())
-            .with_ingestion_heartbeat(ingestion_heartbeat_dir(config))
-            .with_network_buffer_limits(
-                config.max_buffered_net_events(),
-                config.max_buffered_net_bytes(),
-            )
-            .with_network(config.network().clone(), config.peers(), config.quic_port())
-            .with_shared_store()
-            .with_shared_eventstore();
-        return await_startup(builder.build(), startup_timeout).await;
-    }
+        CiphernodeBuilder::bootstrap(rng, cipher)
+    } else {
+        full_node(config, rng, cipher)
+    };
+    let builder = builder
+        .with_name(&config.name())
+        .with_logging()
+        .with_persistence(&config.log_file(), &config.db_file())
+        .with_chains(config.chains())
+        .with_startup_buffer_limits(
+            config.max_buffered_evm_events(),
+            config.max_buffered_net_events(),
+            config.max_buffered_net_bytes(),
+        )
+        .with_ingestion_heartbeat(ingestion_heartbeat_dir(config))
+        .with_network(config.network().clone(), config.peers(), config.quic_port())
+        .with_shared_stores();
+    await_startup(builder.build(), startup_timeout).await
+}
 
+/// A full node builder with the prover backend and the compute scheduler of `config`.
+fn full_node(config: &AppConfig, rng: SharedRng, cipher: Arc<Cipher>) -> CiphernodeBuilder {
     let backend = ZkBackend::new(config.bb_binary(), config.circuits_dir(), config.work_dir())
         .with_bb_timeout(config.bb_timeout());
 
@@ -117,30 +121,8 @@ pub async fn execute(config: &AppConfig, bootstrap: bool) -> Result<CiphernodeHa
             .unwrap_or_else(|| "2 (default)".to_string())
     );
 
-    let builder = CiphernodeBuilder::new(rng.clone(), cipher.clone())
-        .with_name(&config.name())
-        .with_logging()
-        .with_persistence(&config.log_file(), &config.db_file())
-        .with_sortition_score()
-        .with_chains(config.chains())
-        .with_contract_interfold_full()
-        .with_contract_bonding_registry()
-        .with_multithread_config(reserve, concurrent_jobs)
-        .with_max_buffered_evm_events(config.max_buffered_evm_events())
-        .with_network_buffer_limits(
-            config.max_buffered_net_events(),
-            config.max_buffered_net_bytes(),
-        )
-        .with_contract_ciphernode_registry()
-        .with_contract_slashing_manager()
-        .with_ingestion_heartbeat(ingestion_heartbeat_dir(config))
-        .with_trbfv()
-        .with_zkproof(backend)
-        .with_pubkey_aggregation()
-        .with_threshold_plaintext_aggregation()
-        .with_network(config.network().clone(), config.peers(), config.quic_port())
-        .with_shared_store()
-        .with_shared_eventstore();
+    let builder = CiphernodeBuilder::full(rng, cipher, backend)
+        .with_multithread_config(reserve, concurrent_jobs);
 
     #[cfg(feature = "test-only-skip-proof-aggregation")]
     let builder = if config.skip_proof_aggregation() {
@@ -153,10 +135,7 @@ pub async fn execute(config: &AppConfig, bootstrap: bool) -> Result<CiphernodeHa
         builder
     };
 
-    let build = builder.build();
-    let node = await_startup(build, startup_timeout).await?;
-
-    Ok(node)
+    builder
 }
 
 #[cfg(test)]

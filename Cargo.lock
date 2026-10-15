@@ -3670,7 +3670,6 @@ dependencies = [
  "futures",
  "libp2p",
  "rayon",
- "tempfile",
  "tokio",
  "tracing",
 ]
