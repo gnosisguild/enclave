@@ -139,7 +139,7 @@
       "read_first": [
         {
           "why": "Wiring: the node builds E3Router and installs the router extensions",
-          "ref": "crates/ciphernode-builder/src/ciphernode_builder.rs@1226@let mut e3_builder = E3Router::builder(bus, store.clone())"
+          "ref": "crates/ciphernode-builder/src/builder/extensions.rs@235@Ok(E3Router::builder(bus, storage.store.clone())"
         },
         { "why": "The router actor and what it holds per E3", "ref": "crates/request/src/routing/actor.rs@94@pub struct E3Router {" },
         {
@@ -187,7 +187,7 @@
       "depends_on": [
         "e3-bfv-client",
         "e3-committee-hash",
-        "e3-zk-helpers",
+        "e3-committee",
         "e3-events",
         "e3-fhe-params",
         "e3-data",
@@ -645,7 +645,7 @@
           "ref": "crates/slashing/src/accusation_voting/transitions/reverify_proofs.rs@43@let Some(reverif) = self.pending_reverifications.remove(&correlation_id) else {"
         }
       ],
-      "depends_on": ["e3-data", "e3-events", "e3-fhe-params", "e3-request", "e3-utils", "e3-zk-helpers"],
+      "depends_on": ["e3-committee", "e3-data", "e3-events", "e3-fhe-params", "e3-request", "e3-utils", "e3-zk-helpers"],
       "tests": "accusation_voting/workflow_tests/ (admission, voting, outcomes), accusation_voting/actor_tests.rs and commitment_consistency/workflow_tests.rs under crates/slashing/src; fixture crates/slashing/tests/fixtures/layout_lock.txt; cargo test -p e3-slashing",
       "unverified": ["SlashExecuted is built from chain logs in crates/evm/src/slashing/events.rs; only its construction line was read."]
     }

@@ -187,6 +187,7 @@
         }
       ],
       "depends_on": [
+        "e3-committee",
         "e3-bfv-client",
         "e3-config",
         "e3-committee-hash",
@@ -221,12 +222,12 @@
         {
           "name": "PublicKeyAggregator",
           "role": "public-key state machine: verifies C1 proofs, aggregates the keyshares, proves C5, publishes PublicKeyAggregated",
-          "ref": "crates/aggregator/src/public_key_aggregation/actor.rs@44@pub struct PublicKeyAggregator {"
+          "ref": "crates/aggregator/src/public_key_aggregation/actor.rs@42@pub struct PublicKeyAggregator {"
         },
         {
           "name": "ThresholdPlaintextAggregator",
           "role": "decryption state machine: verifies C6 shares, runs the TrBFV threshold decryption, proves C7, publishes PlaintextAggregated",
-          "ref": "crates/aggregator/src/plaintext_aggregation/actor.rs@69@pub struct ThresholdPlaintextAggregator {"
+          "ref": "crates/aggregator/src/plaintext_aggregation/actor.rs@68@pub struct ThresholdPlaintextAggregator {"
         },
         {
           "name": "CommitteeFinalizer",
@@ -335,7 +336,7 @@
         {
           "name": "PlaintextAggregated",
           "by": "ThresholdPlaintextAggregator",
-          "ref": "crates/aggregator/src/plaintext_aggregation/effects/publish_result.rs@113@let event = PlaintextAggregated {"
+          "ref": "crates/aggregator/src/plaintext_aggregation/effects/publish_result.rs@111@let event = PlaintextAggregated {"
         },
         {
           "name": "CommitteeFinalizeRequested",
@@ -357,7 +358,7 @@
         {
           "name": "registered committee (topNodes) for decryption, read from the chain",
           "where": "chain",
-          "ref": "crates/aggregator/src/plaintext_aggregation/actor.rs@80@committee_addresses: Vec<Address>,"
+          "ref": "crates/aggregator/src/plaintext_aggregation/actor.rs@79@committee_addresses: Vec<Address>,"
         }
       ],
       "key_types": [
@@ -379,11 +380,19 @@
         },
         {
           "why": "can_run_aggregation_effects decides which node runs the aggregation effects",
-          "ref": "crates/aggregator/src/public_key_aggregation/actor.rs@141@fn can_run_aggregation_effects(&self) -> bool {"
+          "ref": "crates/aggregator/src/public_key_aggregation/actor.rs@139@fn can_run_aggregation_effects(&self) -> bool {"
         },
         {
           "why": "the decryption actor, which holds the decryption work",
-          "ref": "crates/aggregator/src/plaintext_aggregation/actor.rs@69@pub struct ThresholdPlaintextAggregator {"
+          "ref": "crates/aggregator/src/plaintext_aggregation/actor.rs@68@pub struct ThresholdPlaintextAggregator {"
+        },
+        {
+          "why": "crate surface: CommitteeFinalizer, recovery/state types and repositories are public; key/plaintext actors stay crate-private",
+          "ref": "crates/aggregator/src/lib.rs@21@pub use actors::{"
+        },
+        {
+          "why": "committee hashing is owned by e3-committee-hash, not a local aggregator wrapper",
+          "ref": "crates/committee-hash/src/lib.rs@42@pub fn hash_committee_addresses"
         }
       ],
       "rust_patterns": [
@@ -404,15 +413,15 @@
         }
       ],
       "depends_on": [
-        "e3-config",
+        "e3-committee",
         "e3-data",
         "e3-events",
         "e3-evm",
         "e3-fhe",
         "e3-fhe-params",
         "e3-keyshare",
-        "e3-multithread",
         "e3-polynomial",
+        "e3-polynomial-fhe",
         "e3-trbfv",
         "e3-bfv-client",
         "e3-committee-hash",

@@ -674,14 +674,9 @@
       ],
       "key_types": [
         {
-          "name": "CiphernodeSystemBuilder",
-          "what": "collects groups of node setups and builds them in order",
-          "ref": "crates/test-helpers/src/ciphernode_system.rs@36@pub struct CiphernodeSystemBuilder<'a> {"
-        },
-        {
-          "name": "CiphernodeSystem",
-          "what": "the built nodes and the optional network mock",
-          "ref": "crates/test-helpers/src/ciphernode_system.rs@102@pub struct CiphernodeSystem {"
+          "name": "AddToCommittee",
+          "what": "test helper that publishes CiphernodeAdded with incrementing indices",
+          "ref": "crates/test-helpers/src/lib.rs@160@pub struct AddToCommittee {"
         },
         {
           "name": "Libp2pMock",
@@ -691,16 +686,16 @@
       ],
       "read_first": [
         {
-          "why": "module list: the four helper modules",
-          "ref": "crates/test-helpers/src/lib.rs@8@pub mod ciphernode_system;"
+          "why": "module list and shared deterministic setup helpers",
+          "ref": "crates/test-helpers/src/lib.rs@7@pub mod application;"
         },
         {
-          "why": "the builder: add groups, simulate the network, build",
-          "ref": "crates/test-helpers/src/ciphernode_system.rs@36@pub struct CiphernodeSystemBuilder<'a> {"
+          "why": "per-node RNGs avoid serializing parallel test work on one shared mutex",
+          "ref": "crates/test-helpers/src/lib.rs@98@pub fn derive_shared_rng(base_seed: u64, salt: u64) -> SharedRng {"
         },
         {
-          "why": "turns on the simulated network for the built nodes",
-          "ref": "crates/test-helpers/src/ciphernode_system.rs@74@pub fn simulate_libp2p(mut self) -> Self {"
+          "why": "multi-node assembly now belongs to the integration harness, not this shared crate",
+          "ref": "crates/tests/tests/ciphernode_system/mod.rs@36@pub struct CiphernodeSystemBuilder<'a> {"
         },
         {
           "why": "the in-process gossip and DHT mock",
@@ -709,30 +704,30 @@
       ],
       "rust_patterns": [
         {
-          "pattern": "builder-pattern",
-          "note": "CiphernodeSystemBuilder chains add_group and simulate_libp2p, then build",
-          "ref": "crates/test-helpers/src/ciphernode_system.rs@58@pub fn add_group<F, Fut>("
+          "pattern": "ownership-clone",
+          "note": "committee helper publishes its test event and also returns its payload",
+          "ref": "crates/test-helpers/src/lib.rs@184@self.bus.publish_without_context(evt.clone())?;"
         },
         {
-          "pattern": "trait-object-dyn",
-          "note": "each group's setup is stored as a boxed Fn that returns a boxed future",
-          "ref": "crates/test-helpers/src/ciphernode_system.rs@21@Box<dyn Fn()"
+          "pattern": "arc-shared",
+          "note": "the deterministic RNG is shared behind a mutex",
+          "ref": "crates/test-helpers/src/lib.rs@90@Arc::new(std::sync::Mutex::new(ChaCha20Rng::seed_from_u64(value)))"
         },
         {
           "pattern": "async-await",
-          "note": "build awaits each group's setup in turn",
-          "ref": "crates/test-helpers/src/ciphernode_system.rs@80@pub async fn build(self)"
+          "note": "mock node registration is asynchronous",
+          "ref": "crates/test-helpers/src/libp2p_mock.rs@60@pub async fn add_node(&self, peer_id: PeerId, handle: NetChannelBridge) {"
         },
         {
           "pattern": "async-test",
-          "note": "the one test in ciphernode_system.rs runs under actix",
-          "ref": "crates/test-helpers/src/ciphernode_system.rs@404@#[actix::test]"
+          "note": "network mock tests run under tokio",
+          "ref": "crates/test-helpers/src/libp2p_mock.rs@297@#[tokio::test]"
         }
       ],
       "depends_on": [
         "e3-aggregator",
         "e3-crypto",
-        "e3-ciphernode-builder",
+        "e3-event-system",
         "e3-data",
         "e3-bfv-client",
         "e3-fhe-params",
@@ -747,7 +742,7 @@
         "e3-utils",
         "e3-sortition"
       ],
-      "tests": "Six tests: five #[tokio::test] in src/libp2p_mock.rs and one #[actix::test] in src/ciphernode_system.rs. Run: cargo test -p e3-test-helpers.",
+      "tests": "Five #[tokio::test] tests in src/libp2p_mock.rs. Multi-node harness tests live in e3-tests. Run: cargo test -p e3-test-helpers.",
       "unverified": []
     },
     {
@@ -760,7 +755,7 @@
         {
           "name": "StoredEvents",
           "role": "test-only actor that answers one event-store query by sending the events back on a oneshot channel",
-          "ref": "crates/tests/tests/integration.rs@3076@struct StoredEvents("
+          "ref": "crates/tests/tests/integration.rs@3064@struct StoredEvents("
         }
       ],
       "consumes": [],
@@ -769,22 +764,27 @@
       "key_types": [
         {
           "name": "CiphernodeSystemBuilder",
-          "what": "builds the ciphernode groups each test uses (from e3-test-helpers)",
-          "ref": "crates/tests/tests/integration.rs@1506@let mut nodes = CiphernodeSystemBuilder::new()"
+          "what": "integration-local builder for groups of nodes and their optional network mock",
+          "ref": "crates/tests/tests/ciphernode_system/mod.rs@36@pub struct CiphernodeSystemBuilder<'a> {"
+        },
+        {
+          "name": "CiphernodeSystem",
+          "what": "built nodes and network mock, with restart support",
+          "ref": "crates/tests/tests/ciphernode_system/mod.rs@113@pub struct CiphernodeSystem {"
         }
       ],
       "read_first": [
         {
           "why": "a full multi-node test: test_trbfv_actor",
-          "ref": "crates/tests/tests/integration.rs@1328@async fn test_trbfv_actor()"
+          "ref": "crates/tests/tests/integration.rs@1329@async fn test_trbfv_actor()"
         },
         {
           "why": "the simulated network is switched on for the node group",
-          "ref": "crates/tests/tests/integration.rs@1619@.simulate_libp2p()"
+          "ref": "crates/tests/tests/integration.rs@1615@.simulate_libp2p()"
         },
         {
           "why": "how the zk backend is chosen: a local bb binary or the CI install",
-          "ref": "crates/tests/tests/integration.rs@365@async fn setup_test_zk_backend("
+          "ref": "crates/tests/tests/integration.rs@366@async fn setup_test_zk_backend("
         },
         {
           "why": "the layout-lock test that compares the persisted layouts with the fixture",
@@ -795,17 +795,17 @@
         {
           "pattern": "async-test",
           "note": "integration tests run under actix::test and are serialized with serial_test",
-          "ref": "crates/tests/tests/integration.rs@1326@#[actix::test]"
+          "ref": "crates/tests/tests/integration.rs@1327@#[actix::test]"
         },
         {
           "pattern": "builder-pattern",
           "note": "the node groups are assembled with CiphernodeSystemBuilder",
-          "ref": "crates/tests/tests/integration.rs@1506@let mut nodes = CiphernodeSystemBuilder::new()"
+          "ref": "crates/tests/tests/integration.rs@1507@let mut nodes = CiphernodeSystemBuilder::new()"
         },
         {
           "pattern": "actix-actor",
           "note": "StoredEvents is a small actor that answers one query",
-          "ref": "crates/tests/tests/integration.rs@3078@impl actix::Actor for StoredEvents {"
+          "ref": "crates/tests/tests/integration.rs@3066@impl actix::Actor for StoredEvents {"
         },
         {
           "pattern": "unit-test",
@@ -814,10 +814,12 @@
         }
       ],
       "depends_on": [
+        "e3-committee",
         "e3-aggregator",
         "e3-config",
         "e3-crypto",
         "e3-ciphernode-builder",
+        "e3-event-system",
         "e3-data",
         "e3-events",
         "e3-evm",
@@ -835,8 +837,7 @@
         "e3-fhe-params",
         "e3-utils",
         "e3-zk-prover",
-        "e3-zk-helpers",
-        "e3-polynomial"
+        "e3-zk-helpers"
       ],
       "tests": "cargo test -p e3-tests --test integration (5 tests), --test large_work_plan_recovery (1) and --test layout_lock (1). Regenerate the layout fixture locally with LAYOUT_LOCK_UPDATE=1 cargo test -p e3-tests --test layout_lock. tests/docker holds a shell test of the ciphernode entrypoint's state paths.",
       "unverified": []

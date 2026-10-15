@@ -844,6 +844,7 @@
         }
       ],
       "depends_on": [
+        "e3-committee",
         "e3-request",
         "e3-bfv-client",
         "e3-committee-hash",
@@ -853,6 +854,7 @@
         "e3-crypto",
         "e3-events",
         "e3-polynomial",
+        "e3-polynomial-fhe",
         "e3-zk-helpers",
         "e3-utils",
         "e3-zk-prover"
@@ -861,7 +863,7 @@
       "unverified": [
         "The ZK prover (ZkProver) lives in crates/zk-prover and was not read; the proof side is described only from the dispatch in multithread.rs.",
         "The memory constants (memory.rs:19 and memory.rs:22) are values in code; their effect on a real host was not measured.",
-        "The thread counts and job limits are set in crates/ciphernode-builder (ciphernode_builder.rs:477-483); the builder was checked only at the call sites."
+        "The thread counts and job limits are set in crates/ciphernode-builder/src/builder/mod.rs (with_multithread_config); the builder was checked only at the call sites."
       ]
     },
     {
@@ -1044,7 +1046,7 @@
           "ref": "crates/bfv-client/src/client.rs@382@fn test_bfv_encrypt_a64() {"
         }
       ],
-      "depends_on": ["e3-fhe-params", "e3-zk-helpers", "e3-polynomial"],
+      "depends_on": ["e3-fhe-params", "e3-zk-helpers"],
       "tests": "cargo test -p e3-bfv-client. Eight unit tests in client.rs under cfg(test) at line 271, including test_bfv_encrypt_a64 and test_bfv_verifiable_encrypt_a64.",
       "unverified": [
         "The cfg flag crisp_fhe_optimized (client.rs:242, declared in the Cargo.toml lints) switches a power-basis path; which builds set it was not checked.",

@@ -223,6 +223,16 @@
           "name": "ensure_node_release",
           "what": "startup check: verifies this binary and acknowledges it on INodeReleaseRegistry before the readers start",
           "ref": "crates/evm/src/node_release.rs@71@pub async fn ensure_node_release<P>("
+        },
+        {
+          "name": "ProviderCache",
+          "what": "cached RPC providers and signer, with read-only and write-enabled startup states",
+          "ref": "crates/evm/src/provider_cache.rs@30@pub struct ProviderCache<State = ReadOnly> {"
+        },
+        {
+          "name": "EvmSystemChainBuilder",
+          "what": "registers one chain's contract routes and starts its ingestion gateway",
+          "ref": "crates/evm/src/chain_system.rs@22@pub struct EvmSystemChainBuilder<P> {"
         }
       ],
       "read_first": [
@@ -233,7 +243,7 @@
         },
         {
           "why": "the reader's start block comes from the routing table and the chain's deploy block",
-          "ref": "crates/ciphernode-builder/src/evm_system.rs@174@Filters::from_routing_table(router.get_routing_table(), deploy_block)"
+          "ref": "crates/evm/src/chain_system.rs@124@Filters::from_routing_table(router.get_routing_table(), deploy_block)"
         },
         {
           "why": "restart: the block cursor saved with the snapshot replaces the deploy block",
@@ -263,6 +273,7 @@
         }
       ],
       "depends_on": [
+        "e3-committee",
         "e3-request",
         "e3-bfv-client",
         "e3-config",

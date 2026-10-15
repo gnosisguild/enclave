@@ -330,12 +330,12 @@
         }
       ],
       "depends_on": [
+        "e3-committee",
         "e3-committee-hash",
         "e3-config",
         "e3-data",
         "e3-events",
         "e3-fhe-params",
-        "e3-polynomial",
         "e3-request",
         "e3-slashing",
         "e3-utils",
@@ -453,7 +453,7 @@
           "ref": "crates/zk-helpers/src/circuits/errors.rs@16@pub enum CircuitsErrors"
         }
       ],
-      "depends_on": ["e3-fhe-params", "e3-parity-matrix", "e3-polynomial", "e3-safe"],
+      "depends_on": ["e3-fhe-params", "e3-parity-matrix", "e3-polynomial", "e3-polynomial-fhe", "e3-committee", "e3-safe"],
       "tests": "cargo test -p e3-zk-helpers (in-module #[cfg(test)] tests in each circuit file). The artifact CLI is the e3-zk-artifacts crate in crates/zk/cli.",
       "unverified": [
         "The UserDataEncryption proof path was traced only as far as its input call in crates/bfv-client/src/client.rs:129.",
