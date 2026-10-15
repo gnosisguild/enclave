@@ -54,7 +54,7 @@ num-integer.workspace = true
 e3-polynomial.workspace = true
 e3-polynomial-fhe.workspace = true
 fhe-math.workspace = true
-e3-ciphernode-builder = { workspace = true }
+e3-event-system = { workspace = true }
 e3-net = { workspace = true }
 e3-sync = { workspace = true }
 e3-sortition = { workspace = true }

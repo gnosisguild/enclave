@@ -486,6 +486,9 @@ mod tests {
     use actix::{Actor, Context, Handler, Recipient, ResponseFuture};
     use e3_events::Seed;
     use e3_events::{EventStoreQueryBy, SeqAgg};
+    use e3_fhe_params::BfvPreset;
+    use e3_request::E3Meta;
+    use e3_utils::ArcBytes;
     use std::sync::{Arc, Mutex};
 
     struct TrackedQueries {
@@ -518,7 +521,7 @@ mod tests {
         use e3_events::{E3Requested, EventPublisher, TicketGenerated, TicketId};
         use e3_sortition::SortitionRecoveryState;
         let aggregate = AggregateId::from_chain_id(Some(1));
-        let system = crate::EventSystem::new()
+        let system = e3_event_system::EventSystem::new()
             .with_fresh_bus()
             .with_aggregate_config(e3_events::AggregateConfig::new(HashMap::from([(
                 aggregate,
@@ -636,7 +639,7 @@ mod tests {
         use e3_events::{AdmissionChange, AdmissionPolicy, AdmissionUpdated, EventPublisher};
         use e3_sortition::{BondOwnerState, NodeState, NodeStateStore};
         let aggregate = AggregateId::from_chain_id(None);
-        let system = crate::EventSystem::new()
+        let system = e3_event_system::EventSystem::new()
             .with_fresh_bus()
             .with_aggregate_config(e3_events::AggregateConfig::new(HashMap::from([(
                 aggregate,
@@ -714,7 +717,7 @@ mod tests {
         use e3_sortition::NodeStateRepositoryFactory;
 
         let chain = AggregateId::from_chain_id(None);
-        let system = crate::EventSystem::new()
+        let system = e3_event_system::EventSystem::new()
             .with_fresh_bus()
             .with_aggregate_config(e3_events::AggregateConfig::new(HashMap::from([(
                 chain,
@@ -801,7 +804,7 @@ mod tests {
         use e3_events::{BondOwnerSet, EventPublisher};
 
         let aggregate = AggregateId::from_chain_id(None);
-        let system = crate::EventSystem::new()
+        let system = e3_event_system::EventSystem::new()
             .with_fresh_bus()
             .with_aggregate_config(e3_events::AggregateConfig::new(HashMap::from([(
                 aggregate,
@@ -827,5 +830,118 @@ mod tests {
         let owners = repositories.sortition_bond_owners().read().await?.unwrap();
         assert_eq!(owners.owner_at(1, operator, u64::MAX), None);
         Ok(())
+    }
+
+    #[test]
+    fn startup_reconciles_committees() {
+        let selector_only = E3id::new("1", 1);
+        let finalized_only = E3id::new("2", 1);
+        let terminal = E3id::new("3", 1);
+        let metadata = || E3Meta {
+            threshold_m: 1,
+            threshold_n: 3,
+            seed: Seed([0; 32]),
+            params_preset: BfvPreset::InsecureThreshold512,
+            params: ArcBytes::default(),
+            error_size: ArcBytes::default(),
+        };
+        let committee = Committee::new(vec![
+            "0x1111111111111111111111111111111111111111".to_string()
+        ]);
+        let mut selector = CiphernodeSelectorState {
+            e3_cache: HashMap::from([
+                (selector_only.clone(), metadata()),
+                (finalized_only.clone(), metadata()),
+                (terminal.clone(), metadata()),
+            ]),
+            committees: HashMap::from([
+                (selector_only.clone(), committee.clone()),
+                (terminal.clone(), committee.clone()),
+            ]),
+            ..Default::default()
+        };
+        let mut finalized = HashMap::from([
+            (finalized_only.clone(), committee.clone()),
+            (terminal.clone(), committee.clone()),
+        ]);
+
+        assert_eq!(
+            reconcile_committee_snapshots(
+                &mut selector,
+                &mut finalized,
+                &HashMap::from([(terminal.clone(), E3Stage::Complete)]),
+            )
+            .unwrap(),
+            (true, true)
+        );
+        assert_eq!(selector.committees.get(&finalized_only), Some(&committee));
+        assert_eq!(finalized.get(&selector_only), Some(&committee));
+        assert!(!selector.e3_cache.contains_key(&terminal));
+        assert!(!finalized.contains_key(&terminal));
+    }
+
+    #[test]
+    fn startup_recovers_local_selection() {
+        let e3_id = E3id::new("8", 1);
+        let address = "0x1111111111111111111111111111111111111111";
+        let metadata = E3Meta {
+            threshold_m: 2,
+            threshold_n: 3,
+            seed: Seed([7; 32]),
+            params_preset: BfvPreset::InsecureThreshold512,
+            params: ArcBytes::from_bytes(&[1, 2]),
+            error_size: ArcBytes::from_bytes(&[3, 4]),
+        };
+        let selector = CiphernodeSelectorState {
+            e3_cache: HashMap::from([(e3_id.clone(), metadata.clone())]),
+            committees: HashMap::from([(
+                e3_id.clone(),
+                Committee::new(vec![
+                    address.to_uppercase(),
+                    "0x2222222222222222222222222222222222222222".to_owned(),
+                ]),
+            )]),
+            ..Default::default()
+        };
+
+        let selections = recovered_ciphernode_selections(&selector, address).unwrap();
+
+        assert_eq!(selections.len(), 1);
+        assert_eq!(selections[0].e3_id, e3_id);
+        assert_eq!(selections[0].party_id, 0);
+        assert_eq!(selections[0].threshold_m, metadata.threshold_m);
+        assert_eq!(selections[0].params, metadata.params);
+    }
+
+    #[test]
+    fn startup_rejects_committee_conflicts() {
+        let e3_id = E3id::new("9", 1);
+        let mut selector = CiphernodeSelectorState {
+            e3_cache: HashMap::from([(
+                e3_id.clone(),
+                E3Meta {
+                    threshold_m: 1,
+                    threshold_n: 3,
+                    seed: Seed([0; 32]),
+                    params_preset: BfvPreset::InsecureThreshold512,
+                    params: ArcBytes::default(),
+                    error_size: ArcBytes::default(),
+                },
+            )]),
+            committees: HashMap::from([(
+                e3_id.clone(),
+                Committee::new(vec!["0x1111111111111111111111111111111111111111".to_owned()]),
+            )]),
+            ..Default::default()
+        };
+        let mut finalized = HashMap::from([(
+            e3_id,
+            Committee::new(vec!["0x2222222222222222222222222222222222222222".to_owned()]),
+        )]);
+
+        let error = reconcile_committee_snapshots(&mut selector, &mut finalized, &HashMap::new())
+            .unwrap_err();
+
+        assert!(error.to_string().contains("snapshots disagree"));
     }
 }

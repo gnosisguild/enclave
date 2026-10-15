@@ -15,6 +15,7 @@ too large for that.
 
 | When the task                                                                    | Look up                                                                             |
 | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| changes code in a crate that has its own `AGENTS.md`                             | That file, before you change the crate                                              |
 | needs a command, a term, the monorepo map, or the build configuration            | `agent/CONTEXT.md`                                                                  |
 | changes protocol-bearing code (`agent/RULES.md` §Protocol-bearing changes)       | `agent/invariants/00_INDEX.md`: its routing table names the section to search       |
 | adds a Rust crate, actor, message, persisted state, or side effect               | `agent/ARCHITECTURE.md` (rules) and `agent/CRATES_ARCHITECTURE.md` (map), by search |
@@ -55,6 +56,8 @@ Canonical, tool-neutral content (edit these; they are the single source of truth
 
 - `agent/*.md`, `agent/invariants/`, `agent/flow-trace/`: rules, context, invariants, architecture,
   and protocol traces.
+- `crates/*/AGENTS.md`: the purpose, file map, change rules, and tests of one crate. Keep each file
+  short. Link to `agent/` for a rule that other crates share; do not copy it.
 - `agent/prompts/`: bodies of the reusable agents and commands (`invariant-reviewer`,
   `switch-committee`, `update-flow-trace`).
 - `.agents/skills/`: portable skills. Detailed material stays in the `references/` directory of each

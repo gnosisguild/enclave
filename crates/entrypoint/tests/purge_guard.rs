@@ -13,12 +13,12 @@
 //! that system while this test still uses the bus.
 
 use anyhow::Result;
-use e3_ciphernode_builder::get_interfold_bus_handle;
 use e3_config::{AppConfig, UnscopedAppConfig};
 use e3_data::{DataStore, RepositoriesFactory, SledDb};
 use e3_entrypoint::fence::ProcessFence;
 use e3_entrypoint::helpers::datastore::setup_datastore;
 use e3_entrypoint::nodes::purge::{execute, PurgeTargets, MARKER_FILE_NAME, MARKER_TEXT};
+use e3_event_system::get_interfold_bus_handle;
 use e3_events::{E3Stage, E3id, StoreKeys};
 use e3_keyshare::ThresholdKeyshareRepositoryFactory;
 use e3_request::E3LifecycleRepositoryFactory;

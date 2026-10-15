@@ -57,8 +57,8 @@ COPY crates/console/Cargo.toml ./console/Cargo.toml
 COPY crates/crypto/Cargo.toml ./crypto/Cargo.toml
 COPY crates/data/Cargo.toml ./data/Cargo.toml
 COPY crates/data-availability/Cargo.toml ./data-availability/Cargo.toml
-COPY crates/interfoldup/Cargo.toml ./interfoldup/Cargo.toml
 COPY crates/entrypoint/Cargo.toml ./entrypoint/Cargo.toml
+COPY crates/event-system/Cargo.toml ./event-system/Cargo.toml
 COPY crates/events/Cargo.toml ./events/Cargo.toml
 COPY crates/evm/Cargo.toml ./evm/Cargo.toml
 COPY crates/evm-helpers/Cargo.toml ./evm-helpers/Cargo.toml
@@ -102,7 +102,7 @@ RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./e
 RUN echo 'fn main() { println!("cargo:warning=dependency cache build"); }' > ./cli/build.rs
 RUN for d in ./*/ ./*/*/ ; do \
         if [ -f "$d/Cargo.toml" ]; then \
-          if [ "$d" = "./cli/" ] || [ "$d" = "./interfoldup/" ]; then \
+          if [ "$d" = "./cli/" ]; then \
             mkdir -p "$d/src" && \
             echo "fn main() {}" > "$d/src/main.rs"; \
           elif [ "$d" = "./utils-derive/" ]; then \

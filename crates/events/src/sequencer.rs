@@ -96,7 +96,7 @@ impl Handler<SequencerBarrier> for Sequencer {
 #[cfg(test)]
 mod tests {
     use actix::{Actor, Handler, Message};
-    use e3_ciphernode_builder::EventSystem;
+    use e3_event_system::EventSystem;
     use e3_events::{
         EventPublisher, EventSource, FlushPendingSnapshots, GetEvents, InsertBatch, InterfoldEvent,
         TakeEvents, TestEvent, UpdateDestination,

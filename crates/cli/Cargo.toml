@@ -27,6 +27,7 @@ dirs = { workspace = true }
 e3-config = { workspace = true }
 e3-console = { workspace = true }
 e3-ciphernode-builder = { workspace = true }
+e3-event-system = { workspace = true }
 e3-crypto = { workspace = true }
 e3-dashboard = { workspace = true }
 e3-entrypoint = { workspace = true }
@@ -41,7 +42,9 @@ e3-support-scripts = { workspace = true }
 e3-daemon-server = { workspace = true }
 e3-utils = { workspace = true }
 e3-zk-prover = { workspace = true }
+flate2 = "1"
 hex = { workspace = true }
+indicatif = "0.17"
 opentelemetry = { workspace = true }
 opentelemetry-otlp = { workspace = true }
 opentelemetry-stdout = { workspace = true }
@@ -53,6 +56,8 @@ rand = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tar = "0.4"
+tempfile = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }
@@ -67,4 +72,3 @@ serde_json = { workspace = true }
 [dev-dependencies]
 opentelemetry_sdk = { workspace = true, features = ["testing"] }
 serde_yaml = { workspace = true }
-tempfile = { workspace = true }
