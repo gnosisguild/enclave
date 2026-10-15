@@ -117,9 +117,10 @@ if [ "$CIRCUIT_PATH" = "dkg/sk_share_computation_chunk" ] || [ "$CIRCUIT_PATH" =
     if [ "${BENCHMARK_PRESET:-insecure}" = "insecure" ]; then
         CHUNK_SIZE=128
     elif [ "${BENCHMARK_PRESET:-}" = "secure-16384" ]; then
+        # 8192 for up to four parties (minimum), 2048 above.
         case "$COMMITTEE_NAME" in
             minimum) CHUNK_SIZE=8192 ;;
-            micro) CHUNK_SIZE=1024 ;;
+            *) CHUNK_SIZE=2048 ;;
         esac
     fi
     python3 "${SCRIPT_DIR}/extract_share_computation_chunk.py" \
