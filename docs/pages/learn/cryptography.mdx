@@ -257,10 +257,10 @@ cannot substitute another circuit within the proof tree.
 Two BFV presets exist. Each preset has a threshold parameter set for user data and a DKG parameter
 set for the individual keys. The values come from `crates/fhe-params/src/constants.rs`.
 
-| Preset         | `paramSet` | Threshold degree | Threshold CRT moduli | Plaintext modulus $t$ | DKG degree | DKG CRT moduli |
-| -------------- | ---------: | ---------------: | -------------------: | --------------------: | ---------: | -------------: |
-| `insecure-64`  |          0 |               64 |                    3 |            17,000,000 |         64 |              2 |
-| `secure-8192`  |          2 |             8192 |                    3 |            17,000,000 |       8192 |              2 |
+| Preset        | `paramSet` | Threshold degree | Threshold CRT moduli | Plaintext modulus $t$ | DKG degree | DKG CRT moduli |
+| ------------- | ---------: | ---------------: | -------------------: | --------------------: | ---------: | -------------: |
+| `insecure-64` |          0 |               64 |                    3 |            17,000,000 |         64 |              2 |
+| `secure-8192` |          2 |             8192 |                    3 |            17,000,000 |       8192 |              2 |
 
 `insecure-64` is for development and tests only. The code marks it as not for production. The
 deployment script refuses to deploy it on a chain that is not a known test or local chain.
@@ -269,9 +269,9 @@ deployment script refuses to deploy it on a chain that is not a known test or lo
 
 `ActiveCryptoConfig.sol` selects the supported presets from `block.chainid`:
 
-| Chain            | Chain ID    | Presets                       | Committee sizes in the circuit build |
-| ---------------- | ----------- | ----------------------------- | ------------------------------------ |
-| Ethereum mainnet | 1           | `secure-8192`                 | `Minimum`, `Micro`, `Small`          |
+| Chain            | Chain ID    | Presets                      | Committee sizes in the circuit build |
+| ---------------- | ----------- | ---------------------------- | ------------------------------------ |
+| Ethereum mainnet | 1           | `secure-8192`                | `Minimum`, `Micro`, `Small`          |
 | Sepolia          | 11155111    | `insecure-64`, `secure-8192` | `Minimum`, `Micro`, `Small`          |
 | Local            | 31337, 1337 | `insecure-64`, `secure-8192` | `Minimum`, `Micro`, `Small`          |
 

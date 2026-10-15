@@ -1561,7 +1561,6 @@ jobs:
       - name: Check generated verifiers are in sync
         run: pnpm check:verifiers --no-compile
 
-
       - name: Cancel workflow on failure
         if: failure()
         run: gh run cancel ${{ github.run_id }}

@@ -2,10 +2,10 @@
 
 `@crisp-e3/sdk` and `@crisp-e3/contracts` are published as a matched pair on two channels.
 
-| channel    | tag       | preset         | who it is for                      |
-| ---------- | --------- | -------------- | ---------------------------------- |
+| channel    | tag       | preset        | who it is for                      |
+| ---------- | --------- | ------------- | ---------------------------------- |
 | testing    | `testing` | `insecure-64` | testnets, demos, local development |
-| production | `latest`  | both presets   | deployed clients and real rounds   |
+| production | `latest`  | both presets  | deployed clients and real rounds   |
 
 ## Why presets are separate entry points
 

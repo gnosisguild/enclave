@@ -94,7 +94,7 @@ The template client uses the same two plugins in `client/vite.config.ts`.
 | `walletClient`                 | `WalletClient`                 | No       | A viem wallet client with an account. Write calls need it.   |
 | `contracts`                    | `ContractAddresses`            | Yes      | `interfold`, `ciphernodeRegistry`, and `feeToken` addresses. |
 | `chain`                        | `Chain`                        | No       | The viem chain.                                              |
-| `thresholdBfvParamsPresetName` | `ThresholdBfvParamsPresetName` | No       | The BFV preset. The default is `INSECURE_THRESHOLD_64`.     |
+| `thresholdBfvParamsPresetName` | `ThresholdBfvParamsPresetName` | No       | The BFV preset. The default is `INSECURE_THRESHOLD_64`.      |
 
 The constructor throws an `SDKError` with the code `MISSING_PUBLIC_CLIENT`, `INVALID_ADDRESS`, or
 `INVALID_THRESHOLD_BFV_PARAMS_PRESET_NAME` when the configuration is not valid.
@@ -168,10 +168,10 @@ const sdk = InterfoldSDK.create({
 The preset selects the BFV parameters that the client uses to encrypt. It must match the `paramSet`
 of the E3.
 
-| Preset name              | `paramSet` | Ring degree | CRT moduli (L) | Use                             |
-| ------------------------ | ---------- | ----------- | -------------- | ------------------------------- |
-| `INSECURE_THRESHOLD_64`  | 0          | 64          | 3              | Local development and tests     |
-| `SECURE_THRESHOLD_8192`  | 2          | 8192        | 3              | Production and secure test runs |
+| Preset name             | `paramSet` | Ring degree | CRT moduli (L) | Use                             |
+| ----------------------- | ---------- | ----------- | -------------- | ------------------------------- |
+| `INSECURE_THRESHOLD_64` | 0          | 64          | 3              | Local development and tests     |
+| `SECURE_THRESHOLD_8192` | 2          | 8192        | 3              | Production and secure test runs |
 
 The insecure preset has no production security. Use it only for tests.
 `ThresholdBfvParamsPresetNames` lists both names, and `DEFAULT_THRESHOLD_BFV_PARAMS_PRESET_NAME` is

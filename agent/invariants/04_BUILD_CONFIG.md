@@ -79,9 +79,9 @@ every section.
   an added, removed or changed function, event or error fails until the regenerated files are
   committed. — `scripts/check-cli-bindings.ts`
 - Contracts CI requires at least 128 bytes below the EIP-170 limit for `Interfold`,
-  `BondingRegistry`, `CiphernodeRegistryOwnable`, and the canonical `insecure-64/minimum`
-  aggregator verifiers. Every deployed verifier variant must fit, but CI does not measure the other
-  variants. — `scripts/checkContractSize.ts`; INDEX concern #22
+  `BondingRegistry`, `CiphernodeRegistryOwnable`, and the canonical `insecure-64/minimum` aggregator
+  verifiers. Every deployed verifier variant must fit, but CI does not measure the other variants. —
+  `scripts/checkContractSize.ts`; INDEX concern #22
 - BFV circuit-verifier and OpenVM receipt-verifier constructors require deployed verifier contracts.
   BFV circuit wrappers also require nonzero recursive VK hashes. — INDEX concerns #21, Z-15
 - CLI secrets enter through **stdin or hidden prompts**, never argv or the environment. Wallet keys

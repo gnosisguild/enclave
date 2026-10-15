@@ -30,7 +30,7 @@ output — every step backed by ZK proofs verified on-chain.
 | Committee    | Ciphernodes serving an E3. Sizes `(N, T, H)`: `minimum` (3,1,2), `micro` (9,4,5), `small` (19,9,14)                             |
 | DKG          | Distributed key generation — joint threshold public key, no party holds the full secret                                         |
 | BFV / TrBFV  | Brakerski–Fan–Vercauteren FHE scheme / its threshold (publicly verifiable) variant                                              |
-| Preset       | BFV parameter set: `insecure-64` (dev/CI default) or `secure-8192`                                                             |
+| Preset       | BFV parameter set: `insecure-64` (dev/CI default) or `secure-8192`                                                              |
 | C0–C7        | ZK circuit IDs across the DKG/decryption pipeline (map below)                                                                   |
 | Sortition    | Random committee selection (`crates/sortition`)                                                                                 |
 | Slashing     | Fault attribution, accusation quorum, commitment consistency (`crates/slashing`)                                                |
@@ -70,7 +70,7 @@ Run from repo root via pnpm scripts — not raw cargo/nargo/hardhat.
 | Test one layer              | `pnpm evm:test` · `pnpm rust:test` · `pnpm sdk:test` · `pnpm noir:test`                                                                            |
 | SDK proof verification      | `pnpm sdk:test:proofs` (prepare circuits, generate one proof, verify bindings and reject tampering)                                                |
 | Prepared SDK proof tests    | `pnpm sdk:test:proofs:prepared` (reuse the current SDK build or prepared circuit set)                                                              |
-| Rust proof integration      | `pnpm rust:test:proofs` (prepared insecure-64/minimum circuits, `nargo`, and `bb`)                                                                |
+| Rust proof integration      | `pnpm rust:test:proofs` (prepared insecure-64/minimum circuits, `nargo`, and `bb`)                                                                 |
 | Rust slashing integration   | `pnpm rust:test:slashing` (compiled contract artifacts and `anvil`)                                                                                |
 | Integration tests           | `pnpm test:integration [name]` (`--no-prebuild` to skip binary build)                                                                              |
 | Test runner regressions     | `pnpm test:harnesses`                                                                                                                              |

@@ -490,16 +490,16 @@ interface SDKConfig {
 `thresholdBfvParamsPresetName` selects the BFV parameter set used for encryption. It must match the
 on-chain `paramSet` index registered in the Interfold contract:
 
-| Preset name                | On-chain `paramSet` index | Use case                                                                 |
-| -------------------------- | ------------------------- | ------------------------------------------------------------------------ |
+| Preset name               | On-chain `paramSet` index | Use case                                                                 |
+| ------------------------- | ------------------------- | ------------------------------------------------------------------------ |
 | `'INSECURE_THRESHOLD_64'` | `0`                       | Fast local or testnet work. This preset is not cryptographically secure. |
-| `'SECURE_THRESHOLD_8192'`  | `2`                       | Production-equivalent work with degree 8192 and three ciphertext moduli. |
+| `'SECURE_THRESHOLD_8192'` | `2`                       | Production-equivalent work with degree 8192 and three ciphertext moduli. |
 
-| Network           | Supported presets                                        |
-| ----------------- | -------------------------------------------------------- |
+| Network           | Supported presets                                       |
+| ----------------- | ------------------------------------------------------- |
 | Local development | `'INSECURE_THRESHOLD_64'` and `'SECURE_THRESHOLD_8192'` |
 | Sepolia testnet   | `'INSECURE_THRESHOLD_64'` and `'SECURE_THRESHOLD_8192'` |
-| Ethereum mainnet  | `'SECURE_THRESHOLD_8192'` only                           |
+| Ethereum mainnet  | `'SECURE_THRESHOLD_8192'` only                          |
 
 Use the preset that the target E3 selects. This package includes proof artifacts only for
 `'INSECURE_THRESHOLD_64'`. For secure proof generation, use matching application artifacts such as

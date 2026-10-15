@@ -279,10 +279,10 @@ After `pnpm dev:up`, contract addresses are written automatically to `interfold.
 
 Edit **`crisp.dev.env`** (created from `crisp.dev.env.example` on first `pnpm dev:setup`):
 
-| Variable                       | Default        | Effect                                                                |
-| ------------------------------ | -------------- | --------------------------------------------------------------------- |
+| Variable                       | Default       | Effect                                                                |
+| ------------------------------ | ------------- | --------------------------------------------------------------------- |
 | `CRISP_BFV_PRESET`             | `insecure-64` | BFV preset for aggregation circuits and the server `E3_PARAM_SET`     |
-| `CRISP_SKIP_PROOF_AGGREGATION` | `true`         | Ciphernode-only local-dev skip; also selects mock verifier deployment |
+| `CRISP_SKIP_PROOF_AGGREGATION` | `true`        | Ciphernode-only local-dev skip; also selects mock verifier deployment |
 
 `pnpm dev:setup` applies this profile and builds recursive circuits only when needed. `pnpm dev:up`
 deploys contracts using the same flags.

@@ -120,14 +120,14 @@ to turn the `localhost` chain entry into environment variables:
 `client/src/utils/env-config.ts` reads these variables. When one is missing, the client shows the
 `EnvironmentError` screen instead of the wizard.
 
-| Variable                                | Default                  |
-| --------------------------------------- | ------------------------ |
-| `VITE_INTERFOLD_ADDRESS`                | None                     |
-| `VITE_REGISTRY_ADDRESS`                 | None                     |
-| `VITE_BONDING_REGISTRY_ADDRESS`         | None                     |
-| `VITE_E3_PROGRAM_ADDRESS`               | None                     |
-| `VITE_FEE_TOKEN_ADDRESS`                | None                     |
-| `VITE_RPC_URL`                          | `http://localhost:8545`  |
+| Variable                                | Default                 |
+| --------------------------------------- | ----------------------- |
+| `VITE_INTERFOLD_ADDRESS`                | None                    |
+| `VITE_REGISTRY_ADDRESS`                 | None                    |
+| `VITE_BONDING_REGISTRY_ADDRESS`         | None                    |
+| `VITE_E3_PROGRAM_ADDRESS`               | None                    |
+| `VITE_FEE_TOKEN_ADDRESS`                | None                    |
+| `VITE_RPC_URL`                          | `http://localhost:8545` |
 | `VITE_THRESHOLD_BFV_PARAMS_PRESET_NAME` | `INSECURE_THRESHOLD_64` |
 
 `client/src/main.tsx` also reads `VITE_WALLETCONNECT_PROJECT_ID` for ConnectKit.

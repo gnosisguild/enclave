@@ -1216,7 +1216,7 @@ mod public_key_chunk_tests {
 
     #[test]
     fn historical_slot_zero_uses_its_original_bytes_and_circuit_version() {
-        // The degree-512 parameter set that slot 0 held before the insecure-64 cutover.
+        // The degree-512 parameter set that historical slot-0 requests registered under v1.
         let params = (
             U256::from(512u64),
             U256::from(100u64),
