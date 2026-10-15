@@ -417,8 +417,8 @@ node's own recipient slot is exempt because its exported key comes directly from
 The chunked C2 path keeps the same signed proof multiplicity. For each C2a/C2b request, Rust
 generates one type-bound recursive proof per chunk. The default chunk size is
 `c2_chunk_size(degree, n_parties)`. At degree 16384 it depends on the committee: 8192 coefficients
-for up to 4 parties, 1024 for up to 12, and 512 above. At 8192 the secure-16384/minimum leaves have
-2,090,591 (C2a) and 2,619,131 (C2b) gates. Other degrees use the smaller of 512 and the degree, so
+for up to 4 parties and 2048 above. At 8192 the secure-16384/minimum leaves have 1,926,746 (C2a)
+and 3,059,476 (C2b) gates. Other degrees use the smaller of 512 and the degree, so
 the insecure degree-128 preset uses 128 coefficients per chunk. A batch holds up to four chunks. The
 `--chunk-size` option accepts any nonzero divisor of the preset polynomial degree for generated
 circuit configuration. The production multithread path selects the preset default chunk size. Rust
