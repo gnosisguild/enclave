@@ -105,6 +105,24 @@ mod share_decryption {
         );
     }
 
+    /// A malformed own-share row must fail at the witness boundary, not as a Noir input error.
+    #[test]
+    fn own_share_rows_must_carry_the_configured_degree() {
+        let committee = CiphernodesCommitteeSize::Small.values();
+        let preset = BfvPreset::InsecureThreshold512;
+        let config = Configs::for_preset(preset).unwrap();
+        let mut sample = e3_zk_samples::dkg::share_decryption::generate(
+            &config,
+            preset,
+            committee,
+            DkgInputType::SecretKey,
+        )
+        .unwrap();
+        sample.own_plaintext_share[0].pop();
+        let error = Inputs::compute(&config, &sample).unwrap_err();
+        assert!(error.to_string().contains("own_plaintext_share[0]"));
+    }
+
     /// Check row ordering for both external ciphertexts and the own plaintext slot.
     #[test]
     fn test_commitment_ordering_consistency() {
@@ -162,8 +180,8 @@ mod share_encryption {
     use e3_zk_config::dkg::share_encryption::Configs;
     use e3_zk_config::DkgInputType;
     use e3_zk_witness::dkg::share_encryption::Inputs;
-    use fhe::bfv::Encoding;
-    use fhe_traits::FheDecoder;
+    use fhe::bfv::{Encoding, Plaintext};
+    use fhe_traits::{FheDecoder, FheEncoder};
     use num_bigint::{BigInt, BigUint};
 
     #[test]
@@ -236,5 +254,53 @@ mod share_encryption {
                 );
             }
         }
+    }
+
+    #[test]
+    fn plaintext_with_a_foreign_degree_is_rejected() {
+        let (threshold_params, dkg_params) = BfvPreset::InsecureThreshold512.build_pair().unwrap();
+        let config = Configs::new(&dkg_params).unwrap();
+        let mut sample = e3_zk_samples::dkg::share_encryption::generate(
+            &threshold_params,
+            &dkg_params,
+            BfvPreset::InsecureThreshold512,
+            CiphernodesCommitteeSize::Minimum.values(),
+            DkgInputType::SecretKey,
+            0,
+        )
+        .unwrap();
+        let (_, foreign_params) = BfvPreset::SecureThreshold8192.build_pair().unwrap();
+        sample.plaintext = Plaintext::try_encode(
+            &vec![0u64; foreign_params.degree()],
+            Encoding::poly(),
+            &foreign_params,
+        )
+        .unwrap();
+        let error = Inputs::compute(&config, &sample).unwrap_err();
+        assert!(error.to_string().contains("configured polynomial degree"));
+    }
+
+    /// The insecure DKG preset has a single modulus, so a level-1 plaintext requires the
+    /// two-modulus secure preset. Above level zero, the shorter context pairs with the full limb
+    /// vectors and truncates the witness without an error.
+    #[test]
+    fn plaintext_above_level_zero_is_rejected() {
+        let preset = BfvPreset::SecureThreshold8192;
+        let (threshold_params, dkg_params) = preset.build_pair().unwrap();
+        let config = Configs::new(&dkg_params).unwrap();
+        let mut sample = e3_zk_samples::dkg::share_encryption::generate(
+            &threshold_params,
+            &dkg_params,
+            preset,
+            CiphernodesCommitteeSize::Minimum.values(),
+            DkgInputType::SecretKey,
+            0,
+        )
+        .unwrap();
+        let row = Vec::<u64>::try_decode(&sample.plaintext, Encoding::poly()).unwrap();
+        sample.plaintext =
+            Plaintext::try_encode(&row, Encoding::poly_at_level(1), &dkg_params).unwrap();
+        let error = Inputs::compute(&config, &sample).unwrap_err();
+        assert!(error.to_string().contains("level zero"));
     }
 }

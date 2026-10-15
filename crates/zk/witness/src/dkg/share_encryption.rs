@@ -115,7 +115,15 @@ impl Inputs {
         let e0 = &data.e0_rns;
         let e1 = &data.e1_rns;
 
-        let ctx = dkg_params.context_at_level(pt.level())?;
+        // The pk, ct, and error polynomials are pinned to the level-zero context above. A
+        // plaintext above level zero would pair fewer context moduli with the full limb vectors
+        // and silently truncate the witness.
+        if pt.level() != 0 {
+            return Err(WitnessError::Other(
+                "share encryption plaintext must be at level zero".into(),
+            ));
+        }
+        let ctx = dkg_params.context_at_level(0)?;
         let moduli = dkg_params.moduli();
 
         #[allow(non_snake_case)]
@@ -133,6 +141,11 @@ impl Inputs {
         e0_mod_q.center(&modulus_q);
 
         let mut k1_u64 = Vec::<u64>::try_decode(pt, Encoding::poly())?;
+        if k1_u64.len() != dkg_params.degree() {
+            return Err(WitnessError::Other(
+                "plaintext does not have the configured polynomial degree".into(),
+            ));
+        }
         Modulus::new(t)
             .map_err(|e| WitnessError::Fhe(fhe::Error::from(e)))?
             .scalar_mul_vec(&mut k1_u64, q_mod_t);

@@ -65,7 +65,8 @@ impl Inputs {
 
         let msg_bit = config.bits.msg_bit;
 
-        // Validate own-plaintext shape against L only when an own slot is present.
+        // Validate own-plaintext shape only when an own slot is present: one row per modulus,
+        // each with `params.degree()` coefficients.
         let has_own_slot = data.honest_ciphertexts.iter().any(|s| s.is_none());
         if has_own_slot && data.own_plaintext_share.len() != threshold_l {
             return Err(WitnessError::Other(format!(
@@ -73,6 +74,20 @@ impl Inputs {
                 data.own_plaintext_share.len(),
                 threshold_l
             )));
+        }
+        if has_own_slot {
+            let degree = config.params.degree();
+            if let Some((index, row)) = data
+                .own_plaintext_share
+                .iter()
+                .enumerate()
+                .find(|(_, row)| row.len() != degree)
+            {
+                return Err(WitnessError::Other(format!(
+                    "own_plaintext_share[{index}] has {} coefficients; expected {degree}",
+                    row.len()
+                )));
+            }
         }
 
         // Iterate H slots in ascending honest-party order: external slots BFV-decrypt and

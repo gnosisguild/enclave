@@ -15,7 +15,8 @@
 #   2. Cargo development-only containment — `test-only-skip-proof-aggregation` must never be
 #      a default feature and must only be *enabled* (as a dependency feature) by
 #      crates/tests. Forwarding declarations in [features] sections are fine. Artificial ZK samples
-#      must stay in dev-dependencies in every package.
+#      must stay in dev-dependencies; the unpublished e3-zk-benchmarks development tool is the one
+#      package that may link them as a normal dependency.
 #   3. runtime proof-skip guard — validate_proof_aggregation_mode must exist and be
 #      called in crates/entrypoint (agent/invariants/02_CRYPTO_CIRCUITS.md, C-02).
 #   4. ciphernode Docker workspace coverage — every root workspace crate manifest
