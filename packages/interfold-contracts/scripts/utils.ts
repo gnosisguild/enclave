@@ -255,6 +255,12 @@ export const SECURE_16384_MINIMUM_BFV_CONFIG: ActiveBfvConfig = bfvConfig(
   { committeeSize: 0, h: 2, t: 1, n: 3 },
 );
 
+export const SECURE_16384_SMALL_BFV_CONFIG: ActiveBfvConfig = bfvConfig(
+  "secure-16384",
+  "small",
+  { committeeSize: 2, h: 14, t: 9, n: 19 },
+);
+
 export const PRODUCTION_BFV_CONFIG: ActiveBfvConfig = SECURE_SMALL_BFV_CONFIG;
 
 export const TESTNET_BFV_CONFIG: ActiveBfvConfig = INSECURE_MINIMUM_BFV_CONFIG;
@@ -276,6 +282,7 @@ export const TESTNET_BFV_CONFIGS: readonly ActiveBfvConfig[] = [
   SECURE_MICRO_BFV_CONFIG,
   SECURE_SMALL_BFV_CONFIG,
   SECURE_16384_MINIMUM_BFV_CONFIG,
+  SECURE_16384_SMALL_BFV_CONFIG,
 ] as const;
 
 export function isTestnetOrLocalChainId(chainId: number): boolean {
