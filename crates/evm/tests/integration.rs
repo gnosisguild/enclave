@@ -333,6 +333,7 @@ async fn a_chain_without_a_contract_route_is_rejected() -> Result<()> {
     // chain and route none of them.
     let error = EvmSystemChainBuilder::new(&bus, &provider)
         .build()
+        .map(drop)
         .expect_err("a chain reader without a contract route must not start");
     assert!(
         error.to_string().contains("no contract reader"),

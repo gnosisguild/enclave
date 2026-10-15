@@ -90,7 +90,7 @@ impl CiphernodeBuilder {
                         InterfoldSolReader::setup(&next).recipient()
                     });
             }
-            gateways.push(readers.system.build_with_readiness()?);
+            gateways.push(readers.system.build()?);
         }
 
         Ok((evm_config, gateways))

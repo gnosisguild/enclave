@@ -18,8 +18,6 @@ use e3_events::{run_once, BusHandle, EventSubscriber, EventType, HistoricalEvmSy
 pub trait RouteFn: FnOnce(EvmEventProcessor) -> EvmEventProcessor + Send {}
 impl<F> RouteFn for F where F: FnOnce(EvmEventProcessor) -> EvmEventProcessor + Send {}
 
-type RouteFactory = Box<dyn RouteFn>;
-
 // Build the event system for a single chain
 pub struct EvmSystemChainBuilder<P> {
     provider: EthProvider<P>,
@@ -29,7 +27,7 @@ pub struct EvmSystemChainBuilder<P> {
     max_buffered_events: usize,
     max_log_window: u64,
     progress: Option<IngestionProgressSink>,
-    route_factories: Vec<(Address, RouteFactory)>,
+    route_factories: Vec<(Address, Box<dyn RouteFn>)>,
 }
 
 impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
@@ -78,14 +76,10 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
         self
     }
 
-    pub fn build(&mut self) -> Result<()> {
-        self.build_with_readiness().map(drop)
-    }
-
     /// Fails for a chain without a contract route. The reader's log filter is built from the
     /// routes, so without one it has no address and fetches every log on the chain. The router
     /// drops them all, so the chain would do nothing except load the provider.
-    pub fn build_with_readiness(&mut self) -> Result<EvmChainGatewayHandle> {
+    pub fn build(&mut self) -> Result<EvmChainGatewayHandle> {
         if self.route_factories.is_empty() {
             bail!(
                 "chain {} has no contract reader; a chain reader needs at least one contract route",
@@ -127,8 +121,9 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
                 let router = configure_router(next, route_factories);
 
                 // Extract filters from the router
-                let filters =
-                    filters_from_router(&router, deploy_block, confirmations, max_log_window);
+                let filters = Filters::from_routing_table(router.get_routing_table(), deploy_block)
+                    .with_confirmations(confirmations)
+                    .with_max_log_window(max_log_window);
 
                 // Setup and start the read interface and the router
                 EvmReadInterface::setup_with_factory(
@@ -163,15 +158,4 @@ fn configure_router(
         router = router.add_route(address, &processor);
     }
     router
-}
-
-fn filters_from_router(
-    router: &EvmRouter,
-    deploy_block: u64,
-    confirmations: u64,
-    max_log_window: u64,
-) -> Filters {
-    Filters::from_routing_table(router.get_routing_table(), deploy_block)
-        .with_confirmations(confirmations)
-        .with_max_log_window(max_log_window)
 }

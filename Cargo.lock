@@ -3664,12 +3664,10 @@ dependencies = [
  "e3-sortition",
  "e3-sync",
  "e3-test-helpers",
- "e3-trbfv",
  "e3-utils",
  "e3-zk-prover",
  "futures",
  "libp2p",
- "rayon",
  "tokio",
  "tracing",
 ]
