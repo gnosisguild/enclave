@@ -404,9 +404,9 @@ semantic operation names rather than circuit-stage labels. No `src/actors/`, `sr
 
 The remaining large non-actor files are not automatically actor violations. Generated contract
 bindings and cohesive circuit/FHE algorithms are reviewed by their own complexity and test
-boundaries. Composition roots such as `CiphernodeBuilder`, and infrastructure coordinators such as
-`NetInterface`, remain separate follow-up targets; splitting them mechanically would not make
-protocol actors thinner.
+boundaries. `CiphernodeBuilder` is split by startup phase in
+`crates/ciphernode-builder/src/builder/`. Infrastructure coordinators such as `NetInterface` remain
+separate follow-up targets; splitting them mechanically would not make protocol actors thinner.
 
 ## Event ingestion, persistence, replay, and synchronization
 
