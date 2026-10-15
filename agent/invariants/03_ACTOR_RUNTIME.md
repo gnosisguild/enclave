@@ -424,3 +424,10 @@ the code does not meet yet.
   `--repair`. A mismatch names the supported recovery action and leaves log bytes unchanged. —
   `crates/sync/src/sync/preflight.rs`; `crates/entrypoint/tests/validate_older_schema.rs`;
   `ARCHITECTURE.md`; `00_INDEX.md` known open issues
+- `BfvPreset` is persisted by discriminant inside events and snapshots. Variants 0 and 1 are the
+  degree-64 insecure presets under `SCHEMA_VERSION = 8`; a store written with the degree-512
+  insecure presets at those discriminants has the same marker and decodes to the wrong parameters.
+  Testnet nodes must start from an empty store (`interfold node reset-data`) on a fresh testnet
+  stack. A change that gives a persisted discriminant other parameters must either raise
+  `SCHEMA_VERSION` or state the same reset requirement here and in `flow-trace/07`. —
+  `crates/fhe-params/src/presets.rs`; `crates/sync/src/sync/schema_version.rs`; `flow-trace/07`

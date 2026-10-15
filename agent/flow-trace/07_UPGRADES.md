@@ -257,6 +257,13 @@ its event bytes cannot decode. Validation skips all event and snapshot checks in
 node that upgrades to v0.19.0 clears its state and syncs again from the chain history. The reset
 must use the v0.19.0 binary: `reset-data` in v0.18.0 and earlier has no key-share check.
 
+The insecure preset is not covered by the schema marker. `BfvPreset` variants 0 and 1 are the
+degree-64 `InsecureThreshold64` and `InsecureDkg64` presets, and parameter-set index 0 carries the
+degree-64 tuple under schema version 8. A store or a deployment that holds the degree-512 insecure
+tuple at those positions also reports schema version 8, so the preflight cannot reject it. A testnet
+node therefore runs `interfold node reset-data` before it starts against a fresh testnet stack, and
+a testnet that holds degree-512 index-0 E3s is redeployed, not upgraded in place.
+
 The operator key and the libp2p keypair live in the same key/value store as that state, under
 `//eth_private_key` and `//libp2p/keypair`. Deleting the data directory destroys the identity that
 holds the bond, and `nodes purge` additionally removes the configuration directory holding the

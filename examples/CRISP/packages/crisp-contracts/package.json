@@ -1,6 +1,6 @@
 {
   "name": "@crisp-e3/contracts",
-  "version": "0.26.0",
+  "version": "0.27.0-insecure.0",
   "type": "module",
   "files": [
     "contracts",
