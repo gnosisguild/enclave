@@ -41,7 +41,7 @@ function walk(dir, ext, out = []) {
 const rel = (p) => relative(ROOT, p)
 const lines = (p) => readFileSync(p, 'utf8').split('\n')
 
-// The layer of each workspace crate, from agent/CRATES_ARCHITECTURE.md "Dependency layers".
+// Hand-maintained primary responsibilities for the blueprint, not the full Cargo dependency graph.
 export const LAYERS = {
   entry: [
     'cli',

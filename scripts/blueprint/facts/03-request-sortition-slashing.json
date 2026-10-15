@@ -3,11 +3,10 @@
   "units": [
     {
       "id": "e3-request",
+      "documentation": [{ "title": "Request routing and recovery", "path": "docs/architecture/persistence-and-replay.md" }],
       "kind": "crate",
       "path": "crates/request",
       "one_line": "Routes every bus event to a per-E3 context, creates that E3's actors on demand, and tears the context down when the E3 ends.",
-      "explain": "E3Router gives each E3 id its own E3Context, a struct (not an actor) that holds the Addr of actors created by router extensions and typed dependencies such as E3Meta. Extensions run on every routed event and can create actors on demand (AccusationManagerExtension does so on CommitteeFinalized); the router then forwards the event to that context's recipients, buffering it while a recipient does not exist yet. Without this split, concurrent E3s would share state, and a restart could not tell which E3s are still open.",
-      "analogy": "A hotel front desk that gives each guest a folder of rooms, opens the rooms when the first booking arrives, and passes messages only to that guest's rooms.",
       "actors": [
         {
           "name": "E3Router",
@@ -202,11 +201,10 @@
     },
     {
       "id": "e3-sortition",
+      "documentation": [{ "title": "Committee selection", "path": "docs/architecture/committee-selection.md" }],
       "kind": "crate",
       "path": "crates/sortition",
       "one_line": "Chooses E3 committees by ranking operator tickets against the request seed, then tells each node whether it was finalized into one.",
-      "explain": "Sortition ranks each candidate operator's tickets by keccak256 over the operator address, ticket id, E3 id and the seed that CommitteeRequested delivers, and the lowest scores take the seats; a node whose ranked ticket falls inside the candidate buffer publishes TicketGenerated through CiphernodeSelector. CommitteeFinalizer in e3-aggregator collects those tickets and publishes CommitteeFinalizeRequested at the deadline, and CommitteeFinalized then makes Sortition store the roster and CiphernodeSelector publish CiphernodeSelected, but only when this node's address is in the roster. Without this crate no node could tell whether it must run DKG and decryption for an E3.",
-      "analogy": "A lottery drum with a public seed: every ticket is hashed the same way on every node, and the lowest hashes fill the seats.",
       "actors": [
         {
           "name": "Sortition",
@@ -429,11 +427,10 @@
     },
     {
       "id": "e3-slashing",
+      "documentation": [{ "title": "Accusations and slashing", "path": "docs/architecture/slashing.md" }],
       "kind": "crate",
       "path": "crates/slashing",
       "one_line": "Turns a detected proof fault into a signed accusation, gathers committee votes to a quorum, and emits the verdict for on-chain slashing.",
-      "explain": "A node that sees a proof fail, or a commitment mismatch between circuits, signs an accusation and its own vote, gossips both, and starts a vote timer. Other committee members vote only after their own check, and H agreeing votes decide the outcome: AccusedFaulted for one data hash, Equivocation for several, and Inconclusive when the timer ends with fewer than H votes. Only AccusedFaulted leads to a slash proposal in e3-evm; without this crate a bad share would be seen locally and never attributed.",
-      "analogy": "A jury with a quorum rule: each juror checks the evidence before voting, a verdict needs H agreeing jurors, and only a guilty verdict goes to the court clerk.",
       "actors": [
         {
           "name": "AccusationManager",

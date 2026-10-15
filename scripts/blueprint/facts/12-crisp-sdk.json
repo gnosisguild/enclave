@@ -3,11 +3,10 @@
   "units": [
     {
       "id": "interfold-sdk",
+      "documentation": [{ "title": "TypeScript SDK", "path": "docs/pages/build/sdk.mdx" }],
       "kind": "package",
       "path": "packages/interfold-sdk/src",
       "one_line": "TypeScript SDK for dApps: requests E3 rounds, encrypts values to the committee key with proofs, and reads E3 state and events.",
-      "explain": "InterfoldSDK starts a round with requestE3, which sends the Interfold request call, and reads the committee public key from the ciphernode registry. It encrypts values under that key with WASM, and encryptVectorAndGenProof and encryptNumberAndGenProof also return a user-data-encryption proof built with Barretenberg. After compute, publishCiphertextOutput posts the output reference, and event listeners and getE3 read the results.",
-      "analogy": "Like a sealed-envelope kit at a counter: it seals each value with the committee's public lock, files the request with the desk, and reads back the posted result.",
       "actors": [
         {
           "name": "InterfoldSDK",
@@ -100,11 +99,10 @@
     },
     {
       "id": "crisp-program",
+      "documentation": [{ "title": "CRISP computation and selection", "path": "docs/architecture/encrypted-computation.md" }],
       "kind": "package",
       "path": "examples/CRISP/program",
       "one_line": "The CRISP E3 program: selects each slot's valid ballot chain and adds the selected BFV ciphertexts into one encrypted tally.",
-      "explain": "This is the compute step of a CRISP round: its input policy turns each published entry into a leaf and keeps, per slot, only the current valid head of the parent chain. Its FHE processor adds the selected BFV ciphertexts together without decrypting them, and the OpenVM guest proves that run. The verify call on CRISPProgram later checks that proof against the round's input root, parameter hash, and committee key.",
-      "analogy": "Like a tally clerk who keeps only the latest valid slip from each voter, then adds the sealed envelopes without opening them.",
       "actors": [],
       "consumes": [],
       "emits": [],
@@ -186,11 +184,13 @@
     },
     {
       "id": "crisp-program-contract",
+      "documentation": [
+        { "title": "Application verification", "path": "docs/architecture/encrypted-computation.md" },
+        { "title": "Input availability", "path": "docs/architecture/data-availability.md" }
+      ],
       "kind": "contract",
       "path": "examples/CRISP/packages/crisp-contracts/contracts/CRISPProgram.sol",
       "one_line": "Solidity E3 program for CRISP: checks each ballot's Noir proof, logs inputs in a Merkle tree, and verifies the OpenVM compute proof.",
-      "explain": "Interfold calls validate when a round is requested, and publishInput checks a ballot's Noir proof and a signed availability attestation, then reserves a leaf in an append-only tree. finalizeInput records the data-availability receipt for that leaf, and verify accepts the OpenVM compute proof only when no reserved input is still pending. decodeTally then reads the per-option totals from the plaintext output that Interfold stores.",
-      "analogy": "Like a registrar for sealed ballots: each certificate is checked before the envelope is logged under a number, and the count is accepted only when every logged envelope has its receipt.",
       "actors": [
         {
           "name": "CRISPProgram",
@@ -323,11 +323,10 @@
     },
     {
       "id": "crisp-circuits",
+      "documentation": [{ "title": "Ballot proofs and limits", "path": "docs/architecture/encrypted-computation.md" }],
       "kind": "circuit",
       "path": "examples/CRISP/circuits",
       "one_line": "Noir circuits: the voter proof for an eligible, valid ballot, plus fold circuits that combine it with the encryption proof.",
-      "explain": "The crisp circuit (bin/crisp) proves that the slot is in the census and that the published slot ciphertext comes from the ballot. For a vote it also proves that the option weights fit the balance and that the signature comes from the slot's address. crisp_onchain takes voting power as a public input instead of a Merkle path. The fold circuits verify the crisp proof and the user-data-encryption proof together, check that their commitments match, and return the public-key commitment.",
-      "analogy": "Like a notary who checks sealed slips against the register: the slot must be listed, and a vote's slip must fit the voter's allowance and carry the voter's signature, all without opening the envelope.",
       "actors": [],
       "consumes": [
         {
@@ -423,11 +422,14 @@
     },
     {
       "id": "crisp-server",
+      "documentation": [
+        { "title": "CRISP recovery", "path": "docs/architecture/encrypted-computation.md" },
+        { "title": "DA relay", "path": "docs/architecture/data-availability.md" },
+        { "title": "Server setup", "path": "docs/pages/CRISP/setup.mdx" }
+      ],
       "kind": "package",
       "path": "examples/CRISP/server",
       "one_line": "Rust CRISP server: requests rounds, relays votes to the chain, indexes Interfold events, asks for compute at the deadline, and records the tally.",
-      "explain": "It drives a CRISP round around the chain: a cron-gated POST /rounds/request calls request_e3 on Interfold, and an indexer records the E3 events in a sled store. POST /voting/broadcast stages each vote as a durable job that sends publishInput, publishes the bytes to the data-availability layer, and then calls finalizeInput; the relay key pays for publishInput unless the job falls back to the voter's wallet. At the input deadline the indexed inputs go to the OpenVM program server, and PlaintextOutputPublished records the decoded tally.",
-      "analogy": "Like a stage manager for a poll: it books the hall with Interfold, logs each sealed ballot as it arrives, passes the ballots to the counting room, and posts the final count.",
       "actors": [],
       "consumes": [
         {
@@ -568,11 +570,10 @@
     },
     {
       "id": "crisp-crates",
+      "documentation": [{ "title": "CRISP components", "path": "docs/pages/CRISP/introduction.mdx" }],
       "kind": "crate",
       "path": "examples/CRISP/crates",
       "one_line": "Four helper crates: tally decoding, the CRISPProgram contract client, BFV ZK-input generation, and its WASM binding.",
-      "explain": "crisp-utils turns the decrypted tally bytes into per-option totals, and the server calls it when a round finishes. evm-helpers (directory evm_helpers) wraps CRISPProgram calls such as publish_input and finalize_input for the server. zk-inputs builds keys, encrypted votes, and witnesses for the slot relation, and zk-inputs-wasm (package crisp-zk-inputs) exposes that generator to JavaScript.",
-      "analogy": "Like a toolbox at a counting office: one tool reads the final tally slip, one is the phone line to the contract desk, one prepares sealed paperwork, and one is the same paperwork tool packaged for JavaScript.",
       "actors": [],
       "consumes": [],
       "emits": [],

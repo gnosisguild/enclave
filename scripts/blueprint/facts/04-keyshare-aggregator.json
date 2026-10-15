@@ -3,11 +3,13 @@
   "units": [
     {
       "id": "e3-keyshare",
+      "documentation": [
+        { "title": "DKG", "path": "docs/architecture/dkg.md" },
+        { "title": "Threshold decryption", "path": "docs/architecture/threshold-decryption.md" }
+      ],
       "kind": "crate",
       "path": "crates/keyshare",
       "one_line": "Runs one committee member's share of the E3 distributed key generation, then produces its decryption share.",
-      "explain": "Before any ciphertext can be decrypted, each committee member needs its own secret share of the E3 key. The ThresholdKeyshare actor runs this DKG through the KeyshareState phases: it records a BFV keypair, collects every member's public key, encrypts its shares to each recipient, collects the shares sent to it, and derives its decryption-key share; the active aggregator also proposes the DKG roster. Without this unit no member holds a key share, so no decryption share could be produced.",
-      "analogy": "Like a group of guardians who each split their own secret into pieces, seal every piece for the guardian who must hold it, and later hand in their pieces so that only a quorum can rebuild the key.",
       "actors": [
         {
           "name": "ThresholdKeyshare",
@@ -208,11 +210,13 @@
     },
     {
       "id": "e3-aggregator",
+      "documentation": [
+        { "title": "DKG aggregation", "path": "docs/architecture/dkg.md" },
+        { "title": "Plaintext aggregation", "path": "docs/architecture/threshold-decryption.md" }
+      ],
       "kind": "crate",
       "path": "crates/aggregator",
       "one_line": "Combines committee members' keyshares into the E3 public key and decryption shares into the plaintext, then publishes both.",
-      "explain": "Every E3 needs one committee public key and, at the end, one decrypted plaintext. The PublicKeyAggregator verifies the members' keyshares and C1 proofs, aggregates them, proves the aggregation (C5) and publishes PublicKeyAggregated; the ThresholdPlaintextAggregator verifies decryption shares (C6), combines them through a TrBFV request, proves the result (C7) and publishes PlaintextAggregated. Only the node that AggregatorChanged marks as active aggregator starts these effects, and a demoted node may finish work it already started.",
-      "analogy": "Like a returns clerk who checks each signed ballot from a committee and announces the count only after enough valid ballots have arrived.",
       "actors": [
         {
           "name": "PublicKeyAggregator",

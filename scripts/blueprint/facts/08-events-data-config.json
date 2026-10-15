@@ -3,11 +3,10 @@
   "units": [
     {
       "id": "e3-events",
+      "documentation": [{ "title": "Event durability and replay", "path": "docs/architecture/persistence-and-replay.md" }],
       "kind": "crate",
       "path": "crates/events",
       "one_line": "Typed event vocabulary and in-process bus: sequences every protocol event, stores it, and fans it out to actor subscribers.",
-      "explain": "Each protocol step is an InterfoldEvent: an InterfoldEventData payload plus an EventContext holding its id, causation, HLC timestamp, aggregate and source. A BusHandle stamps a new event with a hybrid logical clock and sends it to the Sequencer, which hands it to the EventStore router; the router passes it to the EventStore of the event's aggregate, which appends and flushes it before the sequenced copy reaches the EventBus, which fans it out by event type. Without this persisted, ordered history a restarted node would have no authoritative record to rebuild its actors from.",
-      "analogy": "Like a notary's register: each document gets the next number and is filed before the mail room hands copies to the offices that asked for that kind of document.",
       "actors": [
         {
           "name": "EventBus",
@@ -240,11 +239,10 @@
     },
     {
       "id": "e3-data",
+      "documentation": [{ "title": "Persistence and replay", "path": "docs/architecture/persistence-and-replay.md" }],
       "kind": "crate",
       "path": "crates/data",
       "one_line": "Persistence layer on sled and commitlog: keyed snapshot storage with Repository and Persistable, plus the durable append-only event log.",
-      "explain": "Actors persist their state as typed snapshots: Persistable and Repository bincode-serialize a value into an Insert message, which the DataStore's recipient delivers to the SledStore actor. A sled batch that carries a snapshot revision is rejected as a whole when its sequence is older than the cursor already stored. The events themselves live in an append-only commitlog, which the code calls the durable source of truth; snapshots are read back through Persistable::load or Repository::read.",
-      "analogy": "Like a row of labelled lockers: each actor keeps its latest belongings in its own locker, and a batch is refused whole if its sequence number is older than the one the aggregate's cursor already records.",
       "actors": [
         {
           "name": "SledStore",
@@ -406,11 +404,10 @@
     },
     {
       "id": "e3-config",
+      "documentation": [{ "title": "Configuration reference", "path": "docs/pages/reference/configuration.mdx" }],
       "kind": "crate",
       "path": "crates/config",
       "one_line": "Loads and validates node configuration from interfold.config.yaml, merging environment and CLI overrides, and exposes chains, contracts and release numbers.",
-      "explain": "A node is picked by name from the nodes map in interfold.config.yaml, found by searching parent folders or taken from the CLI path. Environment references in the YAML are expanded, E3_-prefixed variables and CLI overrides are merged on top with Figment, and the result is scoped to the chosen node, which resolves its network and checks its limits. protocol-release.toml is compiled in and supplies protocol_version and node_generation; the net crate reads protocol_version. Without this layering a node would not know its chains, contracts, ports or network.",
-      "analogy": "Like house rules with stacked overrides: the printed defaults are overlaid by the operator's notebook, then by sticky notes (environment variables), then by a note handed in at the desk (command-line flags).",
       "actors": [],
       "consumes": [
         { "name": "interfold.config.yaml", "by": "load_config", "ref": "crates/config/src/app_config.rs@558@pub fn load_config(" },
@@ -543,11 +540,13 @@
     },
     {
       "id": "e3-logger",
+      "documentation": [
+        { "title": "Operational logs", "path": "docs/pages/reference/dashboard-api.mdx" },
+        { "title": "Dashboard views", "path": "docs/pages/operate/dashboard.mdx" }
+      ],
       "kind": "crate",
       "path": "crates/logger",
       "one_line": "Passive protocol-event logger plus a bounded, redacting operational log of tracing output for the dashboard.",
-      "explain": "attach_protocol_logger subscribes a SimpleLogger to the node's EventBus for every event type, and each event becomes one structured tracing line with a severity chosen by its type; the observer never publishes or changes event ordering. OperationalLogLayer copies tracing events and span fields into LogCollector, which keeps the newest 20,000 entries in memory and, when a path is configured, writes JSON lines to a file that rotates at 25 MiB. Field names such as password, seed, keyshare or plaintext are replaced with [REDACTED] before they are stored. Without it, operators would have no compact, redacted trail of what the node did.",
-      "analogy": "Like a ship's logbook: the newest pages stay in the wheelhouse for quick reading, the full book is copied into numbered volumes that roll over when full, and private names are blacked out before an entry is written.",
       "actors": [
         {
           "name": "SimpleLogger",
