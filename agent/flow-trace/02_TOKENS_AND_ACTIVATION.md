@@ -733,8 +733,11 @@ Each change emits `BondedDelegateChanged(owner, fromDelegate, toDelegate)` on `B
 IVotes `DelegateChanged`: `delegates()` names the votes source's delegate, and an indexer that reads
 `DelegateChanged` would record a different one. A delegate can hold bonded weight with no token log,
 no bond and no escrow position, so the CRISP census reads this event to find it.
-`EtherscanClient::get_bonded_delegate_candidates` adds every non-zero `toDelegate` to the
-candidates, and `getPastVotes` at the snapshot then keeps or drops each one. File:
+`EtherscanClient::get_delegate_candidates` adds every non-zero `toDelegate` to the candidates, and
+`getPastVotes` at the snapshot then keeps or drops each one. Escrowed FOLD has the same gap: a lock
+owner can delegate its escrow votes on the escrow adapter to a key with no lock NFT and no token
+log. When `BondedVotes.votesSource()` is not the token, the census also reads the adapter's
+`DelegateChanged(delegator, fromDelegate, toDelegate)` and adds each non-zero `toDelegate`. File:
 `examples/CRISP/server/src/server/token_holders/etherscan.rs`.
 
 Delegations live in the adapter. A replacement `BondedVotes`, for a new era or for an older adapter,

@@ -4,10 +4,11 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use e3_fhe_params::utils::compute_modulus_bit;
 use e3_polynomial::{CrtPolynomial, Polynomial};
+use e3_polynomial_fhe::FromFhePolynomial as _;
 use e3_zk_helpers::commitments::compute_ciphertext_commitment;
-use e3_zk_helpers::crt_polynomial_to_toml_json;
-use e3_zk_helpers::utils::compute_modulus_bit;
+use e3_zk_helpers::encoding::crt_polynomial_to_toml_json;
 use eyre::{Context, Result};
 use fhe::bfv::BfvParameters;
 use fhe::bfv::Ciphertext;
@@ -177,10 +178,13 @@ impl CiphertextAdditionWitness {
             return previous.clone();
         }
 
-        let mut zeroed = previous.clone();
-        zeroed.scalar_mul(&BigInt::zero());
-
-        zeroed
+        CrtPolynomial::new(
+            previous
+                .limbs
+                .iter()
+                .map(|limb| Polynomial::new(vec![BigInt::zero(); limb.coefficients().len()]))
+                .collect(),
+        )
     }
 
     /// Computes the quotient CRT polynomial `(sum - (a + b)) / q_i` per modulus.
@@ -215,19 +219,10 @@ impl CiphertextAdditionWitness {
             let sum_limb = sum.limb(i);
             let a_limb = a.limb(i);
             let b_limb = b.limb(i);
-            let qi = Polynomial::constant(BigInt::from(modulus));
-
             let diff = sum_limb.sub(&a_limb.add(b_limb));
-            let (q_poly, remainder) = diff
-                .div(&qi)
+            let q_poly = diff
+                .div_exact(&BigInt::from(modulus))
                 .map_err(|e| eyre::eyre!("division by modulus q_i at index {}: {}", i, e))?;
-
-            if !remainder.is_zero() {
-                return Err(eyre::eyre!(
-                    "Division by q_i at modulus index {} was not exact; non-zero remainder",
-                    i
-                ));
-            }
 
             for (j, q) in q_poly.coefficients().iter().enumerate() {
                 if *q < (-1).into() || *q > 1.into() {

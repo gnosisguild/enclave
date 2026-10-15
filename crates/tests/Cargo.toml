@@ -7,6 +7,7 @@ description = "E3 - Interfold Ciphernode Tests"
 repository.workspace = true
 
 [dependencies]
+e3-committee = { workspace = true }
 actix = { workspace = true }
 alloy = { workspace = true }
 alloy-primitives = { workspace = true }
@@ -19,6 +20,7 @@ e3-aggregator = { workspace = true }
 e3-config = { workspace = true }
 e3-crypto = { workspace = true }
 e3-ciphernode-builder = { workspace = true, features = ["test-helpers", "test-only-skip-proof-aggregation"] }
+e3-event-system = { workspace = true }
 e3-data = { workspace = true }
 e3-events = { workspace = true }
 e3-evm = { workspace = true }
@@ -37,7 +39,6 @@ e3-fhe-params = { workspace = true }
 e3-utils = { workspace = true }
 e3-zk-prover = { workspace = true }
 e3-zk-helpers = { workspace = true }
-e3-polynomial = { workspace = true }
 fhe-traits = { workspace = true }
 fhe-util = { workspace = true }
 fhe = { workspace = true }
@@ -57,4 +58,5 @@ e3-events = { workspace = true, features = ["test-helpers"] }
 e3-layout-lock = { workspace = true }
 e3-sync = { workspace = true }
 hex = { workspace = true }
+libp2p = { workspace = true }
 serde = { workspace = true }

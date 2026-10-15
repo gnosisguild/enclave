@@ -5694,7 +5694,7 @@ async fn canonical_key_fixture(
         primitives::{Bytes, B256, U256},
         sol_types::{SolEvent, SolValue},
     };
-    use e3_ciphernode_builder::EventSystem;
+    use e3_event_system::EventSystem;
     use e3_events::{
         AggregateConfig, AggregateId, CommitteePublicKeyChunkPublished, E3Requested, EvmLogObserved,
     };
@@ -6180,7 +6180,7 @@ fn decryption_bus(id: &E3id) -> Result<BusHandle> {
     use e3_events::{AggregateConfig, AggregateId};
     use std::time::Duration;
 
-    e3_ciphernode_builder::EventSystem::new()
+    e3_event_system::EventSystem::new()
         .with_fresh_bus()
         .with_aggregate_config(AggregateConfig::new(HashMap::from([
             (AggregateId::from_chain_id(None), Duration::ZERO),

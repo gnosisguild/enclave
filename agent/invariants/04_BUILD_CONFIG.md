@@ -36,7 +36,10 @@ every section.
 - `pnpm store:circuits pull` selects the newest first-parent `circuit-artifacts` commit whose
   `SOURCE_HASH` matches the current source tree. A different build at the branch tip must not
   replace it. The release workflow pulls the same way. Release verification checks the source hash,
-  every required pair, each pair's build stamp, and `checksums.json` as nodes check it.
+  every required pair, each pair's build stamp, and `checksums.json` as nodes check it. CI and the
+  integration tests use `pull --latest` (the branch tip, no `SOURCE_HASH` match), and
+  `--hydrate-bin-only` does not check the stamp's source hash, until the circuit drift workflow is
+  designed (#2249). Only the release workflow enforces the source match.
   `crates/zk-prover/supported-configurations.json` owns the release matrix that archive installation
   and release verification require. Each listed pair must be a build pair in
   `scripts/circuit-constants.ts`, and a tooling test checks this. The matrix file is not a

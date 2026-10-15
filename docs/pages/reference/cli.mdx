@@ -1,8 +1,7 @@
 ---
 title: 'CLI Reference'
 description:
-  'Every interfold and interfoldup command, with its flags, default values, and behavior, grouped by
-  task.'
+  'Every interfold command, with its flags, default values, and behavior, grouped by task.'
 ---
 
 import { Callout } from 'nextra/components'
@@ -10,16 +9,16 @@ import { Badge, LinkCard, LinkCards } from '@/components/ui'
 
 # CLI Reference
 
-This page lists every command of the `interfold` CLI and the `interfoldup` installer in release
-0.18.0. It is for developers who build E3 programs and for operators who run ciphernodes. Each entry
-gives the purpose, the usage line, and a table of flags with their default values. The source of
-truth is the clap definitions in `crates/cli/src` and `crates/interfoldup/src/main.rs`.
+This page lists every command of the `interfold` CLI in release 0.18.0. It also lists `update` and
+`uninstall`, which only releases after 0.19.0 have. It is for developers who build E3 programs and
+for operators who run ciphernodes. Each entry gives the purpose, the usage line, and a table of
+flags with their default values. The source of truth is the clap definitions in `crates/cli/src`.
 
 ## Commands at a glance
 
 | Task                                                        | Commands                                                                                                                                                          |
 | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [Install and update](#install-and-update)                   | `interfoldup install`, `interfoldup update`, `interfoldup uninstall`                                                                                              |
+| [Install and update](#install-and-update)                   | Install script, `update`, `uninstall`                                                                                                                             |
 | [Project](#project-commands)                                | `init`, `compile`, `program`, `print-env`                                                                                                                         |
 | [Node](#node-commands)                                      | `ciphernode setup`, `start`, `nodes`, `noir`, `events query`, `config get`                                                                                        |
 | [Operator on-chain lifecycle](#operator-on-chain-lifecycle) | `ciphernode set-bond-owner`, `propose-bond-owner`, `accept-bond-owner`, `bond`, `tickets`, `register`, `deregister`, `activate`, `deactivate`, `status`, `faucet` |
@@ -42,7 +41,7 @@ These options apply to every `interfold` command. You can put them before or aft
 | `--name`          | `<NAME>`   | `_default`                                                       | Selects the node profile `nodes.<NAME>`. The name `_default` selects the `node` key. Logs and telemetry use this name. |
 | `--otel`          | `<OTEL>`   | None                                                             | OpenTelemetry collector gRPC endpoint, for example `http://localhost:4317`. The value must be a valid URL.             |
 | `-h`, `--help`    | None       | None                                                             | Prints help.                                                                                                           |
-| `-V`, `--version` | None       | None                                                             | Prints the version. This flag is available on `interfold` only, not on subcommands.                                    |
+| `-V`, `--version` | None       | None                                                             | Prints the version. This flag is available on `interfold` only. `update --version` is a different option.              |
 
 The node profile also sets the storage paths. Each profile keeps its keys and data in folders named
 after the profile. See [storage paths](/reference/configuration#storage-paths).
@@ -62,6 +61,7 @@ file, only these commands run:
 | `ciphernode setup`          | Writes a configuration file and stores the password and wallet key.                                          |
 | `start`                     | Runs `ciphernode setup` with the `sepolia` profile and stops. Run `interfold start` again to start the node. |
 | `noir status`, `noir setup` | Use the folder `~/.interfold/noir`.                                                                          |
+| `update`, `uninstall`       | Change or remove the binary. These commands do not read the configuration file.                              |
 
 All other commands stop with this error:
 
@@ -73,7 +73,7 @@ Configuration file not found. Run `interfold ciphernode setup` to create a confi
 configuration file.
 
 When the configuration sets `autopassword: true` or `autowallet: true`, every command that loads the
-file first creates a missing password or wallet key. See
+file first creates a missing password or wallet key. `update` and `uninstall` do not. See
 [node keys](/reference/configuration#node-keys).
 
 ### Commands that run inside a running node
@@ -101,68 +101,58 @@ A command that fails prints the error in red and exits with status `1`.
 
 ### Install script
 
-The `install` script at the repository root installs `interfoldup` in `~/.local/bin`. It supports
-Linux on `x86_64` and `aarch64`, and macOS. On an Intel Mac, it installs the Apple Silicon build,
-which runs through Rosetta 2.
+The `install` script at the repository root installs `interfold` in `~/.local/bin`. It supports
+Linux on `x86_64` and macOS on Apple silicon. On other platforms, build the CLI from source.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/theinterfold/interfold/main/install | bash
 ```
 
-| Flag           | Value   | Default        | Description                                                                                        |
-| -------------- | ------- | -------------- | -------------------------------------------------------------------------------------------------- |
-| `--version`    | `<TAG>` | Latest release | Release tag of `interfoldup` to install, for example `v0.18.0`. A tag without `v` gets the prefix. |
-| `-h`, `--help` | None    | None           | Prints the usage text.                                                                             |
+| Flag           | Value   | Default        | Description                                                                                      |
+| -------------- | ------- | -------------- | ------------------------------------------------------------------------------------------------ |
+| `--version`    | `<TAG>` | Latest release | Release tag of `interfold` to install, for example `v0.19.0`. A tag without `v` gets the prefix. |
+| `--dir`        | `<DIR>` | `~/.local/bin` | Folder to install the binary in.                                                                 |
+| `-h`, `--help` | None    | None           | Prints the usage text.                                                                           |
 
-The environment variable `INTERFOLDUP_VERSION` sets the same value as `--version`. To pass the flag
-through the pipe, give it to `bash -s --`:
+The environment variables `INTERFOLD_VERSION` and `INTERFOLD_INSTALL_DIR` set the same values as
+`--version` and `--dir`. To pass the flag through the pipe, give it to `bash -s --`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/theinterfold/interfold/main/install | bash -s -- --version v0.18.0
+curl -fsSL https://raw.githubusercontent.com/theinterfold/interfold/main/install | bash -s -- --version v0.19.0
 ```
 
-### `interfoldup install`
+Release 0.19.0 and earlier do not have the `update` command. On these releases, use the install
+script to change the release. For a binary outside `~/.local/bin`, give its folder with `--dir`.
 
-Downloads the `interfold` binary for this platform from a GitHub release and installs it.
+### `update`
+
+Replaces this binary with another release from GitHub. Use an older tag to downgrade. When the
+installed version already matches the release, the command does nothing. `upgrade` is another name
+for this command.
 
 ```bash
-interfoldup install [--system] [--version <TAG>]
+interfold update [--version <TAG>]
 ```
 
 | Flag        | Value   | Default        | Description                                                        |
 | ----------- | ------- | -------------- | ------------------------------------------------------------------ |
-| `--system`  | None    | Off            | Installs to `/usr/local/bin` instead of `~/.local/bin`.            |
-| `--version` | `<TAG>` | Latest release | `latest`, `dev`, or a release tag. Accepts `0.18.0` and `v0.18.0`. |
+| `--version` | `<TAG>` | Latest release | `latest`, `dev`, or a release tag. Accepts `0.19.0` and `v0.19.0`. |
 
 The value `dev` selects the most recently published release, stable or pre-release.
 
-The command prints a warning when the install folder is not in `PATH`.
+The command replaces the file that runs, after it resolves symbolic links. It writes the new binary
+to a temporary file in the same folder and renames it, so a running node continues to use the old
+release until it restarts. When a node answers on the control port, the command prints a reminder to
+restart it. When the user cannot write to the folder, the command stops with `Permission denied`.
+Run it with `sudo` in that case.
 
-### `interfoldup update`
+### `uninstall`
 
-Replaces the installed binary with the requested release. When no binary is installed, the command
-runs `install`. When the installed version already matches, the command does nothing.
-
-```bash
-interfoldup update [--system] [--version <TAG>]
-```
-
-| Flag        | Value   | Default        | Description                                                             |
-| ----------- | ------- | -------------- | ----------------------------------------------------------------------- |
-| `--system`  | None    | Off            | Updates `/usr/local/bin/interfold` instead of `~/.local/bin/interfold`. |
-| `--version` | `<TAG>` | Latest release | Release to move to: `latest`, `dev`, or a release tag.                  |
-
-### `interfoldup uninstall`
-
-Removes the installed `interfold` binary. It does not remove configuration files or node data.
+Removes this binary. It does not remove configuration files, keys, or node data.
 
 ```bash
-interfoldup uninstall [--system]
+interfold uninstall
 ```
-
-| Flag       | Value | Default | Description                                              |
-| ---------- | ----- | ------- | -------------------------------------------------------- |
-| `--system` | None  | Off     | Removes from `/usr/local/bin` instead of `~/.local/bin`. |
 
 ## Project commands
 

@@ -86,6 +86,14 @@ const renderTable = (contributors) => {
   return ['<table>', '\t<tbody>', ...rows, '\t</tbody>', '</table>'].join('\n')
 }
 
+// Cells that differ from the GitHub profile, keyed by account id. GitHub credits
+// the `0xjei` commits to account 340530727, which has a placeholder avatar and
+// no display name. The table shows Giacomo's avatar and name from his original
+// account, 20580910 (`neogiacomo`).
+const OVERRIDES = {
+  340530727: { avatar_url: 'https://avatars.githubusercontent.com/u/20580910?v=4', displayName: 'Giacomo' },
+}
+
 const contributors = (await fetchContributors()).filter((c) => c.type !== 'Bot' && !c.login.endsWith('[bot]'))
 
 if (contributors.length === 0) {
@@ -93,7 +101,9 @@ if (contributors.length === 0) {
   process.exit(1)
 }
 
-const withNames = await Promise.all(contributors.map(async (c) => ({ ...c, displayName: await fetchDisplayName(c.login) })))
+const withNames = await Promise.all(
+  contributors.map(async (c) => ({ ...c, displayName: await fetchDisplayName(c.login), ...OVERRIDES[c.id] })),
+)
 
 const readme = readFileSync(README_PATH, 'utf8')
 const start = readme.indexOf(START)

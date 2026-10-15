@@ -204,13 +204,7 @@ test('release assets require the complete binary and circuit set', () => {
   mkdirSync(distDir, { recursive: true })
   mkdirSync(deploymentsDir)
 
-  for (const archive of [
-    'interfold-linux-x86_64.tar.gz',
-    'interfoldup-linux-x86_64.tar.gz',
-    'interfold-macos-aarch64.tar.gz',
-    'interfoldup-macos-aarch64.tar.gz',
-    'circuits-1.2.3.tar.gz',
-  ]) {
+  for (const archive of ['interfold-linux-x86_64.tar.gz', 'interfold-macos-aarch64.tar.gz', 'circuits-1.2.3.tar.gz']) {
     writeFileSync(join(distDir, archive), archive)
   }
   writeFileSync(join(deploymentsDir, 'manifest.json'), '{}\n')
@@ -249,13 +243,7 @@ test('stable release notes list the pre-release changes and the upgrade note', (
   mkdirSync(deploymentsDir)
   mkdirSync(notesDir, { recursive: true })
 
-  for (const archive of [
-    'interfold-linux-x86_64.tar.gz',
-    'interfoldup-linux-x86_64.tar.gz',
-    'interfold-macos-aarch64.tar.gz',
-    'interfoldup-macos-aarch64.tar.gz',
-    'circuits-1.3.0.tar.gz',
-  ]) {
+  for (const archive of ['interfold-linux-x86_64.tar.gz', 'interfold-macos-aarch64.tar.gz', 'circuits-1.3.0.tar.gz']) {
     writeFileSync(join(distDir, archive), archive)
   }
   writeFileSync(join(deploymentsDir, 'manifest.json'), '{}\n')

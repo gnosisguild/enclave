@@ -309,7 +309,7 @@ async fn c0_inputs_of_an_e3_whose_dkg_ended_before_startup_are_not_verified() {
         error_size: ArcBytes::default(),
     };
     let aggregate = e3_events::AggregateId::new(1);
-    let system = e3_ciphernode_builder::EventSystem::new()
+    let system = e3_event_system::EventSystem::new()
         .with_fresh_bus()
         .with_aggregate_config(e3_events::AggregateConfig::new(HashMap::from([(
             aggregate,

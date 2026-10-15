@@ -13,10 +13,10 @@ jointly generate a threshold BFV key (DKG), compute over encrypted inputs, and t
 output — every step backed by ZK proofs verified on-chain.
 
 - Docs: https://docs.theinterfold.com · License: LGPL-3.0-only
-- Canonical repository: `theinterfold/interfold`. Release assets, the `install` script, the
-  `interfoldup` installer, the zk-prover circuit download, and the `init` templates all resolve
-  against this repository. The `gnosisguild/interfold` name is the former location. Keep the
-  separate `gnosisguild` repositories (`fhe.rs`, `risc0-ethereum`, `CRISP`) as they are.
+- Canonical repository: `theinterfold/interfold`. Release assets, the `install` script,
+  `interfold update`, the zk-prover circuit download, and the `init` templates all resolve against
+  this repository. The `gnosisguild/interfold` name is the former location. Keep the separate
+  `gnosisguild` repositories (`fhe.rs`, `risc0-ethereum`, `CRISP`) as they are.
 - Interfold workspace crates and core `@interfold/*` packages share one release version. CRISP is
   versioned and released separately.
 - Reference app: **CRISP** (`examples/CRISP`, excluded from the workspace)
@@ -63,6 +63,9 @@ Run from repo root via pnpm scripts — not raw cargo/nargo/hardhat.
 | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Install / build all         | `pnpm i` · `pnpm build`                                                                                                                            |
 | Build Rust                  | `pnpm rust:build` (cargo `--locked --release`; prebuilds EVM fixtures)                                                                             |
+| Build ZK artifact CLI       | `pnpm rust:build:zk [--release]` (no EVM fixture prebuild)                                                                                         |
+| ZK artifact CLI             | `pnpm zk list\|generate\|vk-hash\|parity-matrices`                                                                                                 |
+| Rust formatting / Clippy    | `pnpm rust:format` · `pnpm rust:lint` · `pnpm rust:clippy [-- -D warnings]`                                                                        |
 | Test everything             | `pnpm test` (EVM, Rust, required proof/slashing suites, SDK, Noir)                                                                                 |
 | Test one layer              | `pnpm evm:test` · `pnpm rust:test` · `pnpm sdk:test` · `pnpm noir:test`                                                                            |
 | SDK proof verification      | `pnpm sdk:test:proofs` (prepare circuits, generate one proof, verify bindings and reject tampering)                                                |
@@ -101,7 +104,7 @@ Two independent settings select what `pnpm build:circuits` compiles into `circui
 
 - **Preset** (`--preset insecure-512` [default] | `secure-8192`): the BFV parameter set.
 - **Committee** (`--committee minimum` [default] | `micro` | `small`): `(N, T, H)` for the
-  secret-sharing committee. Mirrors `e3_zk_helpers::CiphernodesCommitteeSize`.
+  secret-sharing committee. Mirrors `e3_committee::CiphernodesCommitteeSize`.
 
 `scripts/build-circuits.ts` writes the selection. Never hand-edit the values that it writes:
 
@@ -115,8 +118,8 @@ Two independent settings select what `pnpm build:circuits` compiles into `circui
 `scripts/check-committee.sh` (`pnpm check:committee`, pre-push and the Agent Harness CI workflow)
 compares the BFV tuples, committee values, and configuration IDs across TypeScript, Rust, Noir, and
 Solidity. The file list is at the top of the script. It regenerates and compares the parity matrices
-only when `target/release/generate_parity_matrices` is executable and `nargo` is on PATH. A
-different `.active-preset.json` only prints a note. Always switch with
+only when `target/release/zk-artifacts` is executable and `nargo` is on PATH. A different
+`.active-preset.json` only prints a note. Always switch with
 `pnpm build:circuits --committee <name>`. Supported `(preset, committee)` pairs live in
 `scripts/circuit-constants.ts`. See `scripts/README.md#circuit-builder` and
 `circuits/benchmarks/README.md` for the full recipe.
@@ -172,8 +175,8 @@ node that fetches the asset, and the node then syncs an address that emits no ev
 - **Release channels:** a stable tag publishes to `latest`, a pre-release tag (`vX.Y.Z-<pre>`, by
   convention `-dev.N`) to `dev` (`releaseChannel` in `scripts/release/version.mjs`): npm dist-tag
   and `ciphernode` / `e3-support` image alias. A stable release also moves the `dev` image aliases,
-  and `interfoldup install --version dev` (or `update`) installs the most recently published GitHub
-  release, stable or pre-release. The npm tag `dev` changes only with a pre-release.
+  and `interfold update --version dev` installs the most recently published GitHub release, stable
+  or pre-release. The npm tag `dev` changes only with a pre-release.
 - **Pre-push hook (husky):** `pnpm lint`, `check:pnpm`, `check:license`, `check:committee`,
   `check:docs` (harness-doc drift gate — a watched file is exempt automatically when neither its
   changed lines nor the declarations that enclose them name an identifier the `agent/` docs mention,
@@ -213,4 +216,4 @@ persistence · opentelemetry/tracing.
   `decryption_aggregator`, which produce the on-chain Honk verifiers. The canonical committed root
   matches `(insecure-512, minimum)`; other generated pairs live under `honk/<preset>/<committee>/`.
 - `config` circuit validates preset constants (CRT moduli, bounds, parity matrices). Parity matrices
-  are generated by the Rust `generate_parity_matrices` binary — never hand-edit.
+  are generated by `zk-artifacts parity-matrices` — never hand-edit.

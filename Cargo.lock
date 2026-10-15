@@ -1194,12 +1194,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anes"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b46cbb362ab8752921c97e041f5e366ee6297bd428a31275b9fcf1e380f7299"
-
-[[package]]
 name = "anstream"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2548,12 +2542,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cast"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37b2a672a2cb129a2e41c10b1224bb368f9f37a2b16b612598138befd7b37eb5"
-
-[[package]]
 name = "cbc"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2636,33 +2624,6 @@ dependencies = [
  "serde",
  "wasm-bindgen",
  "windows-link 0.1.3",
-]
-
-[[package]]
-name = "ciborium"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42e69ffd6f0917f5c029256a24d0161db17cea3997d185db0d35926308770f0e"
-dependencies = [
- "ciborium-io",
- "ciborium-ll",
- "serde",
-]
-
-[[package]]
-name = "ciborium-io"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05afea1e0a06c9be33d539b876f1ce3692f4afea2cb41f740e7743225ed1c757"
-
-[[package]]
-name = "ciborium-ll"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57663b653d948a338bfb3eeba9bb2fd5fcfaecb9e199e87e1eda4d9e8b240fd9"
-dependencies = [
- "ciborium-io",
- "half",
 ]
 
 [[package]]
@@ -3010,42 +2971,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9481c1c90cbf2ac953f07c8d4a58aa3945c425b7185c9154d67a65e4230da511"
 dependencies = [
  "cfg-if",
-]
-
-[[package]]
-name = "criterion"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2b12d017a929603d80db1831cd3a24082f8137ce19c69e6447f54f5fc8d692f"
-dependencies = [
- "anes",
- "cast",
- "ciborium",
- "clap",
- "criterion-plot",
- "is-terminal",
- "itertools 0.10.5",
- "num-traits",
- "once_cell",
- "oorandom",
- "plotters",
- "rayon",
- "regex",
- "serde",
- "serde_derive",
- "serde_json",
- "tinytemplate",
- "walkdir",
-]
-
-[[package]]
-name = "criterion-plot"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b50826342786a51a89e2da3a28f1c32b06e387201bc2d19791f622c673706b1"
-dependencies = [
- "cast",
- "itertools 0.10.5",
 ]
 
 [[package]]
@@ -3548,15 +3473,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "directories"
-version = "6.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16f5094c54661b38d03bd7e50df373292118db60b585c08a411c6d840017fe7d"
-dependencies = [
- "dirs-sys 0.5.0",
-]
-
-[[package]]
 name = "dirs"
 version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3667,6 +3583,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "e3-bfv-client",
+ "e3-committee",
  "e3-committee-hash",
  "e3-config",
  "e3-data",
@@ -3677,6 +3594,7 @@ dependencies = [
  "e3-keyshare",
  "e3-multithread",
  "e3-polynomial",
+ "e3-polynomial-fhe",
  "e3-request",
  "e3-sortition",
  "e3-sync",
@@ -3702,7 +3620,6 @@ version = "0.19.0"
 dependencies = [
  "anyhow",
  "e3-fhe-params",
- "e3-polynomial",
  "e3-zk-helpers",
  "fhe",
  "fhe-traits",
@@ -3724,6 +3641,7 @@ dependencies = [
  "e3-config",
  "e3-crypto",
  "e3-data",
+ "e3-event-system",
  "e3-events",
  "e3-evm",
  "e3-fhe",
@@ -3737,14 +3655,10 @@ dependencies = [
  "e3-sortition",
  "e3-sync",
  "e3-test-helpers",
- "e3-trbfv",
  "e3-utils",
  "e3-zk-prover",
  "futures",
  "libp2p",
- "once_cell",
- "rayon",
- "tempfile",
  "tokio",
  "tracing",
 ]
@@ -3768,6 +3682,7 @@ dependencies = [
  "e3-daemon-server",
  "e3-dashboard",
  "e3-entrypoint",
+ "e3-event-system",
  "e3-events",
  "e3-evm",
  "e3-fhe-params",
@@ -3776,9 +3691,10 @@ dependencies = [
  "e3-support-scripts",
  "e3-trbfv",
  "e3-utils",
- "e3-zk-helpers",
  "e3-zk-prover",
+ "flate2",
  "hex",
+ "indicatif 0.17.11",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-stdout",
@@ -3791,6 +3707,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "tar",
  "tempfile",
  "tokio",
  "toml",
@@ -3799,6 +3716,16 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "zeroize",
+]
+
+[[package]]
+name = "e3-committee"
+version = "0.19.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -3905,8 +3832,8 @@ dependencies = [
  "actix-web",
  "alloy",
  "anyhow",
- "e3-ciphernode-builder",
  "e3-config",
+ "e3-event-system",
  "e3-events",
  "e3-evm",
  "e3-logger",
@@ -3978,6 +3905,7 @@ dependencies = [
  "e3-crypto",
  "e3-daemon-server",
  "e3-data",
+ "e3-event-system",
  "e3-events",
  "e3-evm",
  "e3-fhe",
@@ -4008,6 +3936,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "e3-event-system"
+version = "0.19.0"
+dependencies = [
+ "actix",
+ "anyhow",
+ "bincode",
+ "e3-data",
+ "e3-events",
+ "e3-sync",
+ "e3-test-helpers",
+ "e3-utils",
+ "once_cell",
+ "tempfile",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "e3-events"
 version = "0.19.0"
 dependencies = [
@@ -4020,10 +3966,11 @@ dependencies = [
  "bs58",
  "chrono",
  "derivative",
- "e3-ciphernode-builder",
+ "e3-committee",
  "e3-committee-hash",
  "e3-crypto",
  "e3-data",
+ "e3-event-system",
  "e3-events",
  "e3-fhe-params",
  "e3-test-helpers",
@@ -4057,12 +4004,12 @@ dependencies = [
  "bincode",
  "bloom",
  "e3-bfv-client",
- "e3-ciphernode-builder",
+ "e3-committee",
  "e3-config",
  "e3-crypto",
  "e3-data",
  "e3-data-availability",
- "e3-entrypoint",
+ "e3-event-system",
  "e3-events",
  "e3-evm",
  "e3-fhe-params",
@@ -4136,8 +4083,10 @@ dependencies = [
  "anyhow",
  "clap",
  "fhe",
+ "fhe-math",
  "fhe-traits",
  "num-bigint 0.5.1",
+ "num-integer",
  "num-traits",
  "rand 0.9.5",
  "rand_chacha 0.9.0",
@@ -4211,11 +4160,12 @@ dependencies = [
  "async-trait",
  "bincode",
  "e3-bfv-client",
- "e3-ciphernode-builder",
+ "e3-committee",
  "e3-committee-hash",
  "e3-config",
  "e3-crypto",
  "e3-data",
+ "e3-event-system",
  "e3-events",
  "e3-evm",
  "e3-fhe",
@@ -4272,12 +4222,14 @@ dependencies = [
  "anyhow",
  "bincode",
  "e3-bfv-client",
+ "e3-committee",
  "e3-committee-hash",
  "e3-crypto",
  "e3-data",
  "e3-events",
  "e3-fhe-params",
  "e3-polynomial",
+ "e3-polynomial-fhe",
  "e3-request",
  "e3-trbfv",
  "e3-utils",
@@ -4307,10 +4259,10 @@ dependencies = [
  "bincode",
  "chrono",
  "derivative",
- "e3-ciphernode-builder",
  "e3-config",
  "e3-crypto",
  "e3-data",
+ "e3-event-system",
  "e3-events",
  "e3-layout-lock",
  "e3-request",
@@ -4365,13 +4317,20 @@ dependencies = [
 name = "e3-polynomial"
 version = "0.19.0"
 dependencies = [
- "bincode",
- "criterion",
- "fhe-math",
  "num-bigint 0.5.1",
+ "num-integer",
  "num-traits",
  "serde",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "e3-polynomial-fhe"
+version = "0.19.0"
+dependencies = [
+ "e3-polynomial",
+ "fhe-math",
+ "num-bigint 0.5.1",
 ]
 
 [[package]]
@@ -4403,6 +4362,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "e3-bfv-client",
+ "e3-committee",
  "e3-committee-hash",
  "e3-config",
  "e3-crypto",
@@ -4453,6 +4413,7 @@ dependencies = [
  "async-trait",
  "bincode",
  "chrono",
+ "e3-committee",
  "e3-data",
  "e3-events",
  "e3-fhe-params",
@@ -4507,9 +4468,9 @@ dependencies = [
  "actix",
  "anyhow",
  "bincode",
- "e3-ciphernode-builder",
  "e3-config",
  "e3-data",
+ "e3-event-system",
  "e3-events",
  "e3-request",
  "e3-test-helpers",
@@ -4530,9 +4491,9 @@ dependencies = [
  "clap",
  "e3-aggregator",
  "e3-bfv-client",
- "e3-ciphernode-builder",
  "e3-crypto",
  "e3-data",
+ "e3-event-system",
  "e3-events",
  "e3-fhe",
  "e3-fhe-params",
@@ -4570,9 +4531,11 @@ dependencies = [
  "e3-aggregator",
  "e3-bfv-client",
  "e3-ciphernode-builder",
+ "e3-committee",
  "e3-config",
  "e3-crypto",
  "e3-data",
+ "e3-event-system",
  "e3-events",
  "e3-evm",
  "e3-fhe",
@@ -4582,7 +4545,6 @@ dependencies = [
  "e3-logger",
  "e3-multithread",
  "e3-net",
- "e3-polynomial",
  "e3-request",
  "e3-sdk",
  "e3-sortition",
@@ -4596,6 +4558,7 @@ dependencies = [
  "fhe-traits",
  "fhe-util",
  "hex",
+ "libp2p",
  "num-bigint 0.5.1",
  "rand 0.9.5",
  "rand_chacha 0.9.0",
@@ -4681,16 +4644,33 @@ dependencies = [
 ]
 
 [[package]]
-name = "e3-zk-helpers"
+name = "e3-zk-artifacts"
 version = "0.19.0"
 dependencies = [
  "anyhow",
  "ark-bn254 0.5.0",
  "ark-ff 0.5.0",
  "clap",
+ "e3-committee",
+ "e3-fhe-params",
+ "e3-zk-helpers",
+ "hex",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "e3-zk-helpers"
+version = "0.19.0"
+dependencies = [
+ "anyhow",
+ "ark-bn254 0.5.0",
+ "ark-ff 0.5.0",
+ "e3-committee",
  "e3-fhe-params",
  "e3-parity-matrix",
  "e3-polynomial",
+ "e3-polynomial-fhe",
  "e3-safe",
  "fhe",
  "fhe-math",
@@ -4726,19 +4706,21 @@ dependencies = [
  "bincode",
  "bn254_blackbox_solver",
  "chrono",
- "directories 5.0.1",
+ "directories",
  "e3-bfv-client",
- "e3-ciphernode-builder",
+ "e3-committee",
  "e3-committee-hash",
  "e3-config",
  "e3-crypto",
  "e3-data",
+ "e3-event-system",
  "e3-events",
  "e3-evm",
  "e3-fhe-params",
  "e3-layout-lock",
  "e3-net",
  "e3-polynomial",
+ "e3-polynomial-fhe",
  "e3-request",
  "e3-slashing",
  "e3-sortition",
@@ -4748,6 +4730,7 @@ dependencies = [
  "e3-utils",
  "e3-zk-helpers",
  "fhe",
+ "fhe-math",
  "fhe-traits",
  "flate2",
  "futures-util",
@@ -4757,6 +4740,7 @@ dependencies = [
  "ndarray",
  "noirc_abi",
  "num-bigint 0.5.1",
+ "num-integer",
  "num-traits",
  "paste",
  "rand 0.9.5",
@@ -5628,17 +5612,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "half"
-version = "2.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ea2d84b969582b4b1864a92dc5d27cd2b77b622a8d79306834f1be5ba20d84b"
-dependencies = [
- "cfg-if",
- "crunchy",
- "zerocopy",
-]
-
-[[package]]
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6343,23 +6316,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "interfoldup"
-version = "0.19.0"
-dependencies = [
- "anyhow",
- "clap",
- "directories 6.0.0",
- "flate2",
- "futures-util",
- "indicatif 0.17.11",
- "reqwest",
- "serde",
- "serde_json",
- "tar",
- "tokio",
-]
-
-[[package]]
 name = "interprocess"
 version = "2.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6411,17 +6367,6 @@ checksum = "c91338f0783edbd6195decb37bae672fd3b165faffb89bf7b9e6942f8b1a731a"
 dependencies = [
  "memchr",
  "serde",
-]
-
-[[package]]
-name = "is-terminal"
-version = "0.4.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
-dependencies = [
- "hermit-abi",
- "libc",
- "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8110,12 +8055,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
-name = "oorandom"
-version = "11.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
-
-[[package]]
 name = "opaque-debug"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8729,34 +8668,6 @@ name = "pkg-config"
 version = "0.3.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
-
-[[package]]
-name = "plotters"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aeb6f403d7a4911efb1e33402027fc44f29b5bf6def3effcc22d7bb75f2b747"
-dependencies = [
- "num-traits",
- "plotters-backend",
- "plotters-svg",
- "wasm-bindgen",
- "web-sys",
-]
-
-[[package]]
-name = "plotters-backend"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df42e13c12958a16b3f7f4386b9ab1f3e7933914ecea48da7139435263a4172a"
-
-[[package]]
-name = "plotters-svg"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51bae2ac328883f7acdfea3d66a7c35751187f870bc81f94563733a154d7a670"
-dependencies = [
- "plotters-backend",
-]
 
 [[package]]
 name = "polling"
@@ -11344,16 +11255,6 @@ checksum = "42d3e9c45c09de15d06dd8acf5f4e0e399e85927b7f00711024eb7ae10fa4869"
 dependencies = [
  "displaydoc",
  "zerovec",
-]
-
-[[package]]
-name = "tinytemplate"
-version = "1.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be4d6b5f19ff7664e8c98d03e2139cb510db9b0a60b55f8e8709b689d939b6bc"
-dependencies = [
- "serde",
- "serde_json",
 ]
 
 [[package]]

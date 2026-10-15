@@ -8,7 +8,9 @@ repository.workspace = true
 
 [dependencies]
 fhe = { workspace = true }
+fhe-math = { workspace = true }
 num-bigint = { workspace = true }
+num-integer = { workspace = true }
 rand = { workspace = true }
 num-traits = { workspace = true }
 thiserror = { workspace = true }

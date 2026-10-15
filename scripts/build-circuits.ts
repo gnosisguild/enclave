@@ -167,10 +167,11 @@ export function committeeBoundUpdates(rootDir: string, preset: CircuitPreset, co
           'run',
           '--quiet',
           '-p',
-          'e3-zk-helpers',
+          'e3-zk-artifacts',
           '--bin',
-          'zk_cli',
+          'zk-artifacts',
           '--',
+          'generate',
           '--circuit',
           source.circuit,
           '--preset',
@@ -409,7 +410,7 @@ class NoirCircuitBuilder {
 
   /**
    * Regenerates `circuits/lib/src/configs/committee/<committee>/parity_{insecure,secure}.nr`
-   * by invoking the Rust `generate_parity_matrices` binary. The Reed-Solomon parity matrix is
+   * by invoking `zk-artifacts parity-matrices`. The Reed-Solomon parity matrix is
    * a deterministic function of `(N, T, QIS)` — committing the output keeps `nargo check`
    * working standalone, but the build script always overwrites it so a change in committee
    * or BFV preset constants can never silently desync the on-disk literal from what the
@@ -418,7 +419,7 @@ class NoirCircuitBuilder {
   private regenerateParityMatrices(committee: CircuitCommittee): void {
     const libDir = join(this.rootDir, 'circuits', 'lib')
     try {
-      execSync(`cargo run --quiet --release --bin generate_parity_matrices -- --committee ${committee}`, {
+      execSync(`cargo run --quiet --locked --release -p e3-zk-artifacts --bin zk-artifacts -- parity-matrices --committee ${committee}`, {
         cwd: this.rootDir,
         stdio: ['ignore', 'pipe', 'inherit'],
       })
@@ -427,7 +428,7 @@ class NoirCircuitBuilder {
     } catch (err: any) {
       throw new Error(
         `Failed to regenerate parity matrices for committee=${committee}: ${err.message}\n` +
-          `   Try: cargo run --release --bin generate_parity_matrices -- --committee ${committee}`,
+          `   Try: pnpm zk parity-matrices --committee ${committee}`,
       )
     }
   }
@@ -569,10 +570,11 @@ class NoirCircuitBuilder {
             'run',
             '--quiet',
             '-p',
-            'e3-zk-helpers',
+            'e3-zk-artifacts',
             '--bin',
-            'zk_cli',
+            'zk-artifacts',
             '--',
+            'generate',
             '--circuit',
             source.circuit,
             '--preset',
@@ -980,14 +982,21 @@ library ActiveCryptoConfig {
       result.sourceHash = sourceHash
 
       if (this.options.hydrateBinOnly) {
-        if (!this.isDistPresetUpToDate(preset, committee, sourceHash)) {
+        // The stamp's source hash is not checked until the circuit drift workflow is designed. The
+        // active stamp records the hash of the hydrated artifacts, so `--skip-if-built` rebuilds
+        // artifacts from another source.
+        const distStamp = this.readPresetStamp(preset, committee)
+        if (!distStamp?.sourceHash || !this.requiredDistMarkers(preset, committee).every((path) => existsSync(path))) {
           throw new Error(
-            `Cannot hydrate circuits/bin: dist/circuits/${preset}/${committee} is missing or stale. ` +
+            `Cannot hydrate circuits/bin: dist/circuits/${preset}/${committee} is missing. ` +
               `Run: pnpm build:circuits --preset ${preset} --committee ${committee}`,
           )
         }
+        if (distStamp.sourceHash !== sourceHash) {
+          console.log(`   ⚠️  dist/circuits/${preset}/${committee} was built from source hash ${distStamp.sourceHash}, not ${sourceHash}.`)
+        }
         console.log(`   💧 Hydrating circuits/bin from dist/circuits/${preset}/${committee} (no nargo compile)...`)
-        this.hydrateBinFromDist(preset, committee, sourceHash)
+        this.hydrateBinFromDist(preset, committee, distStamp.sourceHash)
         console.log(`\n✅ Hydrated circuits/bin for preset: ${preset}/${committee}`)
         return result
       }
@@ -1371,7 +1380,20 @@ library ActiveCryptoConfig {
     const hashes = JSON.parse(
       execFileSync(
         'cargo',
-        ['run', '--quiet', '--locked', '--release', '-p', 'e3-zk-helpers', '--bin', 'compute-vk-hash', '--', '--bfv-tree', pairDir],
+        [
+          'run',
+          '--quiet',
+          '--locked',
+          '--release',
+          '-p',
+          'e3-zk-artifacts',
+          '--bin',
+          'zk-artifacts',
+          '--',
+          'vk-hash',
+          '--bfv-tree',
+          pairDir,
+        ],
         { cwd: this.rootDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] },
       ),
     ) as Record<string, string>
@@ -1507,9 +1529,12 @@ library ActiveCryptoConfig {
       'circuits/lib/src/core',
       'circuits/lib/src/math',
       'crates/zk-helpers/src',
+      'crates/zk/cli/src',
+      'crates/committee/src',
       'crates/fhe-params/src',
       'crates/fhe/src',
       'crates/polynomial/src',
+      'crates/polynomial/fhe-adapter/src',
       'crates/parity-matrix/src',
       'crates/safe/src',
     ]) {

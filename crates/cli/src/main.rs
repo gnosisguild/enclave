@@ -44,6 +44,7 @@ mod program;
 mod purge_all;
 mod rev;
 mod start;
+mod update;
 mod wallet;
 mod wallet_get;
 mod wallet_set;

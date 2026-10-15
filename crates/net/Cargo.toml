@@ -33,7 +33,7 @@ actix = { workspace = true }
 zeroize = { workspace = true }
 
 [dev-dependencies]
-e3-ciphernode-builder = { workspace = true }
+e3-event-system = { workspace = true }
 e3-request = { workspace = true }
 e3-sync = { workspace = true }
 e3-layout-lock = { workspace = true }

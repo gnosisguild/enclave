@@ -7,6 +7,7 @@ description = "E3 - Interfold Ciphernode Keyshare Actors"
 repository.workspace = true
 
 [dependencies]
+e3-committee = { workspace = true }
 actix = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
@@ -38,4 +39,4 @@ zeroize = { workspace = true }
 [dev-dependencies]
 e3-zk-prover = { workspace = true }
 e3-evm.workspace = true
-e3-ciphernode-builder.workspace = true
+e3-event-system.workspace = true

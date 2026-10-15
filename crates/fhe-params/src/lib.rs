@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! Preset definitions and builders for BFV FHE parameters.
+//! Preset definitions, builders, and arithmetic utilities for BFV FHE parameters.
 
 pub mod builder;
 pub mod constants;
@@ -13,6 +13,7 @@ pub mod crp;
 pub mod encoding;
 pub mod presets;
 pub mod search;
+pub mod utils;
 
 pub use builder::{
     build_bfv_params, build_bfv_params_arc, build_bfv_params_from_set,

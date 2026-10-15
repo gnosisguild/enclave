@@ -3,16 +3,13 @@
 // This file is provided WITHOUT ANY WARRANTY;
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
-// Network selection, public client + contract addresses.
-// Sepolia addresses sourced from deployments/manifest.json (networks.sepolia) and
-// packages/interfold-contracts/deployed_contracts.json, mainnet addresses from
-// deployments/manifest.json (networks.mainnet).
+// Network selection, public client + contract addresses. Profiles and the
+// environment rules that select them live in ./networks.
 //
 // ABIs are imported from the canonical typechain factories in
 // @interfold/contracts so they cannot drift from the deployed contracts.
 
-import { createPublicClient, http, type Address, type Chain } from 'viem'
-import { mainnet, sepolia } from 'viem/chains'
+import { createPublicClient, http, type Address } from 'viem'
 import {
   BondingRegistry__factory,
   CiphernodeRegistryOwnable__factory,
@@ -21,6 +18,7 @@ import {
   InterfoldTicketToken__factory,
   InterfoldToken__factory,
 } from '@interfold/contracts/types'
+import { NETWORKS, overrideKey, selectNetwork, type Env, type Setting } from './networks'
 
 // E3 lifecycle stages — mirrors the Solidity `IInterfold.E3Stage` enum exactly.
 // Defined locally (rather than imported from @interfold/sdk) so the dashboard
@@ -53,83 +51,17 @@ export enum FailureReason {
   VerificationFailed = 12,
 }
 
-// Per-network deployment profile. `VITE_NETWORK` selects one; every value in it
-// can then be overridden individually via the VITE_* variables below, so the
-// dashboard can point at a custom deployment without code changes.
-type NetworkProfile = {
-  chain: Chain
-  // Human-readable name used in UI copy ("Reading from Sepolia…").
-  name: string
-  rpc: string
-  explorer: string
-  interfold: string
-  ciphernodeRegistry: string
-  crispProgram: string
-  bondingRegistry: string
-  // Empty string = no faucet on this network (hides the operator-guide card).
-  faucet: string
-  deployBlock: string
-  // Fee token metadata for formatting escrowed fees/rewards. Hardcoded per
-  // deployment (like the addresses) rather than read on-chain at runtime.
-  feeSymbol: string
-  feeDecimals: number
-  // E3 timeout windows (seconds), from the deployment's getTimeoutConfig().
-  computeWindow: string
-  decryptionWindow: string
-}
+// Vite inlines `import.meta.env` at build time. Node (tests) has none.
+const env: Env = (import.meta as ImportMeta & { env?: Env }).env ?? {}
 
-const NETWORKS: Record<string, NetworkProfile> = {
-  sepolia: {
-    chain: sepolia,
-    name: 'Sepolia',
-    rpc: 'https://ethereum-sepolia.publicnode.com',
-    explorer: 'https://sepolia.etherscan.io',
-    interfold: '0xBD5B6D1aDA9e0eB248B678469C9Cd6a63507E42b',
-    ciphernodeRegistry: '0xb1E8640CF8D0A927290E3d9E1b01c4899B5225Ef',
-    crispProgram: '0xA9894A39061EC33f8550a2B63A66Be59fb9fa443',
-    bondingRegistry: '0x8687bC7C8f055b41aD2C2447c04aCBD76C1075b2',
-    // Test Faucet. It sends 1000 FOLD and 1000 MockUSDC.
-    faucet: '0x1B4340A65BB669267BF5DE37385B139987C3F09c',
-    // Deploy block of the Interfold and the CiphernodeRegistry (11873232), the earliest of those two
-    // and the CRISPProgram (11873424). A later value silently drops early registry events.
-    deployBlock: '11873232',
-    // MockUSDC (0xE2e534F7…555B), the fee token and ticket collateral. Anyone can mint it.
-    feeSymbol: 'USDC',
-    feeDecimals: 6,
-    computeWindow: '604800',
-    decryptionWindow: '21600',
-  },
-  mainnet: {
-    chain: mainnet,
-    name: 'Ethereum mainnet',
-    rpc: 'https://ethereum-rpc.publicnode.com',
-    explorer: 'https://etherscan.io',
-    interfold: '0x28cF63B459e6218C69EA97ea7D90541cf648c715',
-    ciphernodeRegistry: '0xC927A5B2d8F68697bC28C0670df05178c93df2d7',
-    crispProgram: '0x53FCdb21E73A461CfE6c64B19855204384B91BA3',
-    bondingRegistry: '0x0ec90465095C21830BEcED07e032809A2Bd2915F',
-    // No faucet on mainnet.
-    faucet: '',
-    // All mainnet contracts were deployed in the same block.
-    deployBlock: '25786403',
-    // USDS (0xdC035D45…384F) on the mainnet deployment.
-    feeSymbol: 'USDS',
-    feeDecimals: 18,
-    computeWindow: '604800',
-    decryptionWindow: '21600',
-  },
-}
-
-const env = ((import.meta as any).env ?? {}) as Record<string, string | undefined>
-const envStr = (key: string, fallback: string): string => {
-  const v = env[key]
-  return v && v.trim() !== '' ? v.trim() : fallback
-}
-
-const NETWORK_KEY = envStr('VITE_NETWORK', 'sepolia').toLowerCase()
+// The page's hostname picks the network (VITE_NETWORK_HOSTS), so one build can
+// serve mainnet and testnet from different domains. Node (tests) has no window.
+const NETWORK_KEY = selectNetwork(env, typeof window === 'undefined' ? undefined : window.location.hostname)
 const NET = NETWORKS[NETWORK_KEY]
-if (!NET) {
-  throw new Error(`Unknown VITE_NETWORK "${NETWORK_KEY}" — expected one of: ${Object.keys(NETWORKS).join(', ')}`)
+
+const envStr = (setting: Setting, fallback: string): string => {
+  const v = env[overrideKey(NETWORK_KEY, setting)]
+  return v && v.trim() !== '' ? v.trim() : fallback
 }
 
 // The faucet is the one address that can be switched off, so it needs to tell an
@@ -137,11 +69,11 @@ if (!NET) {
 // Every other setting is resolved with `envStr`, which folds empty into the
 // fallback and so can never yield the disabled state.
 const faucetAddress = (): string => {
-  const configured = env['VITE_FAUCET_ADDRESS']
+  const configured = env[overrideKey(NETWORK_KEY, 'FAUCET_ADDRESS')]
   return configured === undefined ? NET.faucet : configured.trim()
 }
 
-const RPC_URL = envStr('VITE_RPC_URL', NET.rpc)
+const RPC_URL = envStr('RPC_URL', NET.rpc)
 
 export const publicClient = createPublicClient({
   chain: NET.chain,
@@ -149,13 +81,13 @@ export const publicClient = createPublicClient({
 })
 
 export const CONTRACTS = {
-  Interfold: envStr('VITE_INTERFOLD_ADDRESS', NET.interfold) as Address,
-  CiphernodeRegistry: envStr('VITE_CIPHERNODE_REGISTRY_ADDRESS', NET.ciphernodeRegistry) as Address,
-  CRISPProgram: envStr('VITE_CRISP_PROGRAM_ADDRESS', NET.crispProgram) as Address,
+  Interfold: envStr('INTERFOLD_ADDRESS', NET.interfold) as Address,
+  CiphernodeRegistry: envStr('CIPHERNODE_REGISTRY_ADDRESS', NET.ciphernodeRegistry) as Address,
+  CRISPProgram: envStr('CRISP_PROGRAM_ADDRESS', NET.crispProgram) as Address,
   // Operator-guide contracts. The bonding registry is the only address the guide
   // needs hardcoded — the ciphernode bond token, ticket wrapper, and ticket underlying
   // are all read back from it at runtime so they cannot drift.
-  BondingRegistry: envStr('VITE_BONDING_REGISTRY_ADDRESS', NET.bondingRegistry) as Address,
+  BondingRegistry: envStr('BONDING_REGISTRY_ADDRESS', NET.bondingRegistry) as Address,
   // Testnet-only convenience faucet (FOLD + fee token). The zero address or an
   // empty string disables the faucet card in the operator guide.
   Faucet: faucetAddress() as Address,
@@ -176,21 +108,21 @@ export const EXPLORER_URL = NET.explorer
 
 // Fee token metadata for formatting escrowed fees/rewards.
 export const FEE_TOKEN = {
-  symbol: envStr('VITE_FEE_TOKEN_SYMBOL', NET.feeSymbol),
-  decimals: Number(envStr('VITE_FEE_TOKEN_DECIMALS', String(NET.feeDecimals))),
+  symbol: envStr('FEE_TOKEN_SYMBOL', NET.feeSymbol),
+  decimals: Number(envStr('FEE_TOKEN_DECIMALS', String(NET.feeDecimals))),
 }
 
 // First block to scan from — lower bound for getLogs. This bounds queries against
 // Interfold, CiphernodeRegistry and CRISPProgram, so it must be the earliest of
 // those three deploy blocks: a later value would silently drop registry events
 // emitted before Interfold was deployed.
-export const DEPLOY_BLOCK = BigInt(envStr('VITE_DEPLOY_BLOCK', NET.deployBlock))
+export const DEPLOY_BLOCK = BigInt(envStr('DEPLOY_BLOCK', NET.deployBlock))
 
 // E3 timeout windows (seconds), matching the deployment's timeoutConfig. Used to
 // decide whether an E3 is still genuinely active vs. expired without completing.
 export const TIMEOUTS = {
-  computeWindow: Number(envStr('VITE_COMPUTE_WINDOW', NET.computeWindow)),
-  decryptionWindow: Number(envStr('VITE_DECRYPTION_WINDOW', NET.decryptionWindow)),
+  computeWindow: Number(envStr('COMPUTE_WINDOW', NET.computeWindow)),
+  decryptionWindow: Number(envStr('DECRYPTION_WINDOW', NET.decryptionWindow)),
 }
 
 export const interfoldAbi = Interfold__factory.abi

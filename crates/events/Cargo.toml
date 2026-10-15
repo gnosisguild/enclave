@@ -7,6 +7,7 @@ description = "Event management for E3 Ciphernodes"
 repository.workspace = true
 
 [dependencies]
+e3-committee = { workspace = true }
 actix = { workspace = true }
 alloy = { workspace = true }
 alloy-primitives = { workspace = true }
@@ -41,4 +42,4 @@ proptest = { workspace = true }
 e3-events = { workspace = true, features = ["test-helpers"] }
 e3-data = { workspace = true }
 e3-test-helpers = { workspace = true }
-e3-ciphernode-builder = { workspace = true }
+e3-event-system = { workspace = true }

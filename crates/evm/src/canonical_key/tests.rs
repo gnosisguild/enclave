@@ -138,7 +138,7 @@ async fn confirmed_observations_admit_publications_in_either_order() -> Result<(
 #[actix::test]
 async fn awaiting_one_key_does_not_stop_other_request_delivery() -> Result<()> {
     use async_trait::async_trait;
-    use e3_ciphernode_builder::EventSystem;
+    use e3_event_system::EventSystem;
     use e3_request::{E3Context, E3ContextSnapshot, E3Extension, E3Router};
     use std::{
         sync::{Arc, Mutex},
@@ -221,7 +221,7 @@ async fn awaiting_one_key_does_not_stop_other_request_delivery() -> Result<()> {
 
 #[actix::test]
 async fn terminal_history_preserves_rosters_for_snapshot_hydration() -> Result<()> {
-    use e3_ciphernode_builder::EventSystem;
+    use e3_event_system::EventSystem;
     use e3_events::{AggregateConfig, E3Stage, E3StageChanged, EventBusFanout};
     use std::time::Duration;
     let aggregate = AggregateId::new(1);
