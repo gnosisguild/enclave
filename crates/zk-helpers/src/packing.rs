@@ -310,3 +310,17 @@ mod tests {
         assert_eq!(packing_layout(51), (52, 4));
     }
 }
+
+/// The carriers `pack` builds for one polynomial (the payload the circuit hashes after its header),
+/// as non-negative integers: the witness of the circuits that sum packed rows (`math::packed_sum`).
+pub fn pack_to_bigints(polynomial: &Polynomial, bit: u32) -> Vec<num_bigint::BigInt> {
+    packer(polynomial, bit)
+        .into_iter()
+        .map(|carrier| {
+            num_bigint::BigInt::from_bytes_le(
+                num_bigint::Sign::Plus,
+                &carrier.into_bigint().to_bytes_le(),
+            )
+        })
+        .collect()
+}
