@@ -233,12 +233,21 @@ pnpm test:integration --no-prebuild
 				</a>
 			</td>
 			<td align="center">
+				<a href="https://github.com/leonschh">
+					<img src="https://avatars.githubusercontent.com/u/312806154?v=4" width="100;" alt="leonschh"/>
+					<br />
+					<sub><b>Ethan</b></sub>
+				</a>
+			</td>
+			<td align="center">
 				<a href="https://github.com/jfschwarz">
 					<img src="https://avatars.githubusercontent.com/u/524089?v=4" width="100;" alt="jfschwarz"/>
 					<br />
 					<sub><b>Jan-Felix</b></sub>
 				</a>
 			</td>
+		</tr>
+		<tr>
 			<td align="center">
 				<a href="https://github.com/callumweb3">
 					<img src="https://avatars.githubusercontent.com/u/314530502?v=4" width="100;" alt="callumweb3"/>
@@ -246,8 +255,6 @@ pnpm test:integration --no-prebuild
 					<sub><b>callumweb3</b></sub>
 				</a>
 			</td>
-		</tr>
-		<tr>
 			<td align="center">
 				<a href="https://github.com/CryptAm">
 					<img src="https://avatars.githubusercontent.com/u/102138190?v=4" width="100;" alt="CryptAm"/>

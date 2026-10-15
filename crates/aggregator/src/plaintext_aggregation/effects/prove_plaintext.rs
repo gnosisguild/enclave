@@ -37,7 +37,6 @@ impl ThresholdPlaintextAggregator {
     pub fn handle_aggregation_proof_signed(
         &mut self,
         msg: TypedEvent<AggregationProofSigned>,
-        _ctx: &mut Context<Self>,
     ) -> Result<()> {
         let (msg, ec) = msg.into_components();
 
@@ -236,11 +235,7 @@ impl ThresholdPlaintextAggregator {
         Ok(())
     }
 
-    pub fn handle_compute_response(
-        &mut self,
-        msg: TypedEvent<ComputeResponse>,
-        ctx: &mut Context<Self>,
-    ) -> Result<()> {
+    pub fn handle_compute_response(&mut self, msg: TypedEvent<ComputeResponse>) -> Result<()> {
         let (msg, ec) = msg.into_components();
         ensure!(
             msg.e3_id == self.e3_id,
@@ -322,7 +317,6 @@ impl ThresholdPlaintextAggregator {
                 // Not a response we handle — ignore
             }
         }
-        let _ = ctx;
         Ok(())
     }
 }

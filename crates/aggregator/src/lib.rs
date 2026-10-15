@@ -17,6 +17,11 @@ pub mod ext;
 mod repo;
 mod workflow;
 
-pub use actors::*;
-pub use domain::committee_hash;
+pub(crate) use actors::*;
+pub use actors::{
+    Collecting, CommitteeFinalizer, CommitteeFinalizerRecoveryState, Complete, Computing,
+    GeneratingC7Proof, PublicKeyAggregatorRecoveryState, PublicKeyAggregatorState,
+    RecoveredCommitteeRequest, ThresholdPlaintextAggregatorRecoveryState,
+    ThresholdPlaintextAggregatorState, VerifyingC6, COMMITTEE_FINALIZER_RECOVERY_SCHEMA_VERSION,
+};
 pub use repo::*;
