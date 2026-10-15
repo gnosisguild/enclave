@@ -13,7 +13,6 @@ members = [
   "crates/crypto",
   "crates/data",
   "crates/data-availability",
-  "crates/interfoldup",
   "crates/entrypoint",
   "crates/event-system",
   "crates/events",

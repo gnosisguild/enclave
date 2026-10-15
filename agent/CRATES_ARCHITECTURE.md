@@ -26,7 +26,6 @@ flowchart TD
         Init[e3-init]
         Fs[e3-fs]
         Support[e3-support-scripts]
-        Up[interfoldup]
     end
 
     subgraph Clients[Client and compute surfaces]

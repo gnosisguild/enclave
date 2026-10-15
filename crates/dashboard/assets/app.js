@@ -8904,7 +8904,7 @@ function dp({ updates: e, activeE3s: t }) {
   var s, u, a, c, m
   const [n, r] = O.useState(!1),
     l = () => {
-      navigator.clipboard.writeText('interfoldup update').then(() => {
+      navigator.clipboard.writeText('interfold update').then(() => {
         ;(r(!0), window.setTimeout(() => r(!1), 1500))
       })
     },
@@ -8997,7 +8997,7 @@ function dp({ updates: e, activeE3s: t }) {
                         type: 'button',
                         className: 'copy-command mono',
                         onClick: l,
-                        children: n ? 'Copied' : 'interfoldup update',
+                        children: n ? 'Copied' : 'interfold update',
                       }),
                     ],
                   }),

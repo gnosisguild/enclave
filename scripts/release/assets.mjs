@@ -7,12 +7,7 @@ import { basename, join } from 'node:path'
 import { ROOT_DIR, fail } from './core.mjs'
 import { releaseChannel } from './version.mjs'
 
-const REQUIRED_BINARIES = [
-  'interfold-linux-x86_64.tar.gz',
-  'interfoldup-linux-x86_64.tar.gz',
-  'interfold-macos-aarch64.tar.gz',
-  'interfoldup-macos-aarch64.tar.gz',
-]
+const REQUIRED_BINARIES = ['interfold-linux-x86_64.tar.gz', 'interfold-macos-aarch64.tar.gz']
 
 function filesBelow(directory) {
   const files = []
@@ -122,19 +117,21 @@ ${changelog || 'See CHANGELOG.md for details.'}
 
 ## Installation
 
-### Install with interfoldup
+### Install the CLI
 
-Install the installer:
-
-\`\`\`bash
-curl -fsSL https://raw.githubusercontent.com/theinterfold/interfold/main/install | bash
-\`\`\`
-
-Install Interfold:
+Install the CLI with the install script:
 
 \`\`\`bash
-interfoldup install${isPrerelease ? ` --version v${version}` : ''}
+curl -fsSL https://raw.githubusercontent.com/theinterfold/interfold/main/install | bash${isPrerelease ? ` -s -- --version v${version}` : ''}
 \`\`\`
+
+To change an installed CLI to this release, run:
+
+\`\`\`bash
+interfold update${isPrerelease ? ` --version v${version}` : ''}
+\`\`\`
+
+Release 0.19.0 and earlier do not have \`interfold update\`. On these releases, use the install script.
 
 ### npm packages
 
@@ -148,7 +145,6 @@ npm install @interfold/react@${npmTag}
 ## Binary Assets
 
 - \`interfold-*\`: Interfold CLI
-- \`interfoldup-*\`: installer and version manager
 
 Supported platforms:
 

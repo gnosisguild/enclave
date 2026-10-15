@@ -271,16 +271,19 @@ does not prove that the node is registered. Read the logs and the
 
 ### Install the CLI
 
-Install `interfoldup`, then use it to install a fixed `interfold` release.
+Use the install script to install a fixed `interfold` release in `~/.local/bin`.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/theinterfold/interfold/main/install | bash
-interfoldup install --version v0.19.0
+curl -fsSL https://raw.githubusercontent.com/theinterfold/interfold/main/install | bash -s -- --version v0.19.0
 interfold --version
 ```
 
-The last command prints the installed version, for example `interfold 0.19.0`. Add `--system` to
-install into `/usr/local/bin` instead of `~/.local/bin`.
+The last command prints the installed version, for example `interfold 0.19.0`. To install in another
+folder, for example `/usr/local/bin`, add `--dir <folder>` after the tag.
+
+To change the release later, run `interfold update --version <TAG>`. Release 0.19.0 does not have
+this command, so on that release run the install script again with `--version <TAG>`. See
+[Change the installed version](/build/installation#change-the-installed-version).
 
 ### Save the configuration file
 

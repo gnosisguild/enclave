@@ -192,14 +192,10 @@ jobs:
           target/${{ matrix.target }}/release/interfold noir status > "$RUNNER_TEMP/noir-status.txt"
           grep -Fx "  Archive SHA-256: $E3_CIRCUITS_ARCHIVE_SHA256" "$RUNNER_TEMP/noir-status.txt"
 
-      - name: Build interfoldup binary
-        run: cargo build --locked --release --target ${{ matrix.target }} --bin interfoldup
-
       - name: Create release archives
         run: |
           mkdir -p dist
           tar -C "target/${{ matrix.target }}/release" -czf "dist/interfold-${{ matrix.os_name }}-${{ matrix.arch }}.tar.gz" interfold
-          tar -C "target/${{ matrix.target }}/release" -czf "dist/interfoldup-${{ matrix.os_name }}-${{ matrix.arch }}.tar.gz" interfoldup
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

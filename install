@@ -3,10 +3,10 @@
 set -e
 
 GITHUB_REPO="theinterfold/interfold"
-BINARY_NAME="interfoldup"
-INSTALL_DIR="$HOME/.local/bin"
+BINARY_NAME="interfold"
+INSTALL_DIR="${INTERFOLD_INSTALL_DIR:-$HOME/.local/bin}"
 # Release tag to install. Empty selects the latest release.
-REQUESTED_VERSION="${INTERFOLDUP_VERSION:-}"
+REQUESTED_VERSION="${INTERFOLD_VERSION:-}"
 
 log_info() {
     echo "$1" >&2
@@ -47,8 +47,14 @@ detect_platform() {
             os="macos"
             case "$(uname -m)" in
                 x86_64)
-                    arch="aarch64" 
-                    log_info "Intel Mac detected - using Apple Silicon binary (runs via Rosetta 2)"
+                    # A shell that runs through Rosetta 2 on Apple silicon reports x86_64. An Intel
+                    # Mac cannot run the Apple silicon binary.
+                    if [ "$(sysctl -in hw.optional.arm64 2>/dev/null)" = "1" ]; then
+                        arch="aarch64"
+                    else
+                        log_error "No release archive exists for macOS on Intel. Build the CLI from source."
+                        exit 1
+                    fi
                     ;;
                 arm64|aarch64)
                     arch="aarch64"
@@ -151,12 +157,15 @@ get_download_url() {
 
 usage() {
     cat <<EOF
-Usage: install [--version TAG]
+Usage: install [--version TAG] [--dir DIR]
 
 Options:
-  --version TAG   Release tag of interfoldup to install, for example v0.13.0.
-                  Default: the latest release. Also settable with the
-                  INTERFOLDUP_VERSION environment variable.
+  --version TAG   Release tag of the interfold CLI to install, for example
+                  v0.19.0. Default: the latest release. Also settable with
+                  the INTERFOLD_VERSION environment variable.
+  --dir DIR       Folder to install the binary in. Default: ~/.local/bin.
+                  Also settable with the INTERFOLD_INSTALL_DIR environment
+                  variable.
   -h, --help      Show this message.
 EOF
 }
@@ -180,6 +189,22 @@ parse_args() {
                 fi
                 shift
                 ;;
+            --dir)
+                if [ -z "${2:-}" ]; then
+                    log_error "--dir needs a folder"
+                    exit 1
+                fi
+                INSTALL_DIR="$2"
+                shift 2
+                ;;
+            --dir=*)
+                INSTALL_DIR="${1#--dir=}"
+                if [ -z "$INSTALL_DIR" ]; then
+                    log_error "--dir needs a folder"
+                    exit 1
+                fi
+                shift
+                ;;
             -h|--help)
                 usage
                 exit 0
@@ -194,7 +219,7 @@ parse_args() {
 }
 
 main() {
-    log_info "Interfold Installer"
+    log_info "Interfold CLI Installer"
     parse_args "$@"
     local platform
     platform=$(detect_platform)
@@ -207,29 +232,34 @@ main() {
     log_info "Download URL: $download_url"
     log_info "Creating install directory: $INSTALL_DIR"
     mkdir -p "$INSTALL_DIR"
-    local temp_file=$(mktemp)
+    # The temporary folder is in the install folder, so that the final move is a rename.
+    local temp_dir
+    temp_dir=$(mktemp -d "$INSTALL_DIR/.interfold-install.XXXXXX")
     local asset_name=$(basename "$download_url")
-    
+
     log_info "Downloading $asset_name..."
-    if ! download_file "$download_url" "$temp_file"; then
+    if ! download_file "$download_url" "$temp_dir/$asset_name"; then
         log_error "Failed to download $asset_name"
-        rm -f "$temp_file"
+        rm -rf "$temp_dir"
         exit 1
     fi
     local target_path="$INSTALL_DIR/$BINARY_NAME"
-    log_info "Extracting to $target_path..."
-    
-    if ! tar -xzf "$temp_file" -C "$INSTALL_DIR" --strip-components=0 "$BINARY_NAME" 2>/dev/null; then
-        # Extracting without specifying the binary name (in case the structure is different)
-        if ! tar -xzf "$temp_file" -O | dd of="$target_path" 2>/dev/null; then
-            log_error "Failed to extract binary from tarball"
-            rm -f "$temp_file"
-            exit 1
-        fi
-    fi
+    log_info "Installing to $target_path..."
 
-    rm -f "$temp_file"
-    chmod +x "$target_path"
+    # Extract next to the archive, then move the binary into place. The rename replaces the file
+    # instead of writing into it, so a running node keeps the binary that it started from.
+    if ! tar -xzf "$temp_dir/$asset_name" -C "$temp_dir" "$BINARY_NAME" || [ ! -f "$temp_dir/$BINARY_NAME" ]; then
+        log_error "Failed to extract $BINARY_NAME from $asset_name"
+        rm -rf "$temp_dir"
+        exit 1
+    fi
+    chmod 755 "$temp_dir/$BINARY_NAME"
+    if ! mv -f "$temp_dir/$BINARY_NAME" "$target_path"; then
+        log_error "Failed to write $target_path"
+        rm -rf "$temp_dir"
+        exit 1
+    fi
+    rm -rf "$temp_dir"
     log_success "Successfully installed $BINARY_NAME to $target_path"
 
     if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
@@ -253,13 +283,11 @@ main() {
     echo ""
     log_success "Installation complete!"
     echo ""
-    echo "You can now use $BINARY_NAME to install the Interfold CLI:"
+    echo "Check the installed version:"
     echo ""
-    echo "  $BINARY_NAME install    # Install the latest interfold CLI"
-    echo "  $BINARY_NAME install --version v0.13.0  # Install a specific release"
-    echo "  $BINARY_NAME update     # Update to the latest version"
-    echo "  $BINARY_NAME uninstall  # Remove the interfold CLI"
-    echo "  $BINARY_NAME --help     # Show help"
+    echo "  $BINARY_NAME --version"
+    echo ""
+    echo "To install another release, run this script again with --version <TAG>."
     echo ""
 }
 

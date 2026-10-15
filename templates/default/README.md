@@ -52,20 +52,18 @@ The easiest way to install the Interfold CLI is using our installer script:
 Or if you prefer wget:
 `wget -qO- https://raw.githubusercontent.com/theinterfold/interfold/main/install | bash`
 
-This script will download and install interfoldup, which is the standalone installer for the
-Interfold CLI.
+The script installs the latest release of the Interfold CLI to `~/.local/bin/interfold`. To install
+a specific release, add `-s -- --version <TAG>` after `bash`.
 
-Once you have `interfoldup` installed, you can manage your Interfold CLI installation:
+To change the installed release later, use the CLI itself:
 
 ```bash
-# Install to ~/.local/bin (default)
-interfoldup install
+# Install the latest release
+interfold update
 
-# Install to /usr/local/bin (requires sudo)
-interfoldup install --system
+# Install a specific release, newer or older
+interfold update --version v0.19.0
 ```
-
-Running `interfoldup install` will install the latest version of the Interfold CLI.
 
 After installation, verify that the Interfold CLI is working correctly:
 
