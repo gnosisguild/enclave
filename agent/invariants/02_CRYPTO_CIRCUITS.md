@@ -268,10 +268,19 @@ every section.
   fits its slot (`pack_checked`, one `assert_max_bit_size::<nibble_bits + 4>()`) makes the opening
   unique, so the opened coefficients must _equal_ the ones the creating circuit committed — its
   canonical bound carries over and need not be repeated. That is all an opener needs: C5's per-party
-  `pk0` (bounded by C1) and C4's shares (bounded by C2) rely on it, at half the cost of a two-sided
-  range check. A value that no upstream commitment bounds still needs its own bound: C1's `pk0`,
-  because C1 originates it and the key equation absorbs `+q` against `r1`; and C5's `pk0_agg`,
-  because `verify_pk_for_basis` pins it only modulo `q_l`. — `flow-trace/04`
+  `pk0` (bounded by C1), C4's shares (bounded by C2), C3's DKG key (bounded by C0) and the l-BFV
+  C3's message (bounded by the C2 chunk leaves) rely on it, at half the cost of a two-sided range
+  check. A value that no upstream commitment bounds still needs its own bound where it originates:
+  C1's `pk0`, because C1 originates it and the key equation absorbs `+q` against `r1`; C0's key, to
+  the centred window, which is why C0 range-checks it rather than only hashing it (a malformed key
+  then fails its owner's C0, not every dealer's C3); and C5's `pk0_agg`, because
+  `verify_pk_for_basis` pins it only modulo `q_l`. — `flow-trace/04`
+- The l-BFV C3 skips the message's own `[0, t)` check (`message_bounded_by_opening`) on three
+  preconditions, all required: the message is opened as the C2 chunk root with checked digits at
+  C2's width (`SHARE_ENCRYPTION_BIT_MSG == SHARE_COMPUTATION_BIT_SHARE`); every threshold modulus is
+  at most the DKG `t`, asserted in the binary, so C2's `[0, q_l)` lies inside `[0, t)`; and the C2→C3
+  link holds (`node_fold_chunked`, and the off-chain C2→C3 consistency check). trBFV C3 keeps the
+  check. — `flow-trace/04`
 - Every prover-chosen modular quotient needs a bound. This includes the `e_sm` CRT lift (C1 on
   trBFV, the C2b chunk leaves on l-BFV), the reduced encryption quotients in ct0, ct1, and C3, and
   the reduced key quotients `r` of `lbfv_pk_generation` and `rd0`/`rd2` of `rlk_generation`. Bounds
@@ -311,7 +320,9 @@ every section.
   What the reduced form then needs is a genuine bound on every coefficient it reads, because it is
   checked at one point and the field equality only implies the integer one when nothing can wrap.
   Those bounds make the plain packing injective as a side effect, which is why the IF-013 digit
-  asserts came back out of ct0/ct1/C3/C7 rather than stacking with them. — `flow-trace/04`
+  asserts came back out of ct0/ct1/C3/C7 rather than stacking with them. C3's DKG key is the later
+  exception: its bound moved to C0, so C3 opens it with checked digits instead of re-bounding it.
+  — `flow-trace/04`
 - **The enumeration axis is "every prover-chosen witness that reaches the sponge", not "every
   commitment opened from elsewhere".** Fiat-Shamir is only sound while `gamma` is independent of the
   witness, and that holds exactly while the packing carrying the witness into the sponge has one
@@ -405,8 +416,10 @@ every section.
   because the packing has one opening. Non-injective packing defeats a chain-supplied anchor as it
   defeats an in-circuit commitment comparison. The same requirement applies to the `u`-commitment
   equality in the `user_data_encryption` fold. — `flow-trace/04`
-- The class is "every circuit that opens a commitment it did not create", and it has seven members:
-  C2a, C2b, C4, C5 and C6 (three). All open through `pack_checked`. A new commitment opened from
+- The class is "every circuit that opens a commitment it did not create". Its members are C2a, C2b,
+  C3 (C0's key; on l-BFV also the C2 chunk root of its message), C4, C5 and C6 (three). All open
+  through checked packing (`pack_checked` / `flatten_with(.., true)`); the l-BFV packed-sum circuits
+  open by hashing the creator's carriers directly. A new commitment opened from
   elsewhere joins that list and needs either the checked helper or its own bound. Naming the class
   matters: the first two instances were found while optimising the circuits that held them, and the
   other five only by enumerating the pattern. CRISP's ballot circuits also open commitments they did

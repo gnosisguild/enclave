@@ -262,7 +262,10 @@ products — gains more than ct0 or ct1. Witnesses deleted: `r2is` and `e0is` (c
 **Why the fixes got cheaper, not just offset.** The reduced identity is checked at one point, so
 every coefficient needs a real bound for the field equality to imply the integer one. Those bounds
 make the plain packing injective on their own, which retires the IF-013 digit asserts rather than
-stacking on them — the soundness fix is absorbed by the optimisation.
+stacking on them — the soundness fix is absorbed by the optimisation. C3's DKG key later moved the other way:
+C0 now range-checks it once, and C3 opens it with checked digits instead of bounding it per proof
+(C3 3,360,464 → 2,880,918 gates at secure-16384 together with the l-BFV message-bound transfer and the
+exact-width transcript packing).
 
 **C7 retires IF-012.** Lagrange coefficients come from a hinted inverse proven by
 `denominator * inverse == 1 (mod q_l)`, and Garner reconstruction derives `u` from the residues.

@@ -98,7 +98,7 @@ ProofRequestActor receives EncryptionKeyPending
 │     ComputeRequest::zk(ZkRequest::PkBfv {
 │       bfv_public_key, party_id, bfv_params
 │     })
-│     → Circuit: PkBfv (C0 — proves BFV keypair was generated correctly)
+│     → Circuit: PkBfv (C0 — commits the BFV key and range-checks it to the centred window)
 │
 ├─ 2. ZkActor (IO layer) receives ComputeRequest:
 │     ├─ Writes witness data to temp directory
@@ -1964,8 +1964,8 @@ InterfoldSolReader decodes CiphertextOutputPublished event
 ┌──────┬────────────────────────────┬───────────────────┬──────────────────────────────┐
 │ Code │ Name                       │ Stage             │ What It Proves               │
 ├──────┼────────────────────────────┼───────────────────┼──────────────────────────────┤
-│ C0   │ BFV Public Key             │ DKG: Key Gen      │ BFV keypair generated        │
-│      │                            │                   │ correctly                    │
+│ C0   │ BFV Public Key             │ DKG: Key Gen      │ Key commitment; every        │
+│      │                            │                   │ coefficient centred mod q_i  │
 ├──────┼────────────────────────────┼───────────────────┼──────────────────────────────┤
 │ C1   │ TrBFV PK Generation        │ DKG: Share Gen    │ Threshold pk_share derived   │
 │      │ (trBFV only)               │                   │ correctly from sk; bounds    │
