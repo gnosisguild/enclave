@@ -417,9 +417,9 @@ node's own recipient slot is exempt because its exported key comes directly from
 The chunked C2 path keeps the same signed proof multiplicity. For each C2a/C2b request, Rust
 generates one type-bound recursive proof per chunk. The default chunk size is
 `c2_chunk_size(degree, n_parties)`. At degree 16384 it depends on the committee: 8192 coefficients
-for up to 4 parties and 2048 above. At 8192 the secure-16384/minimum leaves have 1,926,746 (C2a)
-and 3,059,476 (C2b) gates. Other degrees use the smaller of 512 and the degree, so
-the insecure degree-128 preset uses 128 coefficients per chunk. A batch holds up to four chunks. The
+for up to 4 parties and 2048 above. At 8192 the secure-16384/minimum leaves have 1,926,746 (C2a) and
+3,059,476 (C2b) gates. Other degrees use the smaller of 512 and the degree, so the insecure
+degree-128 preset uses 128 coefficients per chunk. A batch holds up to four chunks. The
 `--chunk-size` option accepts any nonzero divisor of the preset polynomial degree for generated
 circuit configuration. The production multithread path selects the preset default chunk size. Rust
 groups the chunk proofs into fixed recursive batches and verifies all batches in a type-bound
@@ -642,7 +642,8 @@ ShareVerificationActor receives ShareVerificationDispatched(kind=ShareProofs)
 │   │   │   them against `LBFV_CRS_ROW_COMMITMENTS[row]` with checked packing. It binds `sk` and
 │   │   │   `eek` once for the row and checks each limb's reduced identity at one Fiat-Shamir
 │   │   │   challenge. It commits the row as a hash of the limb commitments
-│   │   │   (`compute_lbfv_pk_row_commitment`); an opener recomputes the checked limb commitments.
+│   │   │   (`compute_lbfv_pk_row_commitment`); the aggregation circuit opens it by hashing the
+│   │   │   packed carriers straight into the limb commitments and sums them while packed.
 │   │   │   At secure-16384 the circuit has 3,198,941 gates (2^22). Native proving took 10.7 s
 │   │   │   per row, against 31.3 s for the earlier five limb proofs and their recursive
 │   │   │   finalizer.

@@ -268,19 +268,20 @@ every section.
   fits its slot (`pack_checked`, one `assert_max_bit_size::<nibble_bits + 4>()`) makes the opening
   unique, so the opened coefficients must _equal_ the ones the creating circuit committed — its
   canonical bound carries over and need not be repeated. That is all an opener needs: C5's per-party
-  `pk0` (bounded by C1), C4's shares (bounded by C2), C3's DKG key (bounded by C0) and the l-BFV
-  C3's message (bounded by the C2 chunk leaves) rely on it, at half the cost of a two-sided range
-  check. A value that no upstream commitment bounds still needs its own bound where it originates:
-  C1's `pk0`, because C1 originates it and the key equation absorbs `+q` against `r1`; C0's key, to
-  the centred window, which is why C0 range-checks it rather than only hashing it (a malformed key
-  then fails its owner's C0, not every dealer's C3); and C5's `pk0_agg`, because
-  `verify_pk_for_basis` pins it only modulo `q_l`. — `flow-trace/04`
+  `pk0` (bounded by C1), C4's shares (bounded by C2; the l-BFV C4 hashes C2's carriers directly,
+  which transfers the same bound), C3's DKG key (bounded by C0) and the l-BFV C3's message (bounded
+  by the C2 chunk leaves) rely on it, at half the cost of a two-sided range check. A value that no
+  upstream commitment bounds still needs its own bound where it originates: C1's `pk0`, because C1
+  originates it and the key equation absorbs `+q` against `r1`; C0's key, to the centred window,
+  which is why C0 range-checks it rather than only hashing it (a malformed key then fails its
+  owner's C0, not every dealer's C3); and C5's `pk0_agg`, because `verify_pk_for_basis` pins it only
+  modulo `q_l`. — `flow-trace/04`
 - The l-BFV C3 skips the message's own `[0, t)` check (`message_bounded_by_opening`) on three
   preconditions, all required: the message is opened as the C2 chunk root with checked digits at
   C2's width (`SHARE_ENCRYPTION_BIT_MSG == SHARE_COMPUTATION_BIT_SHARE`); every threshold modulus is
-  at most the DKG `t`, asserted in the binary, so C2's `[0, q_l)` lies inside `[0, t)`; and the C2→C3
-  link holds (`node_fold_chunked`, and the off-chain C2→C3 consistency check). trBFV C3 keeps the
-  check. — `flow-trace/04`
+  at most the DKG `t`, asserted in the binary, so C2's `[0, q_l)` lies inside `[0, t)`; and the
+  C2→C3 link holds (`node_fold_chunked`, and the off-chain C2→C3 consistency check). trBFV C3 keeps
+  the check. — `flow-trace/04`
 - Every prover-chosen modular quotient needs a bound. This includes the `e_sm` CRT lift (C1 on
   trBFV, the C2b chunk leaves on l-BFV), the reduced encryption quotients in ct0, ct1, and C3, and
   the reduced key quotients `r` of `lbfv_pk_generation` and `rd0`/`rd2` of `rlk_generation`. Bounds
@@ -321,8 +322,8 @@ every section.
   checked at one point and the field equality only implies the integer one when nothing can wrap.
   Those bounds make the plain packing injective as a side effect, which is why the IF-013 digit
   asserts came back out of ct0/ct1/C3/C7 rather than stacking with them. C3's DKG key is the later
-  exception: its bound moved to C0, so C3 opens it with checked digits instead of re-bounding it.
-  — `flow-trace/04`
+  exception: its bound moved to C0, so C3 opens it with checked digits instead of re-bounding it. —
+  `flow-trace/04`
 - **The enumeration axis is "every prover-chosen witness that reaches the sponge", not "every
   commitment opened from elsewhere".** Fiat-Shamir is only sound while `gamma` is independent of the
   witness, and that holds exactly while the packing carrying the witness into the sponge has one
@@ -417,18 +418,20 @@ every section.
   defeats an in-circuit commitment comparison. The same requirement applies to the `u`-commitment
   equality in the `user_data_encryption` fold. — `flow-trace/04`
 - The class is "every circuit that opens a commitment it did not create". Its members are C2a, C2b,
-  C3 (C0's key; on l-BFV also the C2 chunk root of its message), C4, C5 and C6 (three). All open
-  through checked packing (`pack_checked` / `flatten_with(.., true)`); the l-BFV packed-sum circuits
-  open by hashing the creator's carriers directly. A new commitment opened from
-  elsewhere joins that list and needs either the checked helper or its own bound. Naming the class
-  matters: the first two instances were found while optimising the circuits that held them, and the
-  other five only by enumerating the pattern. CRISP's ballot circuits also open commitments they did
-  not create (the parent's and the ballot's ciphertexts) and keep plain `pack`: `verify_slot_update`
-  checks a relation that is linear and aligned coefficient by coefficient across ciphertexts packed
-  with the same `BIT_CT`, so an opening that keeps the carriers proves the same relation for the
-  committed coefficients. The exemption holds only for that shape of relation, and only while every
-  commitment in it has a bounded opening that something else fixes: the ballot through the range
-  checks of `user_data_encryption_ct0/ct1`, and the parent and the published result because
+  C3 (C0's key; on l-BFV also the C2 chunk root of its message), C4, C5 and C6 (three), plus the
+  l-BFV PK and RLK aggregation. The trBFV ones open through checked packing (`pack_checked` /
+  `flatten_with(.., true)`). The l-BFV C4 and the l-BFV PK/RLK aggregation (`math::packed_sum`)
+  instead hash the creator's packed carriers directly, which binds them to the creator's
+  range-checked digits without a per-coefficient check. A new commitment opened from elsewhere joins
+  that list and needs either the checked helper or its own bound. Naming the class matters: the
+  first two instances were found while optimising the circuits that held them, and the other five
+  only by enumerating the pattern. CRISP's ballot circuits also open commitments they did not create
+  (the parent's and the ballot's ciphertexts) and keep plain `pack`: `verify_slot_update` checks a
+  relation that is linear and aligned coefficient by coefficient across ciphertexts packed with the
+  same `BIT_CT`, so an opening that keeps the carriers proves the same relation for the committed
+  coefficients. The exemption holds only for that shape of relation, and only while every commitment
+  in it has a bounded opening that something else fixes: the ballot through the range checks of
+  `user_data_encryption_ct0/ct1`, and the parent and the published result because
   `chain_head_per_slot` takes an entry only when its bytes reproduce its commitment and it extends
   the selected head. A check at one point over those commitments, or a Secure Process that follows a
   parent by its stored commitment without its bytes, needs injective openings: chained masks could
@@ -437,9 +440,13 @@ every section.
 - A bound that is not tight enough for the slot is no bound for this purpose. C2b's `as u64` cast
   limited coefficients to `2^64` while the slot was `radix = 2^64` with `base = 2^60`, so a digit
   could still overflow. — `flow-trace/04`
-- A derived value that the circuit reduces itself needs no opened-witness bound. C4's aggregate is
-  canonicalised by `normalize_aggregated`, and `reduce_mod` pins its quotient to `u64`, which stays
-  sound for sums far above the slot width. — `flow-trace/04`
+- A derived value that the circuit reduces itself needs no opened-witness bound. The trBFV C4's
+  aggregate is canonicalised by `normalize_aggregated`. The l-BFV C4 and PK/RLK aggregation derive
+  theirs from the packed sum: hints `k_i, c_i` with `c_i` in the exact centred window, `k_i` in a
+  carry window narrow enough that every digit `k_i * q + c_i` fits one slot, and
+  `S == sum R^(3 - i) * (k_i * q + c_i)`, which makes the unpacking unique and `c_i` the canonical
+  residue. The committee bound that keeps the honest carry in its window is asserted in
+  `reduce_packed_sum`. — `flow-trace/04`
 - `packing_layout` rejects `group == 1`. At one value per carrier, packing saves no sponge
   absorption while still charging the range checks that make it injective — measured +82% gates
   against absorbing directly. — `flow-trace/04`
@@ -748,7 +755,11 @@ every section.
   rows against `LBFV_URS_ROW_COMMITMENTS[row]` and `LBFV_CRS_ROW_COMMITMENTS[row]` with checked
   packing, and absorb `sk`, `r`, `e0`, `e2`, `rd0`, `rd2`, `d0` and `d2` before it derives the
   challenge. Each row proof commits the row as a hash of its limb commitments. Aggregation opens a
-  row by recomputing its checked limb commitments, which carries the centered bounds.
+  row by hashing the carriers the row proof packed directly into those limb commitments: collision
+  resistance makes them the creator's carriers, whose digits the row proof range-checked to the
+  centred window, so the bound carries over with no per-coefficient check. It then sums the parties'
+  carriers while packed and derives the canonical centred aggregate in-circuit (`math::packed_sum`),
+  whose carry and centred windows make the unpacking unique.
 - **l-BFV recursive row folds are bounded:** each generation and aggregation kernel accepts row 0.
   Each fold accepts only the next row. `node_fold_v2` and `dkg_aggregator_v2` require terminal
   row 4. Therefore, each terminal fold contains exactly five ordered proof pairs. `nodes_fold_v2`
