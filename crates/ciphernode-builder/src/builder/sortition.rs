@@ -25,11 +25,7 @@ pub(super) async fn setup_sortition(
     bus: &BusHandle,
     repositories: &e3_data::Repositories,
     addr: &str,
-) -> Result<(
-    Addr<Sortition>,
-    Addr<CiphernodeSelector>,
-    CiphernodeSelectorState,
-)> {
+) -> Result<(Addr<Sortition>, CiphernodeSelectorState)> {
     let lifecycle = repositories
         .e3_lifecycle()
         .read()
@@ -51,7 +47,7 @@ pub(super) async fn setup_sortition(
         bus,
         selector_store,
         repositories.aggregator_failover(),
-        lifecycle.clone(),
+        lifecycle,
         addr,
     )
     .await?;
@@ -67,7 +63,7 @@ pub(super) async fn setup_sortition(
         recovery_store: repositories.sortition_recovery(),
         committees_store: committees_repo,
         default_backend: SortitionBackend::score(),
-        ciphernode_selector: ciphernode_selector.clone(),
+        ciphernode_selector,
         address: addr,
         submitted_e3s: repositories
             .committee_finalizer_recovery()
@@ -80,7 +76,7 @@ pub(super) async fn setup_sortition(
             .collect(),
     })
     .await?;
-    Ok((sortition, ciphernode_selector, selector_state))
+    Ok((sortition, selector_state))
 }
 
 #[cfg(test)]
@@ -148,7 +144,7 @@ mod tests {
                 ..Default::default()
             })
             .await?;
-        let (sortition, _, _) = setup_sortition(&bus, &repos, &local).await?;
+        let (sortition, _) = setup_sortition(&bus, &repos, &local).await?;
         sortition.send(EffectsEnabled::new()).await?;
         bus.flush_event_pipeline().await?;
         // Without the recovered intent, sortition would try to rank this request and fail
@@ -237,7 +233,7 @@ mod tests {
                 false,
             )
             .await?;
-            let (sortition, _, _) = setup_sortition(&bus, &repos, &local).await?;
+            let (sortition, _) = setup_sortition(&bus, &repos, &local).await?;
             if !before_snapshot {
                 // Startup replays the log suffix before it enables effects.
                 sortition
@@ -375,8 +371,7 @@ mod tests {
                 false,
             )
             .await?;
-            let (_sortition, _selector, _) =
-                setup_sortition(&bus, &repos, &operator.to_string()).await?;
+            let (_sortition, _) = setup_sortition(&bus, &repos, &operator.to_string()).await?;
             if !before_snapshot {
                 // Replay delivers stored envelopes on a fresh bus without appending them again.
                 for event in events {
