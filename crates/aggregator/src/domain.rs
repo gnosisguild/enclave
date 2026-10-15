@@ -8,5 +8,3 @@
 
 #[path = "committee.rs"]
 pub mod committee;
-#[path = "committee_hash.rs"]
-pub mod committee_hash;

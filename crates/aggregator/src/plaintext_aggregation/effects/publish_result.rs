@@ -108,8 +108,6 @@ impl ThresholdPlaintextAggregator {
             .decryption_aggregator_proofs
             .clone()
             .unwrap_or_default();
-        // Keep c7_proofs for invariant check; they are subsumed by the decryption_aggregator proof.
-        let _ = c7_proofs;
         let event = PlaintextAggregated {
             decrypted_output,
             e3_id: self.e3_id.clone(),

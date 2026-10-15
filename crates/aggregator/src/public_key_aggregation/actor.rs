@@ -33,9 +33,7 @@ use e3_utils::{ArcBytes, MAILBOX_LIMIT};
 use std::{collections::BTreeSet, sync::Arc};
 use tracing::{error, info, warn};
 
-// Public-key aggregation state machine + pure transition logic now live in
-// `crate::workflow::publickey_aggregation`; re-exported here to preserve the public path
-// `e3_aggregator::publickey_aggregator::PublicKeyAggregatorState`.
+// The state machine and pure transition logic live in `crate::workflow::publickey_aggregation`.
 pub use crate::workflow::publickey_aggregation::{
     PublicKeyAggregatorRecoveryState, PublicKeyAggregatorState,
     PUBLIC_KEY_AGGREGATOR_RECOVERY_SCHEMA_VERSION,
