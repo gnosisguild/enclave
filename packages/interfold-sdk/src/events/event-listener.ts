@@ -40,6 +40,7 @@ export class EventListener implements SDKEventEmitter {
   private randomnessProviderListeners: Map<string, Set<RandomnessProviderEventCallback>> = new Map()
   private seenLiveLogs: Map<string, true> = new Map()
   private isPolling = false
+  private pollGeneration = 0
   private lastBlockNumber: bigint = BigInt(0)
   private publicClient: PublicClient
   private contracts: ContractAddresses
@@ -276,10 +277,12 @@ export class EventListener implements SDKEventEmitter {
     if (this.isPolling) return
 
     this.isPolling = true
+    // A loop from an earlier start may still be sleeping; the new generation makes it exit.
+    const generation = ++this.pollGeneration
 
     try {
       this.lastBlockNumber = await this.publicClient.getBlockNumber()
-      void this.pollForEvents()
+      void this.pollForEvents(generation)
     } catch (error) {
       this.isPolling = false
       throw new SDKError(`Failed to start polling: ${error}`, 'POLLING_START_FAILED')
@@ -432,30 +435,50 @@ export class EventListener implements SDKEventEmitter {
     return logs
   }
 
-  private async pollForEvents(): Promise<void> {
-    while (this.isPolling) {
+  // Event types with a contract watcher already receive logs from viem, which polls on HTTP
+  // transports; polling them here as well would deliver every event twice.
+  private hasContractWatcher(eventType: AllEventTypes): boolean {
+    for (const key of this.activeWatchers.keys()) {
+      if (key.endsWith(`:${eventType}`)) return true
+    }
+    return false
+  }
+
+  private async pollForEvents(generation: number): Promise<void> {
+    while (this.isPolling && generation === this.pollGeneration) {
       try {
         const currentBlock = await this.publicClient.getBlockNumber()
-  
+
         if (currentBlock > this.lastBlockNumber) {
           const fromBlock = this.lastBlockNumber + BigInt(1)
-  
-          for (const eventType of this.listeners.keys()) {
-            const logs = await this.getHistoricalEvents(eventType, fromBlock, currentBlock)
-  
-            for (const log of logs) {
-              this.emit(this.buildEvent(eventType, log))
-            }
+          const eventTypes = [...this.listeners.keys()].filter((eventType) => !this.hasContractWatcher(eventType))
+
+          // Fetch every type before emitting so a failed fetch retries the whole range without
+          // re-delivering events that were already emitted.
+          const batches = await Promise.all(
+            eventTypes.map(async (eventType) => ({
+              eventType,
+              logs: await this.getHistoricalEvents(eventType, fromBlock, currentBlock),
+            })),
+          )
+          if (!this.isPolling || generation !== this.pollGeneration) return
+
+          const events = batches.flatMap(({ eventType, logs }) => logs.map((log) => this.buildEvent(eventType, log)))
+          events.sort((a, b) => {
+            if (a.blockNumber !== b.blockNumber) return a.blockNumber < b.blockNumber ? -1 : 1
+            return (a.log.logIndex ?? 0) - (b.log.logIndex ?? 0)
+          })
+          for (const event of events) {
+            this.emit(event)
           }
-  
+
           this.lastBlockNumber = currentBlock
         }
-  
-        await sleep(this.config.pollingInterval || 5000)
       } catch (error) {
         console.error('Error during polling:', error)
-        await sleep(this.config.pollingInterval || 5000)
       }
+
+      await sleep(this.config.pollingInterval || 5000)
     }
   }
 }

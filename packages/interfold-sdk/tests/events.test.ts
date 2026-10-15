@@ -9,10 +9,12 @@ import type { Log, PublicClient } from 'viem'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { EventListener } from '../src/events/event-listener'
-import { RandomnessProviderEventType, RegistryEventType, type InterfoldEvent } from '../src/events/types'
+import { InterfoldEventType, RandomnessProviderEventType, RegistryEventType, type InterfoldEvent } from '../src/events/types'
 import { InterfoldSDK } from '../src/interfold-sdk'
+import { sleep } from '../src/utils'
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.restoreAllMocks()
 })
 
@@ -300,5 +302,114 @@ describe('RegistryEventType', () => {
     await Promise.resolve()
 
     expect(consoleError).toHaveBeenCalledWith(`Error in event callback for ${RegistryEventType.COMMITTEE_PUBLISHED}:`, error)
+  })
+})
+
+describe('EventListener polling', () => {
+  const pollingInterval = 1_000
+
+  const log = (blockNumber: bigint, logIndex: number, args: string) =>
+    ({ blockNumber, logIndex, transactionHash: '0x1', args }) as unknown as Log
+
+  // Fake HTTP client: `chain.block` is the head, `getContractEvents` serves logs per event name.
+  function setup(getContractEvents: (request: { eventName: string; fromBlock: bigint; toBlock: bigint }) => Promise<Log[]>) {
+    vi.useFakeTimers()
+    const chain = { block: 10n }
+    const watchers: Array<(logs: Log[]) => void> = []
+    const publicClient = {
+      getBlockNumber: async () => chain.block,
+      getContractEvents: vi.fn(getContractEvents),
+      watchContractEvent: ({ onLogs }: { onLogs: (logs: Log[]) => void }) => {
+        watchers.push(onLogs)
+        return () => undefined
+      },
+    }
+    const listener = new EventListener({
+      publicClient: publicClient as unknown as PublicClient,
+      contracts: {
+        interfold: '0x0000000000000000000000000000000000000001',
+        ciphernodeRegistry: '0x0000000000000000000000000000000000000002',
+        feeToken: '0x0000000000000000000000000000000000000003',
+      },
+      config: { pollingInterval },
+    })
+    const seen: unknown[] = []
+    const record = (event: { data: unknown }) => {
+      seen.push(event.data)
+    }
+    return { chain, listener, publicClient, record, seen, watchers }
+  }
+
+  it('emits new logs for on() listeners in chain order across event types', async () => {
+    const { chain, listener, publicClient, record, seen } = setup(async ({ eventName }) =>
+      eventName === InterfoldEventType.E3_REQUESTED
+        ? [log(11n, 0, 'requested-1'), log(12n, 0, 'requested-2')]
+        : [log(11n, 3, 'published-1')],
+    )
+    listener.on(InterfoldEventType.E3_REQUESTED, record)
+    listener.on(RegistryEventType.COMMITTEE_PUBLISHED, record)
+
+    await listener.startPolling()
+    chain.block = 12n
+    await vi.advanceTimersByTimeAsync(pollingInterval)
+    listener.cleanup()
+
+    expect(seen).toEqual(['requested-1', 'published-1', 'requested-2'])
+    expect(publicClient.getContractEvents).toHaveBeenCalledWith(expect.objectContaining({ fromBlock: 11n, toBlock: 12n }))
+  })
+
+  it('retries a failed range without re-emitting events that were already fetched', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    let registryFailures = 1
+    const { chain, listener, record, seen } = setup(async ({ eventName }) => {
+      if (eventName === InterfoldEventType.E3_REQUESTED) return [log(11n, 0, 'requested')]
+      if (registryFailures-- > 0) throw new Error('rpc unavailable')
+      return [log(11n, 1, 'published')]
+    })
+    listener.on(InterfoldEventType.E3_REQUESTED, record)
+    listener.on(RegistryEventType.COMMITTEE_PUBLISHED, record)
+
+    await listener.startPolling()
+    chain.block = 11n
+    await vi.advanceTimersByTimeAsync(pollingInterval)
+    expect(seen).toEqual([])
+
+    await vi.advanceTimersByTimeAsync(pollingInterval)
+    listener.cleanup()
+
+    expect(seen).toEqual(['requested', 'published'])
+  })
+
+  it('does not re-deliver events that a contract watcher already delivers', async () => {
+    const requested = log(11n, 0, 'requested')
+    const { chain, listener, record, seen, watchers } = setup(async () => [requested])
+    await listener.onInterfoldEvent(InterfoldEventType.E3_REQUESTED, record)
+
+    await listener.startPolling()
+    chain.block = 11n
+    watchers.forEach((onLogs) => onLogs([requested]))
+    await vi.advanceTimersByTimeAsync(pollingInterval)
+    listener.cleanup()
+
+    expect(seen).toEqual(['requested'])
+  })
+
+  it('runs a single poll loop after a quick stop and restart', async () => {
+    const rpcLatency = 10
+    // Fake-timer latency lets the fetches of two concurrent loops overlap, as on a real network.
+    const { chain, listener, record, seen } = setup(async () => {
+      await sleep(rpcLatency)
+      return [log(11n, 0, 'requested')]
+    })
+    listener.on(InterfoldEventType.E3_REQUESTED, record)
+
+    await listener.startPolling()
+    listener.stopPolling()
+    await listener.startPolling()
+    chain.block = 11n
+    await vi.advanceTimersByTimeAsync(pollingInterval + rpcLatency)
+    listener.cleanup()
+
+    expect(seen).toEqual(['requested'])
   })
 })
