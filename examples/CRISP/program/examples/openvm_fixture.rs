@@ -60,9 +60,7 @@ fn main() -> Result<()> {
         let weight = (index % 3 + 1) as u64;
         let option = index % 2;
         let mut coefficients = vec![0u64; params.degree()];
-        for bit in 0..50 {
-            coefficients[option * 50 + bit] = (weight >> (49 - bit)) & 1;
-        }
+        coefficients[option] = weight;
         let plaintext = Plaintext::try_encode(&coefficients, Encoding::poly(), &params)?;
         let ciphertext = public_key.try_encrypt(&plaintext, &mut rng)?.to_bytes();
         let commitment = compute_ct_commitment_with_params(&ciphertext, &params)?;
@@ -102,26 +100,16 @@ fn main() -> Result<()> {
     write_execute_input(&output, &input, &result, &selected)?;
     let decrypted = key.try_decrypt(&Ciphertext::from_bytes(&ciphertext, &params)?)?;
     let coefficients: Vec<u64> = Vec::try_decode(&decrypted, Encoding::poly())?;
-    let decode = |offset: usize| {
-        coefficients[offset..offset + 50]
+    ensure!(
+        coefficients[..2] == expected_tally,
+        "Native tally differs from the ballots"
+    );
+    ensure!(
+        coefficients[2..]
             .iter()
-            .fold(0u64, |value, bit| value * 2 + bit)
-    };
-    // The insecure preset's plaintext modulus is 100, so its per-bit sums wrap past 99 ballots and
-    // its tally cannot be decoded this way.
-    let tally_checked = !insecure;
-    if tally_checked {
-        ensure!(
-            [decode(0), decode(50)] == expected_tally,
-            "Native tally differs from the ballots"
-        );
-        ensure!(
-            coefficients[100..]
-                .iter()
-                .all(|coefficient| *coefficient == 0),
-            "Unexpected coefficients outside the tally"
-        );
-    }
+            .all(|coefficient| *coefficient == 0),
+        "Unexpected coefficients outside the tally"
+    );
     fs::write(output.join("public-key.bin"), &public_key_bytes)?;
     fs::write(output.join("ciphertext.bin"), &ciphertext)?;
     fs::write(
@@ -139,7 +127,7 @@ fn main() -> Result<()> {
         "input_root": format!("0x{}", hex::encode(result.merkle_root)),
         "ciphertext_hash": format!("0x{}", hex::encode(result.ciphertext_hash)),
         "ciphertext_commitment": format!("0x{}", hex::encode(result.ciphertext_commitment)),
-        "expected_tally": expected_tally, "native_tally_checked": tally_checked,
+        "expected_tally": expected_tally, "native_tally_checked": true,
         "ballot_proofs_generated": false, "threshold_decryption_proof_generated": false,
     });
     fs::write(

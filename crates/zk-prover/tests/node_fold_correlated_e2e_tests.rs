@@ -501,15 +501,16 @@ async fn node_fold_correlated_sparse_self_slot_proves_and_verifies() {
         )
         .expect("c2ab_fold proof");
 
-    let (_dkg_th, dkg_dkg) = e3_fhe_params::build_pair_for_preset(preset).expect("pair");
+    let (dkg_th, dkg_dkg) = e3_fhe_params::build_pair_for_preset(preset).expect("pair");
     let mut rng = rand::rng();
     let dkg_sk = fhe::bfv::SecretKey::random(&dkg_dkg, &mut rng);
     let dkg_pk = fhe::bfv::PublicKey::new(&dkg_sk, &mut rng);
 
     let total_slots = c3_fold_total_slots_from_compiled_json();
     assert_eq!(
-        total_slots, 6,
-        "Minimum / insecure preset uses 3×2 C3 slots"
+        total_slots,
+        committee.n * dkg_th.moduli().len(),
+        "C3 has one slot per committee member and threshold modulus"
     );
     let slots_per_party = total_slots / committee.n;
     let own_party_id = 0usize;
@@ -567,7 +568,8 @@ async fn node_fold_correlated_sparse_self_slot_proves_and_verifies() {
         );
         slot_indices.push(slot as u32);
     }
-    assert_eq!(slot_indices, vec![2, 3, 4, 5]);
+    let peer_slots: Vec<u32> = (slots_per_party as u32..total_slots as u32).collect();
+    assert_eq!(slot_indices, peer_slots);
 
     let c3a_folded = generate_sequential_c3_fold(
         &prover,

@@ -477,7 +477,7 @@ mod tests {
         let test_votes = vec![
             vec![0u64; insecure_64::DEGREE], // All zeros
             vec![1u64; insecure_64::DEGREE], // All ones
-            create_vote_vector(),             // Alternating pattern
+            create_vote_vector(),            // Alternating pattern
         ];
 
         for vote in test_votes {
