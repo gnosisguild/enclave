@@ -4,16 +4,16 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::{
+    EthProvider, EvmChainGateway, EvmChainGatewayHandle, EvmEventProcessor, EvmReadInterface,
+    EvmRouter, Filters, FixHistoricalOrder, IngestionProgressSink, ProviderFactory,
+    DEFAULT_MAX_BUFFERED_EVM_EVENTS,
+};
 use actix::Actor;
 use alloy::{primitives::Address, providers::Provider};
 use anyhow::{bail, Result};
 use e3_config::chain_config::DEFAULT_RPC_LOG_RANGE_BLOCKS;
 use e3_events::{run_once, BusHandle, EventSubscriber, EventType, HistoricalEvmSyncStart};
-use e3_evm::{
-    EthProvider, EvmChainGateway, EvmChainGatewayHandle, EvmEventProcessor, EvmReadInterface,
-    EvmRouter, Filters, FixHistoricalOrder, IngestionProgressSink, ProviderFactory,
-    DEFAULT_MAX_BUFFERED_EVM_EVENTS,
-};
 
 pub trait RouteFn: FnOnce(EvmEventProcessor) -> EvmEventProcessor + Send {}
 impl<F> RouteFn for F where F: FnOnce(EvmEventProcessor) -> EvmEventProcessor + Send {}
@@ -85,7 +85,7 @@ impl<P: Provider + Clone + 'static> EvmSystemChainBuilder<P> {
     /// Fails for a chain without a contract route. The reader's log filter is built from the
     /// routes, so without one it has no address and fetches every log on the chain. The router
     /// drops them all, so the chain would do nothing except load the provider.
-    pub(crate) fn build_with_readiness(&mut self) -> Result<EvmChainGatewayHandle> {
+    pub fn build_with_readiness(&mut self) -> Result<EvmChainGatewayHandle> {
         if self.route_factories.is_empty() {
             bail!(
                 "chain {} has no contract reader; a chain reader needs at least one contract route",
