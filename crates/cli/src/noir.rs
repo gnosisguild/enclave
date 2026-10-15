@@ -312,7 +312,7 @@ mod tests {
     async fn setup_requires_explicit_archive_subset() {
         use crate::cli::Cli;
         use clap::Parser;
-        use e3_zk_prover::VersionInfo;
+        use e3_zk_prover::{CircuitInfo, VersionInfo};
         use std::{collections::BTreeMap, fs, os::unix::fs::PermissionsExt, process::Command};
 
         assert!(Cli::try_parse_from([
@@ -393,8 +393,17 @@ mod tests {
         fs::create_dir_all(&circuits).unwrap();
         fs::write(circuits.join("retained"), b"previous").unwrap();
         let version_file = circuits.parent().unwrap().join("version.json");
+        let mut circuit_files = std::collections::HashMap::new();
+        circuit_files.insert(
+            "retained".into(),
+            CircuitInfo {
+                file: "retained".into(),
+                checksum: "fixture-checksum".into(),
+            },
+        );
         VersionInfo {
             circuits_version: Some("previous".into()),
+            circuits: circuit_files,
             ..Default::default()
         }
         .save(&version_file)
