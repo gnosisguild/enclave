@@ -594,8 +594,8 @@ fn finished_e3s_forget_the_oldest_beyond_the_bound() {
 
 #[actix::test]
 async fn replayed_c6_intent_is_repaired_before_deduplication() -> Result<()> {
-    use e3_ciphernode_builder::EventSystem;
     use e3_data::RepositoriesFactory;
+    use e3_event_system::EventSystem;
     use e3_events::{
         AggregateConfig, AggregateId, EventConstructorWithTimestamp, EvmEventConfig,
         EvmEventConfigChain, HistoricalEvmEventsReceived, HistoricalNetSyncEventsReceived,

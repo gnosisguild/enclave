@@ -217,7 +217,7 @@ mod tests {
     use super::*;
     use crate::domain::event_conversion::ReceivableDocument;
     use actix::Actor;
-    use e3_ciphernode_builder::{EventStoreAddrs, EventSystem};
+    use e3_event_system::{EventStoreAddrs, EventSystem};
     use e3_events::{
         AggregateConfig, DecryptionKeyShared, DocumentKind, DocumentMeta, DocumentReceived,
         E3StageChanged, EncryptionKey, EncryptionKeyCreated, EventConstructorWithTimestamp,

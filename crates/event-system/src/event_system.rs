@@ -7,8 +7,8 @@
 use crate::get_interfold_event_bus;
 use crate::global_eventstore_cache::{share_eventstore_reader, EventStoreReader};
 use crate::global_store_cache::share_store;
-use actix::{Actor, Addr, Handler, Recipient};
-use anyhow::{anyhow, Context as _, Result};
+use actix::{Actor, Addr, Handler, Message, Recipient};
+use anyhow::{Context as _, Result};
 use e3_data::{
     CommitLogEventLog, DataStore, InMemEventLog, InMemSequenceIndex, InMemStore, SledSequenceIndex,
     SledStore,
@@ -16,16 +16,22 @@ use e3_data::{
 use e3_events::{hlc::Hlc, hlc_factory::HlcFactory};
 use e3_events::{
     AggregateConfig, BusHandle, Disabled, Enabled, EventBus, EventBusConfig, EventStore,
-    EventStoreClockFloor, EventStoreRouter, InsertBatch, InterfoldEvent, Sequencer, SnapshotBuffer,
-    StoreEventRequested, SubscribePreFanout, UpdateDestination,
+    EventStoreClockFloor, EventStoreRouter, FlushEventStores, InsertBatch, InterfoldEvent,
+    Sequencer, SnapshotBuffer, StoreEventRequested, SubscribePreFanout, UpdateDestination,
 };
 use e3_utils::enumerate_path;
 use once_cell::sync::OnceCell;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+type InMemEventStore = EventStore<InMemSequenceIndex, InMemEventLog>;
+type PersistedEventStore = EventStore<SledSequenceIndex, CommitLogEventLog>;
+type InMemRouter = EventStoreRouter<InMemSequenceIndex, InMemEventLog>;
+type PersistedRouter = EventStoreRouter<SledSequenceIndex, CommitLogEventLog>;
+
+#[derive(Default)]
 struct InMemBackend {
-    eventstores: OnceCell<HashMap<usize, Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>>,
+    eventstores: OnceCell<HashMap<usize, Addr<InMemEventStore>>>,
     store: OnceCell<Addr<InMemStore>>,
 }
 
@@ -41,7 +47,7 @@ impl InMemBackend {
 struct PersistedBackend {
     log_path: PathBuf,
     sled_path: PathBuf,
-    eventstores: OnceCell<HashMap<usize, Addr<EventStore<SledSequenceIndex, CommitLogEventLog>>>>,
+    eventstores: OnceCell<HashMap<usize, Addr<PersistedEventStore>>>,
     store: OnceCell<Addr<SledStore>>,
 }
 
@@ -61,8 +67,59 @@ enum EventSystemBackend {
 
 #[derive(Clone)]
 pub enum EventStoreAddrs {
-    InMem(HashMap<usize, Addr<EventStore<InMemSequenceIndex, InMemEventLog>>>),
-    Persisted(HashMap<usize, Addr<EventStore<SledSequenceIndex, CommitLogEventLog>>>),
+    InMem(HashMap<usize, Addr<InMemEventStore>>),
+    Persisted(HashMap<usize, Addr<PersistedEventStore>>),
+}
+
+impl EventStoreAddrs {
+    /// One recipient per aggregate for a message that both event store kinds handle.
+    fn recipients<M>(&self) -> Vec<(usize, Recipient<M>)>
+    where
+        M: Message + Send + 'static,
+        M::Result: Send,
+        InMemEventStore: Handler<M>,
+        PersistedEventStore: Handler<M>,
+    {
+        match self {
+            Self::InMem(addrs) => addrs
+                .iter()
+                .map(|(id, addr)| (*id, addr.clone().recipient()))
+                .collect(),
+            Self::Persisted(addrs) => addrs
+                .iter()
+                .map(|(id, addr)| (*id, addr.clone().recipient()))
+                .collect(),
+        }
+    }
+
+    /// Start a new router over these event stores.
+    fn start_router(self) -> RouterAddr {
+        match self {
+            Self::InMem(addrs) => RouterAddr::InMem(EventStoreRouter::new(addrs).start()),
+            Self::Persisted(addrs) => RouterAddr::Persisted(EventStoreRouter::new(addrs).start()),
+        }
+    }
+}
+
+/// A started router over either event store kind.
+enum RouterAddr {
+    InMem(Addr<InMemRouter>),
+    Persisted(Addr<PersistedRouter>),
+}
+
+impl RouterAddr {
+    fn recipient<M>(&self) -> Recipient<M>
+    where
+        M: Message + Send + 'static,
+        M::Result: Send,
+        InMemRouter: Handler<M>,
+        PersistedRouter: Handler<M>,
+    {
+        match self {
+            Self::InMem(addr) => addr.clone().recipient(),
+            Self::Persisted(addr) => addr.clone().recipient(),
+        }
+    }
 }
 
 /// EventSystem holds interconnected references to the components that manage events and
@@ -111,54 +168,23 @@ impl EventSystem {
 
     /// Create an in memory EventSystem
     pub fn in_mem() -> Self {
-        let (failure_signal, _) = tokio::sync::watch::channel(None);
-        Self {
-            backend: EventSystemBackend::InMem(InMemBackend {
-                eventstores: OnceCell::new(),
-                store: OnceCell::new(),
-            }),
-            buffer: OnceCell::new(),
-            sequencer: OnceCell::new(),
-            eventbus: OnceCell::new(),
-            handle: OnceCell::new(),
-            aggregate_config: OnceCell::new(),
-            eventstore_addrs: OnceCell::new(),
-            global_shared_store: false,
-            global_shared_eventstore: false,
-            failure_signal,
-        }
-    }
-
-    /// Create an in memory EventSystem with a given store
-    pub fn in_mem_from_store(store: &Addr<InMemStore>) -> Self {
-        let (failure_signal, _) = tokio::sync::watch::channel(None);
-        Self {
-            backend: EventSystemBackend::InMem(InMemBackend {
-                eventstores: OnceCell::new(),
-                store: OnceCell::from(store.to_owned()),
-            }),
-            buffer: OnceCell::new(),
-            sequencer: OnceCell::new(),
-            eventbus: OnceCell::new(),
-            handle: OnceCell::new(),
-            aggregate_config: OnceCell::new(),
-            eventstore_addrs: OnceCell::new(),
-            global_shared_store: false,
-            global_shared_eventstore: false,
-            failure_signal,
-        }
+        Self::from_backend(EventSystemBackend::InMem(InMemBackend::default()))
     }
 
     /// Create a persisted EventSystem with datafiles at the given paths
     pub fn persisted(log_path: PathBuf, sled_path: PathBuf) -> Self {
+        Self::from_backend(EventSystemBackend::Persisted(PersistedBackend {
+            log_path,
+            sled_path,
+            eventstores: OnceCell::new(),
+            store: OnceCell::new(),
+        }))
+    }
+
+    fn from_backend(backend: EventSystemBackend) -> Self {
         let (failure_signal, _) = tokio::sync::watch::channel(None);
         Self {
-            backend: EventSystemBackend::Persisted(PersistedBackend {
-                log_path,
-                sled_path,
-                eventstores: OnceCell::new(),
-                store: OnceCell::new(),
-            }),
+            backend,
             buffer: OnceCell::new(),
             sequencer: OnceCell::new(),
             eventbus: OnceCell::new(),
@@ -223,7 +249,7 @@ impl EventSystem {
     pub fn buffer(&self) -> Result<Addr<SnapshotBuffer>> {
         self.buffer
             .get_or_try_init(|| {
-                SnapshotBuffer::spawn(&self.aggregate_config(), NoopBatchReceiver::new().start())
+                SnapshotBuffer::spawn(&self.aggregate_config(), NoopBatchReceiver.start())
             })
             .cloned()
     }
@@ -232,25 +258,13 @@ impl EventSystem {
     pub fn sequencer(&self) -> Result<Addr<Sequencer>> {
         self.sequencer
             .get_or_try_init(|| {
-                let sequencer = match self.eventstore_addrs()? {
-                    EventStoreAddrs::InMem(addrs) => {
-                        let router = EventStoreRouter::new(addrs).start();
-                        Sequencer::new_with_flush(
-                            &self.eventbus(),
-                            router.clone().recipient(),
-                            router.recipient(),
-                        )
-                    }
-                    EventStoreAddrs::Persisted(addrs) => {
-                        let router = EventStoreRouter::new(addrs).start();
-                        Sequencer::new_with_flush(
-                            &self.eventbus(),
-                            router.clone().recipient(),
-                            router.recipient(),
-                        )
-                    }
-                };
-                Ok(sequencer.start())
+                let router = self.eventstore_addrs()?.start_router();
+                Ok(Sequencer::new_with_flush(
+                    &self.eventbus(),
+                    router.recipient::<StoreEventRequested>(),
+                    router.recipient::<FlushEventStores>(),
+                )
+                .start())
             })
             .cloned()
     }
@@ -259,11 +273,9 @@ impl EventSystem {
     pub fn eventstore_addrs(&self) -> Result<EventStoreAddrs> {
         self.eventstore_addrs
             .get_or_try_init(|| {
+                let indexes = self.aggregate_config().indexed_ids();
                 match &self.backend {
                     EventSystemBackend::InMem(b) => {
-                        let config = self.aggregate_config();
-                        let indexes = config.indexed_ids();
-
                         let addrs = b
                             .eventstores
                             .get_or_init(|| {
@@ -286,9 +298,6 @@ impl EventSystem {
                         Ok(EventStoreAddrs::InMem(addrs))
                     }
                     EventSystemBackend::Persisted(b) => {
-                        let config = self.aggregate_config();
-                        let indexes = config.indexed_ids();
-
                         let addrs = b
                             .eventstores
                             .get_or_try_init(|| -> Result<_> {
@@ -333,33 +342,14 @@ impl EventSystem {
     /// Enable the event bus after its HLC is greater than all durable event timestamps.
     pub async fn enable_handle_with_hlc(&self, hlc: Hlc) -> Result<BusHandle<Enabled>> {
         let mut durable_floor: Option<u128> = None;
-        match self.eventstore_addrs()? {
-            EventStoreAddrs::InMem(addrs) => {
-                for (aggregate_id, store) in addrs {
-                    let timestamp = store.send(EventStoreClockFloor).await.with_context(|| {
-                        format!(
-                            "EventStore aggregate {aggregate_id} stopped while reading its clock floor"
-                        )
-                    })?;
-                    if let Some(timestamp) = timestamp {
-                        durable_floor =
-                            Some(durable_floor.map_or(timestamp, |floor| floor.max(timestamp)));
-                    }
-                }
-            }
-            EventStoreAddrs::Persisted(addrs) => {
-                for (aggregate_id, store) in addrs {
-                    let timestamp = store.send(EventStoreClockFloor).await.with_context(|| {
-                        format!(
-                            "EventStore aggregate {aggregate_id} stopped while reading its clock floor"
-                        )
-                    })?;
-                    if let Some(timestamp) = timestamp {
-                        durable_floor =
-                            Some(durable_floor.map_or(timestamp, |floor| floor.max(timestamp)));
-                    }
-                }
-            }
+        for (aggregate_id, store) in self
+            .eventstore_addrs()?
+            .recipients::<EventStoreClockFloor>()
+        {
+            let timestamp = store.send(EventStoreClockFloor).await.with_context(|| {
+                format!("EventStore aggregate {aggregate_id} stopped while reading its clock floor")
+            })?;
+            durable_floor = durable_floor.max(timestamp);
         }
 
         let handle = self.handle()?;
@@ -374,53 +364,14 @@ impl EventSystem {
         Ok(bus)
     }
 
-    /// Get an EventStoreRouter for InMem backend
-    pub fn in_mem_eventstore_router(
-        &self,
-    ) -> Result<Addr<EventStoreRouter<InMemSequenceIndex, InMemEventLog>>> {
-        let eventstores = self.eventstore_addrs()?;
-        if let EventStoreAddrs::InMem(addrs) = eventstores {
-            let router = EventStoreRouter::new(addrs);
-            Ok(router.start())
-        } else {
-            Err(anyhow!("Expected InMem backend but got Persisted"))
-        }
-    }
-
-    /// Get an EventStoreRouter for Persisted backend
-    pub fn persisted_eventstore_router(
-        &self,
-    ) -> Result<Addr<EventStoreRouter<SledSequenceIndex, CommitLogEventLog>>> {
-        let eventstores = self.eventstore_addrs()?;
-        if let EventStoreAddrs::Persisted(addrs) = eventstores {
-            let router = EventStoreRouter::new(addrs);
-            Ok(router.start())
-        } else {
-            Err(anyhow!("Expected Persisted backend but got InMem"))
-        }
-    }
-
     /// Get an EventStoreRouter Recipient
     pub fn eventstore_router(&self) -> Result<Recipient<StoreEventRequested>> {
-        let eventstores = self.eventstore_addrs()?;
-        match &eventstores {
-            EventStoreAddrs::InMem(_) => Ok(self.in_mem_eventstore_router()?.recipient()),
-            EventStoreAddrs::Persisted(_) => Ok(self.persisted_eventstore_router()?.recipient()),
-        }
+        Ok(self.eventstore_addrs()?.start_router().recipient())
     }
 
     pub fn eventstore_reader(&self) -> Result<EventStoreReader> {
-        let eventstores = self.eventstore_addrs()?;
-        let reader = match &eventstores {
-            EventStoreAddrs::InMem(_) => {
-                let router = self.in_mem_eventstore_router()?;
-                EventStoreReader::new(router.clone().recipient(), router.recipient())
-            }
-            EventStoreAddrs::Persisted(_) => {
-                let router = self.persisted_eventstore_router()?;
-                EventStoreReader::new(router.clone().recipient(), router.recipient())
-            }
-        };
+        let router = self.eventstore_addrs()?.start_router();
+        let reader = EventStoreReader::new(router.recipient(), router.recipient());
 
         if self.global_shared_eventstore {
             share_eventstore_reader(&reader);
@@ -453,17 +404,13 @@ impl EventSystem {
                 let base = b.get_or_init_store();
                 let buffer = self.buffer()?;
                 buffer.try_send(UpdateDestination::new(base.clone()))?;
-                DataStore::from_in_mem_with_snapshot_buffer(&base, self.buffer()?)
+                DataStore::from_in_mem_with_snapshot_buffer(&base, buffer)
             }
             EventSystemBackend::Persisted(b) => {
                 let base = b.get_or_init_store(&self.handle()?)?;
                 let buffer = self.buffer()?;
-                buffer.try_send(UpdateDestination::new(base))?;
-
-                DataStore::from_sled_store_with_snapshot_buffer(
-                    &b.get_or_init_store(&self.handle()?)?,
-                    self.buffer()?,
-                )
+                buffer.try_send(UpdateDestination::new(base.clone()))?;
+                DataStore::from_sled_store_with_snapshot_buffer(&base, buffer)
             }
         };
 
@@ -477,11 +424,6 @@ impl EventSystem {
 
 struct NoopBatchReceiver;
 
-impl NoopBatchReceiver {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
 impl Actor for NoopBatchReceiver {
     type Context = actix::Context<Self>;
 }
@@ -863,8 +805,8 @@ mod tests {
         let logs = listener.send(GetLogs).await?;
         assert_eq!(logs, vec!["pink", "yellow", "red", "white"]);
 
-        // Get the in mem eventstore router
-        let router = system.in_mem_eventstore_router()?;
+        // Query the event store by timestamp
+        let router = system.eventstore_reader()?.ts();
 
         // Get all events after the given timestamp using the router
         let mut ts_map = HashMap::new();

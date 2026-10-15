@@ -4,13 +4,13 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::{libp2p_mock::Libp2pMock, simulate_libp2p_net};
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
 use e3_ciphernode_builder::CiphernodeHandle;
 use e3_events::Event;
 use e3_events::{GetEvents, InterfoldEvent, ResetHistory, TakeEvents};
+use e3_test_helpers::libp2p_mock::Libp2pMock;
 use std::time::Instant;
 use std::{future::Future, ops::Deref, pin::Pin, time::Duration};
 use tokio::time::timeout;
@@ -99,6 +99,17 @@ impl<'a> CiphernodeSystemBuilder<'a> {
     }
 }
 
+/// Simulate libp2p by taking output net commands and converting them to net events sending them to
+/// the other nodes
+async fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) -> Libp2pMock {
+    let mock = Libp2pMock::new();
+    for node in nodes.iter() {
+        let interface = node.channel_bridge().unwrap();
+        mock.add_node(node.peer_id, interface).await;
+    }
+    mock
+}
+
 pub struct CiphernodeSystem {
     nodes: Vec<CiphernodeHandle>,
     network_mock: Option<Libp2pMock>,
@@ -145,22 +156,6 @@ impl CiphernodeSystem {
             .as_ref()
             .context("ciphernode system has no simulated network")?;
         mock.disconnect_node(node.peer_id).await;
-        Ok(())
-    }
-
-    pub async fn reconnect_node(&self, index: usize) -> Result<()> {
-        let node = self
-            .nodes
-            .get(index)
-            .context("ciphernode index is out of range")?;
-        let mock = self
-            .network_mock
-            .as_ref()
-            .context("ciphernode system has no simulated network")?;
-        let bridge = node
-            .channel_bridge()
-            .context("ciphernode has no network bridge")?;
-        mock.reconnect_node(node.peer_id, bridge).await;
         Ok(())
     }
 
@@ -342,82 +337,5 @@ impl Deref for CiphernodeHistory {
 
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use actix::prelude::*;
-    use e3_ciphernode_builder::{
-        global_eventstore_cache::EventStoreReader, EventSystem, NetInterfaceKind,
-    };
-    use e3_data::InMemStore;
-    use e3_events::{EventBus, EventBusConfig, EventStoreQueryBy, SeqAgg, TsAgg};
-    use e3_net::NetworkStatus;
-    use libp2p::PeerId;
-
-    // Minimal mock actor that satisfies the EventStoreReader recipient requirements.
-    struct MockEventStore;
-    impl Actor for MockEventStore {
-        type Context = actix::Context<Self>;
-    }
-    impl Handler<EventStoreQueryBy<SeqAgg>> for MockEventStore {
-        type Result = ();
-        fn handle(&mut self, _msg: EventStoreQueryBy<SeqAgg>, _ctx: &mut Self::Context) {}
-    }
-    impl Handler<EventStoreQueryBy<TsAgg>> for MockEventStore {
-        type Result = ();
-        fn handle(&mut self, _msg: EventStoreQueryBy<TsAgg>, _ctx: &mut Self::Context) {}
-    }
-
-    async fn mock_setup_node(address: String) -> Result<CiphernodeHandle> {
-        // Create mock actors for the test
-        let store = InMemStore::new(true).start();
-        let bus = EventBus::<InterfoldEvent>::new(EventBusConfig { deduplicate: true }).start();
-        let history = EventBus::<InterfoldEvent>::history(&bus);
-        let errors = EventBus::<InterfoldEvent>::error(&bus);
-
-        let event_system = EventSystem::new().with_event_bus(bus);
-        let bus = event_system.handle()?.enable("test");
-
-        // Mock event store for EventStoreReader
-        let mock_es = MockEventStore.start();
-        let eventstore = EventStoreReader::new(mock_es.clone().recipient(), mock_es.recipient());
-
-        Ok(CiphernodeHandle {
-            address,
-            store: (&store).into(),
-            bus,
-            history: Some(history),
-            errors: Some(errors),
-            peer_id: PeerId::random(),
-            net_interface: NetInterfaceKind::Libp2p,
-            network_status: NetworkStatus::default(),
-            eventstore,
-            aggregate_ids: vec![],
-            persistence_health: event_system.failure_receiver(),
-            gateway_failures: vec![],
-        })
-    }
-
-    #[actix::test]
-    async fn test_builder_creates_multiple_groups() {
-        let nodes = CiphernodeSystemBuilder::new()
-            .add_group(2, || mock_setup_node("node_a".to_string()))
-            .add_group(3, || mock_setup_node("node_b".to_string()))
-            .build()
-            .await
-            .expect("Should create nodes successfully");
-
-        // Should have created 5 total nodes (2 + 3)
-        assert_eq!(nodes.len(), 5);
-
-        // Verify node addresses
-        assert_eq!(nodes[0].address, "node_a");
-        assert_eq!(nodes[1].address, "node_a");
-        assert_eq!(nodes[2].address, "node_b");
-        assert_eq!(nodes[3].address, "node_b");
-        assert_eq!(nodes[4].address, "node_b");
     }
 }

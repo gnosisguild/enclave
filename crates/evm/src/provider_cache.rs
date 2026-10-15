@@ -4,16 +4,16 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+use crate::helpers::{
+    load_signer_from_repository, ConcreteReadProvider, ConcreteWriteProvider, EthProvider,
+    ProviderConfig,
+};
+use crate::EthPrivateKeyRepositoryFactory;
 use alloy::signers::{k256::ecdsa::SigningKey, local::LocalSigner};
 use anyhow::Result;
 use e3_config::chain_config::ChainConfig;
 use e3_crypto::Cipher;
 use e3_data::Repositories;
-use e3_evm::helpers::{
-    load_signer_from_repository, ConcreteReadProvider, ConcreteWriteProvider, EthProvider,
-    ProviderConfig,
-};
-use e3_evm::EthPrivateKeyRepositoryFactory;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -47,18 +47,6 @@ impl ProviderCache<ReadOnly> {
     pub fn with_signer(mut self, signer: LocalSigner<SigningKey>) -> Self {
         self.signer_cache = Some(signer);
         self
-    }
-
-    pub fn from_single_read_provider(
-        chain: ChainConfig,
-        provider: EthProvider<ConcreteReadProvider>,
-    ) -> Self {
-        ProviderCache {
-            signer_cache: None,
-            read_provider_cache: HashMap::from([(chain, provider)]),
-            write_provider_cache: HashMap::new(),
-            state: ReadOnly,
-        }
     }
 
     /// Configure the cache with cipher and repositories to enable write provider support.

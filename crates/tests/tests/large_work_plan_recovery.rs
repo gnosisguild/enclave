@@ -7,10 +7,10 @@
 use actix::Actor;
 use alloy::signers::local::PrivateKeySigner;
 use anyhow::{ensure, Result};
-use e3_ciphernode_builder::EventSystem;
 use e3_committee::CiphernodesCommitteeSize;
 use e3_crypto::SensitiveBytes;
 use e3_data::{CommitLogEventLog, DataStore, InMemStore};
+use e3_event_system::EventSystem;
 use e3_events::{
     AggregateConfig, AggregateId, ComputeRequestKind, E3id, Event, EventConstructorWithTimestamp,
     EventLog, EventSource, EventSubscriber, EventType, GetEvents, HistoryCollector, InterfoldEvent,

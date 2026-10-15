@@ -7,9 +7,9 @@ use alloy::{
     network::EthereumWallet, providers::ProviderBuilder, signers::local::PrivateKeySigner,
     transports::mock::Asserter,
 };
-use e3_ciphernode_builder::EventSystem;
 use e3_committee::CiphernodesCommitteeSize;
 use e3_data::{Repositories, RepositoriesFactory};
+use e3_event_system::EventSystem;
 use e3_events::{
     AggregateConfig, AggregateId, CiphertextOutputPublished, CircuitName, EventSource,
     EventStoreQueryBy, EvmEventConfig, EvmEventConfigChain, HistoricalEvmEventsReceived, SeqAgg,

@@ -11,8 +11,8 @@ use super::{
     reconcile_request_router_checkpoint,
 };
 use crate::{NodeRole, SyncRepositoryFactory, SCHEMA_VERSION};
-use e3_ciphernode_builder::EventSystem;
 use e3_data::Repositories;
+use e3_event_system::EventSystem;
 use e3_events::{
     hlc::{Hlc, HlcTimestamp},
     AccusationOutcome, AccusationQuorumReached, AggregateId, CommitteeMemberExcluded,

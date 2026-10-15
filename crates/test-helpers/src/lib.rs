@@ -5,13 +5,12 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 pub mod application;
-pub mod ciphernode_system;
 pub mod libp2p_mock;
 pub mod usecase_helpers;
 mod utils;
 use actix::prelude::*;
 use anyhow::Result;
-use e3_ciphernode_builder::{CiphernodeHandle, EventSystem};
+use e3_event_system::EventSystem;
 use e3_events::{
     AggregateConfig, AggregateId, BusHandle, CiphernodeAdded, EventBus, EventBusConfig,
     EventPublisher, EventType, HistoryCollector, InterfoldEvent, InterfoldEventData, Seed,
@@ -24,7 +23,6 @@ use e3_utils::SharedRng;
 use fhe::bfv::BfvParameters;
 use fhe::mbfv::CommonRandomPoly;
 use fhe_traits::Serialize;
-use libp2p_mock::Libp2pMock;
 use rand::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 use std::{collections::HashMap, sync::Arc, time::Duration};
@@ -155,17 +153,6 @@ pub fn get_common_setup(
         .handle()?
         .enable("cn1");
     Ok((handle, rng, seed, params, crpoly, errors, history))
-}
-
-/// Simulate libp2p by taking output net commands and converting them to net events sending them to
-/// the other nodes
-pub(crate) async fn simulate_libp2p_net(nodes: &[CiphernodeHandle]) -> Libp2pMock {
-    let mock = Libp2pMock::new();
-    for node in nodes.iter() {
-        let interface = node.channel_bridge().unwrap();
-        mock.add_node(node.peer_id, interface).await;
-    }
-    mock
 }
 
 /// Test helper to add addresses to the committee by creating events on the event bus

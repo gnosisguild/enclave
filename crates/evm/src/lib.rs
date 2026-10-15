@@ -15,6 +15,8 @@
 mod actors;
 mod adapters;
 pub mod canonical_key;
+mod chain_system;
+mod chains;
 mod contracts;
 mod dkg_timing;
 mod domain;
@@ -22,7 +24,9 @@ mod finalized_lifecycle;
 mod messages;
 mod node_release;
 mod operator_status;
+mod provider_cache;
 mod repo;
+mod slashing_manager_address;
 
 pub mod helpers;
 
@@ -35,6 +39,8 @@ pub use adapters::ingestion_progress::{
     write_ingestion_expectation_at, IngestionProgress, IngestionProgressSink,
     INGESTION_EXPECTATION_FILE,
 };
+pub use chain_system::*;
+pub use chains::{validate_chain_id, Chain, Chains, EnabledChain};
 pub use contracts::ICiphernodeRegistry;
 pub use dkg_timing::{read_canonical_dkg_timing, CanonicalDkgTiming};
 pub use domain::encode_attestation_evidence;
@@ -43,4 +49,6 @@ pub use helpers::*;
 pub use messages::*;
 pub use node_release::*;
 pub use operator_status::*;
+pub use provider_cache::*;
 pub use repo::*;
+pub use slashing_manager_address::{resolve_slashing_managers, slashing_managers_by_chain};

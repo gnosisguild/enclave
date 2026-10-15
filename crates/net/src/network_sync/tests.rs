@@ -14,8 +14,8 @@ use crate::{
     events::{IncomingRequest, NetCommand},
 };
 use actix::{Actor, Context as ActixContext, Handler, Message, MessageResult};
-use e3_ciphernode_builder::EventSystem;
 use e3_config::NetworkProfile;
+use e3_event_system::EventSystem;
 use e3_events::{
     AggregateConfig, DecryptionshareCreated, DkgCoordination, DkgCoordinationKind, DkgDealer,
     E3Failed, E3Stage, E3StageChanged, E3id, EventSource, EventType, EvmEventConfig,
@@ -466,8 +466,7 @@ async fn history_pages_continue_past_pages_of_quarantined_records() {
             Duration::ZERO,
         )])));
     let bus = system.handle().unwrap().enable("test");
-    let e3_ciphernode_builder::EventStoreAddrs::InMem(stores) = system.eventstore_addrs().unwrap()
-    else {
+    let e3_event_system::EventStoreAddrs::InMem(stores) = system.eventstore_addrs().unwrap() else {
         panic!("expected in-memory stores");
     };
     let store = stores.get(&1).expect("aggregate 1 store").clone();
@@ -1692,8 +1691,7 @@ async fn a_quarantined_record_keeps_its_timestamp_from_peers() {
         )])));
     let bus = system.handle().unwrap().enable("test");
     let failure = system.failure_receiver();
-    let e3_ciphernode_builder::EventStoreAddrs::InMem(stores) = system.eventstore_addrs().unwrap()
-    else {
+    let e3_event_system::EventStoreAddrs::InMem(stores) = system.eventstore_addrs().unwrap() else {
         panic!("expected in-memory stores");
     };
     stores

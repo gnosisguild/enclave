@@ -13,8 +13,8 @@ use actix_web::{
     middleware, web, App, HttpResponse, HttpServer, Responder,
 };
 use anyhow::{Context, Result};
-use e3_ciphernode_builder::global_eventstore_cache::EventStoreReader;
 use e3_config::chain_config::ChainConfig;
+use e3_event_system::global_eventstore_cache::EventStoreReader;
 use e3_events::{
     AggregateId, CorrelationId, EventContextSeq, EventStoreQueryBy, EventStoreQueryResponse, SeqAgg,
 };
