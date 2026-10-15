@@ -11,9 +11,8 @@ use crate::threshold::lbfv_proof_domain::{
     validate_lbfv_generation_party_id,
 };
 use crate::{
-    bigint_1d_to_json_values, compute_lbfv_pk_row_commitment, crt_polynomial_to_toml_json,
-    Artifacts, Circuit, CircuitCodegen, CircuitComputation, CircuitsErrors, CodegenConfigs,
-    CodegenToml, Computation,
+    bigint_1d_to_json_values, compute_lbfv_pk_row_commitment, Artifacts, Circuit, CircuitCodegen,
+    CircuitComputation, CircuitsErrors, CodegenConfigs, CodegenToml, Computation,
 };
 use e3_committee::CiphernodesCommittee;
 use e3_committee_hash::LbfvProofDomainContext;
@@ -79,6 +78,10 @@ pub struct LbfvPkAggregationInputs {
     pub expected_pk_generation_commitments: Vec<BigInt>,
     pub pk0: Vec<CrtPolynomial>,
     pub pk0_agg: CrtPolynomial,
+    /// Packing width of the parties' row commitments. The circuit takes each party's `pk0` as the
+    /// carriers packed at this width and derives `pk0_agg` itself.
+    #[serde(default)]
+    pub pk_bit: u32,
 }
 
 impl CircuitComputation for LbfvPkAggregationCircuit {
@@ -178,14 +181,25 @@ impl Computation for LbfvPkAggregationInputs {
             expected_pk_generation_commitments,
             pk0,
             pk0_agg,
+            pk_bit: bit_pk,
         })
     }
 
     fn to_json(&self) -> serde_json::Result<serde_json::Value> {
-        let pk0 = self
+        let pk0_carriers = self
             .pk0
             .iter()
-            .map(crt_polynomial_to_toml_json)
+            .map(|row| {
+                row.limbs
+                    .iter()
+                    .map(|limb| {
+                        bigint_1d_to_json_values(&crate::packing::pack_to_bigints(
+                            limb,
+                            self.pk_bit,
+                        ))
+                    })
+                    .collect::<Vec<_>>()
+            })
             .collect::<Vec<_>>();
         Ok(serde_json::json!({
             "session_id_hi": self.session_id_hi.to_string(),
@@ -197,8 +211,7 @@ impl Computation for LbfvPkAggregationInputs {
             "expected_pk_generation_commitments": bigint_1d_to_json_values(
                 &self.expected_pk_generation_commitments,
             ),
-            "pk0": pk0,
-            "pk0_agg": crt_polynomial_to_toml_json(&self.pk0_agg),
+            "pk0_carriers": pk0_carriers,
         }))
     }
 }
@@ -396,7 +409,9 @@ mod tests {
         );
         let toml = generate_toml(inputs)?;
         assert!(toml.contains("expected_pk_generation_commitments"));
-        assert!(toml.contains("[[pk0_agg]]"));
+        // The circuit takes packed rows and derives the aggregate itself.
+        assert!(toml.contains("pk0_carriers"));
+        assert!(!toml.contains("pk0_agg"));
         assert!(generate_configs(&configs).contains("PK_AGGREGATION_CONFIGS"));
 
         let removed = sample.shares.pop().expect("sample has H shares");
