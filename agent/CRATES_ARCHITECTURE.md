@@ -1133,6 +1133,12 @@ SlashingManager, because the configured address can be a retired manager: a full
 startup. The configured address applies only to a disabled chain, which has no provider. The history
 backfill start block comes from the configured `deploy_block` values.
 
+The node reads the SlashingManager only at startup. After its startup sync, a `SlashingManagerSet`
+log of the `Interfold` contract that names another address fails that chain's `EvmChainGateway`
+closed, so the node exits with an error and a restart reads the new manager. **Gap:** a replacement
+that lands between the startup read and the end of the startup sync is a historical log, so the
+node keeps the old manager until its next restart.
+
 ## Program-server trust boundary
 
 ```mermaid
