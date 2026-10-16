@@ -136,8 +136,9 @@ where
 }
 
 /// Acknowledge this release on chain unless the operator already has. A failed read or transaction
-/// does not stop the node at once: each attempt reads the acknowledged release again, so an attempt
-/// after a mined acknowledgment sends nothing.
+/// does not stop the node at once: each attempt reads the acknowledged release and operator status
+/// again, so an attempt after a mined acknowledgment sends nothing when the operator is active or
+/// not registered.
 async fn acknowledge_release_with_retry<P>(
     provider: &EthProvider<P>,
     controller_address: Address,
