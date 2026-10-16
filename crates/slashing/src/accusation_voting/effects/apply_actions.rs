@@ -60,7 +60,9 @@ impl AccusationManager {
                             }
                         }
                     });
-                    self.timeout_handles.insert(accusation_id, handle);
+                    if let Some(older) = self.timeout_handles.insert(accusation_id, handle) {
+                        ctx.cancel_future(older);
+                    }
                 }
                 VoteAction::CancelTimeout(accusation_id) => {
                     if let Some(handle) = self.timeout_handles.remove(&accusation_id) {

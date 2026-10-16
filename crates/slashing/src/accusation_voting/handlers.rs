@@ -35,6 +35,10 @@ impl Handler<InterfoldEvent> for AccusationManager {
             InterfoldEventData::SlashExecuted(data) => {
                 self.voting.on_slash_executed(data);
             }
+            InterfoldEventData::EffectsEnabled(_) => {
+                let actions = self.voting.on_effects_enabled();
+                self.apply_actions(actions, ctx);
+            }
             InterfoldEventData::CommitmentConsistencyViolation(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }

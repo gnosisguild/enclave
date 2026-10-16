@@ -22,6 +22,12 @@ impl AccusationVoting {
         ec: &EventContext<Sequenced>,
         actions: &mut Vec<VoteAction>,
     ) {
+        // This node's own accusation in the replayed log: a held failure of the same proof is not
+        // accused again.
+        if let Some(key) = self.admit_own_replayed_accusation(&accusation) {
+            self.accused_proofs.insert(key);
+            return;
+        }
         let accusation = match self.admit_accusation(accusation) {
             Ok(accusation) => accusation.into_inner(),
             Err(rejection) => {

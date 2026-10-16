@@ -47,7 +47,15 @@ impl AccusationVoting {
             accusation_deadline_skew_secs,
             clock,
             params_preset,
+            effects_enabled: true,
+            deferred_accusations: Vec::new(),
         }
+    }
+
+    /// Hold local accusations until `EffectsEnabled`. A manager that startup rebuilds receives the
+    /// replayed event log first.
+    pub(crate) fn hold_accusations_until_effects(&mut self) {
+        self.effects_enabled = false;
     }
 
     /// The vote-collection timeout the actor should schedule.

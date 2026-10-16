@@ -91,7 +91,9 @@ impl AccusationManagerExtension {
         }
     }
 
-    fn start_manager(&self, ctx: &mut E3Context, committee: &[String]) {
+    /// Start the per-E3 manager. `effects_enabled` is false for a manager that startup rebuilds:
+    /// it holds local accusations until `EffectsEnabled`, after the replayed event log.
+    fn start_manager(&self, ctx: &mut E3Context, committee: &[String], effects_enabled: bool) {
         if ctx.get_event_recipient("accusation_manager").is_some() {
             return;
         }
@@ -159,7 +161,7 @@ impl AccusationManagerExtension {
         let vote_validity_secs = self.vote_validity_secs_for(e3_id.chain_id());
         // The request router owns delivery and lifetime for this per-E3 actor. A global bus
         // subscription would deliver each event twice and retain completed actors forever.
-        let addr = AccusationManager::new_with_quorum(
+        let manager = AccusationManager::new_with_quorum(
             &self.bus,
             e3_id,
             self.signer.clone(),
@@ -170,8 +172,13 @@ impl AccusationManagerExtension {
             vote_validity_secs,
             self.accusation_deadline_skew_secs,
             meta.params_preset,
-        )
-        .start();
+        );
+        let manager = if effects_enabled {
+            manager
+        } else {
+            manager.hold_accusations_until_effects()
+        };
+        let addr = manager.start();
 
         ctx.set_event_recipient("accusation_manager", Some(addr.into()));
     }
@@ -187,15 +194,16 @@ impl E3Extension for AccusationManagerExtension {
         if data.e3_id != ctx.e3_id {
             return;
         }
-        self.start_manager(ctx, &data.committee);
+        self.start_manager(ctx, &data.committee, true);
     }
 
     /// Recreate the per-E3 actor so this node can process new accusations after a restart.
-    /// In-flight vote state remains ephemeral and expires at the signed accusation deadline.
+    /// In-flight vote state remains ephemeral and expires at the signed accusation deadline. The
+    /// actor holds local accusations until `EffectsEnabled`.
     async fn hydrate(&self, ctx: &mut E3Context, _snapshot: &E3ContextSnapshot) -> Result<()> {
         if let Some(committee) = self.persisted_committees.get(&ctx.e3_id) {
             let members = committee.members().to_vec();
-            self.start_manager(ctx, &members);
+            self.start_manager(ctx, &members, false);
         }
         Ok(())
     }
@@ -207,28 +215,40 @@ mod tests {
     use actix::{Context, Handler};
     use e3_data::{DataStore, InMemStore, RepositoriesFactory};
     use e3_events::{
-        hlc_factory::HlcFactory, EventBus, EventBusConfig, Seed, Sequencer, StoreEventRequested,
+        hlc_factory::HlcFactory, CommitmentConsistencyViolation, EffectsEnabled, EventBus,
+        EventBusConfig, EventConstructorWithTimestamp, EventSource, GetEvents, ProofType, Seed,
+        Sequencer, StoreEventRequested, StoreEventResponse, Unsequenced,
     };
     use e3_fhe_params::BfvPreset;
     use e3_request::{ContextRepositoryFactory, E3ContextParams, E3Meta};
     use e3_utils::ArcBytes;
     use std::sync::Arc;
 
-    struct StoreSink;
+    /// Gives each published event the next sequence number, so the bus delivers it.
+    #[derive(Default)]
+    struct SequencingStore {
+        next_seq: u64,
+    }
 
-    impl Actor for StoreSink {
+    impl Actor for SequencingStore {
         type Context = Context<Self>;
     }
 
-    impl Handler<StoreEventRequested> for StoreSink {
+    impl Handler<StoreEventRequested> for SequencingStore {
         type Result = ();
 
-        fn handle(&mut self, _: StoreEventRequested, _: &mut Self::Context) {}
+        fn handle(&mut self, msg: StoreEventRequested, _: &mut Self::Context) {
+            let StoreEventRequested { event, sender } = msg;
+            self.next_seq += 1;
+            sender
+                .try_send(StoreEventResponse(event.into_sequenced(self.next_seq)))
+                .expect("the sequencer accepts the stored event");
+        }
     }
 
     fn test_bus() -> BusHandle {
         let event_bus = EventBus::new(EventBusConfig { deduplicate: true }).start();
-        let store = StoreSink.start();
+        let store = SequencingStore::default().start();
         let sequencer = Sequencer::new(&event_bus, store.recipient()).start();
         BusHandle::new(event_bus, sequencer, HlcFactory::new()).enable("accusation-hydrate-test")
     }
@@ -308,6 +328,96 @@ mod tests {
                 "unexpected accusation_manager recipient for {id}"
             );
         }
+        Ok(())
+    }
+
+    /// Startup rebuilds the manager before it replays the event log. A local input from the log
+    /// signs an accusation only once effects run.
+    #[actix::test]
+    async fn a_rebuilt_manager_accuses_only_after_effects_enabled() -> Result<()> {
+        let bus = test_bus();
+        let history = bus.history();
+        let e3_id = E3id::new("7", 31337);
+        let me = PrivateKeySigner::random();
+        let accused = Address::repeat_byte(0x22);
+        let committee = Committee::new(vec![
+            me.address().to_string(),
+            accused.to_string(),
+            Address::repeat_byte(0x33).to_string(),
+        ]);
+        let extension = AccusationManagerExtension::create(
+            &bus,
+            me,
+            HashMap::from([(31337, Address::repeat_byte(0x44))]),
+            HashMap::from([(31337, 300)]),
+            30,
+            HashMap::from([(e3_id.clone(), committee.clone())]),
+        );
+        let mut context = test_context(e3_id.clone());
+        context.set_dependency(META_KEY, test_meta());
+        let snapshot = E3ContextSnapshot {
+            e3_id: e3_id.clone(),
+            recipients: Vec::new(),
+            dependencies: vec!["meta".to_string()],
+        };
+        extension.hydrate(&mut context, &snapshot).await?;
+        let manager = context
+            .get_event_recipient("accusation_manager")
+            .expect("hydration starts the manager");
+        let accused_party_id = committee
+            .party_id_for(&accused.to_string())
+            .expect("accused member");
+        let event = |data: e3_events::InterfoldEventData, seq: u64| {
+            InterfoldEvent::<Unsequenced>::new_with_timestamp(
+                data,
+                None,
+                seq as u128,
+                None,
+                EventSource::Local,
+            )
+            .into_sequenced(seq)
+        };
+        let accusations = || async {
+            let events = history.send(GetEvents::new()).await?;
+            Ok::<_, anyhow::Error>(
+                events
+                    .into_iter()
+                    .filter(|event| {
+                        matches!(
+                            event.get_data(),
+                            InterfoldEventData::ProofFailureAccusation(_)
+                        )
+                    })
+                    .count(),
+            )
+        };
+
+        manager
+            .send(event(
+                CommitmentConsistencyViolation {
+                    e3_id: e3_id.clone(),
+                    accused_address: accused,
+                    accused_party_id,
+                    proof_type: ProofType::C1PkGeneration,
+                    data_hash: [7; 32],
+                    evidence: Default::default(),
+                }
+                .into(),
+                1,
+            ))
+            .await?;
+        actix::clock::sleep(std::time::Duration::from_millis(200)).await;
+        assert_eq!(accusations().await?, 0, "accused before EffectsEnabled");
+
+        manager.send(event(EffectsEnabled::new().into(), 2)).await?;
+        actix::clock::timeout(std::time::Duration::from_secs(5), async {
+            while accusations().await? == 0 {
+                actix::clock::sleep(std::time::Duration::from_millis(10)).await;
+            }
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
+        assert_eq!(accusations().await?, 1);
         Ok(())
     }
 }
