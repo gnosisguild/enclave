@@ -142,16 +142,19 @@ export type ProofData = {
 /**
  * One proof in the ballot pipeline, in the order {@link finishBallotProof} produces them.
  *
- * - `encryption_ct0` - the first half of the ciphertext is a BFV encryption of the ballot under the
- *   committee key (`user_data_encryption_ct0`).
- * - `encryption_ct1` - the second half is an encryption with the same randomness
- *   (`user_data_encryption_ct1`).
- * - `ballot` - the ballot rules (`crisp` / `crisp_onchain`): a vote is signed by the slot owner and
- *   within its voting power, a mask is zero everywhere, and either one becomes the slot's new
- *   ciphertext.
- * - `encryption` - the two encryption proofs verified together (`user_data_encryption`).
- * - `fold` - the encryption and ballot proofs verified and bound into the one proof the contract
- *   checks (`fold` / `fold_onchain`).
+ * - `encryption_ct0` (`user_data_encryption_ct0`) - `ct0 = pk0·u + e0 + k0·k1` with every term
+ *   bounded: the half of the ciphertext that carries the ballot plaintext `k1` is well formed.
+ * - `encryption_ct1` (`user_data_encryption_ct1`) - `ct1 = pk1·u + e1`: the other half is well
+ *   formed. It does not compare `u` with ct0's.
+ * - `ballot` (`crisp` / `crisp_onchain`) - the ballot rules. A vote is signed over the digest by the
+ *   slot owner and is within the voting power; a mask is zero everywhere. Either way the new slot
+ *   ciphertext is the ballot ciphertext plus the addend (the slot's current ciphertext for a mask,
+ *   zero otherwise).
+ * - `encryption` (`user_data_encryption`) - verifies both halves and asserts they share the same
+ *   randomness `u`, then commits to the key and the ciphertext.
+ * - `fold` (`fold` / `fold_onchain`) - verifies the encryption and ballot proofs, asserts they cover
+ *   the same ciphertext and plaintext, and outputs the key commitment, which the contract checks
+ *   against the round's committee key.
  */
 export type ProofStage = 'encryption_ct0' | 'encryption_ct1' | 'ballot' | 'encryption' | 'fold'
 
