@@ -14,6 +14,6 @@ capability crates own protocol decisions.
   Test-only proof-skip propagation must not become a production artifact fallback.
 
 Run `cargo test --locked -p e3-entrypoint` with solc/jq and prepared contract fixtures for
-transitive dependencies; [zk-prover](../zk-prover/AGENTS.md) documents build-time Noir side effects.
+transitive dependencies; [zk-prover](../zk-prover/README.md) documents build-time Noir side effects.
 Use temporary node directories for fence/validate/purge regressions. See
 [persistence](../../docs/architecture/persistence-and-replay.md) for cross-layer recovery limits.

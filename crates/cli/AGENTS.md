@@ -16,4 +16,4 @@ to their existing owners rather than implementing another startup path.
 
 Run `cargo test --locked -p e3-cli` after the root `pnpm evm:build` / `pnpm fixtures:build`
 preparation, with solc/jq available. Transitive zk-prover builds may also prepare Noir fixtures; see
-[its build warning](../zk-prover/AGENTS.md). Usage belongs in the [root README](../../README.md).
+[its build warning](../zk-prover/README.md). Usage belongs in the [CLI README](README.md).

@@ -17,5 +17,5 @@ already-filtered set of shares.
 See [DKG](../../docs/architecture/dkg.md) and
 [decryption](../../docs/architecture/threshold-decryption.md). Run `cargo test -p e3-aggregator`;
 local mocks do not establish recursive proof validity. Tests compile chain/prover helpers; prepare
-the [helper prerequisites](../test-helpers/AGENTS.md) before running them, including the documented
+the [helper prerequisites](../test-helpers/README.md) before running them, including the documented
 fixture-build side effects.

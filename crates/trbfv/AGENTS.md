@@ -14,5 +14,5 @@ with the keyshare/aggregation capabilities.
   shares/raw secrets out of logs and ordinary snapshots.
 
 Run `cargo test --locked -p e3-trbfv`; helper dependencies bring Solidity/prover prerequisites from
-[test-helpers](../test-helpers/AGENTS.md). Math changes need independent reconstruction cases and
+[test-helpers](../test-helpers/README.md). Math changes need independent reconstruction cases and
 the affected [DKG](../../docs/architecture/dkg.md)/decryption flow, not only encryption round trips.

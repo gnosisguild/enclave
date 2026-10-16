@@ -16,11 +16,9 @@ process success, a valid witness, and a verified cryptographic statement are dif
   on failed rollback. Test-only proof-skip support must never become a production fallback.
 
 [Proof statements](../../docs/architecture/proof-statements.md) and
-[artifacts](../../docs/architecture/circuit-artifacts.md) own these contracts. `build.rs` invokes
-`scripts/build_fixtures.sh`: a Cargo check can run pnpm install, rebuild Noir circuits, and rewrite
-checked-in fixture JSON. For compile-only work use
-`E3_ZK_PROVER_SKIP_FIXTURE_BUILD=1 cargo check --locked -p e3-zk-prover --tests`; this skips fixture
-preparation, not proof tests, and does not establish that matching artifacts exist.
+[artifacts](../../docs/architecture/circuit-artifacts.md) own these contracts. Read the
+[README build warning and compile-only command](README.md#before-running-cargo) before invoking
+Cargo: fixture preparation can install dependencies, rebuild circuits, and rewrite tracked JSON.
 `pnpm rust:test:proofs` needs prepared matching circuits, nargo, and bb; ordinary ignored tests or
 compilation are not proof verification. Circuit-size sweeps must restore compiled artifacts, not
 just source selectors.

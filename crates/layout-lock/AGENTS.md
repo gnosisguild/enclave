@@ -13,5 +13,5 @@ This test utility samples serde layouts to make persisted/wire encoding changes 
 
 Run `cargo test --locked -p e3-layout-lock`, then the affected consumer's layout test. The broad
 runtime lock is `cargo test --locked -p e3-tests --test layout_lock` and has the
-[integration crate's prerequisites](../tests/AGENTS.md). See
+[integration crate's prerequisites](../tests/README.md). See
 [upgrades](../../docs/architecture/upgrades.md) before approving changed fixture bytes.

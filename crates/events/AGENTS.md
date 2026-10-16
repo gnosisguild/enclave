@@ -16,5 +16,5 @@ orchestration merely because many crates already import it.
 See [persistence](../../docs/architecture/persistence-and-replay.md) for actual guarantees and gaps.
 `cargo test -p e3-events` covers eventstore failure signals and fanout; production signal wiring and
 CLI exit are separate owner tests. Do not describe all actor panics as supervised. Crate tests pull
-in [test helpers](../test-helpers/AGENTS.md) with chain/prover build prerequisites; checking the
+in [test helpers](../test-helpers/README.md) with chain/prover build prerequisites; checking the
 event types alone does not exercise those integrations.

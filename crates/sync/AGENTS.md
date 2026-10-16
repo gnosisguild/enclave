@@ -17,5 +17,5 @@ decision owner. Keep planning independent from adapters when changing the existi
 [Persistence](../../docs/architecture/persistence-and-replay.md) and
 [network history](../../docs/architecture/network-delivery.md#historical-sync-and-coverage) own the
 cross-layer contract. Run `cargo test -p e3-sync`; full replay/hydration equivalence remains
-unproven. The dev-dependency graph includes [test helpers](../test-helpers/AGENTS.md); prepare their
+unproven. The dev-dependency graph includes [test helpers](../test-helpers/README.md); prepare their
 Solidity/prover prerequisites rather than assuming the replay-only target has no external tooling.

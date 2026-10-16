@@ -14,6 +14,6 @@ This is the cross-capability/multi-node harness owner; `src/main.rs` intentional
 
 Start with `cargo test --locked -p e3-tests --test layout_lock` for encoding changes, or a named
 scenario under `--test integration`. Prepare root `pnpm evm:build` / `pnpm fixtures:build`, solc/jq,
-and Anvil where required; [zk-prover](../zk-prover/AGENTS.md) documents Noir build side effects and
+and Anvil where required; [zk-prover](../zk-prover/README.md) documents Noir build side effects and
 real-proof prerequisites. Ignored/skipped scenarios and layout checks are not full restart or
 cryptographic assurance; see [persistence](../../docs/architecture/persistence-and-replay.md).

@@ -1,8 +1,9 @@
 # e3-ciphernode-builder
 
-This is the ciphernode composition root. Protocol decisions belong to their capability crates;
-attach them here without copying their rules. `builder/startup.rs` documents the dependency order of
-Storage → Restart → Live → Protocol; preserve the prerequisites, not just the current line order.
+See [README.md](README.md) for profiles, configuration, and handle lifecycle. This is the ciphernode
+composition root. Protocol decisions belong to their capability crates; attach them here without
+copying their rules. `builder/startup.rs` documents the dependency order of Storage → Restart → Live
+→ Protocol; preserve the prerequisites, not just the current line order.
 
 - Keep the full/bootstrap profiles closed: bootstrap has only the Interfold reader and no protocol
   extensions/writers or compute scheduler. Do not expose independent component switches that bypass
@@ -21,5 +22,5 @@ Storage → Restart → Live → Protocol; preserve the prerequisites, not just 
 semantics; [slashing](../../docs/architecture/slashing.md) owns chain-specific manager resolution.
 `cargo test -p e3-ciphernode-builder` includes finalized-lifecycle tests needing Anvil. Select
 relevant multi-node scenarios rather than mistaking in-memory construction for restart coverage. The
-test graph includes the [helper build prerequisites](../test-helpers/AGENTS.md), including Solidity
+test graph includes the [helper build prerequisites](../test-helpers/README.md), including Solidity
 fixtures and the prover's build-time Noir preparation.

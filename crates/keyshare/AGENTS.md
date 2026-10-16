@@ -18,5 +18,5 @@ separate from mailbox/effects without changing authenticated dealer identity or 
 [decryption](../../docs/architecture/threshold-decryption.md) own dimensions, timing, signatures,
 and recovery requirements. `cargo test -p e3-keyshare` is focused actor coverage; statement changes
 still require prepared real-proof tests. The test graph includes EVM/prover adapters; see
-[helper prerequisites](../test-helpers/AGENTS.md) for solc/jq, fixtures, and build-time Noir side
+[helper prerequisites](../test-helpers/README.md) for solc/jq, fixtures, and build-time Noir side
 effects before invoking Cargo.

@@ -16,5 +16,5 @@ validity. Preserve shared capacity for ZK/TrBFV work rather than spawning around
 [Persistence](../../docs/architecture/persistence-and-replay.md#effect-recovery-and-shutdown) owns
 budgets/retries and current limits. Run `cargo test -p e3-multithread`; fake worker outcomes do not
 measure production prover memory or verify cryptographic correctness. Even focused Cargo checks
-build the prover dependency; read its [fixture-build warning](../zk-prover/AGENTS.md) before
+build the prover dependency; read its [fixture-build warning](../zk-prover/README.md) before
 treating a compile as side-effect-free.

@@ -12,7 +12,7 @@ in `e3-tests` to avoid dragging the builder back into lower-level tests.
 - Tool discovery can permit a test to skip when bb/Anvil is absent. Report skips explicitly;
   successful helper initialization is not evidence that a real proof or chain test executed.
 
-Run `cargo test --locked -p e3-test-helpers` after root `pnpm evm:build` / `pnpm fixtures:build`
-preparation, with solc/jq and Anvil for chain paths. Transitive prover build side effects are
-documented in [zk-prover](../zk-prover/AGENTS.md); integration scenarios belong in
-[e3-tests](../tests/AGENTS.md).
+Run `cargo test --locked -p e3-test-helpers` with the
+[README prerequisites](README.md#prerequisites-before-invoking-cargo). Report skipped chain/proof
+paths separately from completed coverage. Integration scenarios belong in
+[e3-tests](../tests/README.md).
