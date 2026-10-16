@@ -20,7 +20,5 @@ copying their rules. `builder/startup.rs` documents the dependency order of Stor
 
 [Persistence](../../docs/architecture/persistence-and-replay.md) owns startup and failure-signal
 semantics; [slashing](../../docs/architecture/slashing.md) owns chain-specific manager resolution.
-`cargo test -p e3-ciphernode-builder` includes finalized-lifecycle tests needing Anvil. Select
-relevant multi-node scenarios rather than mistaking in-memory construction for restart coverage. The
-test graph includes the [helper build prerequisites](../test-helpers/README.md), including Solidity
-fixtures and the prover's build-time Noir preparation.
+Use the [README test commands and prerequisites](README.md#tests). Recovery and profile changes need
+the affected multi-node scenarios; in-memory construction alone is not restart coverage.

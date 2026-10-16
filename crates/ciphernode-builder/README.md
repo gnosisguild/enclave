@@ -1,8 +1,38 @@
 # e3-ciphernode-builder
 
+## Purpose
+
 Library composition root for a ciphernode: it connects storage, chain adapters, networking, request
 routing, and protocol capabilities. It is not an executable; normal operators use the
 [CLI](../cli/README.md), whose [entrypoint](../entrypoint/README.md) also owns process fencing.
+
+Production startup and the in-process test harness use the same builder. It returns a
+`CiphernodeHandle` once the node has completed startup recovery and reached live-source readiness.
+
+## Map
+
+| Module                                                           | Responsibility                                                                 |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [`builder/mod.rs`](src/builder/mod.rs)                           | Public builder, options, defaults, and full/bootstrap profiles.                |
+| [`builder/startup.rs`](src/builder/startup.rs)                   | Startup phases and their `Storage`, `Restart`, `Live`, and `Protocol` outputs. |
+| [`builder/evm.rs`](src/builder/evm.rs)                           | Contract readers and writers for enabled chains.                               |
+| [`builder/chain_parameters.rs`](src/builder/chain_parameters.rs) | Chain-derived DKG fold contexts and accusation vote validity.                  |
+| [`builder/extensions.rs`](src/builder/extensions.rs)             | Request routing, proof recovery, and full-node protocol extensions.            |
+| [`builder/sortition.rs`](src/builder/sortition.rs)               | Sortition and ciphernode-selector assembly from restored state.                |
+| [`builder/net.rs`](src/builder/net.rs)                           | Network policy, libp2p/channel transport, and startup buffering.               |
+| [`builder/restart.rs`](src/builder/restart.rs)                   | Restart decisions derived from local lifecycle stages.                         |
+| [`recovery.rs`](src/recovery.rs)                                 | Restart-state backfill and committee snapshot reconciliation.                  |
+| [`finalized_lifecycle.rs`](src/finalized_lifecycle.rs)           | Reconciliation with finalized chain lifecycle.                                 |
+| [`ciphernode.rs`](src/ciphernode.rs)                             | Running node handle, health signals, and shutdown.                             |
+
+## Startup lifecycle
+
+`build_inner` assembles the node in phases: storage admission and restart recovery, the live event
+pipeline, protocol infrastructure, EVM adapters, extensions, networking, and synchronization. The
+phase outputs carry the resources needed by subsequent steps. The module documentation in
+[`startup.rs`](src/builder/startup.rs) explains the sequence; the
+[persistence contract](../../docs/architecture/persistence-and-replay.md) describes replay and
+failure boundaries across crates.
 
 ## Choose a node profile
 
@@ -51,3 +81,27 @@ Consume the handle with `shutdown(deadline).await`: it acknowledges shutdown han
 event pipeline, then drains snapshots and closes storage within the supplied deadline. See
 [persistence and replay](../../docs/architecture/persistence-and-replay.md) for guarantees and
 recovery limits, and [e3-tests](../tests/README.md) for in-process multi-node usage.
+
+## Tests
+
+From the repository root:
+
+```sh
+cargo test --locked -p e3-ciphernode-builder
+```
+
+This runs the crate's startup, profile, recovery, and handle tests. The finalized-lifecycle tests
+start Anvil, so Foundry is required. Prepare the
+[shared test prerequisites](../test-helpers/README.md#prerequisites-before-invoking-cargo) first;
+the dependency graph includes Solidity fixtures and build-time Noir preparation.
+
+Multi-node scenarios live in [e3-tests](../tests/README.md), which also uses this builder. List its
+scenarios with `cargo test --locked -p e3-tests --test integration -- --list`, then select the
+scenario to run. In-memory startup tests and persisted restart scenarios exercise different paths.
+
+## Related documentation
+
+- [Entrypoint](../entrypoint/README.md): production startup and process management.
+- [Event system](../event-system/README.md): lower-level event runtime assembly.
+- [Slashing](../../docs/architecture/slashing.md): chain-specific manager resolution.
+- [AGENTS.md](AGENTS.md): conventions and constraints for changing this crate.

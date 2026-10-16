@@ -5,7 +5,7 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 //! Regenerates `circuits/lib/src/configs/committee/<name>/parity_{insecure,secure}.nr`
-//! for the given committee. Invoked by `scripts/build-circuits.ts` whenever the active
+//! for the given committee. Invoked by `scripts/circuits/build.ts` whenever the active
 //! committee is set, so the Reed-Solomon parity matrices stay in lockstep with `(N, T)`
 //! and the threshold `QIS` of each preset.
 //!

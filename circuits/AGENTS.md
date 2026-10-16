@@ -7,8 +7,8 @@ Shared constraints belong in `lib/src/`; `bin/` packages expose their witness/pu
 - Public-input order, coefficient/CRT/party axes, signed-field encoding, and recursive VK genealogy
   are proof interfaces. Coordinate their Rust witness and Solidity consumers, not just Noir callers.
 - Change generators rather than generated bounds, parity matrices, or active selectors. Use the
-  [circuit builder](../scripts/README.md#circuit-builder) for preset/committee switches and artifact
-  regeneration; a valid witness alone does not establish deployed verifier compatibility.
+  [circuit builder](../scripts/circuits/README.md#circuit-builder) for preset/committee switches and
+  artifact regeneration; a valid witness alone does not establish deployed verifier compatibility.
 - Files inside discovered `bin/` packages and hashed shared-source directories contribute to source
   identity, including any README there. Avoid incidental churn in those paths and report intentional
   hash changes. Do not hand-restamp artifacts to hide a changed source identity.

@@ -1,11 +1,11 @@
 # Circuit artifacts and deployment provenance
 
-Owners: [TypeScript circuit builder](../../scripts/build-circuits.ts),
-[artifact store](../../scripts/circuit-artifacts.ts),
+Owners: [TypeScript circuit builder](../../scripts/circuits/build.ts),
+[artifact store](../../scripts/circuits/artifacts.ts),
 [Rust artifact installer](../../crates/zk-prover/src/backend/download.rs), and
 [deployment tooling](../../packages/interfold-contracts/scripts/). This checkout uses the existing
 builder, not a proposed replacement crate stack.
-[Circuit Builder usage](../../scripts/README.md#circuit-builder) owns commands;
+[Circuit Builder usage](../../scripts/circuits/README.md#circuit-builder) owns commands;
 [proof contracts](proof-statements.md) owns what the artifacts must prove.
 
 ## Generated configuration and pair identity
@@ -16,12 +16,12 @@ constants, verifier output, local `.active-preset.json`, or prepared OpenVM iden
 Canonical committees `(N,T,H)` are minimum `(3,1,2)`, micro `(9,4,5)`, small `(19,9,14)`. Every
 preset/committee pair has its own H-shaped PK and T-shaped decryption public-input layout.
 
-`check-committee.sh` compares committee Noir/Rust/ActiveCryptoConfig/deployment utils, complete
+`pnpm check:committee` compares committee Noir/Rust/ActiveCryptoConfig/deployment utils, complete
 threshold BFV tuples across deployment constants/Rust/preset Noir, and configuration IDs across
 contracts, tasks, SDK, and EVM helpers. Drift can register a tuple nodes/circuits do not implement.
 The committed default is insecure-512/minimum; CI rebuilds that selection and rejects diffs. Local
 active-preset cache mismatch is only a note. **Limits:** the gate does not compare
-`scripts/circuit-constants.ts` committee values; manually review those. Parity regeneration/diff
+`scripts/circuits/constants.ts` committee values; manually review those. Parity regeneration/diff
 runs only with `target/release/zk-artifacts` and nargo; Repository Checks can skip it, while
 circuits CI catches committed-selection drift by rebuilding.
 
@@ -30,8 +30,9 @@ replaces whole declarations including array dimensions and rejects unknown prefi
 pair source hash ignores generated values. Smudging quotient bounds grow with committee: retaining a
 minimum array in another pair can reject honest proofs. A renamed global must first have
 declarations seeded in both preset files, removing the old name, then run generation. `sync-config`
-switches the active preset/committee; it does not regenerate bounds. General generated-file policy
-does not permit guessing new generated values by hand.
+updates deployment utils and ActiveCryptoConfig only; it neither switches Noir selectors nor
+regenerates bounds. General generated-file policy does not permit guessing new generated values by
+hand.
 
 Toolchain is one compatibility unit: Nargo/Rust Noir beta.26, witness serialization, bb 5.2.0,
 archive, VKs, SDK noir_js/bb.js, and generated verifiers. **Gap:** no script compares every version
@@ -150,7 +151,7 @@ release workflow does not attach the manifest; a maintainer must run it manually
 
 Use `pnpm check:committee`, `pnpm test:circuit-tooling`, `pnpm check:verifiers` after prepared
 builds, and `pnpm store:circuits verify-release` for archive release acceptance. Existing
-[artifact tooling tests](../../scripts/circuit-artifacts.test.ts),
+[artifact tooling tests](../../scripts/circuits/artifacts.test.ts),
 [deployment artifact selection](../../packages/interfold-contracts/test/Deployment/VerifierArtifactSelection.spec.ts),
 and [storage tests](../../packages/interfold-contracts/test/Standards/StorageLayouts.spec.ts) guard
 distinct boundaries; none proves cryptographic soundness or every missing pin/width/provenance

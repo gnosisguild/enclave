@@ -359,8 +359,9 @@ sequenceDiagram
 ### Quick Release
 
 [RELEASING.md](RELEASING.md) owns release preparation, qualification, tagging, and publication.
-`pnpm bump:versions` formats, stages, commits, and pushes by default; its dry run is read-only.
-Tagging is a separate command after the release PR merges and qualifies on main.
+`pnpm bump:versions` prepares release files by default; `--commit` and `--push` explicitly enable
+Git operations. Its dry run is read-only. Tagging is a separate command after the release PR merges
+and qualifies on main.
 
 ### Release Order
 
@@ -447,7 +448,8 @@ deploying the release.
 ## 🔧 Script Options
 
 The [release guide's command table](RELEASING.md#prepare-a-reviewable-release-branch) distinguishes
-dry-run, file-only, local-commit, and push modes. `--skip-git` is not read-only.
+dry-run, file-only, local-commit, and push modes. File-only preparation still updates manifests,
+lockfiles, and the changelog; use `--dry-run` for a read-only preview.
 
 ## 🔄 Rollback Procedure
 

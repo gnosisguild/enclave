@@ -45,8 +45,9 @@ dependency graph can also need [Solidity fixtures](../test-helpers/README.md).
 ## Real-proof tests
 
 Prepare pinned nargo and bb, jq, pnpm/workspace dependencies, and circuits/VKs matching the active
-preset and committee through the [circuit build guide](../../scripts/README.md#circuit-builder).
-Then use root `pnpm rust:test:proofs` for the explicitly selected ignored proof suites, or
+preset and committee through the
+[circuit build guide](../../scripts/circuits/README.md#circuit-builder). Then use root
+`pnpm rust:test:proofs` for the explicitly selected ignored proof suites, or
 `pnpm rust:test:slashing` for proof-to-slash integration. The `integration-tests` feature gates the
 separate network/download integration target; enabling it alone is not evidence of proof execution.
 Test-only aggregation skipping in the wider harness is never a production fallback.

@@ -14,5 +14,5 @@ Keep BFV presets, parameter builders, and scalar parameter arithmetic here, not 
   contract, circuit, and client review, not just Rust builder updates.
 
 Run `cargo test --locked -p e3-fhe-params --features abi-encoding`. Preset changes also require the
-canonical [circuit build flow](../../scripts/README.md#circuit-builder) and matching proof
+canonical [circuit build flow](../../scripts/circuits/README.md#circuit-builder) and matching proof
 artifacts; search output alone is not a deployed security/compatibility decision.

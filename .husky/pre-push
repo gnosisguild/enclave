@@ -17,7 +17,7 @@ pnpm check:repository
 # the checked-out tree, so the helper stops the push (exit 2) of a branch that differs from HEAD in
 # those paths. husky runs this hook with `sh -e`, so `||` keeps the helper's exit status.
 status=0
-printf '%s\n' "${pushed_refs:-}" | scripts/pushed-paths-match.sh .github/filters/circuits.yml || status=$?
+printf '%s\n' "${pushed_refs:-}" | scripts/hooks/pushed-paths-match.sh .github/filters/circuits.yml || status=$?
 case "$status" in
   0) pnpm check:verifiers ;;
   1) ;;

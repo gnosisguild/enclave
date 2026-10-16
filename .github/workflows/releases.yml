@@ -43,7 +43,7 @@ jobs:
 
       - name: Validate release candidate
         id: release
-        run: node scripts/release.mjs prepare
+        run: node scripts/release/index.mjs prepare
 
   build-ciphernode-image-release:
     name: Build & Push ciphernode (release)
@@ -245,22 +245,22 @@ jobs:
         run: pnpm prepare-publish
 
       - name: Publish @interfold/config
-        run: node scripts/release.mjs publish-npm packages/interfold-config ${{ needs.validate-and-prepare.outputs.channel }}
+        run: node scripts/release/index.mjs publish-npm packages/interfold-config ${{ needs.validate-and-prepare.outputs.channel }}
 
       - name: Publish @interfold/contracts
-        run: node scripts/release.mjs publish-npm packages/interfold-contracts ${{ needs.validate-and-prepare.outputs.channel }}
+        run: node scripts/release/index.mjs publish-npm packages/interfold-contracts ${{ needs.validate-and-prepare.outputs.channel }}
 
       - name: Publish @interfold/wasm
-        run: node scripts/release.mjs publish-npm crates/wasm ${{ needs.validate-and-prepare.outputs.channel }}
+        run: node scripts/release/index.mjs publish-npm crates/wasm ${{ needs.validate-and-prepare.outputs.channel }}
 
       - name: Publish @interfold/sdk
-        run: node scripts/release.mjs publish-npm packages/interfold-sdk ${{ needs.validate-and-prepare.outputs.channel }}
+        run: node scripts/release/index.mjs publish-npm packages/interfold-sdk ${{ needs.validate-and-prepare.outputs.channel }}
 
       - name: Publish @interfold/react
-        run: node scripts/release.mjs publish-npm packages/interfold-react ${{ needs.validate-and-prepare.outputs.channel }}
+        run: node scripts/release/index.mjs publish-npm packages/interfold-react ${{ needs.validate-and-prepare.outputs.channel }}
 
       - name: Publish @interfold/mcp
-        run: node scripts/release.mjs publish-npm packages/interfold-mcp ${{ needs.validate-and-prepare.outputs.channel }}
+        run: node scripts/release/index.mjs publish-npm packages/interfold-mcp ${{ needs.validate-and-prepare.outputs.channel }}
 
   download-circuits:
     name: Download Circuit Artifacts
@@ -287,7 +287,7 @@ jobs:
       - name: Pull circuit artifacts
         id: pull
         run: |
-          SOURCE_HASH=$(pnpm tsx scripts/build-circuits.ts hash)
+          SOURCE_HASH=$(pnpm tsx scripts/circuits/build.ts hash)
           echo "source_hash=$SOURCE_HASH" >> "$GITHUB_OUTPUT"
 
           if ! git fetch origin circuit-artifacts; then
@@ -343,7 +343,7 @@ jobs:
           SUPPORT_RESULT: ${{ needs.build-e3-support-release.result }}
           NPM_RESULT: ${{ needs.publish-npm-packages.result }}
           DAPPNODE_RESULT: ${{ needs.build-dappnode-package-release.result }}
-        run: node scripts/release.mjs verify-publications
+        run: node scripts/release/index.mjs verify-publications
 
   create-github-release:
     name: Create GitHub Release
@@ -390,7 +390,7 @@ jobs:
           RELEASE_IS_PRERELEASE: ${{ needs.validate-and-prepare.outputs.is_prerelease }}
           RELEASE_CANDIDATE_SHA: ${{ needs.validate-and-prepare.outputs.candidate_sha }}
           CIRCUIT_SOURCE_HASH: ${{ needs.download-circuits.outputs.source_hash }}
-        run: node scripts/release.mjs prepare-assets
+        run: node scripts/release/index.mjs prepare-assets
 
       - name: Set up Buildx for channel aliases
         uses: docker/setup-buildx-action@v3
@@ -421,7 +421,7 @@ jobs:
         if: needs.validate-and-prepare.outputs.is_prerelease == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/release.mjs promote-stable ${{ needs.validate-and-prepare.outputs.candidate_sha }}
+        run: node scripts/release/index.mjs promote-stable ${{ needs.validate-and-prepare.outputs.candidate_sha }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

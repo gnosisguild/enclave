@@ -33,16 +33,19 @@ Choose the write behavior deliberately:
 
 `pnpm bump:versions --help` lists the available options.
 
-| Command                               | Side effects                                                         |
-| ------------------------------------- | -------------------------------------------------------------------- |
-| `pnpm bump:versions --skip-git X.Y.Z` | Updates versions, lockfiles, and changelog; no stage/commit/push.    |
-| `pnpm bump:versions --no-push X.Y.Z`  | Updates files, formats, stages **all** changes, and commits locally. |
-| `pnpm bump:versions X.Y.Z`            | Same preparation/commit, then pushes the current branch to origin.   |
+| Command                                    | Side effects                                                                            |
+| ------------------------------------------ | --------------------------------------------------------------------------------------- |
+| `pnpm bump:versions X.Y.Z`                 | Updates versions, lockfiles, changelog and formats release files; no stage/commit/push. |
+| `pnpm bump:versions X.Y.Z --commit`        | Same preparation, then stages **release outputs only** and commits locally.             |
+| `pnpm bump:versions X.Y.Z --commit --push` | Same preparation/commit, then pushes the release branch to origin.                      |
 
-Default committing mode rejects main, dev, detached HEAD, and pending changes. `--skip-git` skips
-those Git safeguards too: it is not a license to overwrite unrelated work. The script does not open
-a PR, create a release tag, or publish artifacts. Review the actual diff and any warning;
-preparation can invoke dependency/lockfile tooling and is not just a textual version replacement.
+`--commit` rejects main, dev, detached HEAD, and pending changes. `--push` requires `--commit`. The
+former `--skip-git` behavior is now the default; replace the removed `--no-push` flag with
+`--commit`. File preparation does not require a clean checkout, so review existing work before
+running it. The script does not open a PR, create a release tag, or publish artifacts. Required
+Cargo/pnpm lock updates, changelog generation, and release-file formatting fail the command before
+staging or committing. Failures leave preparation files for review; they do not roll back files or
+authorize bypassing a failed check. This is not just a textual version replacement.
 
 The bumper updates the shared Cargo workspace, selected core npm packages (including wasm),
 `required_circuits_version`, lockfiles, and CHANGELOG. It also updates Cargo locks for the separate

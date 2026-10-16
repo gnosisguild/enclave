@@ -8,10 +8,7 @@
 # The Noir circuits and the scripts that build, lint, and test them.
 circuits:
   - 'circuits/**'
-  - 'scripts/*-circuits.sh'
-  - 'scripts/build-circuits.ts'
-  - 'scripts/generate-verifiers*.ts'
-  - 'scripts/circuit-constants.ts'
+  - 'scripts/circuits/**'
   - 'crates/zk-prover/supported-configurations.json'
   - '!**/*.md'
   - '!**/*.mdx'
@@ -26,7 +23,7 @@ verifiers:
   - 'crates/fhe-params/**'
   - 'crates/committee/**'
   - 'crates/polynomial/**'
-  # generate-verifiers.ts formats the contracts with this prettier config, and with the prettier
+  # scripts/circuits/verifiers.ts formats contracts with this config and the prettier
   # and prettier-plugin-solidity versions in the lockfile.
   - 'packages/interfold-contracts/.prettierrc.yml'
   - 'pnpm-lock.yaml'

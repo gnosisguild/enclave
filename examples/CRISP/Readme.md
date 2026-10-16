@@ -141,6 +141,11 @@ pnpm cli
 pnpm test:e2e
 ```
 
+For a clean-room run of committed `HEAD`, use `bash scripts/test-isolated.sh [test args]` from this
+directory (or `bash examples/CRISP/scripts/test-isolated.sh` from the repository root). It rejects
+pending changes, creates a temporary worktree, installs/builds its prerequisites, and keeps failed
+runs for diagnosis. It does not test uncommitted wrapper edits.
+
 ## Configuration
 
 ### Ciphernode Configuration

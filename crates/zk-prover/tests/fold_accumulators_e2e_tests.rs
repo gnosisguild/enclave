@@ -7,7 +7,7 @@
 //! Fold **accumulators** integration tests: sequential [`generate_sequential_c3_fold`] /
 //! [`generate_sequential_c6_fold`] (prove + [`ZkProver::verify_fold_proof`]) with the slot count read
 //! from the compiled `c3_fold` / `c6_fold` ABI and artifacts staged under [`CircuitVariant::Default`]
-//! (`noir-recursive-no-zk` VKs — see `scripts/build-circuits.ts`).
+//! (`noir-recursive-no-zk` VKs — see `scripts/circuits/build.ts`).
 //!
 //! The node-fold pipeline ([`CircuitName::C2abFold`] … [`CircuitName::NodeFold`]) is proven in
 //! `node_fold_correlated_e2e_tests.rs`.

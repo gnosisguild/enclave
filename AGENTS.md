@@ -34,10 +34,10 @@ own cross-component rules, rationale, and limits.
   review. Follow [Protocol compatibility](CONTRIBUTING.md#protocol-compatibility).
 - Use canonical generators for committee/preset outputs, parity matrices, verifiers, constants, and
   deployment manifests. Preset switches change shared files: coordinate them. See
-  [Circuit Builder](scripts/README.md#circuit-builder) and
+  [Circuit Builder](scripts/circuits/README.md#circuit-builder) and
   [contract addresses](packages/interfold-contracts/README.md#contract-addresses).
-- Release preparation and publication follow [RELEASING.md](RELEASING.md); commands may commit or
-  push.
+- Release preparation and publication follow [RELEASING.md](RELEASING.md); commit/push flags and
+  tag/publication commands require explicit authorization.
 
 ## Verification
 

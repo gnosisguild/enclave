@@ -5,7 +5,7 @@ to their existing owners rather than implementing another startup path.
 
 - Contract calls generate Rust bindings from tracked contract artifact JSON. After contract API
   changes run `pnpm evm:build` and `pnpm check:bindings`; do not patch a generated ABI to hide a
-  mismatch. The [binding check](../../scripts/check-cli-bindings.ts) documents this boundary.
+  mismatch. The [binding check](../../scripts/checks/cli-bindings.ts) documents this boundary.
 - `build.rs` reads `packages/interfold-contracts/deployed_contracts.json` and generates Rust data in
   `OUT_DIR`. Change deployment records through the contract tooling, not generated Rust. `GIT_SHA`
   overrides build identity; without local Git metadata the build may query the remote.
