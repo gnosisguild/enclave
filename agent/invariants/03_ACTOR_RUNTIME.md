@@ -172,9 +172,12 @@ the code does not meet yet.
 - Every state field is classified **Durable / Derivable / Ephemeral**. Pending proof bundles,
   decrypted-share progress, accusation votes/timeouts, retry state, active-aggregator designation,
   deadlines, and undispatched external effects are durable unless a stronger authority can
-  deterministically recreate them. Process lifetime does not make an actor-local cache durable.
-  **Gap:** accusation votes and timers, and `ComputeEffectGate` buffers, are in memory only. —
-  `ARCHITECTURE.md`; `CRATES_ARCHITECTURE.md`
+  deterministically recreate them. Process lifetime does not make an actor-local cache durable. The
+  accusation manager saves the pending accusations that hold its vote, with their admitted votes,
+  absolute vote timeouts and failed-proof evidence, and the proofs that it accused, after each event
+  of its E3 that changes them. **Gap:** `ComputeEffectGate` buffers are in memory only, and so are
+  the accusation manager's buffered votes, its window-move limits, its in-flight re-verifications,
+  and the rest of its verification cache. — `ARCHITECTURE.md`; `CRATES_ARCHITECTURE.md`
 - `NodeProofAggregator` persists ordered DKG inner proofs and fold metadata before it accepts them.
   It persists a completed fold before publication. Restart must restore inputs or the completed
   output and resume only after `EffectsEnabled`. `KeyPublished` and terminal E3 events release the
@@ -264,10 +267,11 @@ the code does not meet yet.
   `scripts/invariant-baselines.env`; `crates/request/src/context.rs`;
   `crates/request/src/routing/event_buffer.rs`
 - Timers: persist the absolute deadline + purpose, not an in-memory handle; on restart, compare to
-  the injected clock and deterministically re-arm or fire overdue. **Gap:** accusation timers and
-  the request router's slashable-failure teardown grace are memory-only `run_later` handles;
-  keyshare collectors read `SystemTime::now()` instead of an injected clock; the slash fallback
-  delay restarts in full (see `01_PROTOCOL_ONCHAIN.md`). — `ARCHITECTURE.md`
+  the injected clock and deterministically re-arm or fire overdue. Accusation vote timers re-arm
+  from their saved timeout at `EffectsEnabled`. **Gap:** the request router's slashable-failure
+  teardown grace is a memory-only `run_later` handle; keyshare collectors read `SystemTime::now()`
+  instead of an injected clock; the slash fallback delay restarts in full (see
+  `01_PROTOCOL_ONCHAIN.md`). — `ARCHITECTURE.md`
 - Effects stay disabled until durable replay completes and both historical sources merge in HLC
   order. Startup fences `EffectsEnabled` → `SyncEffect` → canonical history → `SyncEnded` in that
   order. `ComputeEffectGate` buffers and deduplicates until `EffectsEnabled`. It sends a live

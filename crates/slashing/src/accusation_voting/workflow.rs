@@ -42,6 +42,7 @@ use e3_events::{
     VOTE_TYPEHASH_STR,
 };
 use e3_utils::ArcBytes;
+use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
 #[path = "state.rs"]

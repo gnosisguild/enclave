@@ -469,6 +469,7 @@ fn a_held_failure_is_accused_when_the_peer_accusation_lacks_this_nodes_vote() {
             accusation: by_peer,
             votes_for: Vec::new(),
             ec: ctx(),
+            timeout_at: NOW + 300,
         },
     );
 

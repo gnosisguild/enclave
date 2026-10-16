@@ -169,3 +169,48 @@ fn local_proof_failure_requires_the_claimed_dealers_signature() {
                 && accusation.accused_party_id == 1)), "authenticated proof failure was not attributed");
     }
 }
+
+/// A restored accusation keeps its votes and its vote timeout: its timer starts at
+/// `EffectsEnabled` with the time that is left.
+#[test]
+fn a_restored_accusation_keeps_its_votes_and_its_timeout() {
+    let me = signer(1);
+    let accused = signer(2);
+    let committee = vec![me.address(), accused.address(), signer(3).address()];
+    let mut before = voting_with(&me, committee.clone(), 1, 2);
+    before.on_consistency_violation(
+        CommitmentConsistencyViolation {
+            e3_id: before.e3_id.clone(),
+            accused_address: accused.address(),
+            accused_party_id: 1,
+            proof_type: ProofType::C1PkGeneration,
+            data_hash: [7; 32],
+            evidence: Bytes::from(vec![0x11; 32]),
+        },
+        &ctx(),
+    );
+    let id = *before.pending.keys().next().expect("pending accusation");
+
+    // The node restarts 100 s later.
+    let mut after = AccusationVoting::new(
+        before.e3_id.clone(),
+        me.clone(),
+        before.slashing_manager,
+        committee,
+        1,
+        2,
+        VALIDITY,
+        SKEW,
+        e3_fhe_params::BfvPreset::default(),
+        Arc::new(FixedClock(NOW + 100)),
+    );
+    after.hold_accusations_until_effects();
+    after.restore(before.snapshot()).expect("restore");
+    assert_eq!(after.pending[&id].votes_for, before.pending[&id].votes_for);
+
+    let actions = after.on_effects_enabled();
+    assert!(actions
+        .iter()
+        .any(|action| matches!(action, VoteAction::StartTimeout(started) if *started == id)));
+    assert_eq!(after.vote_timeout_for(id), Some(Duration::from_secs(200)));
+}

@@ -129,7 +129,7 @@ item in code before you rely on it.
   `crates/net/src/events.rs`; `crates/net/src/document_publishing/`
 - Residual runtime risks: `e3-evm` serializes nonces in memory; only slash submissions have a
   durable intent record, and other transactions rely on preflight reads. Chain ingestion relies on
-  confirmation depth, not reorg rollback. Accusation votes and timers lack durable reconstruction.
-  The `e3-program-server` test endpoint is unauthenticated (never a production boundary).
-  Cancellation ownership is not uniform across crates. — `CRATES_ARCHITECTURE.md` §Subsystem
-  contracts
+  confirmation depth, not reorg rollback. Accusation buffered votes and in-flight re-verifications
+  lack durable reconstruction. The `e3-program-server` test endpoint is unauthenticated (never a
+  production boundary). Cancellation ownership is not uniform across crates. —
+  `CRATES_ARCHITECTURE.md` §Subsystem contracts

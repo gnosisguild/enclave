@@ -425,18 +425,23 @@ LIFECYCLE:
   → Stores committee list, threshold_m, this node's address + signer
   → Keeps finalized party IDs fixed when slashing removes active committee members
   → Actor identity and committee inputs recover from durable committee state
-  → In-flight accusations, votes, and timers remain process-local
-  → Destroyed by E3RequestComplete (Die signal)
+  → Saves the pending accusations that hold its vote, with their votes, vote timeouts and
+    failed-proof evidence, and its accused proofs per E3; hydration restores them, and the vote
+    timers restart at EffectsEnabled
+  → At E3RequestComplete: stops its vote timers and removes its saved votes
 ```
 
-A restart does not reconstruct a partially collected vote tally. The actor can accept new valid
-messages after hydration, but peers must resend any vote that existed only in the old process.
-Signed accusation deadlines bound how long that recovery remains useful. A hydrated actor receives
-the replayed event log before `EffectsEnabled`: it holds the local failures and commitment
-violations from the log, one per proof, and accuses them at `EffectsEnabled`. This node's own
-accusation in the log marks its proof as accused, so a held failure of that proof is not signed
-again. Neither is one whose proof has a pending peer accusation with this node's vote: that
-accusation goes on.
+A restart keeps a partially collected vote tally: after each event of its E3 that changes them, the
+actor saves the pending accusations that hold its vote, with their admitted votes, absolute vote
+timeouts and the failed proof's evidence, and the proofs that it accused. Hydration restores them,
+and each vote timer restarts at `EffectsEnabled` with the time that is left. A timeout is saved by
+the quorum event that it publishes, which comes back to the actor. Buffered votes, the window-move
+limits, in-flight re-verifications of forwarded proofs, and the rest of the verification cache are
+not saved. A hydrated actor receives the replayed event log before `EffectsEnabled`: it holds the
+local failures and commitment violations from the log, one per proof, and accuses them at
+`EffectsEnabled`. This node's own accusation in the log marks its proof as accused, so a held
+failure of that proof is not signed again. Neither is one whose proof has a pending peer accusation
+with this node's vote: that accusation goes on.
 
 #### Step 1: Local Proof Failure Detection
 

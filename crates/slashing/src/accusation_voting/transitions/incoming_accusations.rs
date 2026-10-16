@@ -132,6 +132,7 @@ impl AccusationVoting {
                     accusation,
                     votes_for: Vec::new(),
                     ec: ec.clone(),
+                    timeout_at: self.timeout_from_now(),
                 },
             );
 
@@ -223,6 +224,7 @@ impl AccusationVoting {
             accusation,
             votes_for: vec![vote],
             ec: ec.clone(),
+            timeout_at: self.timeout_from_now(),
         };
         self.pending.insert(accusation_id, pending);
 
@@ -278,9 +280,11 @@ impl AccusationVoting {
                 ec: ec.clone(),
             });
         }
+        let timeout_at = self.timeout_from_now();
         let pending = self.pending.get_mut(&accusation_id).expect("checked above");
         pending.accusation = incoming;
         pending.votes_for = own_vote.into_iter().collect();
+        pending.timeout_at = timeout_at;
         // The adopted window starts a new vote collection with a full timeout.
         actions.push(VoteAction::CancelTimeout(accusation_id));
         actions.push(VoteAction::StartTimeout(accusation_id));

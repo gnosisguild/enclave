@@ -161,6 +161,11 @@ impl AccusationVoting {
                 &mut actions,
             );
         }
+        for accusation_id in std::mem::take(&mut self.restored_timeouts) {
+            if self.pending.contains_key(&accusation_id) {
+                actions.push(VoteAction::StartTimeout(accusation_id));
+            }
+        }
         actions
     }
 
@@ -283,6 +288,7 @@ impl AccusationVoting {
                 accusation,
                 votes_for: vec![own_vote],
                 ec: ec.clone(),
+                timeout_at: self.timeout_from_now(),
             },
         );
 
