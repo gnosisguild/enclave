@@ -140,6 +140,35 @@ export type ProofData = {
 }
 
 /**
+ * One proof in the ballot pipeline, in the order {@link finishBallotProof} produces them.
+ *
+ * - `encryption_ct0` - the first half of the ciphertext is a BFV encryption of the ballot under the
+ *   committee key (`user_data_encryption_ct0`).
+ * - `encryption_ct1` - the second half is an encryption with the same randomness
+ *   (`user_data_encryption_ct1`).
+ * - `ballot` - the ballot rules (`crisp` / `crisp_onchain`): a vote is signed by the slot owner and
+ *   within its voting power, a mask is zero everywhere, and either one becomes the slot's new
+ *   ciphertext.
+ * - `encryption` - the two encryption proofs verified together (`user_data_encryption`).
+ * - `fold` - the encryption and ballot proofs verified and bound into the one proof the contract
+ *   checks (`fold` / `fold_onchain`).
+ */
+export type ProofStage = 'encryption_ct0' | 'encryption_ct1' | 'ballot' | 'encryption' | 'fold'
+
+/** Reported when a proof stage starts. The proof is complete when the promise resolves. */
+export type ProofProgress = {
+  stage: ProofStage
+  /** Zero-based position of `stage` in {@link PROOF_STAGES}. */
+  index: number
+  total: number
+}
+
+export type ProofOptions = {
+  /** Called as each stage starts. Proving takes tens of seconds, so a client can show where it is. */
+  onProgress?: (progress: ProofProgress) => void
+}
+
+/**
  * Which circuit a ballot is built for.
  *
  * `merkle` proves membership of a census tree, and matches `CensusMode.TOKEN` and

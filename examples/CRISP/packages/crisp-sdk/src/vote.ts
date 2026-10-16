@@ -4,11 +4,19 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-import { type Vote, type CensusVariant, type PrepareBallotInputs, type PreparedBallot, ProofData } from './types'
+import {
+  type Vote,
+  type CensusVariant,
+  type PrepareBallotInputs,
+  type PreparedBallot,
+  type ProofOptions,
+  type ProofStage,
+  ProofData,
+} from './types'
 import { proofToFields } from './utils'
 import { checkVoteWeights, getZkInputsGenerator } from './encoding'
 import { attachSignatureImpl, prepareCircuitInputsImpl } from './circuitInputs'
-import { MASK_SIGNATURE } from './constants'
+import { MASK_SIGNATURE, PROOF_STAGES } from './constants'
 export { encodeVote, encryptVote, decodeTally, decryptVote, generateBFVKeys } from './encoding'
 export { splitDigest } from './circuitInputs'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
@@ -104,15 +112,21 @@ export const executeCircuit = async (circuit: CompiledCircuit, inputs: any): Pro
 /**
  * Generate a proof for the CRISP circuit given the circuit inputs.
  * @param circuitInputs - Inputs used in both the CRISP and GRECO circuits.
+ * @param censusMode - Which ballot and fold circuits to prove with.
+ * @param options - `onProgress` is called as each of {@link PROOF_STAGES} starts.
  * @returns The proof.
  */
-export const generateProof = async (circuitInputs: any, censusMode: CensusVariant = 'merkle') => {
+export const generateProof = async (circuitInputs: any, censusMode: CensusVariant = 'merkle', { onProgress }: ProofOptions = {}) => {
+  const report = (stage: ProofStage) => onProgress?.({ stage, index: PROOF_STAGES.indexOf(stage), total: PROOF_STAGES.length })
   const api = await getBBApi()
 
   const circuits = requireCircuits()
   const ballotCircuit = censusMode === 'onchain' ? circuits.crispOnchain : circuits.crisp
   const foldCircuitForMode = censusMode === 'onchain' ? foldOnchainCircuit : foldCircuit
 
+  // Witness generation for the first three circuits runs ahead of any proving; it is short and is
+  // counted as part of the first stage.
+  report('encryption_ct0')
   const { witness: userDataEncryptionCt0Witness } = await executeCircuit(circuits.userDataEncryptionCt0 as CompiledCircuit, {
     pk0is: circuitInputs.pk0is,
     ct0is: circuitInputs.ct0is,
@@ -174,14 +188,18 @@ export const generateProof = async (circuitInputs: any, censusMode: CensusVarian
     await userDataEncryptionCt0Backend.generateProof(userDataEncryptionCt0Witness, {
       verifierTarget: 'noir-recursive-no-zk',
     })
+  report('encryption_ct1')
   const { proof: userDataEncryptionCt1Proof, publicInputs: userDataEncryptionCt1PublicInputs } =
     await userDataEncryptionCt1Backend.generateProof(userDataEncryptionCt1Witness, {
       verifierTarget: 'noir-recursive-no-zk',
     })
+  report('ballot')
   const { proof: crispProof, publicInputs: crispPublicInputs } = await crispBackend.generateProof(crispWitness, {
     verifierTarget: 'noir-recursive-no-zk',
   })
 
+  // The recursive artifacts of the three inner proofs feed the two verifying circuits that follow.
+  report('encryption')
   const userDataEncryptionCt0Artifacts = await userDataEncryptionCt0Backend.generateRecursiveProofArtifacts(
     userDataEncryptionCt0Proof,
     userDataEncryptionCt0PublicInputs.length,
@@ -225,6 +243,7 @@ export const generateProof = async (circuitInputs: any, censusMode: CensusVarian
     },
   )
 
+  report('fold')
   const { witness: foldWitness } = await executeCircuit(foldCircuitForMode as CompiledCircuit, {
     user_data_encryption_verification_key: userDataEncryptionArtifacts.vkAsFields,
     user_data_encryption_proof: proofToFields(userDataEncryptionProof),
@@ -311,13 +330,19 @@ export const prepareBallot = async (inputs: PrepareBallotInputs): Promise<Prepar
  * @param prepared The output of `prepareBallot`.
  * @param digest The ballot digest.
  * @param signature The voter signature over that digest.
+ * @param options `onProgress` reports each proof stage as it starts.
  * @returns The proof.
  */
-export const finishBallotProof = async (prepared: PreparedBallot, digest: `0x${string}`, signature: `0x${string}`): Promise<ProofData> => {
+export const finishBallotProof = async (
+  prepared: PreparedBallot,
+  digest: `0x${string}`,
+  signature: `0x${string}`,
+  options: ProofOptions = {},
+): Promise<ProofData> => {
   const circuitInputs = await attachSignatureImpl(prepared, digest, signature)
 
   return {
-    ...(await generateProof(circuitInputs, prepared.censusMode)),
+    ...(await generateProof(circuitInputs, prepared.censusMode, options)),
     encryptedVote: prepared.encryptedVote,
     parentIndexPlusOne: prepared.parentIndexPlusOne,
   }
@@ -333,10 +358,11 @@ export const finishBallotProof = async (prepared: PreparedBallot, digest: `0x${s
  *
  * @param prepared The output of `prepareBallot` with `isMaskVote: true`.
  * @param digest The ballot digest, from the same contract call a real vote would use.
+ * @param options `onProgress` reports each proof stage as it starts.
  * @returns The proof.
  */
-export const finishMaskProof = async (prepared: PreparedBallot, digest: `0x${string}`): Promise<ProofData> => {
-  return finishBallotProof(prepared, digest, MASK_SIGNATURE)
+export const finishMaskProof = async (prepared: PreparedBallot, digest: `0x${string}`, options: ProofOptions = {}): Promise<ProofData> => {
+  return finishBallotProof(prepared, digest, MASK_SIGNATURE, options)
 }
 
 /**
