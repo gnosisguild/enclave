@@ -276,6 +276,22 @@ interface BuildResult {
   sourceHash?: string
 }
 
+/**
+ * Writes `<vk_recursive>.json`, the `noir-recursive-no-zk` key as bb.js's
+ * `generateRecursiveProofArtifacts` returns it: `vkAsFields` (32-byte big-endian chunks as hex) and
+ * `vkHash`. bb.js recomputes the key from the bytecode on every call, ignoring the proof, so the
+ * SDKs import this file instead of building the circuit a second time per encryption. Skips
+ * silently when either input is missing, as the binary copies do.
+ */
+function writeRecursiveVkJson(vkFile: string, vkHashFile: string): void {
+  if (!existsSync(vkFile) || !existsSync(vkHashFile)) return
+  const vk = readFileSync(vkFile)
+  const vkAsFields: string[] = []
+  for (let i = 0; i < vk.length; i += 32) vkAsFields.push(`0x${vk.subarray(i, i + 32).toString('hex')}`)
+  const vkHash = `0x${readFileSync(vkHashFile).toString('hex')}`
+  writeFileSync(`${vkFile}.json`, `${JSON.stringify({ vkAsFields, vkHash })}\n`)
+}
+
 class NoirCircuitBuilder {
   private rootDir: string
   private circuitsDir: string
@@ -838,6 +854,7 @@ library ActiveCryptoConfig {
       copyPair(join(defaultDir, `${packageName}.json`), join(targetDir, `${packageName}.json`))
       copyPair(join(defaultDir, `${packageName}.vk`), join(targetDir, `${packageName}.vk_recursive`))
       copyPair(join(defaultDir, `${packageName}.vk_hash`), join(targetDir, `${packageName}.vk_recursive_hash`))
+      writeRecursiveVkJson(join(targetDir, `${packageName}.vk_recursive`), join(targetDir, `${packageName}.vk_recursive_hash`))
       copyPair(join(defaultDir, `${packageName}.vk_tree_hash`), join(targetDir, `${packageName}.vk_tree_hash`))
 
       const evmDir = join(distRoot, CIRCUIT_VARIANTS.EVM, circuit.group, circuit.name)
@@ -1196,6 +1213,10 @@ library ActiveCryptoConfig {
     result.artifacts.json = jsonFile
     result.checksums.json = this.checksum(jsonFile)
 
+    // The SDKs prove with this bytecode and the key in `<pkg>.vk_recursive.json`. A key left from an
+    // earlier build would sit beside new bytecode, so drop it; `generateVk` writes the fresh one.
+    rmSync(join(targetDir, `${packageName}.vk_recursive.json`), { force: true })
+
     if (!this.options.skipVk) {
       const vkArtifacts = this.generateVk(circuit, jsonFile, targetDir, packageName)
       if (vkArtifacts.vk) {
@@ -1298,6 +1319,7 @@ library ActiveCryptoConfig {
       if (!runWriteVk('noir-recursive-no-zk', vkRecursiveFile, vkRecursiveHashFile)) {
         throw new Error(`VK generation failed for ${packageName} (noir-recursive-no-zk)`)
       }
+      writeRecursiveVkJson(vkRecursiveFile, vkRecursiveHashFile)
       result.vkRecursive = existsSync(vkRecursiveFile) ? vkRecursiveFile : null
       result.vkRecursiveHash = existsSync(vkRecursiveHashFile) ? vkRecursiveHashFile : null
 
@@ -1320,6 +1342,7 @@ library ActiveCryptoConfig {
       if (!runWriteVk('noir-recursive-no-zk', vkRecursiveFile, vkRecursiveHashFile)) {
         throw new Error(`VK generation failed for ${packageName} (noir-recursive-no-zk)`)
       }
+      writeRecursiveVkJson(vkRecursiveFile, vkRecursiveHashFile)
       result.vkRecursive = existsSync(vkRecursiveFile) ? vkRecursiveFile : null
       result.vkRecursiveHash = existsSync(vkRecursiveHashFile) ? vkRecursiveHashFile : null
 

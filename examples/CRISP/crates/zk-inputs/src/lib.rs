@@ -13,6 +13,7 @@ use e3_fhe_params::build_bfv_params_arc;
 use e3_fhe_params::{default_param_set, BfvParamSet, BfvPreset};
 use e3_zk_helpers::circuits::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use e3_zk_helpers::circuits::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitData;
+use e3_zk_helpers::circuits::threshold::user_data_encryption::utils::public_key_on_protocol_crs;
 use e3_zk_helpers::CircuitComputation;
 use e3_zk_helpers::Computation;
 use eyre::{Context, Result};
@@ -288,7 +289,9 @@ impl ZKInputsGenerator {
         // Generate keys.
         let mut rng = rng();
         let sk = SecretKey::random(&self.bfv_params, &mut rng);
-        let pk = PublicKey::new(&sk, &mut rng);
+        // On the protocol CRS, as committee keys are: user-data encryption proofs need that `a`.
+        let pk = public_key_on_protocol_crs(&self.bfv_params, &sk, &mut rng)
+            .with_context(|| "Failed to build public key")?;
 
         // Serialize secret key coefficients with bincode
         let sk_bytes =
@@ -437,7 +440,8 @@ mod tests {
         assert!(parsed.get("ct0is").is_some());
         assert!(parsed.get("ct1is").is_some());
         assert!(parsed.get("pk0is").is_some());
-        assert!(parsed.get("pk1is").is_some());
+        // ct1 hard-codes the CRS, so the key's second component is not a circuit input.
+        assert!(parsed.get("pk1is").is_none());
     }
 
     #[test]

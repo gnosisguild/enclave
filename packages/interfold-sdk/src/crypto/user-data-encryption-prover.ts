@@ -8,6 +8,10 @@ import { Barretenberg, UltraHonkBackend, type ProofData } from '@aztec/bb.js'
 import userDataEncryptionCt0Circuit from '../../../../circuits/bin/threshold/target/user_data_encryption_ct0.json'
 import userDataEncryptionCt1Circuit from '../../../../circuits/bin/threshold/target/user_data_encryption_ct1.json'
 import userDataEncryptionCircuit from '../../../../circuits/bin/threshold/target/user_data_encryption.json'
+// The `noir-recursive-no-zk` keys the circuit build writes next to the bytecode. bb.js's
+// `generateRecursiveProofArtifacts` would rebuild each circuit to recompute them on every encryption.
+import userDataEncryptionCt0Vk from '../../../../circuits/bin/threshold/target/user_data_encryption_ct0.vk_recursive.json'
+import userDataEncryptionCt1Vk from '../../../../circuits/bin/threshold/target/user_data_encryption_ct1.vk_recursive.json'
 import { CompiledCircuit, Noir } from '@noir-lang/noir_js'
 import { proofToFields } from '../utils'
 
@@ -27,8 +31,8 @@ export const proveUserDataEncryption = async (circuitInputs: CircuitInputs): Pro
       k1: circuitInputs.k1,
       r: circuitInputs.r,
     })
+    // ct1 hard-codes the CRS as `pk1`, so the key's second component is not an input.
     const { witness: userDataEncryptionCt1Witness } = await executeCircuit(userDataEncryptionCt1Circuit as CompiledCircuit, {
-      pk1is: circuitInputs.pk1is,
       ct1is: circuitInputs.ct1is,
       u: circuitInputs.u,
       e1: circuitInputs.e1,
@@ -47,20 +51,8 @@ export const proveUserDataEncryption = async (circuitInputs: CircuitInputs): Pro
         verifierTarget: 'noir-recursive-no-zk',
       })
 
-    const userDataEncryptionCt0Artifacts = await userDataEncryptionCt0Backend.generateRecursiveProofArtifacts(
-      userDataEncryptionCt0Proof,
-      userDataEncryptionCt0PublicInputs.length,
-      {
-        verifierTarget: 'noir-recursive-no-zk',
-      },
-    )
-    const userDataEncryptionCt1Artifacts = await userDataEncryptionCt1Backend.generateRecursiveProofArtifacts(
-      userDataEncryptionCt1Proof,
-      userDataEncryptionCt1PublicInputs.length,
-      {
-        verifierTarget: 'noir-recursive-no-zk',
-      },
-    )
+    const userDataEncryptionCt0Artifacts: RecursiveVk = userDataEncryptionCt0Vk
+    const userDataEncryptionCt1Artifacts: RecursiveVk = userDataEncryptionCt1Vk
 
     const { witness: userDataEncryptionWitness } = await executeCircuit(userDataEncryptionCircuit as CompiledCircuit, {
       ct0_verification_key: userDataEncryptionCt0Artifacts.vkAsFields,
@@ -83,6 +75,9 @@ export const proveUserDataEncryption = async (circuitInputs: CircuitInputs): Pro
     await api.destroy()
   }
 }
+
+/** A verification key in the shape bb.js's `generateRecursiveProofArtifacts` returns it. */
+type RecursiveVk = { vkAsFields: string[]; vkHash: string }
 
 const executeCircuit = async (circuit: CompiledCircuit, inputs: any): Promise<{ witness: Uint8Array; returnValue: any }> => {
   const noir = new Noir(circuit as CompiledCircuit)

@@ -14,7 +14,7 @@
 // Only the four circuits whose ABI is shaped by the BFV degree are staged. The aggregation
 // circuits are proof-shaped and preset-independent — see src/circuits.ts.
 
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -73,6 +73,19 @@ for (const { name, from } of ARTIFACTS) {
   }
 
   copyFileSync(from, join(outDir, `${name}.json`))
+  // The `noir-recursive-no-zk` key compile_circuits.sh wrote with this bytecode, so the SDK does not
+  // recompute it on every ballot.
+  const vk = from.replace(/\.json$/, '.vk_recursive.json')
+  if (!existsSync(vk)) {
+    console.error(`✗ ${name}: no recursive verification key (${vk}). Run compile_circuits.sh.`)
+    process.exit(1)
+  }
+  // compile_circuits.sh writes the key after the bytecode, so an older key belongs to other bytecode.
+  if (statSync(vk).mtimeMs < statSync(from).mtimeMs) {
+    console.error(`✗ ${name}: ${vk} is older than its bytecode. Run compile_circuits.sh.`)
+    process.exit(1)
+  }
+  copyFileSync(vk, join(outDir, `${name}.vk.json`))
   staged.push({ name, degree })
 }
 

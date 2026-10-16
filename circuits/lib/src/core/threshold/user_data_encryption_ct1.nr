@@ -22,7 +22,8 @@ pub struct Configs<let N: u32, let L: u32> {
     pub qis: [Field; L],
     pub e1_bound: Field,
     pub u_bound: Field,
-    /// Bound on `r`, the quotient of the mod-`q` reduction.
+    /// Bound on `r`, the quotient of the mod-`q` reduction, that honest witnesses meet. The circuit
+    /// checks the power-of-two window `[-2^BIT_R, 2^BIT_R)` that covers it.
     pub r_bounds: [Field; L],
 }
 impl<let N: u32, let L: u32> Configs<N, L> {
@@ -38,6 +39,9 @@ impl<let N: u32, let L: u32> Configs<N, L> {
 /// **Produces:** `(pk1_commitment, ct1_commitment, u_commitment)` public outputs.
 pub struct UserDataEncryptionCt1<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E1: u32, let BIT_R: u32> {
     configs: Configs<N, L>,
+    /// The circuit-constant CRS `CRP`, the second component of every committee key. C5 commits it as
+    /// `pk1_agg`, so the binary passes the same constant and nothing here is witnessed: its
+    /// coefficients are centred residues by construction, so this leg does not range-check them.
     pk1is: [Polynomial<N>; L],
     ct1is: [Polynomial<N>; L],
     /// Re-witnessed privately; checked against `u_commitment` from ct0 (same P3 flow).
@@ -51,6 +55,9 @@ pub struct UserDataEncryptionCt1<let N: u32, let L: u32, let BIT_PK: u32, let BI
 
 impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E1: u32, let BIT_R: u32> UserDataEncryptionCt1<N, L, BIT_PK, BIT_CT, BIT_U, BIT_E1, BIT_R> {
 
+    /// `pk1is` must be the circuit-constant CRS that C5 commits as `pk1_agg` (the binary passes
+    /// `CRP`). This leg neither range-checks nor digit-checks it, so a witnessed `pk1is` would give
+    /// the key commitment a second opening and the committee-key anchor would no longer bind it.
     pub fn new(
         configs: Configs<N, L>,
         pk1is: [Polynomial<N>; L],
@@ -65,26 +72,29 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// Bounds every value the reduced identity is checked over.
     ///
     /// The identity is verified at one random point, so each coefficient needs a bound for the
-    /// field equality to imply the integer one. `pk1is` / `ct1is` are centered residues mod `q_i`;
-    /// `u` finally uses `configs.u_bound`, which the unreduced path left unread.
+    /// field equality to imply the integer one.
+    /// - `ct1is` are exact centred residues mod `q_i`, `e1` exact to its bound, and `u` ternary
+    ///   (`u_bound` is 1), checked here in its own right rather than through ct0's commitment.
+    /// - `pk1is` is the constant CRS (see the field), so it needs no check.
+    /// - `r` only needs to stay small. With every other term exactly bounded, the integer identity
+    ///   fixes `r = (ct1 - pk1 * u - e1) / q_i`, so a window `[-2^BIT_R, 2^BIT_R)` that covers
+    ///   `r_bounds` and keeps `q_i * r` far below the field modulus pins it as well as the exact
+    ///   bound did.
     fn check_range_bounds(self) {
         self.e1.range_check_2bounds::<BIT_E1>(self.configs.e1_bound, self.configs.e1_bound);
-        self.u.range_check_2bounds::<BIT_U>(self.configs.u_bound, self.configs.u_bound);
+        assert(self.configs.u_bound == 1, "the ternary check needs u_bound == 1");
+        self.u.assert_ternary();
 
         for i in 0..L {
             let half = (self.configs.qis[i] - 1) / 2;
-            self.pk1is[i].range_check_2bounds::<BIT_PK>(half, half);
             self.ct1is[i].range_check_2bounds::<BIT_CT>(half, half);
-            self.r[i].range_check_2bounds::<BIT_R>(
-                self.configs.r_bounds[i],
-                self.configs.r_bounds[i],
-            );
+            self.r[i].range_check_signed_power_of_two::<BIT_R>();
         }
     }
 
     fn generate_commitments(self) -> (Field, Field, Field) {
-        // `check_range_bounds` bounds `pk1is`, `ct1is` and `u`, so the plain packing is already
-        // injective for all three and the digit asserts would be redundant.
+        // `check_range_bounds` bounds `ct1is` and `u`, so their plain packing is injective. `pk1is`
+        // is the constant CRS, so its commitment is a constant too, the one C5 computes.
         let pk1_commitment =
             compute_multiple_polynomial_commitment::<N, L, BIT_PK>(self.pk1is, DS_PK_AGGREGATION);
         let ct1_commitment =

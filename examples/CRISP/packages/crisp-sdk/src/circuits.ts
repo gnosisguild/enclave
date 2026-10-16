@@ -24,7 +24,21 @@ export type CircuitBundle = {
   readonly crispOnchain: CompiledCircuit
   readonly userDataEncryptionCt0: CompiledCircuit
   readonly userDataEncryptionCt1: CompiledCircuit
+  /**
+   * The `noir-recursive-no-zk` verification keys of the circuits above, written with their bytecode.
+   * bb.js's `generateRecursiveProofArtifacts` would rebuild each circuit to recompute them on every
+   * ballot.
+   */
+  readonly vks: {
+    readonly crisp: RecursiveVk
+    readonly crispOnchain: RecursiveVk
+    readonly userDataEncryptionCt0: RecursiveVk
+    readonly userDataEncryptionCt1: RecursiveVk
+  }
 }
+
+/** A verification key in the shape `generateRecursiveProofArtifacts` returns it. */
+export type RecursiveVk = { readonly vkAsFields: string[]; readonly vkHash: string }
 
 let registered: CircuitBundle | null = null
 

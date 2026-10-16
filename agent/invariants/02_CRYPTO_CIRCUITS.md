@@ -246,7 +246,9 @@ every section.
   C5's `pk0_agg`, because `verify_pk_for_basis` pins it only modulo `q_l`. — `flow-trace/04`
 - Every prover-chosen modular quotient needs a bound. This includes C1's `e_sm` CRT lift and the
   reduced encryption quotients in ct0, ct1, and C3. Bounds on the other operands must also prevent
-  field wraparound. — `flow-trace/04`
+  field wraparound. When every other term of the identity is exactly bounded, the integer identity
+  already pins the quotient, so its bound only has to rule out wraparound: ct0 and ct1 check `r` in
+  the power-of-two window `[-2^BIT_R, 2^BIT_R)`, one assert per coefficient. — `flow-trace/04`
 - C7 derives `u` through bounded interpolation and `garner_reconstruct`; it accepts neither
   `u_global` nor CRT reconstruction quotients as witnesses. `reduce_mod_bounded` and
   `inv_mod_bounded` constrain every reduction and inverse hint used by that path. The rounded decode
@@ -277,7 +279,8 @@ every section.
   Those bounds make the plain packing injective as a side effect, which is why the IF-013 digit
   asserts came back out of ct0/ct1/C3/C7 rather than stacking with them. C3's DKG key is the later
   exception: its bound moved to C0, so C3 opens it with checked digits instead of re-bounding it.
-  — `flow-trace/04`
+  ct0's `pk0` follows the same pattern with C5 as the source of the bound, and ct1's `pk1` is the
+  circuit-constant CRS. — `flow-trace/04`
 - **The enumeration axis is "every prover-chosen witness that reaches the sponge", not "every
   commitment opened from elsewhere".** Fiat-Shamir is only sound while `gamma` is independent of the
   witness, and that holds exactly while the packing carrying the witness into the sponge has one
@@ -364,13 +367,22 @@ every section.
   pk and ciphertext commitments put ct0 at 2,229,363, which stops browser proving rather than
   slowing it. The soundness fix landed first and the pending arithmetic optimisation restores the
   margin, but the two must ship together: ct0 has to be re-measured against 2,097,152 before CRISP
-  ships. Measure ct0 against that number before adding any constraint to it. — `flow-trace/04`
-- Anchoring a value off-circuit still needs an injective packing in-circuit. ct0/ct1 bound the
-  public-key components before commitment generation. `CRISPProgram` supplies the registry's
-  C5-proven committee key as `noirPublicInputs[8]`. This binds the ballot to the round's key only
-  because the packing has one opening. Non-injective packing defeats a chain-supplied anchor as it
-  defeats an in-circuit commitment comparison. The same requirement applies to the `u`-commitment
-  equality in the `user_data_encryption` fold. — `flow-trace/04`
+  ships. Measure ct0 against that number before adding any constraint to it. At secure-8192 ct0 is
+  1,219,509 and ct1 700,155 since ct1 hard-codes the CRS and both legs bound `r` by a window and `u`
+  as ternary. — `flow-trace/04`
+- Anchoring a value off-circuit still needs an injective packing in-circuit. ct0 opens `pk0` with
+  checked digits and ct1 hard-codes `pk1` as the CRS that C5 commits as `pk1_agg`, so the
+  public-key commitment has one opening. `CRISPProgram` supplies the registry's C5-proven committee
+  key as `noirPublicInputs[8]`. This binds the ballot to the round's key only because the packing
+  has one opening. Non-injective packing defeats a chain-supplied anchor as it defeats an in-circuit
+  commitment comparison. The same requirement applies to the `u`-commitment equality in the
+  `user_data_encryption` fold. — `flow-trace/04`
+- **The anchor is load-bearing for ct0's key.** The checked slot keeps `pk0` in
+  `[-2^nb, 15 * 2^nb)` (`nb` = `BIT_PK` rounded up to a nibble, under `2^64` at secure-8192), which
+  rules out wraparound in the identity but not a non-canonical key; the exact centred window comes from
+  C5 through the anchor. Any program that accepts user-data encryption proofs must compare the
+  wrapper's `pk_commitment` with the committee key, as `CRISPProgram` does. Only keys whose second
+  component is the default-seed CRP can be proven, which every committee key is. — `flow-trace/04`
 - The class is "every circuit that opens a commitment it did not create". Its members are C2a, C2b,
   C3 (C0's key), C4, C5 and C6 (three). All open through `pack_checked`. A new commitment opened from
   elsewhere joins that list and needs either the checked helper or its own bound. Naming the class

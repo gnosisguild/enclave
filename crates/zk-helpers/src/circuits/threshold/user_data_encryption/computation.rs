@@ -10,7 +10,8 @@
 //! and (for input) a public key. They implement [`Computation`] and are used by codegen.
 
 use crate::encoding::get_zkp_modulus;
-use crate::negacyclic::fold_negacyclic;
+use crate::negacyclic::negacyclic_mul_exact;
+use crate::threshold::pk_generation::utils::deterministic_crp_crt_polynomial;
 
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuit;
 use crate::threshold::user_data_encryption::circuit::UserDataEncryptionCircuitData;
@@ -351,13 +352,11 @@ impl Computation for Inputs {
         let mut ct1 = CrtPolynomial::from_fhe_polynomial(&ct[1]);
         let mut pk0 = CrtPolynomial::from_fhe_polynomial(&pk.c[0]);
         let mut pk1 = CrtPolynomial::from_fhe_polynomial(&pk.c[1]);
-        let mut e0 = CrtPolynomial::from_fhe_polynomial(intermediates.error_0());
 
         ct0.reverse();
         ct1.reverse();
         pk0.reverse();
         pk1.reverse();
-        e0.reverse();
 
         ct0.center(moduli)?;
         ct1.center(moduli)?;
@@ -365,13 +364,20 @@ impl Computation for Inputs {
         pk0.center(moduli)?;
         pk1.center(moduli)?;
 
-        e0.center(moduli)?;
+        // ct1 hard-codes the protocol CRS as `pk1`, as C5 does, so only keys built on it can be
+        // proven. Committee keys always are; reject anything else here rather than in the prover.
+        if pk1 != deterministic_crp_crt_polynomial(&threshold_params)? {
+            return Err(CircuitsErrors::Other(
+                "user-data encryption proofs need a public key whose second component is the \
+                 protocol CRS (committee keys, or keys built with the default-seed CRP)"
+                    .into(),
+            ));
+        }
 
         let CrtPolynomial { limbs: ct0_limbs } = ct0;
         let CrtPolynomial { limbs: ct1_limbs } = ct1;
         let CrtPolynomial { limbs: pk0_limbs } = pk0;
         let CrtPolynomial { limbs: pk1_limbs } = pk1;
-        let CrtPolynomial { limbs: e0_limbs } = e0;
 
         // Perform the main computation logic
         let mut results: Vec<_> = izip!(
@@ -380,18 +386,11 @@ impl Computation for Inputs {
             ct1_limbs,
             pk0_limbs,
             pk1_limbs,
-            e0_limbs,
         )
         .enumerate()
         .par_bridge()
-        .map(|(i, (qi, ct0i, ct1i, pk0i, pk1i, e0i))| {
+        .map(|(i, (qi, ct0i, ct1i, pk0i, pk1i))| {
             let qi_bigint = BigInt::from(**qi);
-
-            // Compute e0_quotients[i] = (e0 - e0i) / qi for each coefficient
-            // This is used for CRT consistency check: e0[j] = e0i[j] + e0_quotients[i][j] * qi
-            // Each difference must be exactly divisible by qi.
-            let diff = e0_mod_q.sub(&e0i);
-            let e0_quotient = diff.div_exact(&qi_bigint).expect("CRT requires exact division");
 
             // k0qi = -t^{-1} mod qi
             let k0qi = BigInt::from(k0is[i]);
@@ -399,73 +398,30 @@ impl Computation for Inputs {
             // ki = k1 * k0qi
             let ki = k1.scalar_mul(&k0qi);
 
-            // Calculate ct0i_hat = pk0 * ui + e0i + ki
-            let ct0i_hat = {
-                let pk0i_u_times = pk0i.mul(&u);
-                let e0_plus_ki = e0i.add(&ki);
-
-                assert_eq!((pk0i_u_times.coefficients().len() as u64) - 1, 2 * (n - 1));
-                assert_eq!((e0_plus_ki.coefficients().len() as u64) - 1, n - 1);
-
-                pk0i_u_times.add(&e0_plus_ki)
-            };
-
-            assert_eq!((ct0i_hat.coefficients().len() as u64) - 1, 2 * (n - 1));
-
-            // Calculate ct1i_hat = pk1i * ui + e1
-            let ct1i_hat = {
-                let pk1i_u_times = pk1i.mul(&u);
-
-                assert_eq!((pk1i_u_times.coefficients().len() as u64) - 1, 2 * (n - 1));
-
-                pk1i_u_times.add(&e1)
-            };
-            assert_eq!((ct1i_hat.coefficients().len() as u64) - 1, 2 * (n - 1));
-
-            // The circuit checks one degree-N identity per leg, reduced modulo X^N + 1:
+            // The circuit checks one degree-N identity per leg, reduced modulo X^N + 1, over the
+            // integers and with the lifted `e0`:
             //   ct0i = (pk0i * u mod X^N + 1) + e0 + k0qi * k1 + qi * ct0_r
             //   ct1i = (pk1i * u mod X^N + 1) + e1            + qi * ct1_r
-            // Each quotient is pinned by its own identity, so folding the hat computed above and
-            // dividing by qi gives it. The hats already hold the products, so nothing is recomputed
-            // and the cyclotomic quotients never exist.
-            //
-            // The ct0 hat carries the residue `e0i`, while the identity reads the lifted `e0`.
-            // Substituting the CRT split `e0 = e0i + e0_quotient * qi` moves that difference into
-            // the quotient, so `ct0_r` is the folded quotient minus `e0_quotient`.
-            // Both folds run in O(N) without recomputing their convolutions.
-            let ct0_reduced_hat = fold_negacyclic(&ct0i_hat, n as usize);
-            let ct1_reduced_hat = fold_negacyclic(&ct1i_hat, n as usize);
+            // so each quotient is the leg's residual divided by qi. The reduced products are exact
+            // integer products, taken by NTT in O(N log N).
+            let pk0_u = negacyclic_mul_exact(&pk0i, &u, n as usize);
+            let pk1_u = negacyclic_mul_exact(&pk1i, &u, n as usize);
 
-            // Exact division rejects any coefficient that is not a multiple
-            // of qi, so a successful division proves an integer quotient closes the reduced
-            // equation and a wrong fold surfaces as a divisibility failure.
-            let ct0_folded_quotient = ct0i
-                .sub(&ct0_reduced_hat)
+            // Exact division rejects any coefficient that is not a multiple of qi, so a successful
+            // division proves an integer quotient closes the reduced equation, and a wrong product
+            // surfaces as a divisibility failure.
+            let ct0_r = ct0i
+                .sub(&pk0_u)
+                .sub(&e0_mod_q)
+                .sub(&ki)
                 .div_exact(&qi_bigint)
-                .expect("ct0i - (pk0i * u + e0i + k0qi * k1 mod X^N + 1) must be divisible by qi");
-            let ct0_r = ct0_folded_quotient.sub(&e0_quotient);
+                .expect("ct0i - (pk0i * u + e0 + k0qi * k1 mod X^N + 1) must be divisible by qi");
 
             let ct1_r = ct1i
-                .sub(&ct1_reduced_hat)
+                .sub(&pk1_u)
+                .sub(&e1)
                 .div_exact(&qi_bigint)
                 .expect("ct1i - (pk1i * u + e1 mod X^N + 1) must be divisible by qi");
-
-            // Restate both identities on the derived witnesses, with the lifted `e0` the circuit
-            // reads. This checks the derived quotients against the integer equations.
-            let ct0_reduced = ct0_reduced_hat
-                .sub(&e0i)
-                .add(&e0_mod_q)
-                .add(&ct0_r.scalar_mul(&qi_bigint));
-            assert!(
-                ct0i.sub(&ct0_reduced).is_zero(),
-                "reduced ct0 identity must hold: ct0i == pk0i * u + e0 + k0qi * k1 + qi * r (mod X^N + 1)"
-            );
-            assert!(
-                ct1i
-                    .sub(&ct1_reduced_hat.add(&ct1_r.scalar_mul(&qi_bigint)))
-                    .is_zero(),
-                "reduced ct1 identity must hold: ct1i == pk1i * u + e1 + qi * r (mod X^N + 1)"
-            );
 
             (i, k0qi, ct0i, ct1i, pk0i, pk1i, ct0_r, ct1_r)
         })
@@ -516,12 +472,12 @@ impl Computation for Inputs {
     }
 
     // Used as input for Nargo execution. Coefficients are JSON numbers when they fit in i64, else strings.
+    // `pk1is` is not an input: ct1 hard-codes the CRS it must equal.
     fn to_json(&self) -> serde_json::Result<serde_json::Value> {
         use crate::encoding::crt_polynomial_to_toml_json;
         use crate::encoding::polynomial_to_toml_json;
 
         let pk0is = crt_polynomial_to_toml_json(&self.pk0is);
-        let pk1is = crt_polynomial_to_toml_json(&self.pk1is);
         let ct0is = crt_polynomial_to_toml_json(&self.ct0is);
         let ct1is = crt_polynomial_to_toml_json(&self.ct1is);
         let u = polynomial_to_toml_json(&self.u);
@@ -535,7 +491,6 @@ impl Computation for Inputs {
 
         let json = serde_json::json!({
             "pk0is": pk0is,
-            "pk1is": pk1is,
             "ct0is": ct0is,
             "ct1is": ct1is,
             "u": u,
@@ -577,6 +532,29 @@ mod tests {
         assert_eq!(bounds.e0_bound, BigUint::from(6u32));
         assert_eq!(bounds.e1_bound, BigUint::from(20u32));
         assert_eq!(bits.e0_bit, 3);
+    }
+
+    /// ct1 hard-codes the CRS, so a key with a random `a` cannot be proven; say so up front.
+    #[test]
+    fn keys_off_the_protocol_crs_are_rejected() {
+        use fhe_traits::FheEncoder;
+
+        let preset = BfvPreset::InsecureThreshold512;
+        let (threshold_params, _) = build_pair_for_preset(preset).unwrap();
+        let mut rng = rand::rng();
+        let secret_key = SecretKey::random(&threshold_params, &mut rng);
+        let sample = UserDataEncryptionCircuitData {
+            public_key: fhe::bfv::PublicKey::new(&secret_key, &mut rng),
+            plaintext: fhe::bfv::Plaintext::try_encode(
+                &[1u64],
+                Encoding::poly(),
+                &threshold_params,
+            )
+            .unwrap(),
+        };
+
+        let error = Inputs::compute(preset, &sample).unwrap_err();
+        assert!(error.to_string().contains("protocol CRS"), "{error}");
     }
 
     #[test]

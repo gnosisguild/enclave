@@ -56,6 +56,7 @@ for name in user_data_encryption_ct0 user_data_encryption_ct1 user_data_encrypti
     fi
     mv "${THRESHOLD_TARGET}/vk" "${THRESHOLD_TARGET}/${name}.vk_recursive"
     mv "${THRESHOLD_TARGET}/vk_hash" "${THRESHOLD_TARGET}/${name}.vk_recursive_hash"
+    node scripts/vk-json.mjs "${THRESHOLD_TARGET}/${name}.vk_recursive"
 done
 
 # Apply project-specific checks that the generated verifier does not emit.
@@ -146,6 +147,7 @@ for stack in "${STACKS[@]}"; do
     fi
     mv "${crisp_target}/vk" "${crisp_target}/${crisp_dir}.vk_recursive"
     mv "${crisp_target}/vk_hash" "${crisp_target}/${crisp_dir}.vk_recursive_hash"
+    node scripts/vk-json.mjs "${crisp_target}/${crisp_dir}.vk_recursive"
 
     echo "Compiling ${fold_dir} circuit (verifies user_data_encryption + ${crisp_dir})..."
     if ! (cd "$CRISP_CIRCUITS/bin/${fold_dir}" && nargo compile); then

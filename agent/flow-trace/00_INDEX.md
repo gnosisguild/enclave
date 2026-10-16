@@ -228,12 +228,14 @@ _Found during source-code cross-referencing of these trace documents._
 
 Ported from `feat/secure-circuit-optimizations` and generalised off its fixed parameter set. Every
 circuit here checks the **same statement** as before, reduced modulo `X^N + 1`, so these are
-reformulations rather than weakenings — the soundness arguments are in the commit messages.
+reformulations rather than weakenings — the soundness arguments are in the commit messages. ct1 is
+the exception since it hard-codes the CRS as `pk1`: it proves the narrower statement for committee
+keys only (`invariants/02`).
 
 | circuit | main      | + IF-013  | final         | vs main |
 | ------- | --------- | --------- | ------------- | ------- |
-| ct0     | 1,688,639 | 2,229,363 | **1,399,227** | -17.1%  |
-| ct1     | 1,398,622 | 1,625,997 | **1,216,948** | -13.0%  |
+| ct0     | 1,688,639 | 2,229,363 | **1,219,509** | -27.8%  |
+| ct1     | 1,398,622 | 1,625,997 | **700,155**   | -49.9%  |
 | C3      | 3,475,203 | 3,589,892 | **2,125,396** | -38.8%  |
 | C7      | 108,461   | 112,591   | **26,808**    | -75.3%  |
 | C4      | 1,746,030 | 1,954,926 | **1,098,865** | -37.1%  |

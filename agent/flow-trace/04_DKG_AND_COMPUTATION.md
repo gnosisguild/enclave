@@ -2206,8 +2206,11 @@ The ballot is a fresh BFV encryption of `k1`, covered by the recursive `user_dat
 The SDK passes the WASM-generated reduction quotients as `r` for ct0 and `r_ct1` for ct1.
 `CRISPProgram._verifyInputProof` supplies `e3.committeePublicKey` as `noirPublicInputs[8]`. This
 anchors the ballot proof's public-key commitment to the C5-proven key for that round. The caller
-cannot supply a replacement key. The ballot circuits bound both public-key components before
-commitment generation, so their packed openings are injective.
+cannot supply a replacement key. ct0 opens `pk0` with checked digits and ct1 hard-codes `pk1` as
+the CRS that C5 commits as `pk1_agg`, so the key commitment has one opening and the anchor gives
+`pk0` C5's exact centred bound. The SDKs read each circuit's `noir-recursive-no-zk` verification key
+from the file the build writes beside its bytecode (`<name>.vk_recursive.json`) rather than
+recomputing it per proof.
 
 The addend is the slot's current head for a mask, and the zero ciphertext for a vote, a re-vote, or
 any input to an empty slot. `is_mask_vote` chooses between them and is **private**, and the selector

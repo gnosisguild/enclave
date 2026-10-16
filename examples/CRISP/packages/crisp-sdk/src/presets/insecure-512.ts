@@ -17,6 +17,10 @@ import crisp from '../../../../circuits/dist/insecure-512/crisp.json'
 import crispOnchain from '../../../../circuits/dist/insecure-512/crisp_onchain.json'
 import userDataEncryptionCt0 from '../../../../circuits/dist/insecure-512/user_data_encryption_ct0.json'
 import userDataEncryptionCt1 from '../../../../circuits/dist/insecure-512/user_data_encryption_ct1.json'
+import crispVk from '../../../../circuits/dist/insecure-512/crisp.vk.json'
+import crispOnchainVk from '../../../../circuits/dist/insecure-512/crisp_onchain.vk.json'
+import userDataEncryptionCt0Vk from '../../../../circuits/dist/insecure-512/user_data_encryption_ct0.vk.json'
+import userDataEncryptionCt1Vk from '../../../../circuits/dist/insecure-512/user_data_encryption_ct1.vk.json'
 
 export const preset: CircuitPreset = 'insecure-512'
 
@@ -33,4 +37,10 @@ export const loadCircuits = async (): Promise<CircuitBundle> => ({
   crispOnchain: crispOnchain as CompiledCircuit,
   userDataEncryptionCt0: userDataEncryptionCt0 as CompiledCircuit,
   userDataEncryptionCt1: userDataEncryptionCt1 as CompiledCircuit,
+  vks: {
+    crisp: crispVk,
+    crispOnchain: crispOnchainVk,
+    userDataEncryptionCt0: userDataEncryptionCt0Vk,
+    userDataEncryptionCt1: userDataEncryptionCt1Vk,
+  },
 })

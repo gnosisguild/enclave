@@ -19,6 +19,8 @@ import { Barretenberg, BackendType, UltraHonkBackend } from '@aztec/bb.js'
 import foldCircuit from '../../../circuits/bin/fold/target/crisp_fold.json'
 import foldOnchainCircuit from '../../../circuits/bin/fold_onchain/target/crisp_onchain_fold.json'
 import userDataEncryptionCircuit from '../../../../../circuits/bin/threshold/target/user_data_encryption.json'
+// The wrapper's `noir-recursive-no-zk` key, written with its bytecode, so it is not recomputed per ballot.
+import userDataEncryptionVk from '../../../../../circuits/bin/threshold/target/user_data_encryption.vk_recursive.json'
 import { requireCircuits } from './circuits'
 
 // Cached Barretenberg API instance — avoids re-initialising WASM + SRS on every proof.
@@ -121,8 +123,8 @@ export const generateProof = async (circuitInputs: any, censusMode: CensusVarian
     k1: circuitInputs.k1,
     r: circuitInputs.r,
   })
+  // ct1 hard-codes the CRS as `pk1`, so the key's second component is not an input.
   const { witness: userDataEncryptionCt1Witness } = await executeCircuit(circuits.userDataEncryptionCt1 as CompiledCircuit, {
-    pk1is: circuitInputs.pk1is,
     ct1is: circuitInputs.ct1is,
     u: circuitInputs.u,
     e1: circuitInputs.e1,
@@ -178,27 +180,14 @@ export const generateProof = async (circuitInputs: any, censusMode: CensusVarian
     await userDataEncryptionCt1Backend.generateProof(userDataEncryptionCt1Witness, {
       verifierTarget: 'noir-recursive-no-zk',
     })
-  const { proof: crispProof, publicInputs: crispPublicInputs } = await crispBackend.generateProof(crispWitness, {
+  const { proof: crispProof } = await crispBackend.generateProof(crispWitness, {
     verifierTarget: 'noir-recursive-no-zk',
   })
 
-  const userDataEncryptionCt0Artifacts = await userDataEncryptionCt0Backend.generateRecursiveProofArtifacts(
-    userDataEncryptionCt0Proof,
-    userDataEncryptionCt0PublicInputs.length,
-    {
-      verifierTarget: 'noir-recursive-no-zk',
-    },
-  )
-  const userDataEncryptionCt1Artifacts = await userDataEncryptionCt1Backend.generateRecursiveProofArtifacts(
-    userDataEncryptionCt1Proof,
-    userDataEncryptionCt1PublicInputs.length,
-    {
-      verifierTarget: 'noir-recursive-no-zk',
-    },
-  )
-  const crispArtifacts = await crispBackend.generateRecursiveProofArtifacts(crispProof, crispPublicInputs.length, {
-    verifierTarget: 'noir-recursive-no-zk',
-  })
+  // Precomputed with the bytecode (see `CircuitBundle.vks`): bb.js would rebuild each circuit to get them.
+  const userDataEncryptionCt0Artifacts = circuits.vks.userDataEncryptionCt0
+  const userDataEncryptionCt1Artifacts = circuits.vks.userDataEncryptionCt1
+  const crispArtifacts = censusMode === 'onchain' ? circuits.vks.crispOnchain : circuits.vks.crisp
 
   const { witness: userDataEncryptionWitness } = await executeCircuit(userDataEncryptionCircuit as CompiledCircuit, {
     ct0_verification_key: userDataEncryptionCt0Artifacts.vkAsFields,
@@ -217,13 +206,7 @@ export const generateProof = async (circuitInputs: any, censusMode: CensusVarian
       verifierTarget: 'noir-recursive-no-zk',
     },
   )
-  const userDataEncryptionArtifacts = await userDataEncryptionBackend.generateRecursiveProofArtifacts(
-    userDataEncryptionProof,
-    userDataEncryptionPublicInputs.length,
-    {
-      verifierTarget: 'noir-recursive-no-zk',
-    },
-  )
+  const userDataEncryptionArtifacts = userDataEncryptionVk
 
   const { witness: foldWitness } = await executeCircuit(foldCircuitForMode as CompiledCircuit, {
     user_data_encryption_verification_key: userDataEncryptionArtifacts.vkAsFields,
