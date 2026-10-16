@@ -34,7 +34,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<InterfoldEvent>
                         if let Some(intent_times) = intent_times.as_mut() {
                             let key = SlashIntentKey::from_quorum(event)?;
                             if let Err(error) =
-                                intent_times.try_mutate(&event_context, |mut times| {
+                                intent_times.try_mutate_without_context(|mut times| {
                                     times.record(key, now_unix_secs());
                                     Ok(times)
                                 })
@@ -76,7 +76,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<InterfoldEvent>
                                     self.bus.with_ec(&event_context).err(EType::Evm, error);
                                 }
                             }
-                            self.forget_intent_time(&key, Some(&event_context));
+                            self.forget_intent_time(&key);
                             self.submissions.mark_completed(key);
                         }
                         Err(error) => self.bus.err(EType::Evm, error),
@@ -97,7 +97,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<InterfoldEvent>
                                     self.bus.with_ec(&event_context).err(EType::Evm, error);
                                 }
                             }
-                            self.forget_intent_time(&key, Some(&event_context));
+                            self.forget_intent_time(&key);
                             self.submissions.mark_completed(key);
                         }
                         Ok(None) => {}
@@ -261,7 +261,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<SlashSubmissionFini
                     self.bus.err(EType::Evm, error);
                 }
             }
-            self.forget_intent_time(&msg.key, None);
+            self.forget_intent_time(&msg.key);
         }
         self.submissions.finish(&msg.key, msg.terminal);
         let Some(event) = msg.retry_event else {
@@ -269,7 +269,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<SlashSubmissionFini
         };
         // A retry waits the full rank delay again. Forgetting the first record time keeps that true
         // after a restart, so a restarted retry does not submit at once.
-        self.forget_intent_time(&msg.key, None);
+        self.forget_intent_time(&msg.key);
 
         ctx.run_later(SLASH_SUBMISSION_RETRY_DELAY, move |actor, ctx| match actor
             .submissions

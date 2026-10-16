@@ -33,9 +33,7 @@ use e3_events::EventType;
 use e3_events::InterfoldEvent;
 use e3_events::InterfoldEventData;
 use e3_events::Shutdown;
-use e3_events::{
-    AccusationQuorumReached, CommitteeMemberExcluded, EType, EventContext, Sequenced, SlashExecuted,
-};
+use e3_events::{AccusationQuorumReached, CommitteeMemberExcluded, EType, SlashExecuted};
 use e3_utils::{require_successful_receipt, NotifySync, MAILBOX_LIMIT};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -249,20 +247,18 @@ impl<P: Provider + WalletProvider + Clone + 'static> SlashingManagerSolWriter<P>
 }
 
 impl<P: Provider + WalletProvider + Clone + 'static> SlashingManagerSolWriter<P> {
-    /// Drop the record time of a settled intent.
-    fn forget_intent_time(&mut self, key: &SlashIntentKey, ec: Option<&EventContext<Sequenced>>) {
+    /// Drop the record time of a settled intent or of a failed attempt. Every change of the record
+    /// times is a direct write, without an event context: a contextual write waits in its snapshot
+    /// batch until a later event or the shutdown drain, so it could land after a later direct
+    /// write and bring a removed time back.
+    fn forget_intent_time(&mut self, key: &SlashIntentKey) {
         let Some(intent_times) = self.intent_times.as_mut() else {
             return;
         };
-        let forget = |mut times: SlashIntentTimes| {
+        if let Err(error) = intent_times.try_mutate_without_context(|mut times| {
             times.acknowledge(key);
             Ok(times)
-        };
-        let result = match ec {
-            Some(ec) => intent_times.try_mutate(ec, forget),
-            None => intent_times.try_mutate_without_context(forget),
-        };
-        if let Err(error) = result {
+        }) {
             self.bus.err(EType::Evm, error);
         }
     }
@@ -345,19 +341,31 @@ mod tests {
     }
 
     /// A failed attempt forgets when the intent was first recorded, so a retry after a restart waits
-    /// its full rank delay again instead of submitting at once.
+    /// its full rank delay again instead of submitting at once. The quorum's contextual snapshot
+    /// writes wait in their batch until the shutdown drain, and that drain must not bring the
+    /// forgotten time back.
     #[actix::test]
-    async fn a_retry_forgets_the_first_record_time() -> Result<()> {
+    async fn a_retry_forgets_the_first_record_time_also_after_the_shutdown_drain() -> Result<()> {
         use crate::SlashingWriterRepositoryFactory;
         use alloy::{
             network::EthereumWallet, providers::ProviderBuilder, signers::local::PrivateKeySigner,
             transports::mock::Asserter,
         };
-        use e3_data::{DataStore, InMemStore, RepositoriesFactory};
+        use e3_data::RepositoriesFactory;
         use e3_event_system::EventSystem;
+        use e3_events::{AggregateConfig, AggregateId, FlushPendingSnapshots};
+        use std::collections::HashMap;
 
-        let system = EventSystem::new().with_fresh_bus();
+        // The quorum of an E3 on chain 1 goes to aggregate 1.
+        let system =
+            EventSystem::new()
+                .with_fresh_bus()
+                .with_aggregate_config(AggregateConfig::new(HashMap::from([(
+                    AggregateId::new(1),
+                    std::time::Duration::ZERO,
+                )])));
         let bus = system.handle()?.enable("slash-retry");
+        let repositories = system.store()?.repositories();
         let asserter = Asserter::new();
         asserter.push_success(&"0x1");
         let provider = EthProvider::new(
@@ -366,19 +374,8 @@ mod tests {
                 .connect_mocked_client(asserter),
         )
         .await?;
-
-        let repositories = DataStore::from_in_mem(&InMemStore::new(false).start()).repositories();
-        let intent = slash_intent();
-        let key = SlashIntentKey::from_quorum(&intent)?;
-        let mut recovery = SlashingWriterRecoveryState::default();
-        recovery.record(intent.clone())?;
-        let mut times = SlashIntentTimes::default();
-        times.record(key.clone(), 1_000);
         let recovery_repository = repositories.slashing_writer_recovery(1);
-        recovery_repository.write_sync(&recovery).await?;
         let times_repository = repositories.slashing_writer_intent_times(1);
-        times_repository.write_sync(&times).await?;
-
         let writer = SlashingManagerSolWriter::attach_with_recovery(
             &bus,
             provider,
@@ -387,6 +384,12 @@ mod tests {
             times_repository.clone(),
         )
         .await?;
+
+        // Effects are off, so the writer records the quorum and holds it.
+        let intent = slash_intent();
+        let key = SlashIntentKey::from_quorum(&intent)?;
+        bus.publish_without_context(intent.clone())?;
+        bus.flush_event_pipeline().await?;
         writer
             .send(SlashSubmissionFinished {
                 key: key.clone(),
@@ -395,9 +398,14 @@ mod tests {
                 retry_event: Some(intent),
             })
             .await?;
+        // A normal stop drains the snapshot batches that are still open.
+        system.buffer()?.send(FlushPendingSnapshots).await??;
 
-        let times = times_repository.read().await?.expect("intent times");
-        assert_eq!(times.recorded_ago(&key, 2_000), std::time::Duration::ZERO);
+        let times = times_repository.read().await?.unwrap_or_default();
+        assert_eq!(
+            times.recorded_ago(&key, now_unix_secs() + 60),
+            std::time::Duration::ZERO
+        );
         // The intent itself stays pending for the retry.
         let recovery = recovery_repository.read().await?.expect("recovery state");
         assert_eq!(recovery.pending_count(), 1);
