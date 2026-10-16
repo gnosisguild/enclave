@@ -37,8 +37,8 @@ impl Handler<InterfoldEvent> for AccusationManager {
             InterfoldEventData::ComputeRequestError(data) => {
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
-            InterfoldEventData::SlashExecuted(data) => {
-                self.voting.on_slash_executed(data);
+            InterfoldEventData::CommitteeMemberExpelled(data) => {
+                self.voting.on_member_expelled(&data);
             }
             InterfoldEventData::EffectsEnabled(_) => {
                 let actions = self.voting.on_effects_enabled();

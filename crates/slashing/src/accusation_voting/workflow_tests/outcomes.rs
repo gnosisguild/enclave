@@ -56,23 +56,22 @@ fn timeout_outcome_depends_on_vote_count() {
     assert!(v.on_vote_timeout(id).is_none(), "second timeout is a no-op");
 }
 
-/// After a slash shrinks the live roster, ZK re-verification must still use the
+/// After an expulsion shrinks the live roster, ZK re-verification must still use the
 /// canonical circuit committee size cached at construction.
 #[test]
-fn committee_size_unchanged_after_slash() {
+fn committee_size_unchanged_after_expulsion() {
     let me = signer(1);
     // Micro committee (T=4, N=9) — canonical pair in `from_threshold`.
     let committee: Vec<Address> = (1..=9u8).map(|b| signer(b).address()).collect();
     let mut v = voting_with(&me, committee.clone(), 4, 5);
 
-    let slashed = committee[8];
-    v.on_slash_executed(SlashExecuted {
+    let expelled = committee[8];
+    v.on_member_expelled(&CommitteeMemberExpelled {
         e3_id: v.e3_id.clone(),
-        proposal_id: 1,
-        operator: slashed,
+        node: expelled,
         reason: [0u8; 32],
-        ticket_amount: 0,
-        ciphernode_bond_amount: 0,
+        active_count_after: 8,
+        party_id: Some(8),
     });
     assert_eq!(v.committee.len(), 8);
     assert_eq!(v.committee_n, 9);
@@ -155,13 +154,12 @@ fn local_proof_failure_requires_the_claimed_dealers_signature() {
             "{forgery} caused an accusation"
         );
         assert!(voting.received_data.is_empty());
-        voting.on_slash_executed(SlashExecuted {
+        voting.on_member_expelled(&CommitteeMemberExpelled {
             e3_id: voting.e3_id.clone(),
-            proposal_id: 1,
-            operator: other.address(),
+            node: other.address(),
             reason: [0; 32],
-            ticket_amount: 0,
-            ciphernode_bond_amount: 0,
+            active_count_after: 2,
+            party_id: None,
         });
         let actions = voting.on_local_proof_failure(genuine, &ctx());
         assert!(actions.iter().any(|action| matches!(action,

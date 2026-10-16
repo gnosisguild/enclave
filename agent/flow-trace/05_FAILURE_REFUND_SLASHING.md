@@ -423,7 +423,11 @@ an off-chain committee quorum protocol.
 LIFECYCLE:
   Created by AccusationManagerExtension on SortitionCommitteeFinalized or context hydration
   → Stores committee list, threshold_m, this node's address + signer
-  → Keeps finalized party IDs fixed when slashing removes active committee members
+  → Keeps finalized party IDs fixed when an expulsion removes active committee members
+  → CommitteeMemberExpelled removes the member from the voters and drops its votes; until then,
+    also after a SlashExecuted without an expulsion, the member can vote, accuse and be accused
+  → Gap: a restart rebuilds the voters from the finalized committee, so an expulsion before the
+    router checkpoint is not applied again
   → Actor identity and committee inputs recover from durable committee state
   → Saves the pending accusations that hold its vote, with their votes, vote timeouts and
     failed-proof evidence, and its accused proofs per E3; hydration restores them, and the vote
@@ -456,7 +460,7 @@ ProofVerificationFailed OR CommitmentConsistencyViolation event arrives
 │   ├─ 1. Authenticate the accused address:
 │   │     Require the exact proof signature to recover to the claimed finalized committee slot
 │   │     Require the signed E3, proof type, and proof hash to match the failure
-│   │     Keep finalized slots fixed when slashing removes a member from the live voting roster
+│   │     Keep finalized slots fixed when an expulsion removes a member from the live voting roster
 │   │     Drop an unrecoverable signature; never resolve a zero address through party_id
 │   │     Ignore a failure against this node's address or finalized party ID before caching
 │   │
@@ -1430,6 +1434,10 @@ When CommitteeMemberExpelled event arrives from EVM:
 │   └─ Removes the party from decryption collection
 │       ├─ Decryption can continue with T+1 valid roster shares
 │       └─ C6 verification fails if fewer than T+1 roster shares remain possible
+│
+├─ AccusationManager (receives both copies):
+│   └─ Removes the member from the voters and drops its pending and buffered votes; the second
+│       copy changes nothing
 │
 ├─ KeyshareCreatedFilterBuffer (aggregator):
 │   ├─ Only processes raw events (party_id: None)

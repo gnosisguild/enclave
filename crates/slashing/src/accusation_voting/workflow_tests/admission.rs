@@ -227,7 +227,7 @@ fn local_self_accusations_are_ignored() {
     let removed = signer(3);
     let committee = vec![removed.address(), me.address(), other.address()];
 
-    for after_slash in [false, true] {
+    for after_expulsion in [false, true] {
         for consistency in [false, true] {
             for (address, party_id) in [
                 (me.address(), 1),
@@ -239,14 +239,13 @@ fn local_self_accusations_are_ignored() {
                     continue;
                 }
                 let mut v = voting_with(&me, committee.clone(), 1, 2);
-                if after_slash {
-                    v.on_slash_executed(SlashExecuted {
+                if after_expulsion {
+                    v.on_member_expelled(&CommitteeMemberExpelled {
                         e3_id: v.e3_id.clone(),
-                        proposal_id: 1,
-                        operator: removed.address(),
+                        node: removed.address(),
                         reason: [0; 32],
-                        ticket_amount: 0,
-                        ciphernode_bond_amount: 0,
+                        active_count_after: 2,
+                        party_id: Some(0),
                     });
                 }
                 let mut failure = proof_failure(&me, party_id, ProofType::C3aSkShareEncryption);
@@ -268,7 +267,7 @@ fn local_self_accusations_are_ignored() {
                 };
                 assert!(
                     actions.is_empty(),
-                    "self-accusation: consistency={consistency}, after_slash={after_slash}, address={address}, party_id={party_id}"
+                    "self-accusation: consistency={consistency}, after_expulsion={after_expulsion}, address={address}, party_id={party_id}"
                 );
                 assert!(v.received_data.is_empty());
                 assert!(v.pending.is_empty());
