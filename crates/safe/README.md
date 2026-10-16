@@ -1,8 +1,21 @@
 # e3-safe
 
+## Purpose
+
 SAFE sponge over BN254 field elements with Poseidon2, shared by native commitment code and the
 OpenVM guest. It binds a prescribed absorb/squeeze transcript and a 64-byte domain separator; it is
 not a generic byte-hashing convenience API.
+
+## Map
+
+| Location                                       | Responsibility                                                                      |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [`lib.rs`](src/lib.rs)                         | SAFE pattern/tag encoding, sponge state, transcript operations, and native vectors. |
+| [`poseidon2_accel.rs`](src/poseidon2_accel.rs) | Guest-oriented field/permutation implementation and native reference comparisons.   |
+
+`start` binds a domain/transcript, `absorb`/`squeeze` consume its operations, and `finish` checks
+completion and clears state. Native and guest permutations implement that same transcript; target
+selection changes execution, not the commitment format.
 
 ## Sponge transcript
 
@@ -30,6 +43,11 @@ Default builds use the native Poseidon2 implementation. The `openvm` feature ena
 integration; `phase-trace` adds guest diagnostic tracing. Guest cfg/feature combinations are
 target-specific, so enabling every feature on a host is not a guest parity check.
 
-Run `cargo test --locked -p e3-safe` for native/reference vectors. For OpenVM execution follow the
+## Tests
+
+Run `cargo test --locked -p e3-safe` for transcript/domain/tag vectors, zero-length/multiple
+operations, and accelerated field/permutation comparisons against the reference. No prover is needed
+for these inline tests. For OpenVM execution follow the
 [worker workflow](../openvm-prover/README.md). Cross-language commitment requirements live in
-[proof statements](../../docs/architecture/proof-statements.md).
+[proof statements](../../docs/architecture/proof-statements.md). [AGENTS.md](AGENTS.md) covers
+permutation and cross-language changes.

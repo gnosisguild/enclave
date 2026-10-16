@@ -1,9 +1,24 @@
 # OpenVM proving
 
+## Purpose
+
 OpenVM replaces RISC Zero and Boundless. Each project proves its own E3 program: the guest and the
 proving service link the project's `program/` crate, so the guest, the native host and the contract
 use one processor and one input policy. This is a new guest and verifier deployment, not an upgrade
 of an existing receipt. Existing deployment records and legacy RISC Zero contracts stay unchanged.
+
+## Source map
+
+This worker is an excluded, independent Cargo workspace. [`src/main.rs`](src/main.rs) owns command
+parsing plus bounded artifact/input loading, SDK construction, native guest execution,
+proving/verification, and seal encoding. `Config` binds artifact paths/checksums and application
+identity; `verify` checks the expected journal; `read_items` adapts the shared stream into OpenVM
+stdin. [`Cargo.toml`](Cargo.toml) pins this worker's SDK/features independently of the runtime
+workspace; use the Rust/OpenVM toolchains listed under prerequisites below.
+
+The host starts a checked CPU/CUDA worker per operation. The worker executes/proves the project
+guest, aggregates into an EVM proof, verifies it against the supplied journal/commitments, then
+writes the seal. The following map shows how this process fits the consuming project.
 
 ## Pieces
 
@@ -163,6 +178,14 @@ commitment. The protocol BFV verifier and the program's verifier must use the sa
 both verification calls stay mandatory. Rounds keep their request-time verifier snapshot and must
 drain before a live migration. The historical RISC Zero activation scripts do not activate OpenVM.
 The compute path is unaudited.
+
+## Tests
+
+From the repository root, `pnpm openvm prover-check` checks the independent worker and
+`pnpm openvm prover-test` runs its inline stream/seal/probe tests using the pinned toolchain and
+prerequisites above. Root `cargo -p interfold-openvm-prover` cannot select this workspace. Those
+tests do not prepare keys or generate receipts. Real execution/proving/contract acceptance uses the
+prepared workflows below. [AGENTS.md](AGENTS.md) covers worker/artifact changes.
 
 ## CRISP checks
 

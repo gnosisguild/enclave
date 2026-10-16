@@ -1,8 +1,17 @@
 # e3-utils-derive
 
+## Purpose
+
 Procedural implementation of the `BytesSerde` derive, normally imported through `e3-utils`. It
 generates serde implementations for a single-field tuple/newtype whose byte validation is provided
 by `AsBytesSerde`.
+
+## Map and expansion
+
+[`src/lib.rs`](src/lib.rs) parses the input with `syn`, validates its newtype shape, and emits serde
+implementations with `quote`. Generated serializers choose hex or bytes from the format's
+human-readable flag; generated deserializers decode bytes and delegate construction to the
+consumer's `AsBytesSerde`. The proc macro does not own the runtime byte-validation policy.
 
 ## Define a byte newtype
 
@@ -33,5 +42,9 @@ Named-field structs, multiple fields, and enums are rejected. The derive does no
 or authorize bytes, and it does not validate semantics without the trait implementation. `ArcBytes`
 in [e3-utils](../utils/src/utility_types.rs) is an existing consumer.
 
+## Tests
+
 Run `cargo check --locked -p e3-utils-derive`, then `cargo test --locked -p e3-utils` to exercise
-actual expansion. Macro compilation alone does not check generated consumer code.
+actual expansion. Macro compilation alone does not check generated consumer code. There is no
+standalone macro test suite here; `ArcBytes` is the concrete expansion consumer. See
+[AGENTS.md](AGENTS.md) for generated-path and validation changes.

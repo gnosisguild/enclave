@@ -1,8 +1,24 @@
 # e3-evm-helpers
 
+## Purpose
+
 Application-facing Ethereum listeners, Interfold contract clients, retry helpers, and local nonce
 coordination. The [Rust SDK](../sdk/README.md) re-exports this crate as `evm_helpers`.
 Ciphernode-specific ingestion and transaction policy belong in [e3-evm](../evm/README.md).
+
+## Map
+
+| Location                                                                                   | Responsibility                                                   |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| [`contracts.rs`](src/contracts.rs), [`events.rs`](src/events.rs)                           | Typed Interfold client and Solidity event bindings.              |
+| [`event_listener.rs`](src/event_listener.rs), [`block_listener.rs`](src/block_listener.rs) | Subscription/catch-up callbacks and log progress versus headers. |
+| [`nonce.rs`](src/nonce.rs), [`retry.rs`](src/retry.rs)                                     | Process-local nonce coordination and retry classification.       |
+| [`threshold_queue.rs`](src/threshold_queue.rs)                                             | Ordered items released at a confirmation threshold.              |
+| [`tests/integration.rs`](tests/integration.rs)                                             | Anvil listener and transaction scenarios.                        |
+
+Listeners deliver observations to application handlers. Indexer consumers combine successful log
+progress with headers before writing a watermark. Signing clients and nonce helpers handle outbound
+transactions independently of listener delivery.
 
 ## Contract clients
 
@@ -27,8 +43,12 @@ consumer showing catch-up/live coordination and the limits of its applied-block 
 processes. Retry wrappers classify caller-selected error strings; RPC submission success is not a
 successful transaction receipt.
 
-## Build and test
+## Tests and build prerequisites
 
 Provide bash, solc, jq, and workspace JS dependencies; run root `pnpm fixtures:build`. `build.rs`
 runs the fixture script even for a Cargo check and may rewrite JSON artifacts. Run
 `cargo test --locked -p e3-evm-helpers` with Anvil available for chain tests.
+
+Inline tests pin subscription readiness/applied ceilings, nonce reservations/expiry, and threshold
+ordering. Integration tests exercise local subscriptions and refused sends. See
+[AGENTS.md](AGENTS.md) for handler/cursor and fixture-source change constraints.

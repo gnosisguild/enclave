@@ -1,8 +1,22 @@
 # e3-utils
 
+## Purpose
+
 Shared mechanical helpers for runtime/adapters: bounded decoding, byte wrappers, retry and receipt
 handling, Actix/Tokio channels, paths, and diagnostic formatting. Capability-specific protocol
 decisions live in their owning crates.
+
+## Map
+
+| Location                                                                                                                           | Responsibility                                                                    |
+| ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| [`bounded_bincode.rs`](src/bounded_bincode.rs), [`serde_bytes.rs`](src/serde_bytes.rs), [`utility_types.rs`](src/utility_types.rs) | Bounded wire decoding, byte-serde contract, and shared byte/RNG types.            |
+| [`actix/`](src/actix)                                                                                                              | Recipient/channel/one-shot adapters and synchronous handler bridging.             |
+| [`retry.rs`](src/retry.rs), [`transaction.rs`](src/transaction.rs)                                                                 | Retry classification/backoff and receipt-status checks.                           |
+| [`helpers.rs`](src/helpers.rs), [`path.rs`](src/path.rs), [`formatters.rs`](src/formatters.rs)                                     | Ordered extraction, one-time ownership, enumerated paths, and bounded formatting. |
+
+These are independent leaf helpers, not a runtime pipeline. Callers select explicit byte budgets,
+retry policy, and acknowledgment behavior; no capability policy is inferred by the utility layer.
 
 ## Decode bounded data
 
@@ -31,6 +45,10 @@ meaning of the decoded value.
   most once. Awaited acknowledgments and fire-and-forget sends have different contracts.
 - `enumerate_path`, ordering, and formatting helpers avoid duplicating mechanical conversions.
 
-The [public module exports](src/lib.rs) are the navigation point for specialized helpers. Run
-`cargo test --locked -p e3-utils` for decoding and macro-consumer coverage. Serialized helpers serve
-saved/wire data; see [upgrades](../../docs/architecture/upgrades.md) for compatibility.
+## Tests
+
+Run `cargo test --locked -p e3-utils`. Inline cases cover malformed/over-budget/trailing bincode,
+byte wrapper capacity/serde use, receipt status, enumerated paths, bounded formatting, and one-shot
+actor execution. No chain RPC or prover is required. Serialized helpers serve saved/wire data; see
+[upgrades](../../docs/architecture/upgrades.md) and [AGENTS.md](AGENTS.md) for compatibility
+changes.

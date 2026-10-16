@@ -12,6 +12,6 @@ ciphernode ingestion policy belongs in `e3-evm`.
 - `build.rs` always invokes `scripts/build_fixtures.sh`: even `cargo check` needs solc, jq, and bash
   and can rewrite fixture JSON. Edit Solidity fixture sources, not their generated ABI/bytecode.
 
-Prepare root `pnpm fixtures:build`, then run `cargo test --locked -p e3-evm-helpers`; chain tests
-need Anvil. See the [indexer guidance](../indexer/AGENTS.md) before changing shared listener/cursor
-semantics; a local-chain test is not reorg or exactly-once assurance.
+Use the [README tests/prerequisites](README.md#tests-and-build-prerequisites). See the
+[indexer guidance](../indexer/AGENTS.md) before changing shared listener/cursor semantics; a
+local-chain test is not reorg or exactly-once assurance.

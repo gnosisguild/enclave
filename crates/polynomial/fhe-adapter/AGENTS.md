@@ -12,6 +12,6 @@ See the [parent README](../README.md) for conversion semantics.
 - Keep this one-way conversion boundary small. Do not add test-only reverse APIs or pull circuit
   metadata into the adapter merely to simplify one witness caller.
 
-Run `cargo test --locked -p e3-polynomial-fhe` from the root; there is no nested workspace here. For
-representation changes, cover power-basis and transformed inputs plus the affected consumer's
-witness tests; compiling the conversion is not a witness parity check.
+The [README](README.md#tests) locates current consumer coverage. For representation changes, cover
+power-basis and transformed inputs plus affected witness tests; compiling this conversion-only
+package is not a parity check.

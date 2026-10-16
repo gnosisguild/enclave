@@ -13,6 +13,6 @@ CPU/CUDA proving process from the root runtime; see [README.md](README.md) for s
 - Keep bounded artifact/input reads, checked item framing, and fail-closed GPU probing. Do not make
   a CUDA/resource error select unproved execution.
 
-From the repository root, run `pnpm openvm prover-check` or `pnpm openvm prover-test` with the
-pinned toolchain selected. Real receipt changes require the prepared proof/contract flow, not just
-worker unit tests; see [encrypted computation](../../docs/architecture/encrypted-computation.md).
+Use the [README worker tests/prerequisites](README.md#tests). Real receipt changes require the
+prepared proof/contract flow, not just worker unit tests; see
+[encrypted computation](../../docs/architecture/encrypted-computation.md).

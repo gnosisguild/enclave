@@ -1,8 +1,17 @@
 # e3-polynomial-fhe
 
+## Purpose
+
 One-way conversion from fhe-math ring polynomials into the parent's exact-integer `Polynomial` /
 `CrtPolynomial` types. This is a separate package in the root workspace, not a feature or nested
 workspace of `e3-polynomial`.
+
+## Map
+
+[`src/lib.rs`](src/lib.rs) implements two stages: `ToPowerBasisPoly` obtains coefficient form from
+supported FHE representations, and `FromFhePolynomial` reads it as separate CRT rows or
+reconstructed integers. Destination containers/arithmetic live in the parent package; witness
+conventions live in the ZK consumer. This crate has no runtime actors or generation step.
 
 ## Conversion API
 
@@ -24,5 +33,10 @@ In a workspace package, depend on both `e3-polynomial` and `e3-polynomial-fhe` w
 `workspace = true`; import the trait from the latter and destination types from the former. The
 [adapter implementation](src/lib.rs) contains the complete supported conversion surface.
 
-Run `cargo test --locked -p e3-polynomial-fhe` from the repository root. Conversion tests do not
-replace the affected consumer's witness/parity tests.
+## Tests
+
+`cargo test --locked -p e3-polynomial-fhe` compiles this root workspace package and its test target;
+it currently has no dedicated tests. Conversion behavior is exercised by
+[zk-helpers computation tests](../../zk-helpers/README.md#tests), including witness coefficient and
+commitment calculations. Parent polynomial tests cover arithmetic, not FHE conversion. See
+[AGENTS.md](AGENTS.md) for representation/order changes.

@@ -12,5 +12,5 @@ resolved configuration instead of inventing their own precedence rules.
 - Public network/release configuration is admission input, not proof that a chain or peer is
   trusted. Leave runtime chain-ID and compatibility checks at their existing boundaries.
 
-Run `cargo test --locked -p e3-config`. For changes to durable locations or release counters,
+Use the [README tests](README.md#tests). For changes to durable locations or release counters,
 consult [upgrades](../../docs/architecture/upgrades.md) and test affected startup callers too.

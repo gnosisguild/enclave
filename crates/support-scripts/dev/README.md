@@ -1,8 +1,17 @@
 # e3-support-scripts-dev
 
+## Purpose
+
 Development runner template for an application's E3 program. It runs the project's `fhe_processor`
 and policy natively and returns an ABI-shaped **mock proof**, not a verified zkVM receipt. It must
 be used only with an explicitly unproved development setup.
+
+## Map and execution flow
+
+[`src/main.rs`](src/main.rs) connects the user program to `E3ProgramServer`: each job constructs a
+manager with published metadata, runs the selected policy/processor, and encodes a mock seal. Its
+inline test pins the envelope ABI. Sibling `compile`/`start` scripts are invoked by the
+[parent dispatcher](../README.md) from the consuming project.
 
 ## Run in a generated project
 
@@ -33,3 +42,10 @@ envelope is not cryptographic verification.
 The server has no caller authentication or durable job queue. Use the
 [OpenVM service](../openvm/service/README.md) and prepared worker artifacts when real receipt
 verification is required; this runner is never an automatic proving-failure fallback.
+
+## Tests
+
+In the prepared generated workspace, run `cargo test -p e3-support-scripts-dev`. The inline envelope
+test checks Solidity offsets/padding, not cryptographic proof validity. HTTP admission and callback
+tests are in [program-server](../../program-server/README.md); processor behavior belongs to the
+generated project. See [AGENTS.md](AGENTS.md) for template changes.

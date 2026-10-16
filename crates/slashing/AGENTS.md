@@ -16,5 +16,6 @@ timer/publication effects explicit.
   failed-snapshot-write behavior visible rather than describing the whole capability as durable.
 
 [Slashing](../../docs/architecture/slashing.md) owns lanes and settlement dependencies;
-[DKG](../../docs/architecture/dkg.md) owns commitment links. Run `cargo test -p e3-slashing`; use
-the prepared `pnpm rust:test:slashing` suite for changed proof-to-slash behavior.
+[DKG](../../docs/architecture/dkg.md) owns commitment links. Use the
+[README test map](README.md#tests); proof-to-slash changes require the prepared integration suite,
+not only local vote outcomes.

@@ -12,7 +12,5 @@ in `e3-tests` to avoid dragging the builder back into lower-level tests.
 - Tool discovery can permit a test to skip when bb/Anvil is absent. Report skips explicitly;
   successful helper initialization is not evidence that a real proof or chain test executed.
 
-Run `cargo test --locked -p e3-test-helpers` with the
-[README prerequisites](README.md#prerequisites-before-invoking-cargo). Report skipped chain/proof
-paths separately from completed coverage. Integration scenarios belong in
-[e3-tests](../tests/README.md).
+Use the [README tests/prerequisites](README.md#tests). Report skipped chain/proof paths separately
+from completed coverage. Integration scenarios belong in [e3-tests](../tests/README.md).

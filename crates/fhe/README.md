@@ -1,8 +1,22 @@
 # e3-fhe
 
+## Purpose
+
 Runtime adapter around fhe.rs for keyshare generation, ciphertext decryption, and public-key/
 plaintext share aggregation. It also supplies an FHE dependency to each admitted E3 context; DKG
 orchestration itself belongs in [keyshare](../keyshare/README.md).
+
+## Map
+
+| Location                       | Responsibility                                                         |
+| ------------------------------ | ---------------------------------------------------------------------- |
+| [`runtime.rs`](src/runtime.rs) | `Fhe` operations, serialized input types, and parameter/CRP snapshots. |
+| [`ext.rs`](src/ext.rs)         | Request dependency creation/hydration and snapshot repository factory. |
+| [`lib.rs`](src/lib.rs)         | Public exports; the runtime module itself is private.                  |
+
+The extension builds the FHE context and places it in the router's typed dependency map. Aggregation
+callers decode inputs under those parameters. Hydration restores the CRP/parameters while receiving
+an RNG from the current runtime.
 
 ## Direct adapter use
 
@@ -29,6 +43,11 @@ event-recipient actor. Hydration restores parameters/CRP and injects the supplie
 The [builder caller](../ciphernode-builder/src/builder/extensions.rs) installs it alongside
 aggregation extensions. `FheRepositoryFactory` supplies typed snapshot storage.
 
-Run `cargo test --locked -p e3-fhe` from the repository root. See
+## Tests
+
+`cargo test --locked -p e3-fhe` compiles the crate/test target; there are currently no dedicated
+test functions. Observable aggregation/hydration coverage lives in
+[aggregator](../aggregator/README.md) and [builder/system tests](../tests/README.md). See
 [DKG](../../docs/architecture/dkg.md) and
 [threshold decryption](../../docs/architecture/threshold-decryption.md) for the surrounding flow.
+[AGENTS.md](AGENTS.md) covers request-context and secret-serialization changes.

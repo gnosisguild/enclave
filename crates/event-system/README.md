@@ -1,9 +1,25 @@
 # e3-event-system
 
+## Purpose
+
 Runtime assembly of the event bus, per-aggregate event stores, sequencer, snapshot buffer, and data
 store. [e3-events](../events/README.md) owns their messages/types and pipeline behavior;
 [e3-data](../data/README.md) provides storage implementations. This crate wires them without
 requiring a full ciphernode.
+
+## Map
+
+| Location                                                       | Responsibility                                                                      |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [`event_system.rs`](src/event_system.rs)                       | Lazy backend/actor assembly, snapshot admission, clock seeding, stores, and health. |
+| [`eventbus_factory.rs`](src/eventbus_factory.rs)               | Default process-local bus and disabled-handle factories.                            |
+| [`global_eventstore_cache.rs`](src/global_eventstore_cache.rs) | Sequence/timestamp reader abstraction and optional reader cache.                    |
+| [`global_store_cache.rs`](src/global_store_cache.rs)           | Opt-in process-local data-store access for commands.                                |
+
+An enabled handle publishes through the sequencer to the aggregate store, then the bus admits the
+event to snapshot tracking and fans out to subscribers. Snapshot writes go through the buffer to the
+chosen data backend. Assembly shares one failure channel across persistence/admission paths; it does
+not introduce protocol actors.
 
 ## Create a runtime
 
@@ -45,5 +61,13 @@ signals. Global shared-store/reader caches are opt-in and process-local, not int
 sharing.
 
 For production lifecycle/replay use [CiphernodeBuilder](../ciphernode-builder/README.md) and the
-[persistence contract](../../docs/architecture/persistence-and-replay.md). Tests:
+[persistence contract](../../docs/architecture/persistence-and-replay.md).
+
+## Tests
+
 `cargo test --locked -p e3-event-system`, with [helper prerequisites](../test-helpers/README.md).
+
+Inline `event_system.rs` scenarios cover both backends, multiple aggregates, pre-fanout admission,
+durable-clock seeding, and shutdown final-state writes using temporary storage. They exercise
+assembly, not a complete ciphernode restart. [AGENTS.md](AGENTS.md) owns ordering/cache change
+rules.

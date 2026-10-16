@@ -1,8 +1,24 @@
 # e3-init
 
+## Purpose
+
 Project scaffolding behind `interfold init`: download a template, copy/filter its files, rewrite
 dependencies for that checkout, initialize the project, and optionally install JS dependencies. It
 does not define the generated application's protocol behavior.
+
+## Map
+
+| Location                                                               | Responsibility                                                                   |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| [`lib.rs`](src/lib.rs)                                                 | Install workflow, template defaults, filters, and dependency/workspace rewrites. |
+| [`git.rs`](src/git.rs)                                                 | URL/ref/subpath parsing, cloning, commit discovery, and new-project Git setup.   |
+| [`copy.rs`](src/copy.rs), [`file_utils.rs`](src/file_utils.rs)         | Filtered copying, destination checks, and cleanup.                               |
+| [`pkgman.rs`](src/pkgman.rs), [`package_json.rs`](src/package_json.rs) | Package-manager dispatch and downloaded package versions.                        |
+| [`logging.rs`](src/logging.rs)                                         | Install progress/spinner output.                                                 |
+
+Installation checks the destination, obtains a checkout, copies the selected template, pins its
+dependencies, initializes the new project, and optionally installs packages. Scratch/destination
+cleanup surround the workflow; neither is part of the generated program's runtime.
 
 ## Create a project
 
@@ -32,5 +48,9 @@ The destination must be empty. Installation creates/removes scratch content and 
 on failure; `--skip-cleanup` leaves it for diagnosis. The current shared scratch location also means
 concurrent installs can collide. Use a disposable destination when trying templates.
 
-Run `cargo test --locked -p e3-init` for parsing/file transformations. A full generated-project
-install is a separate integration exercise with the prerequisites above.
+## Tests
+
+Run `cargo test --locked -p e3-init` for URL parsing, filtered-copy behavior, and dependency pinning
+with retained features. Cases live in `git.rs`, `copy.rs`, and `lib.rs`. A full generated-project
+install is a separate integration exercise with the prerequisites above. See [AGENTS.md](AGENTS.md)
+for template-source and cleanup changes.

@@ -11,6 +11,6 @@ This is the local CLI control transport; command execution and node management r
 - Discovery only checks transport reachability; it is not authenticated daemon identity or proof
   that a subsequent command will succeed. Preserve HTTP error propagation on command responses.
 
-Run `cargo check --locked -p e3-daemon-server --tests`. For transport changes, add loopback tests
+Use the [README check/coverage boundary](README.md#tests). For transport changes, add loopback tests
 covering framing and error responses and exercise entrypoint's daemon client; do not require a live
 ciphernode merely to test parsing.

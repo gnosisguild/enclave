@@ -11,6 +11,6 @@ This is the runtime fhe.rs adapter and per-E3 FHE dependency extension, not the 
 - Aggregation decodes against this request's parameters and ciphertext; preserve ordered share
   inputs and the client crate's plaintext word encoding rather than duplicating conversion rules.
 
-Run `cargo test --locked -p e3-fhe` for the focused adapter target; test new hydration behavior at
-the request/builder boundary too. Adapter compilation does not replace the
-[DKG](../../docs/architecture/dkg.md) or threshold-decryption acceptance flows.
+The [README](README.md#tests) locates consumer coverage; this crate's target is compile-only today.
+Test new hydration behavior at the request/builder boundary. Adapter compilation does not replace
+the [DKG](../../docs/architecture/dkg.md) or threshold-decryption acceptance flows.

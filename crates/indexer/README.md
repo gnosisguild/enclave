@@ -1,5 +1,29 @@
 # Indexer catch-up and coverage
 
+## Purpose
+
+`e3-indexer` maintains application-side E3/committee/output projections from Interfold logs and lets
+consumers attach raw/typed callbacks. It combines [EVM listeners](../evm-helpers/README.md) with a
+consumer-provided store; it is not the ciphernode's protocol event journal.
+
+## Map
+
+| Location                                                   | Responsibility                                                                                 |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| [`indexer.rs`](src/indexer.rs)                             | Construction, built-in projections/key assembly, callbacks, catch-up, and cursor coordination. |
+| [`models.rs`](src/models.rs), [`traits.rs`](src/traits.rs) | E3/committee data and the application store interface.                                         |
+| [`repo.rs`](src/repo.rs)                                   | Projection accessors and updates preserving already-indexed round state.                       |
+| [`callback_queue.rs`](src/callback_queue.rs)               | Timestamp-scheduled application callbacks.                                                     |
+| [`tests/integration.rs`](tests/integration.rs)             | Local-contract indexing, backfill, and listener-lifetime scenarios.                            |
+
+## Usage and catch-up
+
+`InterfoldIndexer::<InMemoryStore, ReadOnly>::from_endpoint_address_in_mem(rpc_url, addresses)`
+creates a read-only in-memory indexer. Custom stores/signing clients use the other constructors in
+`indexer.rs`. Register `add_raw_log_handler` or `add_event_handler`, optionally configure backfill,
+then await `listen()`. Query with `get_e3`, or use `get_store` for application data.
+[`tests/integration.rs`](tests/integration.rs) shows concrete callback/store wiring.
+
 `InterfoldIndexer::configure_backfill` opts a consumer into historical catch-up and cursor writes.
 Without it, the subscription starts at head and writes no recovery cursor. This matters because
 application handlers can send transactions or initialize rounds: replay is not automatically safe
@@ -40,9 +64,12 @@ convergence, deferred census discovery, and selection cache have separate applic
 [encrypted computation](../../docs/architecture/encrypted-computation.md). The watermark cannot
 stand in for those state checks.
 
-## Evidence
+## Tests
 
-`cargo test -p e3-indexer` exercises crate tests, including temporary key-assembly cleanup. Listener
+Prepare root `pnpm fixtures:build` with bash, solc, and jq: the build script invokes Solidity
+fixture compilation even for checks. `cargo test --locked -p e3-indexer` exercises inline
+callback/repository/key-assembly tests and the Anvil-backed integration target. Listener
 subscription/progress tests are in [event_listener.rs](../evm-helpers/src/event_listener.rs),
 runnable with `cargo test -p e3-evm-helpers`. They do not establish all-handler crash consistency or
-atomicity of concurrent cursor writes.
+atomicity of concurrent cursor writes. See [AGENTS.md](AGENTS.md) for handler/cursor changes and
+ownership hazards.

@@ -11,6 +11,6 @@ This is the native Secure Process/worker adapter; the separate worker owns OpenV
 - Preserve two-pass selected-input ordering and the shared `e3-openvm-types` framing. The host's
   memory usage is not the guest's streaming memory bound.
 
-Run `cargo test --locked -p e3-openvm-host` for worker/config adapter coverage. Real proving, guest
-parity, and contract acceptance need the pinned tools/artifacts in the
-[OpenVM README](../openvm-prover/README.md); fake worker tests do not validate a receipt.
+Use the [README adapter tests](README.md#tests). Real proving, guest parity, and contract acceptance
+need the pinned tools/artifacts in the [OpenVM README](../openvm-prover/README.md); fake worker
+tests do not validate a receipt.

@@ -1,9 +1,29 @@
 # e3-zk-prover
 
+## Purpose
+
 Noir witness/proof execution, verification, recursive folding, and artifact installation for
 ciphernode protocol proofs. This is separate from the
 [OpenVM computation worker](../openvm-prover/README.md). Circuit-specific arithmetic/witness shapes
 belong in [e3-zk-helpers](../zk-helpers/README.md).
+
+## Map
+
+| Location                                                                                                 | Responsibility                                                                                  |
+| -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| [`backend/`](src/backend), [`config.rs`](src/config.rs)                                                  | Version/checksum admission, downloads, transactional artifact installation, and backend status. |
+| [`witness.rs`](src/witness.rs), [`prover.rs`](src/prover.rs)                                             | Noir execution and bounded/deadlined Barretenberg subprocesses.                                 |
+| [`actor_system.rs`](src/actor_system.rs)                                                                 | Node-wide proof actor composition and recovery inputs.                                          |
+| [`proof_request/`](src/proof_request), [`proof_verification/`](src/proof_verification)                   | Local proof planning/signing and authenticated key-proof verification/recovery.                 |
+| [`share_verification/`](src/share_verification), [`node_proof_aggregation/`](src/node_proof_aggregation) | Signed share bundles, per-batch outcomes, and node-fold accumulation/recovery.                  |
+| [`circuits/aggregation/`](src/circuits/aggregation), [`commitment_links/`](src/commitment_links)         | Recursive folds and cross-proof public-value links.                                             |
+| [`tests/`](tests)                                                                                        | Prepared local, recursive-fold, network/download, and proof-to-slash suites.                    |
+
+A capability actor records a proof/verification plan and requests compute work. Shared workers
+execute the circuit/prover and return correlated outcomes; actor effects sign/publish complete
+results or retain exact retry inputs. Recovery restores canonical context and unresolved work before
+current-boot effect readiness. This is distinct from artifact installation, which prepares the
+backend before requests are served.
 
 ## Backend and public API
 
@@ -42,7 +62,15 @@ E3_ZK_PROVER_SKIP_FIXTURE_BUILD=1 cargo check --locked -p e3-zk-prover --tests
 This skips fixture preparation only. It neither skips proof tests nor supplies valid artifacts. The
 dependency graph can also need [Solidity fixtures](../test-helpers/README.md).
 
-## Real-proof tests
+## Tests
+
+`cargo test --locked -p e3-zk-prover --lib` runs native/unit and actor suites after the preparation
+above. Backend tests cover local archives/install rollback; prover tests use fake processes for
+timeout/error classification; witness tests execute the dummy compiled circuit; capability tests
+cover plans, signature admission, correlations, and restart inputs. These have different external
+requirements from the explicitly selected real-proof suites below.
+
+### Real-proof tests
 
 Prepare pinned nargo and bb, jq, pnpm/workspace dependencies, and circuits/VKs matching the active
 preset and committee through the
@@ -55,4 +83,5 @@ Test-only aggregation skipping in the wider harness is never a production fallba
 See [proof statements](../../docs/architecture/proof-statements.md) and
 [artifact compatibility](../../docs/architecture/circuit-artifacts.md) for required cross-layer
 acceptance. Witness generation, process success, checksum matching, and verified statements are
-different results.
+different results. See [AGENTS.md](AGENTS.md) for proof-plan, verification-outcome, and artifact
+change rules.

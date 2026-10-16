@@ -1,7 +1,16 @@
 # e3-openvm-types
 
+## Purpose
+
 Shared host/guest input framing and public journal for the OpenVM Secure Process. This crate defines
 bytes and domain identity, not worker/backend execution.
+
+## Map
+
+[`src/lib.rs`](src/lib.rs) is the shared format implementation. `GuestHeader` encodes computation
+metadata; `write_items`/`ItemReader` frame a bounded stream; `ComputeDomain`/`ComputeJournal`
+describe the public result and explicitly ordered ABI words. Its inline tests pin these bytes. The
+host writes the stream, the worker/guest reads it, and the verifier consumes the journal.
 
 ## Input stream
 
@@ -26,5 +35,10 @@ The journal is public and replay-bound; input/selection framing is not a substit
 See [encrypted computation](../../docs/architecture/encrypted-computation.md) for the application,
 guest, and contract boundary.
 
-Run `cargo test --locked -p e3-openvm-types` for framing/ABI behavior. Real proof compatibility
-requires the matching [OpenVM setup and parity flow](../openvm-prover/README.md).
+## Tests
+
+Run `cargo test --locked -p e3-openvm-types`. Inline tests pin journal word order, header exact
+consumption, item framing, and rejection of truncated/padded streams; no worker or GPU is needed.
+Real proof compatibility requires the matching
+[OpenVM setup and parity flow](../openvm-prover/README.md). Format-change responsibilities are in
+[AGENTS.md](AGENTS.md).

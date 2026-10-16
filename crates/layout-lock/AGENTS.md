@@ -11,7 +11,6 @@ This test utility samples serde layouts to make persisted/wire encoding changes 
 - `LAYOUT_LOCK_UPDATE=1` rewrites consumer fixtures. Use it only after reviewing compatibility and
   the required schema/wire version decisions, never as the default response to a failing lock.
 
-Run `cargo test --locked -p e3-layout-lock`, then the affected consumer's layout test. The broad
-runtime lock is `cargo test --locked -p e3-tests --test layout_lock` and has the
-[integration crate's prerequisites](../tests/README.md). See
-[upgrades](../../docs/architecture/upgrades.md) before approving changed fixture bytes.
+Use the [README utility/consumer tests](README.md#tests), then the affected consumer's fixture.
+Sampling changes need independent synthetic counterexamples rather than only refreshing runtime
+rows. See [upgrades](../../docs/architecture/upgrades.md) before approving changed fixture bytes.

@@ -1,10 +1,30 @@
 # E3 program service boundary
 
+## Purpose
+
 `E3ProgramServerBuilder` wraps an asynchronous program runner with `/run_compute` and `/health`. The
 runner may be unproved development FHE or a real OpenVM host; the HTTP service does not itself
 authenticate callers or supply durable admission. Keep it behind an explicitly managed perimeter.
 Health reports process availability, not proof-worker readiness, durable job ownership, or drain
 state.
+
+## Map
+
+| Location                                                          | Responsibility                                                                                      |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| [`lib.rs`](src/lib.rs)                                            | Builder, HTTP admission/body handling, domain validation, runner invocation, and callback delivery. |
+| [`types.rs`](src/types.rs)                                        | Hex-encoded request and completion/failure webhook formats.                                         |
+| [`development runner`](../support-scripts/dev/src/main.rs)        | Concrete native/mock-proof consumer of the server builder.                                          |
+| [`OpenVM service`](../support-scripts/openvm/service/src/main.rs) | Worker-verified project runner with explicit limits.                                                |
+
+## Usage and job lifecycle
+
+Pass an async `Fn(ComputeJob)` runner to `E3ProgramServer::builder`, configure host/port and
+capacity/body limits, call `build()?`, then `run().await`. The runner returns
+`(proof_bytes, ciphertext_bytes)`. A request first obtains capacity and validates its body/domain,
+then runs in a background task and delivers a webhook; the HTTP acceptance response is not the
+result. The linked runner sources show complete project integration without duplicating
+cryptographic processing inside the HTTP boundary.
 
 ## Bounded admission and callback delivery
 
@@ -49,6 +69,10 @@ executable/VM/keys and deployed receipt verifiers. See
 [OpenVM prover operations](../openvm-prover/README.md); explicit `program.dev` is unproved and is
 not a fallback for failed production proving.
 
-`cargo test -p e3-program-server` covers URL rules, localhost rewrites, body/permit limits, and
-webhook serialization. These tests do not establish deployed authentication, DNS-safe egress,
-durable callback recovery, or real OpenVM proof verification.
+## Tests
+
+`cargo test --locked -p e3-program-server` covers URL rules, localhost rewrites, body/permit limits,
+and webhook serialization. These tests do not establish deployed authentication, DNS-safe egress,
+durable callback recovery, or real OpenVM proof verification. HTTP admission tests use a local
+service and synthetic runner; `types.rs` tests pin request/webhook serialization.
+[AGENTS.md](AGENTS.md) contains admission/callback change constraints.

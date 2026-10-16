@@ -1,8 +1,22 @@
 # e3-bfv-client
 
+## Purpose
+
 Native client helpers for BFV encryption, circuit-compatible public-key/ciphertext commitments, and
 plaintext byte conversion. The same implementation backs the [WASM API](../wasm/README.md) and is
 re-exported as `e3_sdk::bfv_client` with the SDK's `bfv` feature.
+
+## Map
+
+| Location                     | Responsibility                                                                 |
+| ---------------------------- | ------------------------------------------------------------------------------ |
+| [`client.rs`](src/client.rs) | Parameter validation, ordinary/verifiable encryption, and circuit commitments. |
+| [`lib.rs`](src/lib.rs)       | Public exports and plaintext/u64/byte conversions.                             |
+
+The client decodes the committee key against the supplied parameters, encodes the plaintext, and
+encrypts it. Verifiable encryption uses the circuit computation so the ciphertext and private
+witness come from one operation. Commitments are shared with the ZK layer, rather than hashing
+whichever key serialization the caller received.
 
 ## Encrypting inputs
 
@@ -34,5 +48,12 @@ assert_eq!(decode_bytes_to_vec_u64(&bytes).unwrap(), words);
 
 Words are little-endian; decoding rejects a partial eight-byte word.
 
-Run `cargo test --locked -p e3-bfv-client` from the repository root. Encryption round trips do not
-replace the [proof-statement](../../docs/architecture/proof-statements.md) acceptance flow.
+## Tests
+
+Run `cargo test --locked -p e3-bfv-client` from the root. Inline tests in
+[`client.rs`](src/client.rs) cover parameter/key rejection, encryption, and key commitment
+admission. The word-conversion snippet above illustrates the separate `lib.rs` helpers; there are no
+dedicated inline tests for those helpers today. No node or external prover process is needed.
+Real-proof acceptance is described in
+[proof statements](../../docs/architecture/proof-statements.md); [AGENTS.md](AGENTS.md) covers
+changes to the shared boundary.

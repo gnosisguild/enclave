@@ -1,7 +1,22 @@
 # e3-dashboard
 
+## Purpose
+
 Read-only node-operator dashboard with an embedded web UI and JSON endpoints. It projects durable
 event history and network status; it does not participate in protocol decisions.
+
+## Map
+
+| Location                             | Responsibility                                                                 |
+| ------------------------------------ | ------------------------------------------------------------------------------ |
+| [`lib.rs`](src/lib.rs)               | HTTP routes, aggregate cursors, runtime state, and cached operator RPC status. |
+| [`projection.rs`](src/projection.rs) | Event-to-E3/committee/reward views and protocol summaries.                     |
+| [`updates.rs`](src/updates.rs)       | Release metadata and version comparison.                                       |
+| [`assets/`](assets)                  | Embedded browser UI, scripts, styles, and logo.                                |
+
+Requests advance the projection from each aggregate's EventStore cursor, then serialize the view.
+Network and operational logs come from separate collectors. Operator RPC status and release metadata
+are cached independently of durable history.
 
 ## Serve a dashboard
 
@@ -27,5 +42,11 @@ Event projections refresh by per-aggregate sequence cursor. Operator chain statu
 RPC calls; errors/stale diagnostic state are not canonical chain authority. Logs come from the
 bounded [logger collector](../logger/README.md), separately from durable event history.
 
+## Tests
+
 Run `cargo test --locked -p e3-dashboard` after preparing the
 [EVM build prerequisites](../evm/README.md). Projection tests do not require a live public chain.
+
+Inline [`projection.rs`](src/projection.rs) tests feed synthetic histories into summaries/traces;
+[`updates.rs`](src/updates.rs) tests release/version handling. These do not exercise a browser or
+authenticate the HTTP service. [AGENTS.md](AGENTS.md) describes projection changes.

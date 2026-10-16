@@ -1,8 +1,17 @@
 # e3-support-scripts-openvm
 
+## Purpose
+
 Project-local HTTP runner connecting an application's `fhe_processor`/policy to the native
 [OpenVM host](../../../openvm-host/README.md). It returns a real worker-verified proof envelope and
 ciphertext through [E3ProgramServer](../../../program-server/README.md).
+
+## Map and startup flow
+
+[`src/main.rs`](src/main.rs) is the composition root: resolve configuration, start/check `Prover`,
+configure HTTP limits, and translate each job's full domain into the host call. The project supplies
+`e3_user_program::fhe_processor` and `policy`; the host supplies execution/proof verification.
+Sibling support scripts build/configure these project-specific pieces.
 
 ## Project setup
 
@@ -34,6 +43,13 @@ Each request supplies the full chain/deployment/E3/encryption-scheme/committee-k
 The HTTP API has no authentication or durable job queue; keep the loopback default unless a separate
 access-control boundary is provided.
 
+## Tests and project checks
+
 Use root `pnpm openvm service-check` for the linked CRISP project, or
 `cargo check -p e3-support-scripts-openvm` in a prepared generated workspace. Its first build may
 refresh copied lockfile sources; successful checking does not prove a computation.
+
+The template has no standalone test functions. Root `pnpm openvm service-test` exercises
+host/types/Secure Process/HTTP owners; `pnpm openvm service-e2e` runs the prepared CRISP
+service/contract flow described in the [OpenVM guide](../../../openvm-prover/README.md). See
+[AGENTS.md](AGENTS.md) for wiring changes.

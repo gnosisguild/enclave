@@ -12,6 +12,6 @@ belongs in adapters. [Readme.md](Readme.md) explains policies and provider usage
 - Keep guest execution streaming rather than materializing the ciphertext round. Host `parallel`
   batching and `openvm-hashes` acceleration must preserve reference hashing and leaf order.
 
-Run `cargo test --locked -p e3-compute-provider`, adding `--features parallel` for batching changes.
+Use the [README test variants](Readme.md#tests), including parallel batching for batching changes.
 Guest-specific changes need the prepared host/guest parity flow from the
 [OpenVM README](../openvm-prover/README.md), not just native tests.

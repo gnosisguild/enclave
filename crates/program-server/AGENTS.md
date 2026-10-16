@@ -14,6 +14,6 @@ authentication or durable job queue; a real proof runner does not supply either 
 - Callback retry is process-local. Cancellation/exit can lose accepted computation or delivery, so
   keep recovery expectations separate from CRISP's durable DA jobs and contract one-shot gates.
 
-Run `cargo test -p e3-program-server` for callback/admission/serialization tests. End-to-end OpenVM
-proof identity and output publication require the service/application acceptance flow, not these
-tests.
+Use the [README tests](README.md#tests) for callback/admission/serialization coverage. End-to-end
+OpenVM proof identity and output publication require the service/application acceptance flow, not
+these tests.

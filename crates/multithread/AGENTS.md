@@ -14,7 +14,6 @@ validity. Preserve shared capacity for ZK/TrBFV work rather than spawning around
   buffers are not a transactional outbox or a complete exactly-once guarantee.
 
 [Persistence](../../docs/architecture/persistence-and-replay.md#effect-recovery-and-shutdown) owns
-budgets/retries and current limits. Run `cargo test -p e3-multithread`; fake worker outcomes do not
-measure production prover memory or verify cryptographic correctness. Even focused Cargo checks
-build the prover dependency; read its [fixture-build warning](../zk-prover/README.md) before
-treating a compile as side-effect-free.
+budgets/retries and current limits. Use the [README tests/prerequisites](README.md#tests). Gate and
+retry changes need replay/redrive/cancellation histories; fake outcomes do not measure production
+prover memory or verify cryptographic correctness.

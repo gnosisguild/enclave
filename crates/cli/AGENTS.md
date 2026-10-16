@@ -14,6 +14,6 @@ to their existing owners rather than implementing another startup path.
 - Keep proof-skip arguments behind the dedicated test-only feature; never make missing proof
   artifacts silently choose an unproved production mode.
 
-Run `cargo test --locked -p e3-cli` after the root `pnpm evm:build` / `pnpm fixtures:build`
-preparation, with solc/jq available. Transitive zk-prover builds may also prepare Noir fixtures; see
-[its build warning](../zk-prover/README.md). Usage belongs in the [CLI README](README.md).
+Use the [README tests/build prerequisites](README.md#tests). Command changes need the affected
+executable/daemon path, not only parser assertions. Contract API changes also need the binding check
+above; generated data is not the source of truth.

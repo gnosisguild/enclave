@@ -13,6 +13,6 @@ conventions.
 - CRT limbs are ordered residue polynomials, not words of one integer. The optional serde layout,
   including the `limbs` name and padding, is a consumer compatibility boundary.
 
-Run `cargo test --locked -p e3-polynomial --all-features`, preserving independent arithmetic
-references and overflow/fallback cases. Circuit folding and witness-shape changes belong in
+Use the [README tests](README.md#tests), preserving independent arithmetic references and
+overflow/fallback cases. Circuit folding and witness-shape changes belong in
 [zk-helpers](../zk-helpers/README.md), not generic polynomial APIs.

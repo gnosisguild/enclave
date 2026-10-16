@@ -1,8 +1,22 @@
 # e3-data-availability
 
+## Purpose
+
 Content-addressed data transport for Interfold applications: publication coordinates, retrieval, and
 Avail/VectorX bridge-proof encoding. Application job scheduling and Ethereum acceptance remain with
 their respective owners.
+
+## Map
+
+| Location                   | Responsibility                                                                    |
+| -------------------------- | --------------------------------------------------------------------------------- |
+| [`lib.rs`](src/lib.rs)     | Content references, transport traits, bounds, HTTP reader, and VectorX proof ABI. |
+| [`avail.rs`](src/avail.rs) | Feature-gated Avail retrieval and signed submission/finalization.                 |
+
+Publication produces pending coordinates; a later bridge query supplies the Ethereum proof and final
+reference. Retrieval checks bytes against that reference independently of bridge acceptance. The
+adapters share the content-hash/bounds boundary, so changing transport does not make RPC bytes
+authoritative.
 
 ## Publication and retrieval
 
@@ -31,5 +45,11 @@ not. `AvailMerkleProofInput` is the Solidity-compatible bridge ABI type, not a g
 format. See [data availability](../../docs/architecture/data-availability.md) for the
 application/contract flow and trust boundary.
 
+## Tests
+
 Run `cargo test --locked -p e3-data-availability`; check optional adapters with
 `cargo check --locked -p e3-data-availability --features avail-read,avail-submit`.
+
+Inline tests cover substituted bytes, bridge response/URL shape, Solidity proof encoding, and
+optional endpoint validation. They do not publish to Avail or wait for bridge finality; those
+require configured live services. See [AGENTS.md](AGENTS.md) for adapter-change guidance.

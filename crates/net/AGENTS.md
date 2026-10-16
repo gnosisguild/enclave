@@ -14,5 +14,6 @@ signed gossip envelope authenticates a peer, not that peer's right to fill an E3
 - Command results go directly to their registered caller before broadcast; do not accidentally fence
   them behind startup application buffering. Publications themselves wait for SyncEnded.
 
-[Network delivery](../../docs/architecture/network-delivery.md) owns budgets and loss windows. Run
-`cargo test -p e3-net`; a peer restart test must assert topic readiness, not connection count alone.
+[Network delivery](../../docs/architecture/network-delivery.md) owns budgets and loss windows. Use
+the [README test map](README.md#tests); a restart regression must assert topic readiness, not
+connection count alone.

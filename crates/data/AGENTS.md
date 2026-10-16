@@ -12,6 +12,6 @@ Maintain persistence mechanisms here, with typed repository keys owned by capabi
 - Preserve repository scopes, bincode layouts, and error propagation across in-memory and Sled
   implementations. A memory-only regression cannot establish crash/flush guarantees.
 
-Run `cargo test --locked -p e3-data`, including temporary-directory log/blob tests for durable I/O
-changes. Consult [persistence](../../docs/architecture/persistence-and-replay.md) and
+Use the [README test map](README.md#tests), including temporary-directory log/blob tests for durable
+I/O changes. Consult [persistence](../../docs/architecture/persistence-and-replay.md) and
 [upgrades](../../docs/architecture/upgrades.md) before changing formats or locations.

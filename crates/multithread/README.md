@@ -1,8 +1,24 @@
 # e3-multithread
 
+## Purpose
+
 Shared Rayon task admission and ciphernode compute dispatch for ZK and threshold-BFV work. It keeps
 expensive jobs off actor mailboxes and coordinates replay-safe effects; protocol validity remains
 with the requesting capabilities.
+
+## Map
+
+| Location                               | Responsibility                                                                   |
+| -------------------------------------- | -------------------------------------------------------------------------------- |
+| [`pool.rs`](src/pool.rs)               | Semaphore admission, Rayon execution, cancellation groups, and task results.     |
+| [`memory.rs`](src/memory.rs)           | CPU/requested-job and host/cgroup-memory capacity calculation.                   |
+| [`effect_gate.rs`](src/effect_gate.rs) | Current-boot dispatch gating, duplicate/redrive matching, and retained outcomes. |
+| [`multithread.rs`](src/multithread.rs) | Bus-facing ZK/TrBFV dispatch, retries, request teardown, and result publication. |
+| [`report.rs`](src/report.rs)           | Timing/capacity report actor and flattened diagnostics.                          |
+
+The dispatcher admits an event through the effect gate, queues its work in the shared pool, executes
+off the actor thread, and publishes a correlated result. Effect readiness and request termination
+control admission independently of the pool's CPU/memory limits.
 
 ## Task pool
 
@@ -31,5 +47,13 @@ local resource failure is not proof that a peer supplied invalid crypto. `Multit
 
 See
 [effect recovery](../../docs/architecture/persistence-and-replay.md#effect-recovery-and-shutdown)
-for admission/retry limits. `cargo test --locked -p e3-multithread` transitively builds the prover;
-read its [build prerequisites and side effects](../zk-prover/README.md) first.
+for admission/retry limits.
+
+## Tests
+
+`cargo test --locked -p e3-multithread` transitively builds the prover; read its
+[build prerequisites and side effects](../zk-prover/README.md) first.
+
+Inline suites distinguish pool cancellation/panic handling, deterministic capacity calculations,
+effect-gate replay/redelivery, and bus dispatch/retry/teardown. Fake outcomes test scheduling and
+correlation, not production prover resource use. [AGENTS.md](AGENTS.md) covers scheduler changes.

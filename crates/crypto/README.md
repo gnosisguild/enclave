@@ -1,8 +1,22 @@
 # e3-crypto
 
+## Purpose
+
 Local encryption for saved operator identities and secret shares. It provides password sources, an
 Argon2-derived AES-GCM `Cipher`, and encrypted byte wrappers. Threshold BFV calculations belong in
 [e3-trbfv](../trbfv/README.md), not this crate.
+
+## Map
+
+| Location                                         | Responsibility                                                          |
+| ------------------------------------------------ | ----------------------------------------------------------------------- |
+| [`password_manager.rs`](src/password_manager.rs) | Async password sources and exclusive, permission-restricted file setup. |
+| [`cipher.rs`](src/cipher.rs)                     | Argon2 derivation and nonce-prefixed AES-GCM bytes.                     |
+| [`sensitive.rs`](src/sensitive.rs)               | Encrypted wrappers and zeroizing plaintext access.                      |
+
+Password loading derives a local cipher key once. Encryption stores a fresh nonce with the
+authenticated ciphertext; accessing `SensitiveBytes` decrypts into a short-lived buffer. This
+protects saved bytes, not a peer's authorization to supply them.
 
 ## Protect local bytes
 
@@ -29,6 +43,11 @@ its successful input and returns nonce-prefixed authenticated ciphertext. The cu
 derivation uses a fixed application salt, not a per-record random salt. Keep passwords and decrypted
 buffers out of logs and ordinary snapshots.
 
-Run `cargo test --locked -p e3-crypto`; file tests use Unix filesystem behavior. Saved ciphertext
+## Tests
+
+Run `cargo test --locked -p e3-crypto`. Inline tests cover cipher round trips, wrong passwords, and
+encrypted wrappers. No chain or prover is required. Password-file operations use Unix permissions
+and are also exercised through [CLI secret commands](../cli/tests/cli_secrets.rs). Saved ciphertext
 and KDF choices are durable compatibility boundaries; see
-[upgrades](../../docs/architecture/upgrades.md) before changing stored data.
+[upgrades](../../docs/architecture/upgrades.md) before changing stored data. See
+[AGENTS.md](AGENTS.md) for cipher/secret-handling change guidance.

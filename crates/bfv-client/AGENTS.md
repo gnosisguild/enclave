@@ -11,6 +11,6 @@ This is the client-side BFV/commitment boundary shared by native callers and WAS
 - Plaintext byte helpers use little-endian u64 words and reject partial words; changing this also
   changes runtime/application decoding.
 
-Run `cargo test --locked -p e3-bfv-client`. For commitment/witness changes, also exercise the
+Use the [README tests](README.md#tests). For commitment/witness changes, also exercise the
 consumer's real-proof flow; Rust round trips alone do not establish circuit agreement. See
 [proof statements](../../docs/architecture/proof-statements.md).

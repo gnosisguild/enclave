@@ -18,7 +18,7 @@ process success, a valid witness, and a verified cryptographic statement are dif
 [Proof statements](../../docs/architecture/proof-statements.md) and
 [artifacts](../../docs/architecture/circuit-artifacts.md) own these contracts. Read the
 [README build warning and compile-only command](README.md#before-running-cargo) before invoking
-Cargo: fixture preparation can install dependencies, rebuild circuits, and rewrite tracked JSON.
-`pnpm rust:test:proofs` needs prepared matching circuits, nargo, and bb; ordinary ignored tests or
-compilation are not proof verification. Circuit-size sweeps must restore compiled artifacts, not
-just source selectors.
+Cargo: fixture preparation can install dependencies, rebuild circuits, and rewrite tracked JSON. Use
+the [README test map](README.md#tests) to distinguish native/fake-process coverage from prepared
+real proofs; ordinary ignored tests or compilation are not proof verification. Circuit-size sweeps
+must restore compiled artifacts, not just source selectors.

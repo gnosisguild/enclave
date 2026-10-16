@@ -14,7 +14,6 @@ orchestration merely because many crates already import it.
   Process readiness/effect/shutdown signals are current-boot control, not replayable instructions.
 
 See [persistence](../../docs/architecture/persistence-and-replay.md) for actual guarantees and gaps.
-`cargo test -p e3-events` covers eventstore failure signals and fanout; production signal wiring and
-CLI exit are separate owner tests. Do not describe all actor panics as supervised. Crate tests pull
-in [test helpers](../test-helpers/README.md) with chain/prover build prerequisites; checking the
-event types alone does not exercise those integrations.
+Use the [README test map/prerequisites](README.md#tests). Failure-signal changes also need
+production composition and CLI-exit coverage at their owners. Do not describe all actor panics as
+supervised; checking event types alone does not exercise those integrations.

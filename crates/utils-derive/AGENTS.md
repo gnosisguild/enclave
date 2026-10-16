@@ -11,6 +11,6 @@ This proc-macro crate implements `BytesSerde`; the byte-validation contract live
 - Construction must delegate to `AsBytesSerde::try_from_bytes`, retaining exact-size/semantic
   rejection rather than bypassing the implementor's validation.
 
-Run `cargo check --locked -p e3-utils-derive`, then `cargo test --locked -p e3-utils` to exercise
-the expansion through a real consumer. Macro compilation alone does not validate generated code;
-layout changes also need affected [compatibility review](../../docs/architecture/upgrades.md).
+Use the [README check/consumer tests](README.md#tests) to exercise expansion through a real type.
+Macro compilation alone does not validate generated code; layout changes also need affected
+[compatibility review](../../docs/architecture/upgrades.md).

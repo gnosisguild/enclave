@@ -1,9 +1,10 @@
 # Rust components
 
 The root [Cargo workspace](../Cargo.toml) contains the ciphernode runtime, application libraries,
-and artifact tooling. Component READMEs explain usage/public boundaries; their `AGENTS.md` files
-provide editing guidance. Cross-component protocol rules live in the
-[architecture document index](../docs/architecture/AGENTS.md).
+and artifact tooling. Component READMEs orient users and agents with purpose, source maps,
+runtime/API boundaries, usage, and tests. Their `AGENTS.md` files describe how to change the code:
+conventions, invariants, hazards, and change-specific verification. Cross-component protocol rules
+live in the [architecture document index](../docs/architecture/AGENTS.md).
 
 ## Setup and checks
 

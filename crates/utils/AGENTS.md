@@ -12,6 +12,6 @@ Keep shared mechanical helpers here; capability-specific protocol rules belong w
 - Actix/Tokio bridging helpers must preserve acknowledgment and error behavior. A fire-and-forget
   channel send is not equivalent to awaited completion of the underlying work.
 
-Run `cargo test --locked -p e3-utils`, including malformed-length/trailing-byte and macro consumer
+Use the [README tests](README.md#tests), including malformed-length/trailing-byte and macro consumer
 coverage for encoding changes. These helpers serve durable/wire data; consult
 [upgrades](../../docs/architecture/upgrades.md) before changing serialized behavior.

@@ -16,5 +16,5 @@ authorities.
   failures may still need accusation work, so local Failed is not proof that teardown is harmless.
 
 [Persistence](../../docs/architecture/persistence-and-replay.md) owns the recovery/overflow limits.
-`cargo test -p e3-request` includes routing capacity tests; Linux RSS checks and restart histories
-exercise different properties than reducer unit tests.
+Use the [README test map](README.md#tests). Routing changes need capacity and restart histories as
+well as reducer cases; Linux RSS checks exercise another boundary.

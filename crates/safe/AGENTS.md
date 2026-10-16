@@ -11,7 +11,6 @@ This crate owns SAFE sponge behavior and native/guest Poseidon2 equivalence.
 - Updating permutation constants or sponge parameters requires coordinating every Noir/Rust/
   contract commitment consumer, not simply refreshing expected native vectors.
 
-Run `cargo test --locked -p e3-safe` for native vectors and accelerated-reference tests. Guest-only
-changes additionally need the pinned [OpenVM parity workflow](../openvm-prover/README.md); enabling
-all features on a host is not a substitute for a guest build. See
-[proof statements](../../docs/architecture/proof-statements.md).
+Use the [README native/reference tests](README.md#tests). Guest-only changes additionally need the
+pinned [OpenVM parity workflow](../openvm-prover/README.md); enabling all features on a host is not
+a substitute for a guest build. See [proof statements](../../docs/architecture/proof-statements.md).

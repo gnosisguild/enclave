@@ -11,7 +11,6 @@ This is a feature-gated facade, not another implementation of BFV, EVM, or index
 - EVM/indexer features transitively run Solidity fixture build scripts; minimal consumers should not
   need those tools simply to use an unrelated capability.
 
-Check `cargo check --locked -p e3-sdk --no-default-features` and
-`cargo check --locked -p e3-sdk --no-default-features --features bfv`. For the default facade, run
-`cargo check --locked -p e3-sdk` with solc/jq and root `pnpm fixtures:build` preparation; underlying
-owner tests, especially the [indexer boundary](../indexer/AGENTS.md), cover actual behavior.
+Use the [README feature checks/prerequisites](README.md#tests-and-feature-checks). Feature changes
+need minimal, BFV-only, and default export checks; underlying owner tests, especially the
+[indexer boundary](../indexer/AGENTS.md), cover behavior.

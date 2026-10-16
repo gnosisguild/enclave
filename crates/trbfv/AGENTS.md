@@ -13,6 +13,6 @@ with the keyshare/aggregation capabilities.
   fields. Treat inner-layout changes as saved-state compatibility changes and keep decrypted
   shares/raw secrets out of logs and ordinary snapshots.
 
-Run `cargo test --locked -p e3-trbfv`; helper dependencies bring Solidity/prover prerequisites from
-[test-helpers](../test-helpers/README.md). Math changes need independent reconstruction cases and
-the affected [DKG](../../docs/architecture/dkg.md)/decryption flow, not only encryption round trips.
+Use the [README tests/prerequisites](README.md#tests). Math changes need independent reconstruction
+cases and the affected [DKG](../../docs/architecture/dkg.md)/decryption flow, not only encryption
+round trips.

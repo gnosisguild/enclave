@@ -16,7 +16,6 @@ builder or protocol orchestration crates.
   them.
 
 [Persistence contracts](../../docs/architecture/persistence-and-replay.md) describe fences and
-current limits; [upgrades](../../docs/architecture/upgrades.md) governs layout/path changes. Run
-`cargo test -p e3-event-system`; in-memory composition is not a disk-crash test. The dev-dependency
-graph brings [helper prerequisites](../test-helpers/README.md), including Solidity/prover fixture
-preparation, even though this crate has no build script of its own.
+current limits; [upgrades](../../docs/architecture/upgrades.md) governs layout/path changes. Use the
+[README tests/prerequisites](README.md#tests). Persistence changes need the disk-backed path;
+in-memory composition is not a disk-crash test.

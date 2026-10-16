@@ -11,5 +11,5 @@ This is injectable command output, not protocol logging or durable event storage
 - Sends and writer shutdown are currently best-effort, and the queue is unbounded. Do not use this
   path for acknowledged delivery or describe it as bounded backpressure.
 
-Run `cargo check --locked -p e3-console --tests`; output changes should add focused async writer/
-channel coverage here and exercise the command consumer. No external services are required.
+The [README](README.md#tests) records the current check/coverage boundary. Output changes should add
+focused async writer/channel coverage here and exercise the command consumer.

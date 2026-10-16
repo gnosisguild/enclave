@@ -11,6 +11,6 @@ This crate owns content-addressed transport and bridge-proof encoding, not appli
 - Pending bridge proofs are retryable absence, not verified inclusion or permanent failure. Keep the
   optional Avail reader/submitter features separate from the default HTTP/mock boundary.
 
-Run `cargo test --locked -p e3-data-availability`; for Avail adapter changes also check
-`cargo check --locked -p e3-data-availability --features avail-read,avail-submit`. Mock tests do not
-establish bridge finality; see [data availability](../../docs/architecture/data-availability.md).
+Use the [README tests/feature checks](README.md#tests), including the optional adapters for Avail
+changes. Mock tests do not establish bridge finality; see
+[data availability](../../docs/architecture/data-availability.md).

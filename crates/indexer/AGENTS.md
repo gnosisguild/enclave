@@ -13,9 +13,8 @@ projections.
 - Consumer coverage must be checked against live deployment/configuration, not trusted forever just
   because a record remains in a store with no delete operation.
 
-`build.rs` invokes `scripts/build_fixtures.sh` even for a check and can rewrite fixture JSON;
-provide solc, jq, and bash. Root `pnpm fixtures:build` prepares these sources; edit Solidity rather
-than generated ABI/bytecode. Run `cargo test --locked -p e3-indexer` with Anvil for chain tests;
+`build.rs` invokes `scripts/build_fixtures.sh` even for a check and can rewrite fixture JSON; edit
+Solidity rather than generated ABI/bytecode. Use the [README tests/prerequisites](README.md#tests);
 listener progress checks live in e3-evm-helpers. Neither the atomic high-water claim nor typed
 callback success proves durable all-handler completion. Catch-up changes need an affected
 consumer/reconnect scenario, not only a higher stored block number.

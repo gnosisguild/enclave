@@ -1,9 +1,21 @@
 # e3-openvm-host
 
+## Purpose
+
 Native adapter for proving an E3 program's Secure Process through a separate OpenVM worker. It
 computes the result/journal natively, writes guest input, then requires the worker to prove and
 verify the expected journal before accepting the seal. The OpenVM SDK lives in the
 [independent worker workspace](../openvm-prover/README.md), not this crate.
+
+## Map and proving lifecycle
+
+[`src/lib.rs`](src/lib.rs) contains the host adapter: `WorkerConfig` resolves paths/deadlines,
+backend selection probes CUDA, `Prover` checks artifacts and manages job processes, and native
+execution writes the input stream/journal. `encode_compute_proof` builds the Solidity envelope.
+
+Startup selects/checks a worker. Each job runs the Secure Process natively, records the expected
+journal and two-pass inputs, invokes the worker with a deadline, then reads its verified seal. Job
+directories are temporary; they are not a durable accepted-work queue.
 
 ## Configure a worker
 
@@ -32,5 +44,9 @@ contract. `encode_compute_proof` constructs the Solidity envelope and checks sea
 Deadlines/cancellation stop the worker process group on Unix rather than leaving a proving child
 behind. Resource failures never select a mock proof.
 
-Run `cargo test --locked -p e3-openvm-host` for configuration/fake-worker adapter tests. Real
-host/guest parity and proof acceptance are separate [OpenVM workflows](../openvm-prover/README.md).
+## Tests
+
+Run `cargo test --locked -p e3-openvm-host`. Inline fake-worker tests cover backend selection,
+envelope bytes, deadlines, and wrapper-child cleanup without preparing OpenVM keys. Real host/guest
+parity and proof acceptance are separate [OpenVM workflows](../openvm-prover/README.md). See
+[AGENTS.md](AGENTS.md) for process/verification change rules.

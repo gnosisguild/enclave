@@ -11,6 +11,5 @@ Keep the operator dashboard a read-only projection, not an alternate source of p
 - Operational logs come from the bounded logger collector; durable event history comes from the
   EventStore. Keep their cursor/retention expectations separate, including in the embedded UI.
 
-Run `cargo test --locked -p e3-dashboard` for projection/update behavior. Transitive EVM builds need
-solc and the [fixture prerequisites](../evm/AGENTS.md); RPC-facing behavior needs explicit adapter
-coverage rather than assuming projection tests contact a chain.
+Use the [README tests/prerequisites](README.md#tests) for projection/update behavior. RPC-facing
+changes need explicit adapter coverage rather than assuming projection tests contact a chain.

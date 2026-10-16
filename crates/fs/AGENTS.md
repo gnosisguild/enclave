@@ -11,6 +11,6 @@ Maintain the async VFS adapter shared by physical-file and in-memory tooling.
 - Replacement writes only when content changes. Preserve that property so no-op tooling does not
   needlessly invalidate timestamps or rebuild generated artifacts.
 
-Run `cargo test --locked -p e3-fs`; use the in-memory adapter for deterministic transformation tests
+Use the [README tests](README.md#tests); use the in-memory adapter for deterministic transformations
 and temporary physical roots when changing filesystem-specific semantics. This adapter is not a
 symlink-safe sandbox or a transactional filesystem.

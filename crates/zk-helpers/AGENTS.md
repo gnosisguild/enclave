@@ -14,6 +14,6 @@ Keep circuit-specific computation, witness shape, packing, and code generation h
 - Change generators/encoding owners, not generated `configs.nr` or Prover files. Keep private
   witness/randomness output out of normal runtime diagnostics.
 
-Run `cargo test --locked -p e3-zk-helpers`; changed witness statements also need matching prepared
-Noir/real-proof tests. Use [artifact CLI](../zk/cli/README.md) for commands and
+Use the [README computation/reference tests](README.md#tests); changed witness statements also need
+matching prepared Noir/real-proof tests. Use [artifact CLI](../zk/cli/README.md) for commands and
 [proof statements](../../docs/architecture/proof-statements.md) for cross-layer review.

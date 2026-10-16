@@ -17,5 +17,5 @@ IDs.
   snapshot-derived roles/selections are injected, not appended as synthetic facts on every boot.
 
 See [selection](../../docs/architecture/committee-selection.md) and
-[DKG](../../docs/architecture/dkg.md). Run `cargo test -p e3-sortition`; on-chain score/owner-cap
-behavior also needs the contract suite.
+[DKG](../../docs/architecture/dkg.md). Use the [README tests](Readme.md#tests); on-chain
+score/owner-cap behavior also needs the contract suite.

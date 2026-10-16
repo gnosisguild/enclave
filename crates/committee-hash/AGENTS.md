@@ -10,6 +10,6 @@ This crate is the shared Rust owner of EVM committee and decryption-domain hash 
   domain. A convenience overload must not omit context that prevents cross-request replay.
 - Keep this deterministic helper free of provider lookups; callers supply canonical chain context.
 
-Run `cargo test --locked -p e3-committee-hash`, retaining cross-language vectors. Hash-layout
-changes also need the affected Solidity/Noir coverage and compatibility review in
+Use the [README tests](README.md#tests), retaining cross-language vectors. Hash-layout changes also
+need the affected Solidity/Noir coverage and compatibility review in
 [threshold decryption](../../docs/architecture/threshold-decryption.md).

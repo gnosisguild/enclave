@@ -1,8 +1,16 @@
 # e3-committee
 
+## Purpose
+
 Canonical names and numeric parameters for supported ciphernode committee sizes. This small crate
 supplies configuration to runtime, parameter, and circuit tooling; it does not select committee
 members or determine their party IDs.
+
+## Map
+
+[`src/lib.rs`](src/lib.rs) contains the whole crate: `CiphernodesCommitteeSize` parses canonical
+names and looks up `CiphernodesCommittee { n, h, threshold }`; inline tests pin numeric lookups and
+serialized variants. There is no actor, runtime selector, or generated table here.
 
 ## Look up a committee
 
@@ -25,6 +33,10 @@ For a dependency inside this workspace, use `e3-committee = { workspace = true }
 `e3_committee`. The [FHE parameter API](../fhe-params/README.md) combines committee dimensions with
 cryptographic presets; supported dimensions alone do not imply installed circuit artifacts.
 
-Run `cargo test --locked -p e3-committee` from the repository root. See
+## Tests
+
+Run `cargo test --locked -p e3-committee` from the root; no chain/proof tools are needed. Tests
+cover names/serialization, all supported dimensions, and rejected parameter pairs. See
 [committee selection](../../docs/architecture/committee-selection.md) for runtime membership and
 [circuit artifacts](../../docs/architecture/circuit-artifacts.md) for matching generated outputs.
+Compatibility rules for table changes are in [AGENTS.md](AGENTS.md).

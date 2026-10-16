@@ -1,8 +1,26 @@
 # e3-request
 
+## Purpose
+
 Per-E3 context routing and lifecycle projection. The router admits requests from chain facts or
 restored contexts, constructs their capability recipients through extensions, and forwards events.
 It does not own the cryptographic statements implemented by those recipients.
+
+## Map
+
+| Location                                                                                                   | Responsibility                                                 |
+| ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| [`routing/actor.rs`](src/routing/actor.rs), [`routing/handlers.rs`](src/routing/handlers.rs)               | Router/extension interface and mailbox delivery.               |
+| [`routing/workflow.rs`](src/routing/workflow.rs), [`routing/event_buffer.rs`](src/routing/event_buffer.rs) | Admission/routing decisions and deferred recipient queues.     |
+| [`routing/effects/`](src/routing/effects)                                                                  | Context construction, hydration, checkpoints, and snapshots.   |
+| [`context.rs`](src/context.rs), [`meta.rs`](src/meta.rs), [`hetrogenous_map.rs`](src/hetrogenous_map.rs)   | Per-E3 recipients, metadata, and typed dependencies.           |
+| [`lifecycle/`](src/lifecycle), [`canonical_key.rs`](src/canonical_key.rs)                                  | Node-wide stage projection and shared confirmed-key authority. |
+| [`repo.rs`](src/repo.rs)                                                                                   | Router/context/lifecycle persistence accessors.                |
+
+Chain admission creates a context; extensions add dependencies and recipients as prerequisites
+arrive. Deferred history reaches a new recipient before the creating event. Hydration restores
+recipients from a checkpoint before replay, while lifecycle tracks progress outside any one
+recipient's cryptographic state machine.
 
 ## Build a router
 
@@ -32,5 +50,12 @@ intent cannot. Repository factory traits expose typed context, metadata, lifecyc
 router-checkpoint storage to startup/recovery consumers.
 
 See [persistence and replay](../../docs/architecture/persistence-and-replay.md) for checkpoint,
-deferred-queue, overflow, and teardown limits. Run `cargo test --locked -p e3-request`; routing
-capacity tests and full node restart scenarios cover different boundaries.
+deferred-queue, overflow, and teardown limits.
+
+## Tests
+
+Run `cargo test --locked -p e3-request`. Routing/lifecycle `workflow_tests.rs` cover pure decisions;
+[`routing/tests.rs`](src/routing/tests.rs) exercises checkpoint hydration and failed-context
+teardown. Buffer/capacity tests cover per-E3/global limits and retained allocation;
+context/typed-map tests cover recipient order and lookup. Whole-node restart is in
+[e3-tests](../tests/README.md). See [AGENTS.md](AGENTS.md) for routing/checkpoint changes.

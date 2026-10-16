@@ -13,7 +13,7 @@ This executable owns argument parsing, artifact dispatch, and terminal output, n
   active preset switches; direct edits to generated configs can leave Rust/Noir/verifiers
   mismatched.
 
-Run `cargo test --locked -p e3-zk-artifacts` for dispatch/generator behavior. Generation and proof
-acceptance are different checks; follow
-[circuit artifacts](../../../docs/architecture/circuit-artifacts.md) for tool pins, coordinated
-rebuilds, and verification requirements.
+Use the [README tests](README.md#tests). Dispatch changes need the selected circuit/input-family
+generation path as well as VK parser cases. Generation and proof acceptance are different checks;
+follow [circuit artifacts](../../../docs/architecture/circuit-artifacts.md) for tool pins,
+coordinated rebuilds, and verification requirements.

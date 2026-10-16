@@ -12,6 +12,6 @@ protocol behavior.
 - Installation clones, copies, installs dependencies, and removes temporary content. Keep cleanup
   limited to owned paths; the current fixed scratch path also means concurrent installs can collide.
 
-Run `cargo test --locked -p e3-init` for parsing/file transformations. A full install additionally
-needs Git/network and the selected package manager; exercise it in a disposable destination, not an
-existing project. Check [template usage](../../templates/default/README.md) for user-facing changes.
+Use the [README tests/prerequisites](README.md#tests). Exercise full-install changes in a disposable
+destination, not an existing project. Check [template usage](../../templates/default/README.md) for
+user-facing changes.

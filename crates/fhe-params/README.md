@@ -1,5 +1,7 @@
 # FHE Parameters Library
 
+## Purpose
+
 A Rust library for managing BFV (Brakerski-Fan-Vercauteren) homomorphic encryption parameters. This
 library provides preset configurations, parameter builders, and a search module for finding optimal
 parameters that satisfy security constraints.
@@ -23,16 +25,30 @@ system. It supports two main workflows:
 1. **Using Presets**: Quick access to pre-validated parameter sets for production or testing
 2. **Custom Search**: Finding optimal parameters for specific security and performance requirements
 
+## Map
+
+| Location                                                                    | Responsibility                                                                     |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [`presets.rs`](src/presets.rs), [`constants.rs`](src/constants.rs)          | Canonical preset names, parameter pairs, dimensions/noise metadata, and constants. |
+| [`builder.rs`](src/builder.rs), [`crp.rs`](src/crp.rs)                      | FHE parameter construction and deterministic common random polynomials.            |
+| [`utils.rs`](src/utils.rs)                                                  | Exact scalar residue, inverse, and coefficient-width derivation.                   |
+| [`search/`](src/search), [`bin/search_params.rs`](src/bin/search_params.rs) | Exact-integer security search and its CLI.                                         |
+| [`encoding.rs`](src/encoding.rs)                                            | Optional Solidity ABI parameter exchange.                                          |
+
+Consumers resolve a named preset to metadata, build its threshold/DKG pair as needed, and derive
+scalar bounds/CRP at this shared boundary. Searching custom parameters is an exploratory workflow,
+not installation of matching Noir circuits or deployed verifiers.
+
 ## Modules
 
 ### Presets (`presets`)
 
 Pre-configured BFV parameter sets for PVSS (Public Verifiable Secret Sharing) protocol:
 
-- **`BfvPreset::SecureThreshold8192`** (default): Production-ready threshold BFV parameters
-  (degree 8192)
+- **`BfvPreset::SecureThreshold8192`**: Secure threshold BFV parameters (degree 8192)
 - **`BfvPreset::SecureDkg8192`**: Production-ready DKG parameters (degree 8192)
-- **`BfvPreset::InsecureThreshold512`**: Testing-only threshold BFV parameters (degree 512)
+- **`BfvPreset::InsecureThreshold512`** (current `DEFAULT_BFV_PRESET`): Testing-only threshold BFV
+  parameters (degree 512)
 - **`BfvPreset::InsecureDkg512`**: Testing-only DKG parameters (degree 512)
 
 In the PVSS protocol, two types of BFV parameters are needed:
@@ -45,8 +61,10 @@ In the PVSS protocol, two types of BFV parameters are needed:
 
 Functions to construct `BfvParameters` instances:
 
-- `build_bfv_params()` / `build_bfv_params_arc()`: Build from a `BfvParamSet`
-- `build_bfv_params_from_set()` / `build_bfv_params_from_set_arc()`: Build from preset metadata
+- `build_bfv_params()` / `build_bfv_params_arc()`: Build from explicit degree, plaintext modulus,
+  moduli, and optional variance
+- `build_bfv_params_from_set()` / `build_bfv_params_from_set_arc()`: Build from a `BfvParamSet`
+- `try_build_bfv_params_arc()`: Fallible construction for untrusted parameter inputs
 - `build_pair_for_preset()`: Build both threshold and DKG parameter pairs for a preset
 
 ### Parameter utilities (`utils`)
@@ -140,12 +158,11 @@ This enables serialization for smart contracts and cross-platform parameter exch
 ### Using Presets
 
 ```rust
-use e3_fhe_params::{BfvPreset, build_bfv_params_arc, builder::build_pair_for_preset};
-use std::sync::Arc;
+use e3_fhe_params::{BfvParamSet, BfvPreset, build_pair_for_preset};
 
 fn example() -> Result<(), e3_fhe_params::PresetError> {
     // Build threshold BFV parameters
-    let params = build_bfv_params_arc(BfvPreset::SecureThreshold8192)?;
+    let params = BfvParamSet::from(BfvPreset::SecureThreshold8192).build_arc();
 
     // Build both threshold and DKG parameter pairs
     let (threshold_params, dkg_params) = build_pair_for_preset(BfvPreset::SecureThreshold8192)?;
@@ -166,7 +183,7 @@ let param_set = BfvParamSet {
     error1_variance: Some("3"),
 };
 
-let params = build_bfv_params_from_set_arc(&param_set)?;
+let params = build_bfv_params_from_set_arc(param_set);
 ```
 
 ### Parameter Search
@@ -236,9 +253,9 @@ cargo run --bin search_params --package e3-fhe-params -- \
 - `--help`: Show help message
 - `--version`: Show version information
 
-**Example: Reproducing Production Preset**
+**Example: Exploring secure-parameter constraints**
 
-The production preset `SecureThresholdBfv8192` can be reproduced using:
+For a search with 100 parties and plaintext modulus 100:
 
 ```bash
 cargo run --bin search_params --package e3-fhe-params -- \
@@ -250,12 +267,9 @@ cargo run --bin search_params --package e3-fhe-params -- \
     --b-chi 1
 ```
 
-This will output the same parameter set as the preset, including:
-
-- Degree: 8192
-- 4 NTT-friendly primes (52-53 bits each)
-- All noise budgets and validation metrics
-- A second parameter set (if found)
+Search reports feasible candidates and noise metrics, with a second parameter set if found. Use the
+named preset's metadata for an installed circuit configuration rather than assuming a search result
+has matching artifacts.
 
 **Output Format:**
 
@@ -270,10 +284,10 @@ The CLI displays:
 
 ```rust
 #[cfg(feature = "abi-encoding")]
-use e3_fhe_params::{BfvPreset, build_bfv_params_arc, encode_bfv_params, decode_bfv_params, decode_bfv_params_arc};
+use e3_fhe_params::{BfvParamSet, BfvPreset, encode_bfv_params, decode_bfv_params, decode_bfv_params_arc};
 
 // Build parameters from a preset
-let params = build_bfv_params_arc(BfvPreset::SecureThreshold8192)?;
+let params = BfvParamSet::from(BfvPreset::SecureThreshold8192).build_arc();
 
 // Encode parameters to ABI bytes for smart contract use
 let encoded_bytes = encode_bfv_params(&params);
@@ -289,3 +303,11 @@ assert_eq!(decoded_params.degree(), params.degree());
 assert_eq!(decoded_params.plaintext(), params.plaintext());
 assert_eq!(decoded_params.moduli(), params.moduli());
 ```
+
+## Tests
+
+Run `cargo test --locked -p e3-fhe-params --features abi-encoding` from the root. Inline suites
+cover exact preset lookup/pairs, fallible construction, deterministic CRP, ABI round trips,
+full-width scalar arithmetic, prime selection, and search validation. These native tests do not run
+a prover. [Circuit artifacts](../../docs/architecture/circuit-artifacts.md) describes matching
+generated outputs; [AGENTS.md](AGENTS.md) covers parameter-compatibility changes.

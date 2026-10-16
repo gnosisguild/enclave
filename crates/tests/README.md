@@ -1,9 +1,25 @@
 # e3-tests
 
+## Purpose
+
 Cross-capability and multi-node ciphernode test harness. `src/main.rs` intentionally does no work;
 use Cargo's named integration targets, not `cargo run`, to exercise the system.
 
-## Choose a target
+## Map
+
+| Location                                                                 | Responsibility                                                           |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| [`tests/ciphernode_system/`](tests/ciphernode_system)                    | Multi-node builder/handle harness, histories, and network helpers.       |
+| [`tests/integration.rs`](tests/integration.rs)                           | Cross-capability scenarios and optional expensive proof/benchmark flows. |
+| [`tests/large_work_plan_recovery.rs`](tests/large_work_plan_recovery.rs) | Reopen large proof plans and dispatch missing work.                      |
+| [`tests/layout_lock.rs`](tests/layout_lock.rs)                           | Runtime encoding roots and repository/event samples.                     |
+| [`src/main.rs`](src/main.rs)                                             | Empty executable, not a test runner.                                     |
+
+Scenarios compose real actors with isolated buses/stores and selectable transport/worker
+substitutes. They publish histories, observe outcomes, and for recovery reopen saved state. Which
+parts are mocked or ignored is specific to the scenario, not guaranteed by the package name.
+
+## Tests: choose a target
 
 - [integration.rs](tests/integration.rs): end-to-end key/plaintext flows, routing, restart, and
   multi-node scenarios using [ciphernode_system](tests/ciphernode_system/mod.rs).
@@ -36,4 +52,5 @@ unification can enable them throughout a workspace test graph; successful tests 
 production feature containment or recursive proof verification. Deterministic RNGs and mocked
 transport are isolated per node but do not model all distributed failures. See
 [persistence and replay](../../docs/architecture/persistence-and-replay.md) for current
-restart/overflow assurance limits.
+restart/overflow assurance limits. See [AGENTS.md](AGENTS.md) for isolation and regression-design
+guidance.

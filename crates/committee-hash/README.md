@@ -1,7 +1,16 @@
 # e3-committee-hash
 
+## Purpose
+
 Deterministic EVM committee and decryption-domain hashes shared by Rust protocol consumers. There
 are no provider lookups: callers supply the canonical addresses and E3 chain context.
+
+## Map
+
+All implementation and vectors are in [`src/lib.rs`](src/lib.rs). Committee helpers hash ordered
+address bytes and split the digest for Noir. Decryption helpers combine that commitment with
+deployment/request/ciphertext/key context using Solidity ABI encoding, then expose u128 limbs. These
+are separate statements even though both use Keccak and two-limb outputs.
 
 ## Committee commitments
 
@@ -27,5 +36,10 @@ public-key commitment. Supply the latter three context fields through `Decryptio
 `split_decryption_domain` and `decryption_domain_limbs` expose the two u128 Noir limbs. This domain
 is not interchangeable with the committee hash alone.
 
-Run `cargo test --locked -p e3-committee-hash` for cross-language vectors. The larger C6/C7 contract
-is documented in [threshold decryption](../../docs/architecture/threshold-decryption.md).
+## Tests
+
+Run `cargo test --locked -p e3-committee-hash` from the root. Inline vectors check raw address
+hashing, bytes32 limb alignment, and the Solidity domain tuple without starting an EVM. The larger
+C6/C7 contract is documented in
+[threshold decryption](../../docs/architecture/threshold-decryption.md). [AGENTS.md](AGENTS.md)
+covers coordinated hash-layout changes.

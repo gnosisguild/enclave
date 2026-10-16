@@ -1,7 +1,20 @@
 # e3-fs
 
+## Purpose
+
 Asynchronous virtual filesystem for project/template tooling. The same read, copy, discovery, and
 replacement operations work over physical files or an isolated in-memory filesystem.
+
+## Map
+
+| Location                                                     | Responsibility                                                         |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| [`fs.rs`](src/fs.rs)                                         | Backend constructors and read/write/copy/find/replace implementations. |
+| [`traits.rs`](src/traits.rs), [`prelude.rs`](src/prelude.rs) | Async operation interfaces and consumer imports.                       |
+
+Tooling selects a root/backend, then applies the same transformations to memory or physical files.
+Discovery and replacement are separate operations, so callers can inspect a file set before
+rewriting it. The [initializer](../init/README.md) is the template-copy consumer.
 
 ## In-memory transformations
 
@@ -27,5 +40,11 @@ strings, not only basenames. `replace_in_place(regex, replacement, path)` writes
 content changes.
 
 The [initializer](../init/README.md) uses this boundary for filtered template copies. It is not a
-symlink-safe sandbox or a transactional filesystem. Run `cargo test --locked -p e3-fs`; in-memory
-tests need no external services.
+symlink-safe sandbox or a transactional filesystem.
+
+## Tests
+
+Run `cargo test --locked -p e3-fs`. Inline tests in [`fs.rs`](src/fs.rs) cover recursive copying,
+glob discovery, reads/writes, and replacement tables using memory storage; no external services are
+required. Physical filesystem behavior remains a separate adapter boundary. See
+[AGENTS.md](AGENTS.md) for path/copy change guidance.

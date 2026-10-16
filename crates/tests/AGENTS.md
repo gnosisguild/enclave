@@ -12,8 +12,8 @@ This is the cross-capability/multi-node harness owner; `src/main.rs` intentional
 - Layout-lock fixtures cover listed serde roots, not repository paths, hand-written framing, or
   opaque encrypted payloads. Review compatibility/version decisions before intentional regeneration.
 
-Start with `cargo test --locked -p e3-tests --test layout_lock` for encoding changes, or a named
-scenario under `--test integration`. Prepare root `pnpm evm:build` / `pnpm fixtures:build`, solc/jq,
-and Anvil where required; [zk-prover](../zk-prover/README.md) documents Noir build side effects and
-real-proof prerequisites. Ignored/skipped scenarios and layout checks are not full restart or
-cryptographic assurance; see [persistence](../../docs/architecture/persistence-and-replay.md).
+Choose the affected target using the
+[README test map/prerequisites](README.md#tests-choose-a-target). Encoding changes need the consumer
+layout lock; behavioral changes need a named history/restart scenario. Ignored/skipped scenarios and
+layout checks are not full restart or cryptographic assurance; see
+[persistence](../../docs/architecture/persistence-and-replay.md).

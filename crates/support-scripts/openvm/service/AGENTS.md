@@ -12,7 +12,6 @@ host. It runs in the consuming project's workspace, not the root Rust workspace.
 - Preserve explicit request/concurrency/body limits and loopback defaults. The HTTP boundary has no
   authentication or durable queue; a real runner does not add those properties.
 
-Use root `pnpm openvm service-check` for the linked CRISP project, or
-`cargo check -p e3-support-scripts-openvm` in a prepared generated project. Real startup/proving
-needs pinned OpenVM tooling, prepared worker configuration, and keys from the
-[OpenVM README](../../../openvm-prover/README.md); the first project build may refresh its lockfile.
+Use the [README project checks/prerequisites](README.md#tests-and-project-checks). Domain/runner
+changes require prepared service/contract acceptance as well as checking the linked package;
+compilation alone cannot establish proof identity.

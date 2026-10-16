@@ -1,9 +1,27 @@
 # e3-keyshare
 
+## Purpose
+
 Per-E3 DKG and secret-share lifecycle for a ciphernode: collect authenticated dealer material,
 produce threshold contributions, assemble this node's decryption key, and later emit proven
 decryption shares. Arithmetic runs through [e3-trbfv](../trbfv/README.md) and shared workers; this
 capability coordinates protocol state and recovery.
+
+## Map
+
+| Location                                                                                                                                                | Responsibility                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [`ext.rs`](src/ext.rs), [`repo.rs`](src/repo.rs)                                                                                                        | Per-E3 actor construction/hydration and typed storage.                         |
+| [`threshold_keyshare/actor.rs`](src/threshold_keyshare/actor.rs), [`handlers.rs`](src/threshold_keyshare/handlers.rs)                                   | Mailbox shell and event dispatch.                                              |
+| [`state.rs`](src/threshold_keyshare/state.rs), [`roster.rs`](src/threshold_keyshare/roster.rs), [`validation.rs`](src/threshold_keyshare/validation.rs) | Phase model, mutually ready dealer roster, and authenticated input checks.     |
+| [`collection decisions`](src/threshold_keyshare/collect_threshold_shares.rs)                                                                            | Encryption-key, threshold-share, and decryption-key cutoff/expulsion handling. |
+| [`effects/`](src/threshold_keyshare/effects)                                                                                                            | Compute/proof requests, roster coordination, delivery, and replay recovery.    |
+| [`recovery_state.rs`](src/threshold_keyshare/recovery_state.rs), [`recovery_payloads.rs`](src/threshold_keyshare/recovery_payloads.rs)                  | Durable recovery metadata and separately stored large inputs.                  |
+
+Selection creates this node's per-E3 keyshare actor. It exchanges encryption keys, generates and
+checks dealer shares, coordinates an accepted roster, and assembles local decryption material. After
+the canonical committee key and ciphertext are available, it produces decryption shares. The same
+saved phase/inputs drive restart, with external work dispatched by effects.
 
 ## Runtime integration
 
@@ -33,3 +51,9 @@ dimensions, roster transitions, proof batches, and recovery limits are in
 Run `cargo test --locked -p e3-keyshare` after the
 [test-helper prerequisites](../test-helpers/README.md). Its test graph includes EVM/prover build
 steps. Actor/mock coverage is separate from matching real-proof acceptance.
+
+[`threshold_keyshare/tests.rs`](src/threshold_keyshare/tests.rs) exercises actor histories and
+restart/cutoff behavior; [`tests/admission.rs`](src/threshold_keyshare/tests/admission.rs) covers
+forged dealer inputs. Collection, roster, state-transition, and payload-digest cases sit beside
+their pure modules. For complete DKG/decryption scenarios use [e3-tests](../tests/README.md).
+[AGENTS.md](AGENTS.md) carries phase-order and secret-lifecycle editing rules.

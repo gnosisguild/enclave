@@ -12,6 +12,6 @@ Keep protocol observation and operational diagnostics passive; the EventStore re
 - Global collector initialization keeps the first instance, like tracing's subscriber. Use local
   collector instances in focused tests instead of depending on test execution order.
 
-Run `cargo test --locked -p e3-logger`, including redaction/cursor/rotation coverage for changed
-paths. Logger failure should not acquire protocol authority or reorder events; see
+Use the [README tests](README.md#tests); changed paths need redaction/cursor/rotation coverage as
+applicable. Logger failure should not acquire protocol authority or reorder events; see
 [persistence](../../docs/architecture/persistence-and-replay.md).

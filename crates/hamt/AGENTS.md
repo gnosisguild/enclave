@@ -12,5 +12,5 @@ This is the immutable membership-map implementation used for historical sortitio
 - `DefaultHasher` is an internal lookup choice, not a stable cryptographic commitment or durable
   trie encoding. Do not expose its shape as protocol identity.
 
-Run `cargo test --locked -p e3-hamt`; selection changes additionally need the owning sortition
+Use the [README tests](README.md#tests); selection changes additionally need the owning sortition
 tests. Keep benchmark claims separate from immutable-map correctness.

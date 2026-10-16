@@ -12,7 +12,6 @@ usage; keep cryptographic calculations in their Rust owners.
 - Preserve the `@interfold/wasm/init` universal loader and package export conditions; the raw web
   initializer is not the Node API. Rebuild both targets for changes that alter the loader shape.
 
-With workspace JS dependencies, wasm-pack, and the WASM Rust target available, run root
-`pnpm wasm:build`, then `pnpm -C crates/wasm test:browser` with Playwright's browser installed. Also
-exercise SDK consumers for API changes; generated bindings and native tests alone do not validate
-browser loading or proof compatibility.
+Use the [README build/browser tests](README.md#build-and-tests). API changes also need SDK consumer
+coverage; generated bindings and native tests alone do not validate browser loading or proof
+compatibility.

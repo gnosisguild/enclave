@@ -12,7 +12,7 @@ verification. It becomes a member of that project's workspace after copying/link
 - Change template sources here and exercise a copied/linked project. Do not fix relative imports by
   hard-coding this repository's local filesystem paths.
 
-In a prepared generated project, run `cargo test -p e3-support-scripts-dev`; run
-`cargo build --bin e3-support-scripts-dev` for the same build used by `compile`. The initial build
-may update sources in its copied lockfile. See the [parent guidance](../AGENTS.md) for dispatch and
+Use the [README project-context tests](README.md#tests). Exercise changed processor/policy plumbing
+in a generated project, not just the mock envelope unit case. See the
+[parent guidance](../AGENTS.md) for dispatch and
 [program-server guidance](../../program-server/AGENTS.md) for the shared HTTP boundary.

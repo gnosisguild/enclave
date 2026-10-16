@@ -14,6 +14,6 @@ templates, not root workspace members. Their nearest instructions describe proje
 - Cache purge removes the project's `.interfold/caches`; it must not broaden into support sources or
   operator identity/state directories.
 
-Run `cargo test --locked -p e3-support-scripts` for backend dispatch. Script integration needs a
-disposable generated project and the [OpenVM prerequisites](../openvm-prover/README.md); host unit
-tests do not compile a guest, prepare keys, or prove a round.
+Use the [README tests/project prerequisites](README.md#tests). Dispatch/template changes need a
+disposable generated project; host unit tests do not compile a guest, prepare keys, or prove a
+round.

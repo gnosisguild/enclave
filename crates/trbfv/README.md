@@ -1,8 +1,24 @@
 # e3-trbfv
 
+## Purpose
+
 Threshold-BFV calculations and typed request/response payloads for distributed key generation and
 threshold decryption. Actors, authenticated dealer admission, and timing belong in
 [keyshare](../keyshare/README.md) and [aggregation](../aggregator/README.md).
+
+## Map
+
+| Location                                                                                                                                                               | Responsibility                                                        |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| [`gen_pk_share_and_sk_sss.rs`](src/gen_pk_share_and_sk_sss.rs), [`gen_esi_sss.rs`](src/gen_esi_sss.rs)                                                                 | Randomized key/error contributions and encrypted Shamir payloads.     |
+| [`key assembly`](src/calculate_decryption_key.rs), [`share calculation`](src/calculate_decryption_share.rs), [`reconstruction`](src/calculate_threshold_decryption.rs) | Local decryption key, ciphertext shares, and final plaintext.         |
+| [`shares/`](src/shares)                                                                                                                                                | Typed encrypted share containers and BFV transport encoding.          |
+| [`trbfv_config.rs`](src/trbfv_config.rs), [`trbfv_request.rs`](src/trbfv_request.rs)                                                                                   | Parameter/dimension inputs and worker request/result/error envelopes. |
+| [`tests/integration.rs`](tests/integration.rs)                                                                                                                         | Isolated threshold calculation flow using generated fixtures.         |
+
+Workers generate contributions from caller RNG/cipher inputs, recipients assemble their local
+decryption keys, and the final calculation reconstructs from party-indexed ciphertext shares. These
+functions return data/errors; actor delivery, roster admission, and retries are outside them.
 
 ## Calculation surface
 
@@ -26,13 +42,18 @@ zero-based; Shamir reconstruction coordinates are one-based at the mathematical 
 ordering must retain the corresponding party IDs. Use paired threshold/DKG metadata from
 [e3-fhe-params](../fhe-params/README.md), not interchangeable parameter sets.
 
-## Secrets and tests
+## Secret inputs and outputs
 
 Share payloads in `shares` use local encrypted wrappers. Their opaque serialized bytes do not make
 decoded secret material suitable for logging or ordinary snapshots. Randomized operations take
 caller RNG/cipher inputs; runtime recovery reuses successful outputs rather than silently generating
 different shares.
 
+## Tests
+
 Run `cargo test --locked -p e3-trbfv` with [test-helper prerequisites](../test-helpers/README.md).
-See [DKG](../../docs/architecture/dkg.md) and
+Inline cases cover encrypted share serialization/indices and structured error extraction;
+[`tests/integration.rs`](tests/integration.rs) exercises threshold computation in isolation. See
+[DKG](../../docs/architecture/dkg.md) and
 [threshold decryption](../../docs/architecture/threshold-decryption.md) for dimensions and proofs.
+See [AGENTS.md](AGENTS.md) for mathematical/indexing change rules.

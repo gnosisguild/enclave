@@ -1,8 +1,24 @@
 # e3-zk-artifacts
 
+## Purpose
+
 The `zk-artifacts` executable generates Interfold circuit artifacts. Its commands call the
 computation, encoding, and commitment libraries. Argument parsing, command dispatch, and terminal
 output belong to this package.
+
+## Map
+
+| Location                                       | Responsibility                                                               |
+| ---------------------------------------------- | ---------------------------------------------------------------------------- |
+| [`main.rs`](src/main.rs)                       | Clap options, command dispatch, metadata listing, and terminal output.       |
+| [`generate.rs`](src/generate.rs)               | Circuit/preset/input-family dispatch into computation/sample/codegen traits. |
+| [`vk_hash.rs`](src/vk_hash.rs)                 | Canonical field parsing and complete recursive VK-tree combination.          |
+| [`parity_matrices.rs`](src/parity_matrices.rs) | Committee-specific parity derivation and Noir file output.                   |
+
+Generation resolves circuit metadata, samples inputs, computes bounds/witnesses, and writes the
+selected artifacts. Its samples are not production request inputs; `Prover.toml` includes private
+witness data. The shared implementation lives in [zk-helpers](../../zk-helpers/README.md), not in
+the CLI's dispatch table.
 
 ## Commands
 
@@ -41,3 +57,12 @@ as JSON.
 `parity-matrices` writes both preset files under `circuits/lib/src/configs/committee/<name>/`. Use
 `--output-root <path>` to select another root that contains the committee directory. To change the
 active committee or preset, use `pnpm build:circuits`, not direct edits to generated files.
+
+## Tests
+
+Run `cargo test --locked -p e3-zk-artifacts` from the root. Inline `vk_hash.rs` tests check
+full-tree descendant ordering, missing keys, and noncanonical fields using local artifacts.
+Computation and artifact-writer tests live in [zk-helpers](../../zk-helpers/README.md#tests).
+Running generation samples data/writes files but does not prove a circuit; the prepared proof flow
+is in [circuit artifacts](../../../docs/architecture/circuit-artifacts.md). See
+[AGENTS.md](AGENTS.md) for dispatch/generated-output changes.

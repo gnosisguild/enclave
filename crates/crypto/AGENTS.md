@@ -13,6 +13,6 @@ This crate owns local secret-at-rest encryption and password sources, not thresh
 - An encrypted wrapper records ciphertext, not authorization to deserialize arbitrary peer data.
   Keep caller-side authentication and size validation at their boundaries.
 
-Run `cargo test --locked -p e3-crypto`; tests use local password sources and require Unix filesystem
-semantics for file handling. See [upgrades](../../docs/architecture/upgrades.md) for saved-state
-changes.
+Use the [README tests](README.md#tests). Password-file changes need Unix permission/exclusive-create
+coverage as well as cipher round trips. See [upgrades](../../docs/architecture/upgrades.md) for
+saved-state changes.

@@ -1,5 +1,26 @@
 # Persistence Patterns
 
+## Purpose
+
+`e3-data` supplies ciphernode storage mechanisms: scoped key/value access, typed repositories,
+snapshot-backed state, append-only event logs, indexes, and large-event blobs. Runtime assembly
+belongs to [event-system](../event-system/README.md); domain crates choose repository keys/types.
+
+## Map
+
+| Location                                                                                                             | Responsibility                                                                  |
+| -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| [`data_store.rs`](src/data_store.rs), [`repository.rs`](src/repository.rs), [`repositories.rs`](src/repositories.rs) | Scoped transport wrapper, typed values, and repository factories.               |
+| [`persistable.rs`](src/persistable.rs), [`snapshot.rs`](src/snapshot.rs)                                             | In-memory state with scheduled snapshots and explicit hydration traits.         |
+| [`sled_store.rs`](src/sled_store.rs), [`sled_db.rs`](src/sled_db.rs), [`in_mem.rs`](src/in_mem.rs)                   | Persistent and memory data actors behind the same operations.                   |
+| [`commit_log_event_log.rs`](src/commit_log_event_log.rs), [`event_blob.rs`](src/event_blob.rs)                       | Durable history, bounded reads, validation/repair, and oversized payload files. |
+| [`sled_sequence_index.rs`](src/sled_sequence_index.rs), [`in_mem_sequence_index.rs`](src/in_mem_sequence_index.rs)   | Derived timestamp/sequence lookup for each backend.                             |
+| [`durable_intent.rs`](src/durable_intent.rs)                                                                         | Explicit record-once intent primitive used by durable effect owners.            |
+
+Events append/sync before delivery; handlers schedule snapshot state through repositories. The
+journal remains replay authority while indexes/snapshots accelerate recovery. The sections below
+explain why the data-access layers exist and how consumers use them.
+
 For current cross-layer guarantees and limits, see
 [persistence and replay](../../docs/architecture/persistence-and-replay.md). Repository keys and
 serialized payloads are durable interfaces: a Rust type-compatible change or key rename can still
@@ -39,13 +60,19 @@ Store struct and pass in either a `SledStore` or an `InMemStore` Actor to the `D
 accomplish this.
 
 ```rust
-let store = DataStore::from(SledStore::from(SledDb::new()));
+// Integration fragment: bus and db_path come from runtime assembly.
+let actor = SledStore::new(&bus, &db_path)?;
+let store = DataStore::from_sled_store(&actor);
 ```
 
 or for testing:
 
 ```rust
-let store = DataStore::from(InMemStore::new());
+use actix::Actor;
+use e3_data::{DataStore, InMemStore};
+
+let actor = InMemStore::new(false).start();
+let store = DataStore::from_in_mem(&actor);
 ```
 
 ```mermaid
@@ -58,9 +85,8 @@ graph LR
     SledStore --> DB
 ```
 
-The `DataStore` actor also has some convenience methods within it where it is possible to scope the
-keys so that you can consider the information you are storing as more of a tree structure as opposed
-to a flat list.
+The `DataStore` wrapper also has convenience methods that scope the keys so that you can consider
+the information you are storing as more of a tree structure as opposed to a flat list.
 
 ```rust
 let store = DataStore::from(&addr);
@@ -146,14 +172,18 @@ This has several benefits:
 
 ```rust
 
-// Get a repository for a type.
-let repo:Repository<Vec<String>> = get_repo();
+// Fragment inside a handler/routine with a DataStore and sequenced event context.
+use e3_data::{AutoPersist, Persistable, Repository};
+let repo: Repository<Vec<String>> = Repository::new(store.scope("example/names"));
 
 // Load a persistable object from the repository.
-let persistable:Persistable<Vec<String>> = repo.load().await?;
+let mut persistable: Persistable<Vec<String>> = repo.load().await?;
+if !persistable.has() {
+    persistable.set(Vec::new());
+}
 
 // A mutation schedules persistence; it is not a durability acknowledgment.
-persistable.try_mutate(|mut list| {
+persistable.try_mutate(&context, |mut list| {
   list.push("Fred");
   Ok(list)
 })?;
@@ -204,3 +234,12 @@ The CLI command `interfold node validate` checks stopped-node state without chan
 `--repair` only for a reported uncommitted physical tail. Repair can restore complete unindexed
 frames or truncate a torn suffix. It cannot remove an indexed record or migrate an unsupported
 schema.
+
+## Tests
+
+Run `cargo test --locked -p e3-data` from the root. Inline log/blob cases use temporary physical
+files to cover reopen, byte-bounded reads, integrity, and uncommitted tails. Sled tests cover
+batch/cursor behavior; memory tests cover backend operations; `persistable.rs` tests distinguish
+rejected write admission from a changed in-memory value. Runtime snapshot ordering/shutdown is
+tested in [event-system](../event-system/README.md). See [AGENTS.md](AGENTS.md) for durable-format
+and repair change constraints.

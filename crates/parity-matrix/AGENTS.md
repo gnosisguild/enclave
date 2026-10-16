@@ -12,7 +12,7 @@ Maintain finite-field parity-matrix derivation here, not generated Noir configur
 - A different valid null-space basis can change committed generated output. Review deterministic
   row/pivot order and regenerate through `pnpm zk parity-matrices`, not hand edits to circuit files.
 
-Run `cargo test --locked -p e3-parity-matrix`, retaining independent parity/property checks.
+Use the [README tests](README.md#testing), retaining independent parity/property checks.
 Generator/output changes also need the
 [circuit artifact flow](../../docs/architecture/circuit-artifacts.md) and affected circuit tests;
 algebraic validity alone does not establish artifact parity.

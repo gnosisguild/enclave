@@ -1,8 +1,17 @@
 # e3-sdk
 
+## Purpose
+
 Feature-gated Rust facade for application clients. It re-exports the existing capability crates
 rather than wrapping them with another implementation. The JavaScript SDK is a separate
 [workspace package](../../packages/interfold-sdk/README.md).
+
+## Map
+
+[`src/lib.rs`](src/lib.rs) is intentionally only a feature-gated export surface.
+[`Cargo.toml`](Cargo.toml) maps features to optional owner crates. Calls through an alias go
+directly to that owner; there is no SDK actor, configuration loader, or second client
+implementation.
 
 ## Select capabilities
 
@@ -35,6 +44,12 @@ assert_eq!(decode_bytes_to_vec_u64(&bytes).unwrap(), vec![7]);
 See [BFV usage](../bfv-client/README.md), [contract/listener helpers](../evm-helpers/README.md), and
 [indexing](../indexer/README.md) for their API contracts and examples.
 
+## Tests and feature checks
+
 Minimal checks: `cargo check --locked -p e3-sdk --no-default-features`, or add `--features bfv`.
 Default/EVM/indexer builds require the [Solidity fixture prerequisites](../evm-helpers/README.md)
 even for Cargo checks; BFV-only builds avoid those optional adapters.
+
+The facade has no independent behavioral tests. `cargo check --locked -p e3-sdk` checks the default
+exports; BFV/listener/indexer behavior is tested in the linked owner crates above. See
+[AGENTS.md](AGENTS.md) for feature/default and re-export changes.

@@ -10,6 +10,6 @@ This is the canonical owner of committee names and parameter values, not a runti
 - A new committee requires coordinated generated circuit/config outputs and verifier compatibility;
   adding an enum variant alone does not make its proofs usable.
 
-Run `cargo test --locked -p e3-committee` for serialized variants and lookup behavior. Follow
+Use the [README tests](README.md#tests) for serialized variants and lookup behavior. Follow
 [circuit artifacts](../../docs/architecture/circuit-artifacts.md) for coordinated generation and
 [selection](../../docs/architecture/committee-selection.md) for runtime meaning.
