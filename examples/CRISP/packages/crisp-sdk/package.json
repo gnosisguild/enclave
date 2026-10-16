@@ -39,8 +39,6 @@
   "homepage": "https://github.com/theinterfold/interfold",
   "scripts": {
     "compile:circuits": "bash ../../scripts/compile_circuits.sh",
-    "compile:user_data_encryption_ct0": "cd ../../../../circuits/bin/threshold/user_data_encryption_ct0 && nargo compile",
-    "compile:user_data_encryption_ct1": "cd ../../../../circuits/bin/threshold/user_data_encryption_ct1 && nargo compile",
     "compile:user_data_encryption": "cd ../../../../circuits/bin/threshold/user_data_encryption && nargo compile",
     "compile:crisp": "cd ../../circuits/bin/crisp && nargo compile",
     "compile:crisp_onchain": "cd ../../circuits/bin/crisp_onchain && nargo compile",

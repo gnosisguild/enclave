@@ -72,7 +72,7 @@ generate_raw_toml() {
     "${cmd[@]}"
 }
 
-if [ "$CIRCUIT_PATH" = "threshold/user_data_encryption_ct0" ] || [ "$CIRCUIT_PATH" = "threshold/user_data_encryption_ct1" ]; then
+if [ "$CIRCUIT_PATH" = "threshold/user_data_encryption_ct0_chunked" ] || [ "$CIRCUIT_PATH" = "threshold/user_data_encryption_ct1_chunked" ]; then
     TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/interfold-ude-benchmark.XXXXXX")
     trap 'rm -rf "$TEMP_DIR"' EXIT
     echo "  Generating the user-data encryption witness and recursive child proofs..."

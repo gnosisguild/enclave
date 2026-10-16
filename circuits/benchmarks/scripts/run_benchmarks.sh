@@ -333,7 +333,7 @@ for CIRCUIT in $RUN_CIRCUITS; do
         
         # Generate Prover.toml via zk-artifacts generate so nargo execute has witness
         echo "  Generating Prover.toml..."
-        if [[ "$CIRCUIT" == threshold/user_data_encryption_ct0 || "$CIRCUIT" == threshold/user_data_encryption_ct1 ]]; then
+        if [[ "$CIRCUIT" == threshold/user_data_encryption_ct0_chunked || "$CIRCUIT" == threshold/user_data_encryption_ct1_chunked ]]; then
             if [ "$USER_DATA_ENCRYPTION_INPUTS_READY" = false ]; then
                 if ! BENCHMARK_COMMITTEE="$OUTPUT_COMMITTEE" "${SCRIPT_DIR}/generate_prover_toml.sh" "$CIRCUIT" "$MODE" "$REPO_ROOT" 2>&1; then
                     echo "⚠️  Prover.toml generation failed for $CIRCUIT, skipping benchmark"

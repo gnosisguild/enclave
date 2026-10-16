@@ -45,11 +45,11 @@ const CIRCUIT_NAMES = {
   ct0ChunkMain: 'ct0_chunk_main',
   ct0PkCtCommit: 'ct0_pk_ct_commit',
   ct0EvalChunkIdentity: 'ct0_eval_chunk_identity',
-  userDataEncryptionCt0: 'user_data_encryption_ct0',
+  userDataEncryptionCt0: 'user_data_encryption_ct0_chunked',
   ct1ChunkMain: 'ct1_chunk_main',
   ct1PkCtCommit: 'ct1_pk_ct_commit',
   ct1EvalChunkIdentity: 'ct1_eval_chunk_identity',
-  userDataEncryptionCt1: 'user_data_encryption_ct1',
+  userDataEncryptionCt1: 'user_data_encryption_ct1_chunked',
 } as const
 
 const loadCircuits = (preset: string, committee: string): UserDataEncryptionCircuitBundle => {
@@ -87,8 +87,8 @@ const main = async () => {
   const api = await Barretenberg.new({ srsSize: 2 ** 21 })
   try {
     const topLevel = await buildUserDataEncryptionTopLevelInputs(api, circuits, inputs)
-    writeFileSync(join(options.outputRoot, 'user_data_encryption_ct0', 'Prover.toml'), toToml(topLevel.ct0))
-    writeFileSync(join(options.outputRoot, 'user_data_encryption_ct1', 'Prover.toml'), toToml(topLevel.ct1))
+    writeFileSync(join(options.outputRoot, 'user_data_encryption_ct0_chunked', 'Prover.toml'), toToml(topLevel.ct0))
+    writeFileSync(join(options.outputRoot, 'user_data_encryption_ct1_chunked', 'Prover.toml'), toToml(topLevel.ct1))
   } finally {
     api.destroy()
   }
