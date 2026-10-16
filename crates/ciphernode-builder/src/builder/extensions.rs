@@ -324,6 +324,7 @@ fn accusation_manager(
         vote_validity_by_chain.clone(),
         accusation_deadline_skew_secs,
         persisted_committees,
+        &storage.repositories.store,
     ))
 }
 

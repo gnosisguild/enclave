@@ -43,17 +43,19 @@ use actix::{Actor, Addr, AsyncContext, Context, Handler, SpawnHandle};
 use alloy::primitives::{Address, Bytes};
 use alloy::signers::local::PrivateKeySigner;
 use e3_committee::CiphernodesCommitteeSize;
+use e3_data::Repository;
 use e3_events::{
     AccusationVote, BusHandle, CommitmentConsistencyViolation, ComputeRequestError,
     ComputeResponse, E3id, EventPublisher, EventSubscriber, EventType, InterfoldEvent,
     InterfoldEventData, ProofFailureAccusation, ProofType, ProofVerificationFailed,
     ProofVerificationPassed, TypedEvent,
 };
+use e3_events::{EventContext, Sequenced};
 use e3_utils::NotifySync;
 use tracing::{error, warn};
 
 pub use crate::workflow::accusation_voting::Clock;
-use crate::workflow::accusation_voting::{AccusationVoting, VoteAction};
+use crate::workflow::accusation_voting::{AccusationVotesSnapshot, AccusationVoting, VoteAction};
 
 /// Production clock backed by `SystemTime::now()`.
 pub struct SystemClock;
@@ -75,9 +77,9 @@ impl Clock for SystemClock {
 /// lives inside the owned [`AccusationVoting`] service and is therefore
 /// naturally scoped to a single E3.
 ///
-/// **Ephemeral**: This actor does *not* persist state across restarts.
-/// In-flight accusations are lost on node restart (accepted trade-off:
-/// they would have timed out within the vote timeout anyway).
+/// **Durable votes**: the pending accusations, their admitted votes and vote timeouts, and the
+/// proofs this node accused are saved after each event that changes them. A restarted manager
+/// restores them and starts their vote timers at `EffectsEnabled`.
 ///
 /// Subscribes to:
 /// - [`ProofVerificationFailed`] — local proof failure detection
@@ -102,6 +104,11 @@ pub struct AccusationManager {
     /// Active vote-collection timeouts keyed by accusation_id. Managed entirely
     /// by the actor — the service only signals start/cancel via [`VoteAction`].
     timeout_handles: HashMap<[u8; 32], SpawnHandle>,
+    /// Where the vote state is saved; `None` in tests that run without a store.
+    votes_repo: Option<Repository<AccusationVotesSnapshot>>,
+    /// Context of the latest E3 event. Saves use it: an older context makes the store drop the
+    /// write as stale.
+    last_ec: Option<EventContext<Sequenced>>,
 }
 
 #[path = "effects/mod.rs"]

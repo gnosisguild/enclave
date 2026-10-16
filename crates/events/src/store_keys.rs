@@ -98,6 +98,11 @@ impl StoreKeys {
         format!("//commitment_consistency/v1/{e3_id}")
     }
 
+    /// Durable vote state of the per-E3 accusation manager.
+    pub fn accusation_votes(e3_id: &E3id) -> String {
+        format!("//accusation_votes/v1/{e3_id}")
+    }
+
     pub fn router() -> String {
         String::from("//router")
     }

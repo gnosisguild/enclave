@@ -14,12 +14,15 @@
 use std::collections::HashMap;
 
 use crate::actors::accusation_manager::AccusationManager;
+use crate::repo::AccusationVotesRepositoryFactory;
+use crate::workflow::accusation_voting::AccusationVotesSnapshot;
 use actix::Actor;
 use alloy::primitives::Address;
 use alloy::signers::local::PrivateKeySigner;
 use anyhow::Result;
 use async_trait::async_trait;
 use e3_committee::CiphernodesCommitteeSize;
+use e3_data::{DataStore, RepositoriesFactory};
 use e3_events::{BusHandle, Committee, E3id, Event, InterfoldEvent, InterfoldEventData};
 use e3_request::{E3Context, E3ContextSnapshot, E3Extension, META_KEY};
 use tracing::{error, info, warn};
@@ -57,6 +60,8 @@ pub struct AccusationManagerExtension {
     accusation_deadline_skew_secs: u64,
     /// Active finalized committees loaded before request contexts hydrate.
     persisted_committees: HashMap<E3id, Committee>,
+    /// Holds each E3's saved vote state.
+    store: DataStore,
 }
 
 impl AccusationManagerExtension {
@@ -67,6 +72,7 @@ impl AccusationManagerExtension {
         vote_validity_secs_by_chain: HashMap<u64, u64>,
         accusation_deadline_skew_secs: u64,
         persisted_committees: HashMap<E3id, Committee>,
+        store: &DataStore,
     ) -> Box<Self> {
         Box::new(Self {
             bus: bus.clone(),
@@ -75,6 +81,7 @@ impl AccusationManagerExtension {
             vote_validity_secs_by_chain,
             accusation_deadline_skew_secs,
             persisted_committees,
+            store: store.clone(),
         })
     }
 
@@ -93,7 +100,13 @@ impl AccusationManagerExtension {
 
     /// Start the per-E3 manager. `effects_enabled` is false for a manager that startup rebuilds:
     /// it holds local accusations until `EffectsEnabled`, after the replayed event log.
-    fn start_manager(&self, ctx: &mut E3Context, committee: &[String], effects_enabled: bool) {
+    fn start_manager(
+        &self,
+        ctx: &mut E3Context,
+        committee: &[String],
+        effects_enabled: bool,
+        saved_votes: Option<AccusationVotesSnapshot>,
+    ) {
         if ctx.get_event_recipient("accusation_manager").is_some() {
             return;
         }
@@ -178,6 +191,14 @@ impl AccusationManagerExtension {
         } else {
             manager.hold_accusations_until_effects()
         };
+        let votes_repo = self.store.repositories().accusation_votes(&ctx.e3_id);
+        let manager = match manager.with_saved_votes(votes_repo, saved_votes) {
+            Ok(manager) => manager,
+            Err(error) => {
+                error!(e3_id = %ctx.e3_id, %error, "Cannot restore the saved accusation votes");
+                return;
+            }
+        };
         let addr = manager.start();
 
         ctx.set_event_recipient("accusation_manager", Some(addr.into()));
@@ -194,16 +215,22 @@ impl E3Extension for AccusationManagerExtension {
         if data.e3_id != ctx.e3_id {
             return;
         }
-        self.start_manager(ctx, &data.committee, true);
+        self.start_manager(ctx, &data.committee, true, None);
     }
 
-    /// Recreate the per-E3 actor so this node can process new accusations after a restart.
-    /// In-flight vote state remains ephemeral and expires at the signed accusation deadline. The
-    /// actor holds local accusations until `EffectsEnabled`.
+    /// Recreate the per-E3 actor so this node can process new accusations after a restart. It
+    /// restores the saved vote state, and holds local accusations until `EffectsEnabled`.
     async fn hydrate(&self, ctx: &mut E3Context, _snapshot: &E3ContextSnapshot) -> Result<()> {
         if let Some(committee) = self.persisted_committees.get(&ctx.e3_id) {
             let members = committee.members().to_vec();
-            self.start_manager(ctx, &members, false);
+            let repo = self.store.repositories().accusation_votes(&ctx.e3_id);
+            let saved_votes = DataStore::from(&repo)
+                .read_checked::<AccusationVotesSnapshot>()
+                .await?;
+            if let Some(saved_votes) = &saved_votes {
+                saved_votes.validate()?;
+            }
+            self.start_manager(ctx, &members, false, saved_votes);
         }
         Ok(())
     }
@@ -212,12 +239,13 @@ impl E3Extension for AccusationManagerExtension {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::workflow::accusation_voting::AccusationVoting;
     use actix::{Context, Handler};
     use e3_data::{DataStore, InMemStore, RepositoriesFactory};
     use e3_events::{
-        hlc_factory::HlcFactory, CommitmentConsistencyViolation, EffectsEnabled, EventBus,
-        EventBusConfig, EventConstructorWithTimestamp, EventSource, GetEvents, ProofType, Seed,
-        Sequencer, StoreEventRequested, StoreEventResponse, Unsequenced,
+        hlc_factory::HlcFactory, AccusationVote, CommitmentConsistencyViolation, EffectsEnabled,
+        EventBus, EventBusConfig, EventConstructorWithTimestamp, EventSource, GetEvents, ProofType,
+        Seed, Sequencer, StoreEventRequested, StoreEventResponse, Unsequenced,
     };
     use e3_fhe_params::BfvPreset;
     use e3_request::{ContextRepositoryFactory, E3ContextParams, E3Meta};
@@ -309,6 +337,7 @@ mod tests {
                 (e3_id.clone(), committee.clone()),
                 (unmapped_e3_id.clone(), committee),
             ]),
+            &DataStore::from_in_mem(&InMemStore::new(false).start()),
         );
 
         for (id, expect_manager) in [(e3_id, true), (unmapped_e3_id, false)] {
@@ -352,6 +381,7 @@ mod tests {
             HashMap::from([(31337, 300)]),
             30,
             HashMap::from([(e3_id.clone(), committee.clone())]),
+            &DataStore::from_in_mem(&InMemStore::new(false).start()),
         );
         let mut context = test_context(e3_id.clone());
         context.set_dependency(META_KEY, test_meta());
@@ -418,6 +448,146 @@ mod tests {
         })
         .await??;
         assert_eq!(accusations().await?, 1);
+        Ok(())
+    }
+
+    /// A restart keeps an accusation's tally and evidence: a vote that arrives after the restart
+    /// completes the quorum with this node's vote from before it, and the quorum carries the
+    /// evidence that the slash proposal needs.
+    #[actix::test]
+    async fn a_restarted_manager_keeps_the_votes_of_a_pending_accusation() -> Result<()> {
+        use alloy::signers::SignerSync;
+
+        let bus = test_bus();
+        let history = bus.history();
+        let store = DataStore::from_in_mem(&InMemStore::new(false).start());
+        let e3_id = E3id::new("7", 31337);
+        let slashing_manager = Address::repeat_byte(0x44);
+        let me = PrivateKeySigner::random();
+        let voter = PrivateKeySigner::random();
+        let accused = Address::repeat_byte(0x22);
+        let committee = Committee::new(vec![
+            me.address().to_string(),
+            voter.address().to_string(),
+            accused.to_string(),
+        ]);
+        let accused_party_id = committee
+            .party_id_for(&accused.to_string())
+            .expect("accused member");
+        let event = |data: e3_events::InterfoldEventData, seq: u64| {
+            InterfoldEvent::<Unsequenced>::new_with_timestamp(
+                data,
+                None,
+                seq as u128,
+                None,
+                EventSource::Local,
+            )
+            .into_sequenced(seq)
+        };
+        // Each run hydrates its manager from the same store, as a restart does.
+        let start = || async {
+            let extension = AccusationManagerExtension::create(
+                &bus,
+                me.clone(),
+                HashMap::from([(31337, slashing_manager)]),
+                HashMap::from([(31337, 300)]),
+                30,
+                HashMap::from([(e3_id.clone(), committee.clone())]),
+                &store,
+            );
+            let mut context = test_context(e3_id.clone());
+            context.set_dependency(META_KEY, test_meta());
+            let snapshot = E3ContextSnapshot {
+                e3_id: e3_id.clone(),
+                recipients: Vec::new(),
+                dependencies: vec!["meta".to_string()],
+            };
+            extension.hydrate(&mut context, &snapshot).await?;
+            let manager = context
+                .get_event_recipient("accusation_manager")
+                .cloned()
+                .expect("hydration starts the manager");
+            manager.send(event(EffectsEnabled::new().into(), 1)).await?;
+            Ok::<_, anyhow::Error>(manager)
+        };
+        let published = |matches: fn(&e3_events::InterfoldEventData) -> bool| {
+            let history = history.clone();
+            async move {
+                let events = history.send(GetEvents::new()).await?;
+                Ok::<_, anyhow::Error>(
+                    events
+                        .into_iter()
+                        .filter(|event| matches(event.get_data()))
+                        .map(|event| event.into_data())
+                        .collect::<Vec<_>>(),
+                )
+            }
+        };
+
+        let before_restart = start().await?;
+        before_restart
+            .send(event(
+                CommitmentConsistencyViolation {
+                    e3_id: e3_id.clone(),
+                    accused_address: accused,
+                    accused_party_id,
+                    proof_type: ProofType::C1PkGeneration,
+                    data_hash: [7; 32],
+                    evidence: alloy::primitives::Bytes::from(vec![0x11; 32]),
+                }
+                .into(),
+                2,
+            ))
+            .await?;
+        let accusation = actix::clock::timeout(std::time::Duration::from_secs(5), async {
+            loop {
+                let accusations =
+                    published(|data| matches!(data, InterfoldEventData::ProofFailureAccusation(_)))
+                        .await?;
+                if let Some(InterfoldEventData::ProofFailureAccusation(accusation)) =
+                    accusations.into_iter().next()
+                {
+                    return Ok::<_, anyhow::Error>(accusation);
+                }
+                actix::clock::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        })
+        .await??;
+
+        let after_restart = start().await?;
+        let mut vote = AccusationVote {
+            e3_id: e3_id.clone(),
+            accusation_id: AccusationVoting::accusation_id(&accusation),
+            voter: voter.address(),
+            data_hash: accusation.data_hash,
+            issued_at: accusation.issued_at,
+            deadline: accusation.deadline,
+            signature: ArcBytes::default(),
+        };
+        let digest = AccusationVoting::vote_digest(&vote, slashing_manager);
+        vote.signature = ArcBytes::from_bytes(&voter.sign_hash_sync(&digest.into())?.as_bytes());
+        after_restart.send(event(vote.into(), 3)).await?;
+
+        let quorum = actix::clock::timeout(std::time::Duration::from_secs(5), async {
+            loop {
+                let quorums = published(|data| {
+                    matches!(data, InterfoldEventData::AccusationQuorumReached(_))
+                })
+                .await?;
+                if let Some(InterfoldEventData::AccusationQuorumReached(quorum)) =
+                    quorums.into_iter().next()
+                {
+                    return Ok::<_, anyhow::Error>(quorum);
+                }
+                actix::clock::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        })
+        .await??;
+        assert_eq!(quorum.votes_for.len(), 2);
+        assert_eq!(
+            quorum.evidence,
+            alloy::primitives::Bytes::from(vec![0x11; 32])
+        );
         Ok(())
     }
 }

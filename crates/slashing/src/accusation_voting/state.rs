@@ -52,6 +52,58 @@ pub(crate) struct PendingAccusation {
     pub(crate) accusation: ProofFailureAccusation,
     pub(crate) votes_for: Vec<AccusationVote>,
     pub(crate) ec: EventContext<Sequenced>,
+    /// Unix seconds when the vote collection times out. A restart keeps it.
+    pub(crate) timeout_at: u64,
+}
+
+pub(crate) const ACCUSATION_VOTES_SNAPSHOT_VERSION: u32 = 1;
+
+/// Saved vote state of one E3: the pending accusations that hold this node's vote, with their
+/// admitted votes, vote timeouts and the failed proof's evidence, and the proofs that this node
+/// accused. Replay starts after the snapshot cursor, so a restarted manager cannot rebuild a tally
+/// from the event log.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub(crate) struct AccusationVotesSnapshot {
+    pub(super) version: u32,
+    pub(super) pending: Vec<SavedAccusation>,
+    pub(super) accused_proofs: Vec<(Address, ProofType)>,
+}
+
+impl Default for AccusationVotesSnapshot {
+    fn default() -> Self {
+        Self {
+            version: ACCUSATION_VOTES_SNAPSHOT_VERSION,
+            pending: Vec::new(),
+            accused_proofs: Vec::new(),
+        }
+    }
+}
+
+impl AccusationVotesSnapshot {
+    pub(crate) fn validate(&self) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            self.version == ACCUSATION_VOTES_SNAPSHOT_VERSION,
+            "unsupported accusation-votes snapshot version {}",
+            self.version
+        );
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub(super) struct SavedAccusation {
+    pub(super) accusation: ProofFailureAccusation,
+    pub(super) votes_for: Vec<AccusationVote>,
+    pub(super) ec: EventContext<Sequenced>,
+    pub(super) timeout_at: u64,
+    /// This node's failed check of the accused proof: a quorum carries its evidence on chain.
+    pub(super) failed_proof: Option<SavedFailedProof>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub(super) struct SavedFailedProof {
+    pub(super) data_hash: [u8; 32],
+    pub(super) evidence: Bytes,
 }
 
 /// Cached verification result for an accused party and proof type.
@@ -100,4 +152,8 @@ pub(crate) struct AccusationVoting {
     /// accusation with a vote window from the current clock.
     pub(super) effects_enabled: bool,
     pub(super) deferred_accusations: Vec<DeferredAccusation>,
+    /// Restored accusations whose vote timers start at `EffectsEnabled`.
+    pub(super) restored_timeouts: Vec<[u8; 32]>,
+    /// The last saved vote state, so an event that changes nothing writes nothing.
+    pub(super) saved: Option<AccusationVotesSnapshot>,
 }

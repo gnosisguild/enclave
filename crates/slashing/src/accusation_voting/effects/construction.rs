@@ -115,6 +115,8 @@ impl AccusationManager {
                 clock,
             ),
             timeout_handles: HashMap::new(),
+            votes_repo: None,
+            last_ec: None,
         }
     }
 
@@ -211,6 +213,20 @@ impl AccusationManager {
             addr.clone().into(),
         );
         addr
+    }
+
+    /// Save the vote state in `repo`, and restore `restored`, the state that this E3's manager
+    /// saved before a restart.
+    pub(crate) fn with_saved_votes(
+        mut self,
+        repo: Repository<AccusationVotesSnapshot>,
+        restored: Option<AccusationVotesSnapshot>,
+    ) -> anyhow::Result<Self> {
+        if let Some(snapshot) = restored {
+            self.voting.restore(snapshot)?;
+        }
+        self.votes_repo = Some(repo);
+        Ok(self)
     }
 
     /// Hold local accusations until `EffectsEnabled`, for a manager that startup rebuilds before
