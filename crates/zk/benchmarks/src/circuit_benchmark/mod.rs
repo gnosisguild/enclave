@@ -207,7 +207,7 @@ pub(crate) fn execute(root: &Path, options: &Options) -> Result<()> {
     let config: selection::Config = serde_json::from_slice(&fs::read(config_path)?)?;
     let mode = options.mode.as_deref().unwrap_or(&config.mode);
     let preset = match mode {
-        "insecure" => BfvPreset::InsecureThreshold512,
+        "insecure" => BfvPreset::InsecureThreshold64,
         "secure" => BfvPreset::SecureThreshold8192,
         _ => bail!("Mode must be insecure or secure"),
     };
@@ -228,7 +228,7 @@ pub(crate) fn execute(root: &Path, options: &Options) -> Result<()> {
     let preset_name = if mode == "secure" {
         "secure-8192"
     } else {
-        "insecure-512"
+        "insecure-64"
     };
     let policy = e3_zk_build::build_pairs(root)?;
     if !policy

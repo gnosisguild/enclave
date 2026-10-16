@@ -182,7 +182,7 @@ fn report_only_uses_saved_data_and_does_not_overwrite_its_input() {
 
 #[test]
 fn replay_rejects_bad_proofs_and_wrong_configuration_before_evm_execution() {
-    let doc = serde_json::json!({"benchmark_config":{"mode":"insecure","bfv_preset_subdir":"insecure-512","committee_n":3,"committee_h":2,"committee_t":1},"folded_artifacts":{"dkg_aggregator":{"proof_hex":"0x01","public_inputs_hex":"0x00"},"decryption_aggregator":{"proof_hex":"0x01","public_inputs_hex":"0x00"}}});
+    let doc = serde_json::json!({"benchmark_config":{"mode":"insecure","bfv_preset_subdir":"insecure-64","committee_n":3,"committee_h":2,"committee_t":1},"folded_artifacts":{"dkg_aggregator":{"proof_hex":"0x01","public_inputs_hex":"0x00"},"decryption_aggregator":{"proof_hex":"0x01","public_inputs_hex":"0x00"}}});
     assert!(protocol::configuration(&doc, Some("secure"), None, 1).is_err());
     assert!(protocol::configuration(&doc, None, Some("micro"), 1).is_err());
     assert!(protocol::folded(&doc).is_err());
@@ -397,7 +397,7 @@ fn integration_child_uses_validated_bb_even_when_path_selects_another_binary() {
     assert!(e3_zk_build::reports_version(&observed, "5.2.0"));
     let cfg = protocol::Configuration {
         mode: "insecure".into(),
-        preset: "insecure-512".into(),
+        preset: "insecure-64".into(),
         committee: e3_committee::CiphernodesCommitteeSize::Minimum,
         jobs: 1,
         bb_binary: Some(selected.clone()),

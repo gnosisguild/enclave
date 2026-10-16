@@ -174,7 +174,7 @@ describe('CRISP Contracts', function () {
             {
               verify_gas: { user: measuredGas },
               source: 'crisp_verifier_test',
-              preset: 'insecure-512',
+              preset: 'insecure-64',
               artifact: {
                 proof_hex: ethers.hexlify(voteProof.proof),
                 public_inputs_hex: `0x${voteProof.publicInputs.map((value: string) => ethers.toBeHex(BigInt(value), 32).slice(2)).join('')}`,

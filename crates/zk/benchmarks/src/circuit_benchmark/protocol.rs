@@ -138,7 +138,7 @@ pub(crate) fn configuration(
     let stored_mode = cfg["mode"]
         .as_str()
         .or_else(|| match cfg["bfv_preset_subdir"].as_str() {
-            Some("insecure-512") => Some("insecure"),
+            Some("insecure-64") => Some("insecure"),
             Some("secure-8192") => Some("secure"),
             _ => None,
         });
@@ -151,7 +151,7 @@ pub(crate) fn configuration(
         .or(stored_mode)
         .context("Specify --mode for an export without preset metadata")?;
     let preset = match mode {
-        "insecure" => "insecure-512",
+        "insecure" => "insecure-64",
         "secure" => "secure-8192",
         _ => bail!("Mode must be insecure or secure"),
     };

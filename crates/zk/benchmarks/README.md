@@ -69,7 +69,7 @@ The active preset and committee must match the request, and the driver verifies 
 artifact inventory and checksums. To select an archived pair without compiling:
 
 ```bash
-pnpm build:circuits --preset insecure-512 --committee minimum --hydrate-bin-only
+pnpm build:circuits --preset insecure-64 --committee minimum --hydrate-bin-only
 ```
 
 Verifier gas and calldata gas stay separate measurements; calldata cost never substitutes for
