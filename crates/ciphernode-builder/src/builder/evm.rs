@@ -295,7 +295,9 @@ async fn attach_slashing_manager(
 ) -> Result<()> {
     let slashing_manager = slashing_manager.with_context(|| {
         format!(
-            "Slashing manager is enabled but no contract address configured for chain {}",
+            "Chain {} has no SlashingManager: Interfold.slashingManager() could not be read or \
+             is not set. A full node needs the live manager to sign accusation votes and submit \
+             slash proposals",
             readers.chain.name
         )
     })?;
