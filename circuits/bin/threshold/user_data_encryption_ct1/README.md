@@ -1,6 +1,9 @@
-# `user_data_encryption_ct1` — P3 (inner)
+# `user_data_encryption_ct1` — P3 (standalone leg)
 
-Second leg of user BFV encryption (paired with `user_data_encryption_ct0`).
+Second leg of user BFV encryption, as a standalone circuit.
+[`user_data_encryption`](../user_data_encryption/README.md) proves this leg and
+`user_data_encryption_ct0` together, and clients prove only that circuit. This package builds for
+per-leg benchmarks.
 
 |           |                                                                                                                     |
 | --------- | ------------------------------------------------------------------------------------------------------------------- |

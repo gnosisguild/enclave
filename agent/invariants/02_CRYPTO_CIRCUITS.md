@@ -241,9 +241,9 @@ every section.
   `pk0` (bounded by C1), C4's shares (bounded by C2) and C3's DKG key (bounded by C0) rely on it, at
   half the cost of a two-sided range check. A value that no upstream commitment bounds still needs
   its own bound where it originates: C1's `pk0`, because C1 originates it and the key equation
-  absorbs `+q` against `r1`; C0's key, to the centred window, which is why C0 range-checks it
-  rather than only hashing it (a malformed key then fails its owner's C0, not every dealer's C3); and
-  C5's `pk0_agg`, because `verify_pk_for_basis` pins it only modulo `q_l`. — `flow-trace/04`
+  absorbs `+q` against `r1`; C0's key, to the centred window, which is why C0 range-checks it rather
+  than only hashing it (a malformed key then fails its owner's C0, not every dealer's C3); and C5's
+  `pk0_agg`, because `verify_pk_for_basis` pins it only modulo `q_l`. — `flow-trace/04`
 - Every prover-chosen modular quotient needs a bound. This includes C1's `e_sm` CRT lift and the
   reduced encryption quotients in ct0, ct1, and C3. Bounds on the other operands must also prevent
   field wraparound. When every other term of the identity is exactly bounded, the integer identity
@@ -363,42 +363,45 @@ every section.
   an artifact of the sweep, not of the change under test: rebuild with `pnpm build:circuits` before
   believing it. — `flow-trace/04`
 - A soundness fix can be blocked by the browser prover, and the ceiling is a cliff rather than a
-  slope. CRISP proves ct0 in-browser against a hardcoded `srsSize: 2**21` (2,097,152); the checked
-  pk and ciphertext commitments put ct0 at 2,229,363, which stops browser proving rather than
-  slowing it. The soundness fix landed first and the pending arithmetic optimisation restores the
-  margin, but the two must ship together: ct0 has to be re-measured against 2,097,152 before CRISP
-  ships. Measure ct0 against that number before adding any constraint to it. At secure-8192 ct0 is
-  1,219,509 and ct1 700,155 since ct1 hard-codes the CRS and both legs bound `r` by a window and `u`
-  as ternary. — `flow-trace/04`
+  slope. CRISP and `@interfold/sdk` prove `user_data_encryption` in-browser against a hardcoded
+  `srsSize: 2**21` (2,097,152). A circuit above that size stops browser proving rather than slowing
+  it: the checked pk and ciphertext commitments once put ct0 alone at 2,229,363. At secure-8192
+  `user_data_encryption`, which proves both legs, is 1,891,256, under the ceiling and under its
+  2,000,000 budget (108,744 spare). The standalone legs are ct0 1,219,509 and ct1 700,155, since ct1
+  hard-codes the CRS and both legs bound `r` by a window and `u` as ternary. A constraint added to
+  either leg also lands in `user_data_encryption`, so measure `user_data_encryption` against the
+  budget before adding one. — `flow-trace/04`
 - Anchoring a value off-circuit still needs an injective packing in-circuit. ct0 opens `pk0` with
-  checked digits and ct1 hard-codes `pk1` as the CRS that C5 commits as `pk1_agg`, so the
-  public-key commitment has one opening. `CRISPProgram` supplies the registry's C5-proven committee
-  key as `noirPublicInputs[8]`. This binds the ballot to the round's key only because the packing
-  has one opening. Non-injective packing defeats a chain-supplied anchor as it defeats an in-circuit
-  commitment comparison. The same requirement applies to the `u`-commitment equality in the
-  `user_data_encryption` fold. — `flow-trace/04`
-- **The anchor is load-bearing for ct0's key.** The checked slot keeps `pk0` in
-  `[-2^nb, 15 * 2^nb)` (`nb` = `BIT_PK` rounded up to a nibble, under `2^64` at secure-8192), which
-  rules out wraparound in the identity but not a non-canonical key; the exact centred window comes from
-  C5 through the anchor. Any program that accepts user-data encryption proofs must compare the
-  wrapper's `pk_commitment` with the committee key, as `CRISPProgram` does. Only keys whose second
+  checked digits and ct1 hard-codes `pk1` as the CRS that C5 commits as `pk1_agg`, so the public-key
+  commitment has one opening. `CRISPProgram` supplies the registry's C5-proven committee key as
+  `noirPublicInputs[8]`. This binds the ballot to the round's key only because the packing has one
+  opening. Non-injective packing defeats a chain-supplied anchor as it defeats an in-circuit
+  commitment comparison. `user_data_encryption` needs no `u`-commitment comparison: both legs read
+  one `u` witness, the ct0 leg bounds it to `{-1, 0, 1}` and commits it, and the ct1 leg takes that
+  commitment into its transcript (`execute_with_u_commitment`). That entry point is sound only with
+  the commitment of the same `u` witness that the ct1 leg reads. — `flow-trace/04`
+- **The anchor is load-bearing for ct0's key.** The checked slot keeps `pk0` in `[-2^nb, 15 * 2^nb)`
+  (`nb` = `BIT_PK` rounded up to a nibble, under `2^64` at secure-8192), which rules out wraparound
+  in the identity but not a non-canonical key; the exact centred window comes from C5 through the
+  anchor. Any program that accepts user-data encryption proofs must compare the `pk_commitment` of
+  `user_data_encryption` with the committee key, as `CRISPProgram` does. Only keys whose second
   component is the default-seed CRP can be proven, which every committee key is. — `flow-trace/04`
 - The class is "every circuit that opens a commitment it did not create". Its members are C2a, C2b,
-  C3 (C0's key), C4, C5 and C6 (three). All open through `pack_checked`. A new commitment opened from
-  elsewhere joins that list and needs either the checked helper or its own bound. Naming the class
-  matters: the first two instances were found while optimising the circuits that held them, and the
-  other five only by enumerating the pattern. CRISP's ballot circuits also open commitments they did
-  not create (the parent's and the ballot's ciphertexts) and keep plain `pack`: `verify_slot_update`
-  checks a relation that is linear and aligned coefficient by coefficient across ciphertexts packed
-  with the same `BIT_CT`, so an opening that keeps the carriers proves the same relation for the
-  committed coefficients. The exemption holds only for that shape of relation, and only while every
-  commitment in it has a bounded opening that something else fixes: the ballot through the range
-  checks of `user_data_encryption_ct0/ct1`, and the parent and the published result because
-  `chain_head_per_slot` takes an entry only when its bytes reproduce its commitment and it extends
-  the selected head. A check at one point over those commitments, or a Secure Process that follows a
-  parent by its stored commitment without its bytes, needs injective openings: chained masks could
-  then carry a coefficient past the radix and shift a plaintext coefficient by a carry. —
-  `flow-trace/04`
+  C3 (C0's key), C4, C5 and C6 (three). All open through `pack_checked`. A new commitment opened
+  from elsewhere joins that list and needs either the checked helper or its own bound. Naming the
+  class matters: the first two instances were found while optimising the circuits that held them,
+  and the other five only by enumerating the pattern. CRISP's ballot circuits also open commitments
+  they did not create (the parent's and the ballot's ciphertexts) and keep plain `pack`:
+  `verify_slot_update` checks a relation that is linear and aligned coefficient by coefficient
+  across ciphertexts packed with the same `BIT_CT`, so an opening that keeps the carriers proves the
+  same relation for the committed coefficients. The exemption holds only for that shape of relation,
+  and only while every commitment in it has a bounded opening that something else fixes: the ballot
+  through the range checks of the two legs of `user_data_encryption`, and the parent and the
+  published result because `chain_head_per_slot` takes an entry only when its bytes reproduce its
+  commitment and it extends the selected head. A check at one point over those commitments, or a
+  Secure Process that follows a parent by its stored commitment without its bytes, needs injective
+  openings: chained masks could then carry a coefficient past the radix and shift a plaintext
+  coefficient by a carry. — `flow-trace/04`
 - A bound that is not tight enough for the slot is no bound for this purpose. C2b's `as u64` cast
   limited coefficients to `2^64` while the slot was `radix = 2^64` with `base = 2^60`, so a digit
   could still overflow. — `flow-trace/04`
@@ -587,11 +590,13 @@ every section.
   point derived from the three commitments is unsound: the point is known before the prover picks
   the parent opening and the quotients, and a second opening of the parent commitment let a mask
   publish its ballot alone and drop the slot's vote
-  (`a_second_opening_of_the_parent_cannot_erase_the_slot`). The fold circuits pin the ballot
-  circuits through `CRISP_FOLD_EXPECTED_KEY_HASH_*` and `CRISP_ONCHAIN_FOLD_EXPECTED_KEY_HASH_*`, so
-  a change to either ballot circuit must regenerate those constants (`pnpm compute:vk-hash`, both
-  presets) and the generated verifiers; a deployed `CRISPProgram` keeps the circuit its verifier was
-  built from. — `flow-trace/04`
+  (`a_second_opening_of_the_parent_cannot_erase_the_slot`). The fold circuits pin
+  `user_data_encryption` and the ballot circuit through
+  `compute_vk_hash([user_data_encryption_key_hash, crisp_key_hash])` against
+  `CRISP_FOLD_EXPECTED_KEY_HASH_*` and `CRISP_ONCHAIN_FOLD_EXPECTED_KEY_HASH_*`, so a change to
+  `user_data_encryption` or to either ballot circuit must regenerate those constants
+  (`pnpm compute:vk-hash`, both presets) and the generated verifiers; a deployed `CRISPProgram`
+  keeps the circuit its verifier was built from. — `flow-trace/04`
 - **CRISPProgram keeps every option total below the plaintext modulus.** A ballot holds one weight
   for each option, so coefficient `o` of the decrypted tally is the total weight on option `o`, and
   the committee decrypts it modulo the plaintext modulus `t` of the round's BFV parameters.
@@ -618,12 +623,12 @@ every section.
   coefficient, the hinted weight, and the quotient to `[0, t)`. Then `k1 + t * r == Q_MOD_T * v`
   holds over the integers, and `v` is the value that the coefficient decrypts to. The bound on the
   coefficient also gives the packed `k1_commitment` one opening. Thus the fold's equality check
-  binds this `k1` to the plaintext that `user_data_encryption_ct0` encrypts. Without that bound, a
-  prover can open the commitment to shifted option coefficients that decode to other weights.
-  Indexing as if the polynomial were the message width makes both checks read only padding: every
-  vote passes any balance bound, and a mask — which needs no signature and may be written to any
-  eligible slot — can carry an arbitrary payload into someone else's ballot. Tests must build `k1`
-  at the compiled degree, not at `MAX_MSG_NON_ZERO_COEFFS`. — `flow-trace/04`
+  binds this `k1` to the plaintext that the ct0 leg of `user_data_encryption` encrypts. Without that
+  bound, a prover can open the commitment to shifted option coefficients that decode to other
+  weights. Indexing as if the polynomial were the message width makes both checks read only padding:
+  every vote passes any balance bound, and a mask — which needs no signature and may be written to
+  any eligible slot — can carry an arbitrary payload into someone else's ballot. Tests must build
+  `k1` at the compiled degree, not at `MAX_MSG_NON_ZERO_COEFFS`. — `flow-trace/04`
 - **The SAFE ciphertext commitment requires exactly two components.** It covers `c[0]` and `c[1]`
   only, matching the Noir circuit, so `bfv_ciphertext_to_greco` rejects any other component count. A
   padded ciphertext would otherwise share a commitment with its two-component prefix while threshold

@@ -34,7 +34,8 @@ impl<let N: u32, let L: u32> Configs<N, L> {
 
 /// User-data encryption ct1 (P3).
 ///
-/// **Role:** Second ciphertext leg; `u` must match the ct0 `u_commitment`.
+/// **Role:** Second ciphertext leg. Standalone, it bounds and commits `u` itself (`execute`); inside
+/// `user_data_encryption` it reads ct0's `u` and reuses ct0's commitment (`execute_with_u_commitment`).
 ///
 /// **Produces:** `(pk1_commitment, ct1_commitment, u_commitment)` public outputs.
 pub struct UserDataEncryptionCt1<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, let BIT_E1: u32, let BIT_R: u32> {
@@ -44,7 +45,7 @@ pub struct UserDataEncryptionCt1<let N: u32, let L: u32, let BIT_PK: u32, let BI
     /// coefficients are centred residues by construction, so this leg does not range-check them.
     pk1is: [Polynomial<N>; L],
     ct1is: [Polynomial<N>; L],
-    /// Re-witnessed privately; checked against `u_commitment` from ct0 (same P3 flow).
+    /// The encryption randomness, the same `u` as ct0's.
     u: Polynomial<N>,
     e1: Polynomial<N>,
     /// Quotient of the mod-`q` reduction, already reduced modulo `X^N + 1` by the prover. Degree `N`
@@ -74,16 +75,21 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     /// The identity is verified at one random point, so each coefficient needs a bound for the
     /// field equality to imply the integer one.
     /// - `ct1is` are exact centred residues mod `q_i`, `e1` exact to its bound, and `u` ternary
-    ///   (`u_bound` is 1), checked here in its own right rather than through ct0's commitment.
+    ///   (`u_bound` is 1). Inside `user_data_encryption` ct0 bounds the shared `u` instead.
     /// - `pk1is` is the constant CRS (see the field), so it needs no check.
     /// - `r` only needs to stay small. With every other term exactly bounded, the integer identity
     ///   fixes `r = (ct1 - pk1 * u - e1) / q_i`, so a window `[-2^BIT_R, 2^BIT_R)` that covers
     ///   `r_bounds` and keeps `q_i * r` far below the field modulus pins it as well as the exact
     ///   bound did.
     fn check_range_bounds(self) {
-        self.e1.range_check_2bounds::<BIT_E1>(self.configs.e1_bound, self.configs.e1_bound);
         assert(self.configs.u_bound == 1, "the ternary check needs u_bound == 1");
         self.u.assert_ternary();
+        self.check_range_bounds_except_u();
+    }
+
+    /// Everything [`Self::check_range_bounds`] bounds except `u`.
+    fn check_range_bounds_except_u(self) {
+        self.e1.range_check_2bounds::<BIT_E1>(self.configs.e1_bound, self.configs.e1_bound);
 
         for i in 0..L {
             let half = (self.configs.qis[i] - 1) / 2;
@@ -93,18 +99,26 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
     }
 
     fn generate_commitments(self) -> (Field, Field, Field) {
-        // `check_range_bounds` bounds `ct1is` and `u`, so their plain packing is injective. `pk1is`
-        // is the constant CRS, so its commitment is a constant too, the one C5 computes.
-        let pk1_commitment =
-            compute_multiple_polynomial_commitment::<N, L, BIT_PK>(self.pk1is, DS_PK_AGGREGATION);
-        let ct1_commitment =
-            compute_multiple_polynomial_commitment::<N, L, BIT_CT>(self.ct1is, DS_CIPHERTEXT);
+        let (pk1_commitment, ct1_commitment) = self.generate_commitments_except_u();
+        // `check_range_bounds` makes `u` ternary, so its plain packing is injective.
         let u_commitment = compute_single_polynomial_commitment::<N, BIT_U>(
             self.u,
             DS_USER_DATA_ENCRYPTION_COMMITMENT,
         );
 
         (pk1_commitment, ct1_commitment, u_commitment)
+    }
+
+    /// `(pk1_commitment, ct1_commitment)`.
+    fn generate_commitments_except_u(self) -> (Field, Field) {
+        // `ct1is` is range-checked, so its plain packing is injective. `pk1is` is the constant CRS,
+        // so its commitment is a constant too, the one C5 computes.
+        let pk1_commitment =
+            compute_multiple_polynomial_commitment::<N, L, BIT_PK>(self.pk1is, DS_PK_AGGREGATION);
+        let ct1_commitment =
+            compute_multiple_polynomial_commitment::<N, L, BIT_CT>(self.ct1is, DS_CIPHERTEXT);
+
+        (pk1_commitment, ct1_commitment)
     }
 
     fn generate_challenge(
@@ -160,12 +174,38 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
 
         (pk1_commitment, ct1_commitment, u_commitment)
     }
+
+    /// The `u` this leg reads.
+    pub(crate) fn u(self) -> Polynomial<N> {
+        self.u
+    }
+
+    /// ct1 inside the merged `user_data_encryption` circuit, which proves ct0 over the same `u`
+    /// witness first. ct0 constrains that `u` to `{-1, 0, 1}` and commits it, so this leg takes its
+    /// commitment for the transcript instead of checking and committing `u` again.
+    ///
+    /// Only sound when `u_commitment` is ct0's commitment to this leg's own `u`, after ct0 bounded
+    /// it. Crate-private for that reason: `user_data_encryption::execute` is the one caller, and it
+    /// asserts both legs read the same `u`.
+    ///
+    /// Returns `(pk1_commitment, ct1_commitment)`.
+    pub(crate) fn execute_with_u_commitment(self, u_commitment: Field) -> (Field, Field) {
+        self.check_range_bounds_except_u();
+
+        let (pk1_commitment, ct1_commitment) = self.generate_commitments_except_u();
+
+        let gammas = self.generate_challenge(pk1_commitment, ct1_commitment, u_commitment);
+
+        assert(self.verify_evaluations(gammas), "ct1 encryption check failed");
+
+        (pk1_commitment, ct1_commitment)
+    }
 }
 
 /// IF-013 / reduced identity: a `u` outside `u_bound` is rejected.
 ///
 /// Before the reduced path, ct1 bounded `u` nowhere: it relied on ct0's bound reaching it through the
-/// equality the `user_data_encryption` fold asserts between the two `u` commitments, and the plain
+/// equality the former `user_data_encryption` fold asserted between the two `u` commitments, and the plain
 /// packing let a carry (`+delta` in slot 0, `-radix * delta` in slot 1) satisfy that equality with
 /// different randomness. The reduced identity needs `u` bounded in its own right — the field equality
 /// at one point only implies the integer one when every coefficient is bounded — so `configs.u_bound`
@@ -202,4 +242,22 @@ fn honest_reduced_identity_holds() {
     let c: UserDataEncryptionCt1<4, 1, 6, 6, 1, 1, 3> =
         UserDataEncryptionCt1::new(Configs::new([97], 1, 1, [3]), [pk1], [ct1], u, e1, [r]);
     let _ = c.execute();
+}
+
+/// In the merged circuit ct1 takes ct0's `u` commitment instead of committing `u` itself. Given the
+/// commitment of its own `u`, it returns the same commitments and passes the same check as `execute`.
+#[test]
+fn shared_u_commitment_matches_standalone_execution() {
+    let u = Polynomial::new([0, 1, 0, -1]);
+    let c: UserDataEncryptionCt1<4, 1, 6, 6, 1, 1, 3> = UserDataEncryptionCt1::new(
+        Configs::new([97], 1, 1, [3]),
+        [Polynomial::new([30, 40, -20, 10])],
+        [Polynomial::new([47, -30, -10, 48])],
+        u,
+        Polynomial::new([0, 0, 0, 1]),
+        [Polynomial::new([1, 0, 0, 1])],
+    );
+    let (pk1_commitment, ct1_commitment, u_commitment) = c.execute();
+    let shared = c.execute_with_u_commitment(u_commitment);
+    assert(shared == (pk1_commitment, ct1_commitment));
 }

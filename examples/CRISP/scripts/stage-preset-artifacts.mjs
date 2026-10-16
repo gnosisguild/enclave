@@ -29,8 +29,7 @@ const EXPECTED_DEGREE = { 'insecure-512': 512, 'secure-8192': 8192 }
 const ARTIFACTS = [
   { name: 'crisp', from: join(CRISP, 'circuits/bin/crisp/target/crisp.json') },
   { name: 'crisp_onchain', from: join(CRISP, 'circuits/bin/crisp_onchain/target/crisp_onchain.json') },
-  { name: 'user_data_encryption_ct0', from: join(REPO, 'circuits/bin/threshold/target/user_data_encryption_ct0.json') },
-  { name: 'user_data_encryption_ct1', from: join(REPO, 'circuits/bin/threshold/target/user_data_encryption_ct1.json') },
+  { name: 'user_data_encryption', from: join(REPO, 'circuits/bin/threshold/target/user_data_encryption.json') },
 ]
 
 /**

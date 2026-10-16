@@ -25,21 +25,7 @@ STACKS=(
     "crisp_onchain:fold_onchain:crisp_onchain_fold:CRISPOnchainVerifier.sol"
 )
 
-echo "Compiling interfold user_data_encryption circuits (dependencies)..."
-
-echo "Compiling user_data_encryption_ct0..."
-if ! (cd "$INTERFOLD_CIRCUITS/bin/threshold/user_data_encryption_ct0" && nargo compile); then
-    echo "Error: user_data_encryption_ct0 compilation failed"
-    exit 1
-fi
-
-echo "Compiling user_data_encryption_ct1..."
-if ! (cd "$INTERFOLD_CIRCUITS/bin/threshold/user_data_encryption_ct1" && nargo compile); then
-    echo "Error: user_data_encryption_ct1 compilation failed"
-    exit 1
-fi
-
-echo "Compiling user_data_encryption..."
+echo "Compiling interfold user_data_encryption (dependency; proves both ciphertext legs)..."
 if ! (cd "$INTERFOLD_CIRCUITS/bin/threshold/user_data_encryption" && nargo compile); then
     echo "Error: user_data_encryption compilation failed"
     exit 1
@@ -48,8 +34,8 @@ fi
 # Inner recursive proofs use noir-recursive-no-zk; fold's compute_vk_hash chain reads
 # `{name}.vk_recursive_hash` in each package target/ (same layout as interfold `scripts/build-circuits.ts`).
 THRESHOLD_TARGET="${INTERFOLD_CIRCUITS}/bin/threshold/target"
-echo "Writing noir-recursive-no-zk VKs (user_data_encryption)..."
-for name in user_data_encryption_ct0 user_data_encryption_ct1 user_data_encryption; do
+echo "Writing noir-recursive-no-zk VK (user_data_encryption)..."
+for name in user_data_encryption; do
     if ! bb write_vk -b "${THRESHOLD_TARGET}/${name}.json" -o "${THRESHOLD_TARGET}" -t noir-recursive-no-zk; then
         echo "Error: bb write_vk (noir-recursive-no-zk) failed for ${name}"
         exit 1

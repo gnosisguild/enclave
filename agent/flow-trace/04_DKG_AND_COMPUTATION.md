@@ -2202,15 +2202,23 @@ The ballot circuit proves the same statement for all three operations:
 published ciphertext = addend + ballot ciphertext
 ```
 
-The ballot is a fresh BFV encryption of `k1`, covered by the recursive `user_data_encryption` proof.
-The SDK passes the WASM-generated reduction quotients as `r` for ct0 and `r_ct1` for ct1.
+The ballot is a fresh BFV encryption of `k1`, covered by the `user_data_encryption` proof. That one
+circuit proves both ciphertext legs over a single `u` witness: the ct0 leg bounds `u` to
+`{-1, 0, 1}` and commits it, and the ct1 leg takes that commitment into its transcript
+(`UserDataEncryptionCt1::execute_with_u_commitment`). Its public inputs are `pk_commitment`,
+`ct_commitment`, and `k1_commitment`. The fold verifies it directly beside the ballot proof, checks
+`ct_commitment` and `k1_commitment` against the ballot proof, returns `pk_commitment`, and pins both
+keys through `compute_vk_hash([user_data_encryption_key_hash, crisp_key_hash])`. A ballot is
+therefore three proofs: `user_data_encryption`, the ballot circuit, and the fold. The SDK passes the
+WASM-generated reduction quotients as `r` for ct0 and `r_ct1` for ct1.
 `CRISPProgram._verifyInputProof` supplies `e3.committeePublicKey` as `noirPublicInputs[8]`. This
 anchors the ballot proof's public-key commitment to the C5-proven key for that round. The caller
-cannot supply a replacement key. ct0 opens `pk0` with checked digits and ct1 hard-codes `pk1` as
-the CRS that C5 commits as `pk1_agg`, so the key commitment has one opening and the anchor gives
-`pk0` C5's exact centred bound. The SDKs read each circuit's `noir-recursive-no-zk` verification key
-from the file the build writes beside its bytecode (`<name>.vk_recursive.json`) rather than
-recomputing it per proof.
+cannot supply a replacement key. ct0 opens `pk0` with checked digits and ct1 hard-codes `pk1` as the
+CRS that C5 commits as `pk1_agg`, so the key commitment has one opening and the anchor gives `pk0`
+C5's exact centred bound. The CRISP SDK reads each inner circuit's `noir-recursive-no-zk`
+verification key from the file the build writes beside its bytecode (`<name>.vk_recursive.json`,
+staged per preset as `<name>.vk.json`) rather than recomputing it per proof. `@interfold/sdk` proves
+`user_data_encryption` alone and needs no verification key for that.
 
 The addend is the slot's current head for a mask, and the zero ciphertext for a vote, a re-vote, or
 any input to an empty slot. `is_mask_vote` chooses between them and is **private**, and the selector
@@ -2242,9 +2250,8 @@ requires every coefficient outside the first `num_options` message positions to 
 each option weight. The prover hints the weight `v` and a quotient `r`. `check_weight` range-checks
 the coefficient, `v`, and `r` to `[0, t)` and checks `k1 + t * r == Q_MOD_T * v`. With every value
 below `t`, the equation holds over the integers, so `v` is the value that the coefficient decrypts
-to. The fold binds this `k1` to the plaintext of `user_data_encryption_ct0` through `k1_commitment`.
-A packed commitment has one opening only while every coefficient fits its slot.
-`user_data_encryption_ct0` range-checks its `k1` to `[0, t)`, and the ballot circuit bounds every
-coefficient of its own `k1`. The weights must sum to at most the slot's bound, and with two options
-at most one weight is nonzero. `check_coefficient_zero` requires the whole polynomial to be zero for
-a mask.
+to. The fold binds this `k1` to the plaintext of the ct0 leg of `user_data_encryption` through
+`k1_commitment`. A packed commitment has one opening only while every coefficient fits its slot. The
+ct0 leg range-checks its `k1` to `[0, t)`, and the ballot circuit bounds every coefficient of its
+own `k1`. The weights must sum to at most the slot's bound, and with two options at most one weight
+is nonzero. `check_coefficient_zero` requires the whole polynomial to be zero for a mask.

@@ -9,7 +9,6 @@ import { InterfoldSDK } from '../../src/interfold-sdk'
 import { generateProof } from '../../src/crypto/user-data-encryption'
 import circuit from '../../../../circuits/bin/threshold/target/user_data_encryption.json'
 import ct0Circuit from '../../../../circuits/bin/threshold/target/user_data_encryption_ct0.json'
-import ct1Circuit from '../../../../circuits/bin/threshold/target/user_data_encryption_ct1.json'
 
 const options = { verifierTarget: 'noir-recursive-no-zk' } as const
 const sdk = new InterfoldSDK({
@@ -26,7 +25,6 @@ describe('real encryption proof', () => {
   let publicKeyCommitment: bigint
   let ciphertextCommitment: bigint
   let k1Commitment: bigint
-  let innerKeyHashes: bigint[]
 
   beforeAll(async () => {
     const publicKey = await sdk.generatePublicKey()
@@ -43,8 +41,8 @@ describe('real encryption proof', () => {
     publicKeyCommitment = bytesToBigInt(await sdk.computePublicKeyCommitment(publicKey))
     ciphertextCommitment = bytesToBigInt(await sdk.computeCiphertextCommitment(encryptedData))
 
-    // The outer circuit forwards `k1_commitment` from the third ct0 output. Derive the same value
-    // from the `k1` witness so the assertion fails if the outer circuit forwards a different output.
+    // The circuit returns ct0's `k1_commitment`. Derive the same value with the standalone ct0
+    // circuit, so the assertion fails if the merged circuit returns a different output.
     // `CircuitInputs` carries Noir structs that the `InputMap` index signature does not accept,
     // so the witness map is cast in the same way as the production prover.
     const { returnValue: ct0Outputs } = await new Noir(ct0Circuit as CompiledCircuit).execute({
@@ -60,11 +58,6 @@ describe('real encryption proof', () => {
     api = await Barretenberg.new({ srsSize: 2 ** 21 })
     verificationKey = await new UltraHonkBackend(circuit.bytecode, api).getVerificationKey(options)
     verifier = new UltraHonkVerifierBackend(api)
-    innerKeyHashes = []
-    for (const innerCircuit of [ct0Circuit, ct1Circuit]) {
-      const artifacts = await new UltraHonkBackend(innerCircuit.bytecode, api).generateRecursiveProofArtifacts(new Uint8Array(), 0, options)
-      innerKeyHashes.push(BigInt(artifacts.vkHash))
-    }
   })
 
   afterAll(async () => {
@@ -72,12 +65,12 @@ describe('real encryption proof', () => {
   })
 
   it('verifies against the compiled verification key and exact PK/ciphertext bindings', async () => {
-    expect(proof.publicInputs).toHaveLength(5)
-    expect(proof.publicInputs.map(BigInt)).toEqual([...innerKeyHashes, publicKeyCommitment, ciphertextCommitment, k1Commitment])
+    expect(proof.publicInputs).toHaveLength(3)
+    expect(proof.publicInputs.map(BigInt)).toEqual([publicKeyCommitment, ciphertextCommitment, k1Commitment])
     expect(await verifier.verifyProof({ ...proof, verificationKey }, options)).toBe(true)
   })
 
-  it.each([0, 1, 2, 3, 4])('rejects an altered public input at position %i', async (index) => {
+  it.each([0, 1, 2])('rejects an altered public input at position %i', async (index) => {
     const publicInputs = [...proof.publicInputs]
     publicInputs[index] = toHex(BigInt(publicInputs[index]) ^ 1n, { size: 32 })
     expect(await verifier.verifyProof({ ...proof, publicInputs, verificationKey }, options)).toBe(false)

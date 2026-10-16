@@ -6,7 +6,7 @@
       "kind": "package",
       "path": "packages/interfold-sdk/src",
       "one_line": "TypeScript SDK for dApps: requests E3 rounds, encrypts values to the committee key with proofs, and reads E3 state and events.",
-      "explain": "InterfoldSDK starts a round with requestE3, which sends the Interfold request call, and reads the committee public key from the ciphernode registry. It encrypts values under that key with WASM, and encryptVectorAndGenProof and encryptNumberAndGenProof also return a user-data-encryption proof built with Barretenberg. After compute, publishCiphertextOutput posts the output reference, and event listeners and getE3 read the results.",
+      "explain": "InterfoldSDK starts a round with requestE3, which sends the Interfold request call, and reads the committee public key from the ciphernode registry. It encrypts values under that key with WASM, and encryptVectorAndGenProof and encryptNumberAndGenProof also return one user_data_encryption proof, built with Barretenberg, whose public inputs are the public-key, ciphertext and k1 commitments. After compute, publishCiphertextOutput posts the output reference, and event listeners and getE3 read the results.",
       "analogy": "Like a sealed-envelope kit at a counter: it seals each value with the committee's public lock, files the request with the desk, and reads back the posted result.",
       "actors": [
         {
@@ -326,7 +326,7 @@
       "kind": "circuit",
       "path": "examples/CRISP/circuits",
       "one_line": "Noir circuits: the voter proof for an eligible, valid ballot, plus fold circuits that combine it with the encryption proof.",
-      "explain": "The crisp circuit (bin/crisp) proves that the slot is in the census and that the published slot ciphertext comes from the ballot. For a vote it also proves that the option weights fit the balance and that the signature comes from the slot's address. crisp_onchain takes voting power as a public input instead of a Merkle path. The fold circuits verify the crisp proof and the user-data-encryption proof together, check that their commitments match, and return the public-key commitment.",
+      "explain": "The crisp circuit (bin/crisp) proves that the slot is in the census and that the published slot ciphertext comes from the ballot. For a vote it also proves that the option weights fit the balance and that the signature comes from the slot's address. crisp_onchain takes voting power as a public input instead of a Merkle path. The fold circuits verify the crisp proof and the user_data_encryption proof (one proof of both ciphertext legs) together, check that their ciphertext and k1 commitments match, pin both verification keys through one compute_vk_hash, and return the public-key commitment.",
       "analogy": "Like a notary who checks sealed slips against the register: the slot must be listed, and a vote's slip must fit the voter's allowance and carry the voter's signature, all without opening the envelope.",
       "actors": [],
       "consumes": [
@@ -388,7 +388,7 @@
         {
           "name": "UltraHonkVerificationKey",
           "what": "verification key of one inner proof, passed to the fold circuit as a witness",
-          "ref": "examples/CRISP/circuits/bin/fold/src/main.nr@20@user_data_encryption_verification_key: UltraHonkVerificationKey,"
+          "ref": "examples/CRISP/circuits/bin/fold/src/main.nr@21@user_data_encryption_verification_key: UltraHonkVerificationKey,"
         }
       ],
       "read_first": [
@@ -410,7 +410,11 @@
         },
         {
           "why": "fold: verifies the crisp proof and the encryption proof together",
-          "ref": "examples/CRISP/circuits/bin/fold/src/main.nr@39@verify_honk_proof_non_zk("
+          "ref": "examples/CRISP/circuits/bin/fold/src/main.nr@40@verify_honk_proof_non_zk("
+        },
+        {
+          "why": "fold: pins the user_data_encryption and crisp keys with one hash",
+          "ref": "examples/CRISP/circuits/bin/fold/src/main.nr@70@let vk_hashes = [user_data_encryption_key_hash, crisp_key_hash].as_vector();"
         }
       ],
       "rust_patterns": [],
@@ -581,7 +585,7 @@
         {
           "name": "ZKInputsGenerator",
           "what": "holds the BFV parameters and builds keys, encrypted votes, commitments, and circuit inputs",
-          "ref": "examples/CRISP/crates/zk-inputs/src/lib.rs@32@pub struct ZKInputsGenerator {"
+          "ref": "examples/CRISP/crates/zk-inputs/src/lib.rs@33@pub struct ZKInputsGenerator {"
         },
         {
           "name": "SimulateError",
@@ -603,7 +607,7 @@
           "why": "contract client: publish_input and finalize_input",
           "ref": "examples/CRISP/crates/evm_helpers/src/lib.rs@232@pub struct CRISPContract<P = CRISPWriteProvider> {"
         },
-        { "why": "ZK input generation for ballots", "ref": "examples/CRISP/crates/zk-inputs/src/lib.rs@173@pub fn generate_inputs(" },
+        { "why": "ZK input generation for ballots", "ref": "examples/CRISP/crates/zk-inputs/src/lib.rs@174@pub fn generate_inputs(" },
         {
           "why": "the JavaScript binding over the same generator",
           "ref": "examples/CRISP/crates/zk-inputs-wasm/src/lib.rs@16@pub struct ZKInputsGenerator {"

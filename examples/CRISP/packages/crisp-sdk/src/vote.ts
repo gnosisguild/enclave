@@ -13,14 +13,11 @@ export { encodeVote, encryptVote, decodeTally, decryptVote, generateBFVKeys } fr
 export { splitDigest } from './circuitInputs'
 import { Noir, type CompiledCircuit } from '@noir-lang/noir_js'
 import { Barretenberg, BackendType, UltraHonkBackend } from '@aztec/bb.js'
-// Only the aggregation circuits are imported here. Their ABI is proof and verification-key shaped
-// rather than polynomial shaped, so one artifact serves every preset and inlining them costs ~0.3MB.
+// Only the fold circuits are imported here. Their ABI is proof and verification-key shaped rather
+// than polynomial shaped, so one artifact serves every preset and inlining them costs ~0.3MB.
 // The BFV-shaped circuits arrive through `setCircuits()` — see ./circuits.
 import foldCircuit from '../../../circuits/bin/fold/target/crisp_fold.json'
 import foldOnchainCircuit from '../../../circuits/bin/fold_onchain/target/crisp_onchain_fold.json'
-import userDataEncryptionCircuit from '../../../../../circuits/bin/threshold/target/user_data_encryption.json'
-// The wrapper's `noir-recursive-no-zk` key, written with its bytecode, so it is not recomputed per ballot.
-import userDataEncryptionVk from '../../../../../circuits/bin/threshold/target/user_data_encryption.vk_recursive.json'
 import { requireCircuits } from './circuits'
 
 // Cached Barretenberg API instance — avoids re-initialising WASM + SRS on every proof.
@@ -115,19 +112,17 @@ export const generateProof = async (circuitInputs: any, censusMode: CensusVarian
   const ballotCircuit = censusMode === 'onchain' ? circuits.crispOnchain : circuits.crisp
   const foldCircuitForMode = censusMode === 'onchain' ? foldOnchainCircuit : foldCircuit
 
-  const { witness: userDataEncryptionCt0Witness } = await executeCircuit(circuits.userDataEncryptionCt0 as CompiledCircuit, {
+  // One circuit proves both ciphertext legs over a shared `u`. It hard-codes the CRS as `pk1`, so
+  // the key's second component is not an input.
+  const { witness: userDataEncryptionWitness } = await executeCircuit(circuits.userDataEncryption as CompiledCircuit, {
     pk0is: circuitInputs.pk0is,
     ct0is: circuitInputs.ct0is,
-    u: circuitInputs.u,
-    e0: circuitInputs.e0,
-    k1: circuitInputs.k1,
-    r: circuitInputs.r,
-  })
-  // ct1 hard-codes the CRS as `pk1`, so the key's second component is not an input.
-  const { witness: userDataEncryptionCt1Witness } = await executeCircuit(circuits.userDataEncryptionCt1 as CompiledCircuit, {
     ct1is: circuitInputs.ct1is,
     u: circuitInputs.u,
+    e0: circuitInputs.e0,
     e1: circuitInputs.e1,
+    k1: circuitInputs.k1,
+    r: circuitInputs.r,
     r_ct1: circuitInputs.r_ct1,
   })
   // The two stacks share every input except how eligibility reaches the circuit: a census round
@@ -166,39 +161,9 @@ export const generateProof = async (circuitInputs: any, censusMode: CensusVarian
     num_options: circuitInputs.num_options,
   })
 
-  const userDataEncryptionCt0Backend = new UltraHonkBackend((circuits.userDataEncryptionCt0 as CompiledCircuit).bytecode, api)
-  const userDataEncryptionCt1Backend = new UltraHonkBackend((circuits.userDataEncryptionCt1 as CompiledCircuit).bytecode, api)
-  const userDataEncryptionBackend = new UltraHonkBackend((userDataEncryptionCircuit as CompiledCircuit).bytecode, api)
+  const userDataEncryptionBackend = new UltraHonkBackend((circuits.userDataEncryption as CompiledCircuit).bytecode, api)
   const crispBackend = new UltraHonkBackend((ballotCircuit as CompiledCircuit).bytecode, api)
   const foldBackend = new UltraHonkBackend((foldCircuitForMode as CompiledCircuit).bytecode, api)
-
-  const { proof: userDataEncryptionCt0Proof, publicInputs: userDataEncryptionCt0PublicInputs } =
-    await userDataEncryptionCt0Backend.generateProof(userDataEncryptionCt0Witness, {
-      verifierTarget: 'noir-recursive-no-zk',
-    })
-  const { proof: userDataEncryptionCt1Proof, publicInputs: userDataEncryptionCt1PublicInputs } =
-    await userDataEncryptionCt1Backend.generateProof(userDataEncryptionCt1Witness, {
-      verifierTarget: 'noir-recursive-no-zk',
-    })
-  const { proof: crispProof } = await crispBackend.generateProof(crispWitness, {
-    verifierTarget: 'noir-recursive-no-zk',
-  })
-
-  // Precomputed with the bytecode (see `CircuitBundle.vks`): bb.js would rebuild each circuit to get them.
-  const userDataEncryptionCt0Artifacts = circuits.vks.userDataEncryptionCt0
-  const userDataEncryptionCt1Artifacts = circuits.vks.userDataEncryptionCt1
-  const crispArtifacts = censusMode === 'onchain' ? circuits.vks.crispOnchain : circuits.vks.crisp
-
-  const { witness: userDataEncryptionWitness } = await executeCircuit(userDataEncryptionCircuit as CompiledCircuit, {
-    ct0_verification_key: userDataEncryptionCt0Artifacts.vkAsFields,
-    ct0_proof: proofToFields(userDataEncryptionCt0Proof),
-    ct0_public_inputs: userDataEncryptionCt0PublicInputs,
-    ct0_key_hash: userDataEncryptionCt0Artifacts.vkHash,
-    ct1_verification_key: userDataEncryptionCt1Artifacts.vkAsFields,
-    ct1_proof: proofToFields(userDataEncryptionCt1Proof),
-    ct1_public_inputs: userDataEncryptionCt1PublicInputs,
-    ct1_key_hash: userDataEncryptionCt1Artifacts.vkHash,
-  })
 
   const { proof: userDataEncryptionProof, publicInputs: userDataEncryptionPublicInputs } = await userDataEncryptionBackend.generateProof(
     userDataEncryptionWitness,
@@ -206,7 +171,13 @@ export const generateProof = async (circuitInputs: any, censusMode: CensusVarian
       verifierTarget: 'noir-recursive-no-zk',
     },
   )
-  const userDataEncryptionArtifacts = userDataEncryptionVk
+  const { proof: crispProof } = await crispBackend.generateProof(crispWitness, {
+    verifierTarget: 'noir-recursive-no-zk',
+  })
+
+  // Precomputed with the bytecode (see `CircuitBundle.vks`): bb.js would rebuild each circuit to get them.
+  const userDataEncryptionArtifacts = circuits.vks.userDataEncryption
+  const crispArtifacts = censusMode === 'onchain' ? circuits.vks.crispOnchain : circuits.vks.crisp
 
   const { witness: foldWitness } = await executeCircuit(foldCircuitForMode as CompiledCircuit, {
     user_data_encryption_verification_key: userDataEncryptionArtifacts.vkAsFields,

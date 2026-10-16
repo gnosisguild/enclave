@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fold public key_hash = compute_vk_hash(ude, crisp, ct0, ct1). Needs pnpm compile:circuits.
+# Fold public key_hash = compute_vk_hash(ude, crisp). Needs pnpm compile:circuits.
 #
 # Prints one hash per ballot stack. Each belongs in the matching fold circuit:
 #   crisp         -> circuits/bin/fold/src/main.nr         CRISP_FOLD_EXPECTED_KEY_HASH_*
@@ -16,8 +16,6 @@ for name in crisp crisp_onchain; do
   VK=(
     "$T/user_data_encryption.vk_recursive_hash"
     "$CRISP/circuits/bin/${name}/target/${name}.vk_recursive_hash"
-    "$T/user_data_encryption_ct0.vk_recursive_hash"
-    "$T/user_data_encryption_ct1.vk_recursive_hash"
   )
   for f in "${VK[@]}"; do
     [[ -f "$f" ]] || { echo "missing $f (run pnpm compile:circuits in examples/CRISP)" >&2; exit 1; }

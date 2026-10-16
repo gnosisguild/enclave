@@ -8,7 +8,7 @@
 //! same SAFE sponge as Noir `lib::math::commitments::compute_vk_hash` (`DS_VK_HASH`).
 //!
 //! Input order is preserved — e.g. CRISP fold uses:
-//! `user_data_encryption`, `crisp`, `ct0`, `ct1`.
+//! `user_data_encryption`, `crisp`.
 
 use anyhow::{bail, Context, Result};
 use ark_bn254::Fr;

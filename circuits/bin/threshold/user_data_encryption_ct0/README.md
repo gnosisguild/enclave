@@ -1,7 +1,9 @@
-# `user_data_encryption_ct0` — P3 (inner)
+# `user_data_encryption_ct0` — P3 (standalone leg)
 
-First leg of user BFV encryption under the **aggregated** threshold public key (paired with
-`user_data_encryption_ct1`).
+First leg of user BFV encryption under the **aggregated** threshold public key, as a standalone
+circuit. [`user_data_encryption`](../user_data_encryption/README.md) proves this leg and
+`user_data_encryption_ct1` together, and clients prove only that circuit. This package builds for
+per-leg benchmarks and for the SDK proof test, which derives `k1_commitment` from it.
 
 |           |                                                                                                                     |
 | --------- | ------------------------------------------------------------------------------------------------------------------- |

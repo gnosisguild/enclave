@@ -31,10 +31,10 @@ fn check_option_count<let D: u32>(num_options: u32) {
 /// `t * t`, so the equation holds over the integers, and one weight solves it because `Q_MOD_T` is
 /// invertible modulo `t`.
 ///
-/// The bound on the coefficient also makes this `k1` the plaintext that `user_data_encryption_ct0`
-/// encrypts. That circuit bounds its `k1` to `[0, t)`, the fold only checks that the two
-/// `k1_commitment` values are equal, and a packed commitment has one opening only while every
-/// coefficient fits its slot.
+/// The bound on the coefficient also makes this `k1` the plaintext that the ct0 leg of
+/// `user_data_encryption` encrypts. That leg bounds its `k1` to `[0, t)`, the fold only checks that
+/// the two `k1_commitment` values are equal, and a packed commitment has one opening only while
+/// every coefficient fits its slot.
 fn check_weight(coefficient: Field, weight: Field, quotient: Field) {
     assert_in_range::<USER_DATA_ENCRYPTION_BIT_K>(coefficient, PLAINTEXT_MODULUS);
     assert_in_range::<USER_DATA_ENCRYPTION_BIT_K>(weight, PLAINTEXT_MODULUS);

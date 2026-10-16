@@ -711,7 +711,7 @@ function circuits() {
         lines: ['AggregatorVerifier', 'via BfvDecryptionVerifier'],
         drill: 'contract:Verifiers',
       },
-      chip('p3', 60, 1100, 'P3 user_data_encryption', 'ct0 + ct1 are valid', 'P3 user_data_encryption', 340),
+      chip('p3', 60, 1100, 'P3 user_data_encryption', 'ct0 + ct1 in one proof', 'P3 user_data_encryption', 340),
       {
         id: 'crispfold',
         x: 520,
@@ -721,7 +721,7 @@ function circuits() {
         title: 'CRISP fold',
         lines: ['P3 + the voter proof'],
         mono: true,
-        ref: 'examples/CRISP/circuits/bin/fold/src/main.nr@41@user_data_encryption_proof,',
+        ref: 'examples/CRISP/circuits/bin/fold/src/main.nr@42@user_data_encryption_proof,',
       },
       {
         id: 'crispver',

@@ -48,8 +48,8 @@ impl<let N: u32, let L: u32> Configs<N, L> {
 
 /// User-data encryption ct0 (P3).
 ///
-/// **Role:** Prove the first ciphertext leg and publish `pk0`, `ct0`, `k1`, and `u` commitments
-/// for the wrapper and ct1 circuit.
+/// **Role:** Prove the first ciphertext leg and publish `pk0`, `ct0`, `k1`, and `u` commitments.
+/// In the `user_data_encryption` circuit this leg runs first and bounds the `u` ct1 shares.
 ///
 /// **Consumes:** Threshold PK from C5 (`pk0is` witness path).
 ///
@@ -170,6 +170,11 @@ impl<let N: u32, let L: u32, let BIT_PK: u32, let BIT_CT: u32, let BIT_U: u32, l
         }
 
         holds
+    }
+
+    /// The `u` this leg constrains and commits.
+    pub(crate) fn u(self) -> Polynomial<N> {
+        self.u
     }
 
     /// Returns `(pk0_commitment, ct0_commitment, k1_commitment, u_commitment)`.

@@ -32,9 +32,8 @@ const REPO = resolve(CRISP, '..', '..')
 const SOURCE_DIRS = [
   join(CRISP, 'circuits/bin/crisp'),
   join(CRISP, 'circuits/bin/crisp_onchain'),
+  join(REPO, 'circuits/bin/threshold/user_data_encryption'),
   join(CRISP, 'circuits/lib'),
-  join(REPO, 'circuits/bin/threshold/user_data_encryption_ct0'),
-  join(REPO, 'circuits/bin/threshold/user_data_encryption_ct1'),
   join(REPO, 'circuits/lib'),
 ]
 
