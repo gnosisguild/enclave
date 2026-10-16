@@ -140,6 +140,35 @@ export type ProofData = {
 }
 
 /**
+ * One proof in the ballot pipeline, in the order {@link finishBallotProof} produces them.
+ *
+ * - `encryption` (`user_data_encryption`) - both halves of the ballot ciphertext are well formed
+ *   under one randomness `u`: `ct0 = pk0·u + e0 + k0·k1`, which carries the ballot plaintext `k1`,
+ *   and `ct1 = pk1·u + e1`, every term bounded. It commits to the key and the ciphertext.
+ * - `ballot` (`crisp` / `crisp_onchain`) - the ballot rules. A vote is signed over the digest by the
+ *   slot owner and is within the voting power; a mask is zero everywhere. Either way the new slot
+ *   ciphertext is the ballot ciphertext plus the addend (the slot's current ciphertext for a mask,
+ *   zero otherwise).
+ * - `fold` (`fold` / `fold_onchain`) - verifies the encryption and ballot proofs, asserts they cover
+ *   the same ciphertext and plaintext, and outputs the key commitment, which the contract checks
+ *   against the round's committee key.
+ */
+export type ProofStage = 'encryption' | 'ballot' | 'fold'
+
+/** Reported when a proof stage starts. The proof is complete when the promise resolves. */
+export type ProofProgress = {
+  stage: ProofStage
+  /** Zero-based position of `stage` in {@link PROOF_STAGES}. */
+  index: number
+  total: number
+}
+
+export type ProofOptions = {
+  /** Called as each stage starts. Proving takes tens of seconds, so a client can show where it is. */
+  onProgress?: (progress: ProofProgress) => void
+}
+
+/**
  * Which circuit a ballot is built for.
  *
  * `merkle` proves membership of a census tree, and matches `CensusMode.TOKEN` and

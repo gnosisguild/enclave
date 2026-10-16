@@ -5,8 +5,8 @@
       "id": "e3-fhe-params",
       "kind": "crate",
       "path": "crates/fhe-params",
-      "one_line": "BFV parameter presets (insecure 512 and secure 8192, threshold and DKG variants) and the committee sizes they assume.",
-      "explain": "Threshold encryption needs every node to build the same BFV ring degree, moduli and plaintext modulus, so this crate keeps them as named presets. Each preset is a threshold pair plus a DKG pair; the 512 presets are marked insecure and not for production, and the default preset for local development and tests is the insecure threshold one. The on-chain parameter index 0 maps to the insecure 512 threshold preset and index 2 to the secure 8192 threshold preset. Keyshare, aggregator, config, sdk and the CLI depend on it.",
+      "one_line": "BFV parameter presets (insecure 64 and secure 8192, threshold and DKG variants) and the committee sizes they assume.",
+      "explain": "Threshold encryption needs every node to build the same BFV ring degree, moduli and plaintext modulus, so this crate keeps them as named presets. Each preset is a threshold pair plus a DKG pair; the 64 presets are marked insecure and not for production, and the default preset for local development and tests is the insecure threshold one. The on-chain parameter index 0 maps to the insecure 64 threshold preset and index 2 to the secure 8192 threshold preset. Keyshare, aggregator, config, sdk and the CLI depend on it.",
       "analogy": "A price list with two sizes, each sold as a matched pair: one for the shared public key and one for the temporary setup key.",
       "actors": [],
       "consumes": [],
@@ -39,8 +39,8 @@
           "ref": "crates/fhe-params/src/presets.rs@40@pub enum BfvPreset"
         },
         {
-          "why": "the insecure 512 constants: degree, moduli and party count per threshold or DKG set",
-          "ref": "crates/fhe-params/src/constants.rs@13@pub mod insecure_512 {"
+          "why": "the insecure 64 constants: degree, moduli and party count per threshold or DKG set",
+          "ref": "crates/fhe-params/src/constants.rs@13@pub mod insecure_64 {"
         },
         {
           "why": "turns a preset into its threshold and DKG BFV parameter pair",

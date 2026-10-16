@@ -92,7 +92,7 @@ Requester calls: Interfold.request({
 │   │    Mainnet has secure-8192 routes for minimum, micro, and small committees.
 │   │    The launch pricing policy sets `minCommitteeSize = 19`, so only Small can be
 │   │    requested. Minimum and Micro remain configured for a later governance change.
-│   │    Sepolia and local chains support insecure-512 and secure-8192 with all committee sizes.
+│   │    Sepolia and local chains support insecure-64 and secure-8192 with all committee sizes.
 │   │    A different parameter hash, committee shape, or verifier H/T is rejected.
 │   │    CI derives and compares the full BFV tuple across deployment code, Rust, and Noir.
 │   ├─ inputWindow[0] >= block.timestamp (start in future)
@@ -706,6 +706,9 @@ CiphernodeRegistrySolReader decodes SortitionCommitteeFinalized
 │   ├─ Reconciles the provisional reservation with the finalized N-node committee
 │   │   → A selected node keeps its existing reservation without a second increment
 │   │   → A node outside the final committee releases its provisional reservation
+│   │   → Reserves nothing for an E3 that already had a terminal event, because the startup
+│   │     chain sync can deliver the finalization after it; startup releases the slots of
+│   │     E3s that the lifecycle projection records as terminal
 │   └─ Stores finalized committee as a `Committee` struct in persistent map
 │       → Provides O(1) address→party_id lookup for later expulsion handling
 │       → `CommitteeFinalized` is normalized into ascending address order before storage

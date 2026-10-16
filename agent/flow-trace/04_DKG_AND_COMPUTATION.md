@@ -1849,12 +1849,14 @@ The document publisher rebuilds its active outbox and received-document set from
 log before network effects start. Its DHT store is in memory, so at `SyncEnded` it also stores
 received broadcast documents in that store again, one at a time, and prunes them with the other
 records of their E3. A document with a party filter is not restored: its filter names this node, so
-no peer fetches it from here. This restore is best effort. Recovery chooses the candidates while it
-reads the local log: at most 512 documents and 128 MiB, the ones received last in event-log order.
-The chain history then drops the documents of E3s that closed while the node was offline, but those
-documents can already have taken the place of an open E3's document, which is then not restored.
-Expired documents, and documents that do not fit in a full store, are skipped. Document publication
-and receipt events use their E3's chain aggregate. Recovery reads the log in pages of at most 1,024
+no peer fetches it from here. This restore is best effort. Recovery keeps every candidate while it
+reads the local log, in event-log order; only the newest ones within 512 documents and 128 MiB hold
+their bytes, and the older ones stay as references into the log. The chain history then drops the
+documents of E3s that closed while the node was offline. At `SyncEnded` the publisher keeps the
+newest candidates within the limits and reads a referenced document from the log before it stores
+it, so the documents of closed E3s cannot take the place of an open E3's document. Expired
+documents, and documents that do not fit in a full store, are skipped. Document publication and
+receipt events use their E3's chain aggregate. Recovery reads the log in pages of at most 1,024
 events and 16 MiB; a page holds at least one event, also a larger one. During DKG, the publisher
 first stores each document in its own DHT store, so that a peer whose lookup reaches this node can
 fetch it from here, and then gossips a small notification that names it. The inbound put handler in
@@ -2143,16 +2145,15 @@ Capacity: `TREE_DEPTH = 20` gives 2^20 entries. Every input, whether a vote, an 
 appends one entry, and `_verifyInputProof` refuses an input once the round holds `inputLimit`
 entries (`InputLimitReached`), on both `publishInput` and `validateInputProof`. The limit is at most
 `MAX_INPUTS_PER_ROUND` (100,000). Every input adds at most one fresh ciphertext to the sum that the
-committee decrypts. Decryption stays correct for `SEARCH_Z` additions, which is 100,000 for
-secure-8192. The insecure-512 test preset is sized for 1,024 additions. A CUSTOM round on it, or a
-CONSTANT round with zero credits, can accept more inputs than that.
+committee decrypts. Decryption stays correct for `SEARCH_Z` additions, which is 100,000 for both
+secure-8192 and insecure-64, so no round accepts more inputs than the presets allow.
 
 A mask needs no voter signature, so any account can fill `inputLimit` with masks (`00_INDEX.md`,
 "Masks can fill the input limit").
 
 **Plaintext modulus bound.** The committee decrypts each tally coefficient modulo the plaintext
-modulus `t` of the round's BFV parameters: 100 for insecure-512 and 17,000,000 for secure-8192. A
-ballot holds one weight in `[0, t)` for each option, so the decrypted tally holds per-option totals:
+modulus `t` of the round's BFV parameters: 17,000,000 for both insecure-64 and secure-8192. A ballot
+holds one weight in `[0, t)` for each option, so the decrypted tally holds per-option totals:
 coefficient `o` is the total weight on option `o`, exact only while it is below `t`.
 `CRISPProgram.validate` decodes `t` from `e3ProgramParams` (the `BfvParameters` tuple that
 `encode_bfv_params` and `encodeBfvParams` write) and sizes the round so that no total reaches it:

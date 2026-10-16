@@ -39,7 +39,10 @@ use e3_config::{chain_config::ChainConfig, RpcAuth, RPC};
 use e3_crypto::Cipher;
 use e3_data::Repository;
 use e3_events::Proof;
-use e3_utils::{retry_with_backoff, should_retry_error, RetryError};
+use e3_utils::{
+    retry_with_backoff, should_retry_error, RetryError, RPC_RETRY_ATTEMPTS,
+    RPC_RETRY_FIRST_DELAY_MS,
+};
 use std::{
     collections::HashMap,
     env,
@@ -358,8 +361,12 @@ where
     Ok(block.header.timestamp)
 }
 
-const TX_RETRY_MAX_ATTEMPTS: u32 = 3;
-const TX_RETRY_INITIAL_DELAY_MS: u64 = 2000;
+/// The wait before a writer tries a ticket, committee finalization, committee publication or
+/// plaintext publication again. Each try already retries its transaction with backoff
+/// (`send_tx_with_retry`) and reads the chain first, so a try after a mined transaction sends
+/// nothing. The wait between tries stays fixed because each of these transactions has an on-chain
+/// window, such as the 10-minute ticket submission window, and a growing wait could miss it.
+pub(crate) const PUBLICATION_RETRY_DELAY: Duration = Duration::from_secs(30);
 
 pub async fn send_tx_with_retry<F, Fut>(
     operation_name: &str,
@@ -401,8 +408,8 @@ where
                 }
             }
         },
-        TX_RETRY_MAX_ATTEMPTS,
-        TX_RETRY_INITIAL_DELAY_MS,
+        RPC_RETRY_ATTEMPTS,
+        RPC_RETRY_FIRST_DELAY_MS,
     )
     .await
 }

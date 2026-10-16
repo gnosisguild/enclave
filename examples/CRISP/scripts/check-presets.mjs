@@ -7,7 +7,7 @@
 
 // Refuse to publish a channel whose artifacts do not match the presets that channel stands for.
 //
-// The testing channel carries only insecure-512 so testnet installs stay small. The production
+// The testing channel carries only insecure-64 so testnet installs stay small. The production
 // channel carries both presets so one client can select the preset from the E3's on-chain param set.
 //
 // The SDK and the contracts package are checked together because they are a matched pair. The SDK
@@ -25,8 +25,8 @@ const CONTRACTS = join(CRISP, 'packages', 'crisp-contracts')
 
 /** Which presets each release channel carries. */
 const CHANNEL_PRESETS = {
-  testing: ['insecure-512'],
-  latest: ['insecure-512', 'secure-8192'],
+  testing: ['insecure-64'],
+  latest: ['insecure-64', 'secure-8192'],
 }
 
 const ALL_PRESETS = [...new Set(Object.values(CHANNEL_PRESETS).flat())]
@@ -35,7 +35,7 @@ const ALL_PRESETS = [...new Set(Object.values(CHANNEL_PRESETS).flat())]
 const VERIFIERS = ['CRISPVerifier.sol', 'CRISPOnchainVerifier.sol']
 
 /** Polynomial degree each preset's circuits carry, used to prove the bundle is what it claims. */
-const EXPECTED_DEGREE = { 'insecure-512': 512, 'secure-8192': 8192 }
+const EXPECTED_DEGREE = { 'insecure-64': 64, 'secure-8192': 8192 }
 
 /** Below this a "built" entry is a stub or a failed inline rather than a real circuit bundle. */
 const MIN_BYTES = 100 * 1024
@@ -43,9 +43,17 @@ const MIN_BYTES = 100 * 1024
 /** Above this an off-channel entry is probably a real circuit bundle rather than a resolver stub. */
 const MAX_STUB_BYTES = 10 * 1024
 
-// The bundler may emit the inlined JSON as a JS object literal, so the key can be quoted or bare
-// and the space is optional. Match all of those rather than one spelling.
-const hasDegree = (source, value) => new RegExp(`["']?length["']?\\s*:\\s*${value}\\b`).test(source)
+// Only polynomial `coefficients` arrays carry the degree. Other arrays can share a preset's length
+// by coincidence: the ECDSA `signature: [u8; 64]` input of `crisp` and `crisp_onchain` matches
+// insecure-64 in every bundle, which made a correct secure-8192 build look mixed.
+//
+// The bundler may emit the inlined JSON as a JS object literal, so keys can be quoted or bare and
+// spaces are optional. Match all of those rather than one spelling.
+const key = (name) => `["']?${name}["']?\\s*:\\s*`
+const hasDegree = (source, value) =>
+  new RegExp(
+    `${key('name')}["']coefficients["']\\s*,\\s*${key('type')}\\{\\s*${key('kind')}["']array["']\\s*,\\s*${key('length')}${value}\\b`,
+  ).test(source)
 
 // npm gives `prepublishOnly` no way to see `--tag`, so the channel comes through the environment
 // when the publish scripts set it, and through argv when run by hand.
@@ -115,11 +123,11 @@ for (const preset of wanted) {
   const unexpected = Object.entries(EXPECTED_DEGREE).filter(([candidate]) => candidate !== preset)
 
   if (!hasDegree(source, degree)) {
-    problems.push(`${preset}: dist/presets/${preset}.js contains no length-${degree} arrays; the inlined circuits are not ${preset}.`)
+    problems.push(`${preset}: dist/presets/${preset}.js contains no degree-${degree} polynomials; the inlined circuits are not ${preset}.`)
   }
   for (const [otherPreset, otherDegree] of unexpected) {
     if (hasDegree(source, otherDegree)) {
-      problems.push(`${preset}: dist/presets/${preset}.js contains length-${otherDegree} arrays, which belong to ${otherPreset}.`)
+      problems.push(`${preset}: dist/presets/${preset}.js contains degree-${otherDegree} polynomials, which belong to ${otherPreset}.`)
     }
   }
 }

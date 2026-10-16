@@ -18,8 +18,10 @@ the code does not meet yet.
 
 - Before EVM readers and protocol actors start, each enabled ciphernode chain reads the
   governance-selected `NodeReleaseRegistry`, verifies that the compiled compatibility values meet
-  the required policy, and acknowledges its exact release ID and values on-chain. A missing
-  controller or stale protocol/generation is a startup error. — `e3_evm::node_release`;
+  the required policy, and acknowledges its exact release ID and values on-chain. The acknowledgment
+  gets three attempts, and each one reads the acknowledged release and operator status first, so a
+  retry after a mined acknowledgment sends nothing when the operator is active or not registered. A
+  missing controller or stale protocol/generation is a startup error. — `e3_evm::node_release`;
   `flow-trace/07`
 - `protocol_version` covers incompatible contracts, events, cryptography, and protocol behavior. It
   is part of the gossip topic, the Identify string, and the Kademlia and sync protocol names, and a
@@ -424,3 +426,10 @@ the code does not meet yet.
   `--repair`. A mismatch names the supported recovery action and leaves log bytes unchanged. —
   `crates/sync/src/sync/preflight.rs`; `crates/entrypoint/tests/validate_older_schema.rs`;
   `ARCHITECTURE.md`; `00_INDEX.md` known open issues
+- `BfvPreset` is persisted by discriminant inside events and snapshots. Variants 0 and 1 are the
+  degree-64 insecure presets under `SCHEMA_VERSION = 8`; a store written with the degree-512
+  insecure presets at those discriminants has the same marker and decodes to the wrong parameters.
+  Testnet nodes must start from an empty store (`interfold node reset-data`) on a fresh testnet
+  stack. A change that gives a persisted discriminant other parameters must either raise
+  `SCHEMA_VERSION` or state the same reset requirement here and in `flow-trace/07`. —
+  `crates/fhe-params/src/presets.rs`; `crates/sync/src/sync/schema_version.rs`; `flow-trace/07`

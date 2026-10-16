@@ -12,7 +12,7 @@ vi.mock('../src/crypto/user-data-encryption', () => ({ generateProof: vi.fn() })
 const sdk = new InterfoldSDK({
   publicClient: createPublicClient({ chain: hardhat, transport: http() }),
   contracts: { interfold: zeroAddress, ciphernodeRegistry: zeroAddress, feeToken: zeroAddress },
-  thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_512',
+  thresholdBfvParamsPresetName: 'INSECURE_THRESHOLD_64',
 })
 
 describe('proof API forwarding', () => {
@@ -44,12 +44,12 @@ describe('proof API forwarding', () => {
     expect(inputs.pk0is).toEqual(expectedKeyInputs.pk0is)
     // ct1 hard-codes the CRS, so the key's second component is not an input.
     expect(inputs).not.toHaveProperty('pk1is')
-    const expectedPlaintext = Array<bigint>(512).fill(0n)
-    expectedPlaintext[511] = encodeCoefficient(1n)
-    if (kind === 'vector') expectedPlaintext[510] = encodeCoefficient(2n)
+    const expectedPlaintext = Array<bigint>(64).fill(0n)
+    expectedPlaintext[63] = encodeCoefficient(1n)
+    if (kind === 'vector') expectedPlaintext[62] = encodeCoefficient(2n)
     expect(inputs.k1.coefficients.map(BigInt)).toEqual(expectedPlaintext)
-    expect(inputs.ct0is).toHaveLength(2)
-    expect(inputs.ct1is).toHaveLength(2)
+    expect(inputs.ct0is).toHaveLength(3)
+    expect(inputs.ct1is).toHaveLength(3)
     expect(result.proof).toBe(proof)
     expect(await sdk.computeCiphertextCommitment(result.encryptedData)).toHaveLength(32)
   })

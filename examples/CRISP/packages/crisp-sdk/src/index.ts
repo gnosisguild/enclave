@@ -16,7 +16,14 @@ export {
 export * from './token'
 export * from './state'
 export * from './api'
-export { MAX_MSG_NON_ZERO_COEFFS, MAX_VOTE_OPTIONS, MERKLE_TREE_MAX_DEPTH, SIGNATURE_MESSAGE, SIGNATURE_MESSAGE_HASH } from './constants'
+export {
+  MAX_MSG_NON_ZERO_COEFFS,
+  MAX_VOTE_OPTIONS,
+  MERKLE_TREE_MAX_DEPTH,
+  PROOF_STAGES,
+  SIGNATURE_MESSAGE,
+  SIGNATURE_MESSAGE_HASH,
+} from './constants'
 export { hashLeaf, generateMerkleProof, generateMerkleTree, getAddressFromSignature, getZeroVote } from './utils'
 export {
   encodeVote,
@@ -59,6 +66,9 @@ export type {
   PrepareBallotRequest,
   PreparedBallot,
   ProofData,
+  ProofOptions,
+  ProofProgress,
+  ProofStage,
   SlotHead,
   TallyResult,
   CurrentRoundResponse,
