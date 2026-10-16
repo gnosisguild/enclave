@@ -291,6 +291,15 @@ request history. Permissionless `refreshOperatorStatus` and `refreshOperatorStat
 Refresh matured positions before requesting a committee that needs their capacity. Refreshing a
 waiting position cannot admit it early. No timer transaction runs automatically at expiry.
 
+Governance sets a separate identity policy through `setIdentityPolicy(registry, required)` and emits
+`IdentityPolicyUpdated`. `BondingIdentityLib` checkpoints this policy in its own storage namespace.
+When identity is required, it reads `bondOwnerAt(operator, timepoint)` and checks that owner's
+`OwnerIdentityRegistry.isVerifiedAt` history at the same request snapshot. `BondingEligibilityLib`
+applies this check after cooldown and pause checks in `eligibilityAt` and owner-capacity refreshes.
+Identity policy changes reset capacity, and ownership transfers also check identity before moving
+counted capacity. Credential expiry and revocation preserve earlier snapshots, and status refreshes
+remove affected owners from the current count.
+
 Before pausing admissions after an eligibility configuration change, refresh every operator that
 must remain eligible. Wait for a later block timestamp. Check that
 `committeeOwnerCapacity(latest.timestamp - 1)` covers the required committee size. An unrefreshed
