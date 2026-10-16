@@ -299,12 +299,12 @@ applies this check after cooldown and pause checks in `eligibilityAt` and owner-
 Identity policy changes reset capacity, and ownership transfers also check identity before moving
 counted capacity.
 
-Capacity checkpoints track the earliest counted credential expiry and the registry's
-revocation counter at each reset. Capacity returns zero past that expiry or when the historical
-revocation counter differs, even without a status refresh. The first refresh or transfer after either
-condition resets the count. Permissionless status refreshes rebuild it from verified owners without
-double counting. Freshness checkpoints preserve earlier capacity answers under the existing policy
-and full-refresh guards.
+Capacity checkpoints track the earliest counted credential expiry and the registry's revocation
+counter at each reset. Capacity returns zero past that expiry or when the historical revocation
+counter differs, even without a status refresh. The first refresh or transfer after either condition
+resets the count. Permissionless status refreshes rebuild it from verified owners without double
+counting. Freshness checkpoints preserve earlier capacity answers under the existing policy and
+full-refresh guards.
 
 Credential expiry and revocation preserve earlier eligibility snapshots. Registration cannot shorten
 an existing credential's expiry. Governance must revoke it first so that the capacity guard detects

@@ -283,9 +283,9 @@ every section.
 - **Per-E3 sortition state is immutable:** for request timestamp `T`, the request-time eligible
   count, each operator's eligibility, and each ticket balance come from `T-1`. The request also
   freezes `ticketPrice`, and Rust consumes the same timepoint and price. Current registration and
-  activity are additional liveness checks only. The IMT root is snapshotted at request time. —
+  activity are additional liveness checks only. The IMT root is snapshotted at request time.
+  **Gap:** the Rust shortlist does not apply the owner-identity policy or credential history. —
   `CiphernodeRegistryOwnable.sol`; `flow-trace/03`
-  **Gap:** the Rust shortlist does not apply the owner-identity policy or credential history.
 - **One selected operator per snapshot bond owner:** new requests freeze the owner-cap policy.
   `bondOwnerAt(operator, T-1)` determines the group; later transfers cannot create a second seat for
   that snapshot owner. Both ownership write paths must checkpoint before assignment. Unchanged
@@ -302,14 +302,14 @@ every section.
 - **Owner identity follows the request snapshot:** governance checkpoints the registry and required
   flag through `BondingIdentityLib`. A required policy checks the historical owner's credential at
   `T-1`; an unset policy does not require identity. Every identifier stays reserved to its first
-  owner through replacement, expiry, and revocation. Writes at later timestamps cannot change earlier
-  policy, ownership, or verification answers. Registration cannot reduce an existing expiry; governance
-  must revoke first so capacity observes the invalidation. Capacity fails closed past the earliest
-  counted expiry or when the registry's checkpointed revocation count changes. The first refresh or
-  transfer resets stale capacity before counting operators. Permissionless refreshes rebuild the
-  distinct-owner count.
-  Freshness checkpoints prevent a rebuild from admitting a stale historical count. —
-  `BondingIdentityLib.sol`; `OwnerIdentityRegistry.sol`; `BondOwnerCapacityLib.sol`; `flow-trace/02`
+  owner through replacement, expiry, and revocation. Writes at later timestamps cannot change
+  earlier policy, ownership, or verification answers. Registration cannot reduce an existing expiry;
+  governance must revoke first so capacity observes the invalidation. Capacity fails closed past the
+  earliest counted expiry or when the registry's checkpointed revocation count changes. The first
+  refresh or transfer resets stale capacity before counting operators. Permissionless refreshes
+  rebuild the distinct-owner count. Freshness checkpoints prevent a rebuild from admitting a stale
+  historical count. — `BondingIdentityLib.sol`; `OwnerIdentityRegistry.sol`;
+  `BondOwnerCapacityLib.sol`; `flow-trace/02`
 - **Owner-capacity admission is shared by every requester:** activity refreshes and owner transfers
   maintain an epoch-scoped count through `BondOwnerCapacityLib`. A configuration change resets the
   count. After upgrade, unrefreshed legacy operators do not count. Permissionless status refreshes

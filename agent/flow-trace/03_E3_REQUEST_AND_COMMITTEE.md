@@ -36,9 +36,9 @@ proof of independent human control.
 position's registration/owner-change time. A later cooldown change, admission pause, or owner change
 does not alter that E3's admission rule. When identity is required, `eligibilityAt` also checks the
 historical bond owner's credential at that same snapshot. Current `isActive` still checks collateral
-and release requirements without applying the new admission policy to an older request. Policy updates
-reset the conservative owner count; status refreshes count only positions admitted under the new policy.
-See
+and release requirements without applying the new admission policy to an older request. Policy
+updates reset the conservative owner count; status refreshes count only positions admitted under the
+new policy. See
 [admission cooldown and pause](02_TOKENS_AND_ACTIVATION.md#admission-cooldown-and-pause).
 
 Governance configures the fee token, its expected decimals, and every raw-unit pricing term through
