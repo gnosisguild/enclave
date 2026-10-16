@@ -240,7 +240,9 @@ mod tests {
         fn handle(&mut self, msg: StoreEventRequested, _: &mut Self::Context) {
             let StoreEventRequested { event, sender } = msg;
             self.next_seq += 1;
-            sender.do_send(StoreEventResponse(event.into_sequenced(self.next_seq)));
+            sender
+                .try_send(StoreEventResponse(event.into_sequenced(self.next_seq)))
+                .expect("the sequencer accepts the stored event");
         }
     }
 
