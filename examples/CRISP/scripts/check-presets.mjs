@@ -43,9 +43,17 @@ const MIN_BYTES = 100 * 1024
 /** Above this an off-channel entry is probably a real circuit bundle rather than a resolver stub. */
 const MAX_STUB_BYTES = 10 * 1024
 
-// The bundler may emit the inlined JSON as a JS object literal, so the key can be quoted or bare
-// and the space is optional. Match all of those rather than one spelling.
-const hasDegree = (source, value) => new RegExp(`["']?length["']?\\s*:\\s*${value}\\b`).test(source)
+// Only polynomial `coefficients` arrays carry the degree. Other arrays can share a preset's length
+// by coincidence: the ECDSA `signature: [u8; 64]` input of `crisp` and `crisp_onchain` matches
+// insecure-64 in every bundle, which made a correct secure-8192 build look mixed.
+//
+// The bundler may emit the inlined JSON as a JS object literal, so keys can be quoted or bare and
+// spaces are optional. Match all of those rather than one spelling.
+const key = (name) => `["']?${name}["']?\\s*:\\s*`
+const hasDegree = (source, value) =>
+  new RegExp(
+    `${key('name')}["']coefficients["']\\s*,\\s*${key('type')}\\{\\s*${key('kind')}["']array["']\\s*,\\s*${key('length')}${value}\\b`,
+  ).test(source)
 
 // npm gives `prepublishOnly` no way to see `--tag`, so the channel comes through the environment
 // when the publish scripts set it, and through argv when run by hand.
@@ -115,11 +123,11 @@ for (const preset of wanted) {
   const unexpected = Object.entries(EXPECTED_DEGREE).filter(([candidate]) => candidate !== preset)
 
   if (!hasDegree(source, degree)) {
-    problems.push(`${preset}: dist/presets/${preset}.js contains no length-${degree} arrays; the inlined circuits are not ${preset}.`)
+    problems.push(`${preset}: dist/presets/${preset}.js contains no degree-${degree} polynomials; the inlined circuits are not ${preset}.`)
   }
   for (const [otherPreset, otherDegree] of unexpected) {
     if (hasDegree(source, otherDegree)) {
-      problems.push(`${preset}: dist/presets/${preset}.js contains length-${otherDegree} arrays, which belong to ${otherPreset}.`)
+      problems.push(`${preset}: dist/presets/${preset}.js contains degree-${otherDegree} polynomials, which belong to ${otherPreset}.`)
     }
   }
 }

@@ -147,13 +147,13 @@ const proof = await finishBallotProof(prepared, digest, signature, {
 })
 ```
 
-| Stage            | Circuit                    | What it proves                                                        |
-| ---------------- | -------------------------- | --------------------------------------------------------------------- |
-| `encryption_ct0` | `user_data_encryption_ct0` | The first ciphertext half encrypts the ballot under the committee key |
-| `encryption_ct1` | `user_data_encryption_ct1` | The second half uses the same encryption randomness                   |
-| `ballot`         | `crisp` / `crisp_onchain`  | A vote is signed and within voting power, or a mask is zero           |
-| `encryption`     | `user_data_encryption`     | Both encryption proofs verify together                                |
-| `fold`           | `fold` / `fold_onchain`    | One proof binds the encryption and ballot proofs for the contract     |
+| Stage            | Circuit                    | What it proves                                                                                                                       |
+| ---------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `encryption_ct0` | `user_data_encryption_ct0` | The ciphertext half that carries the ballot is a well-formed encryption of it                                                        |
+| `encryption_ct1` | `user_data_encryption_ct1` | The other ciphertext half is well formed                                                                                             |
+| `ballot`         | `crisp` / `crisp_onchain`  | A vote is signed by the slot owner and within voting power, or a mask is zero; the new slot ciphertext is the ballot plus the addend |
+| `encryption`     | `user_data_encryption`     | Both halves verify and share the same encryption randomness                                                                          |
+| `fold`           | `fold` / `fold_onchain`    | Encryption and ballot proofs cover the same ciphertext; outputs the key commitment the contract checks against the committee key     |
 
 #### Verify Proof
 
