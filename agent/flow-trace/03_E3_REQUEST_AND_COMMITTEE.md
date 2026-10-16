@@ -34,9 +34,11 @@ proof of independent human control.
 
 `eligibilityAt(operator, requestBlock - 1)` also applies the historical admission policy and the
 position's registration/owner-change time. A later cooldown change, admission pause, or owner change
-does not alter that E3's admission rule. Current `isActive` still checks collateral and release
-requirements without applying the new admission policy to an older request. Policy updates reset the
-conservative owner count; status refreshes count only positions admitted under the new policy. See
+does not alter that E3's admission rule. When identity is required, `eligibilityAt` also checks the
+historical bond owner's credential at that same snapshot. Current `isActive` still checks collateral
+and release requirements without applying the new admission policy to an older request. Policy updates
+reset the conservative owner count; status refreshes count only positions admitted under the new policy.
+See
 [admission cooldown and pause](02_TOKENS_AND_ACTIVATION.md#admission-cooldown-and-pause).
 
 Governance configures the fee token, its expected decimals, and every raw-unit pricing term through
@@ -805,6 +807,9 @@ A ready committee must finalize at or before its absolute DKG deadline.
    submission when its local active-job capacity is exhausted. Before ticket dispatch, the node
    persists a provisional reservation. Committee finalization confirms or releases that reservation.
    Terminal failure or completion releases every remaining reservation.
+
+   **Gap:** the Rust shortlist does not apply the owner-identity policy or credential history.
+   Solidity rejects those owners' tickets through `eligibilityAt` at the request snapshot.
 
    For capped requests, admission requires N counted active snapshot owners. Every caller, including
    CRISP and the SDK, passes this on-chain check before a VRF draw. Failure reverts all request
