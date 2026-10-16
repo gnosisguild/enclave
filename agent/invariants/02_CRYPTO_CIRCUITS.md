@@ -270,9 +270,11 @@ every section.
   canonical bound carries over and need not be repeated. That is all an opener needs: C5's per-party
   `pk0` (bounded by C1), C4's shares (bounded by C2; the l-BFV C4 hashes C2's carriers directly,
   which transfers the same bound), C3's DKG key (bounded by C0) and the l-BFV C3's message (bounded
-  by the C2 chunk leaves) rely on it, at half the cost of a two-sided range check. A value that no
-  upstream commitment bounds still needs its own bound where it originates: C1's `pk0`, because C1
-  originates it and the key equation absorbs `+q` against `r1`; C0's key, to the centred window,
+  by the C2 chunk leaves) rely on it, at half the cost of a two-sided range check. The trBFV
+  `user_data_encryption` ct0 leg also relies on it: it opens `pk0is` with checked packing, and the
+  committee-key anchor makes the opened key the one C5 bounded to the centred window. A value that
+  no upstream commitment bounds still needs its own bound where it originates: C1's `pk0`, because
+  C1 originates it and the key equation absorbs `+q` against `r1`; C0's key, to the centred window,
   which is why C0 range-checks it rather than only hashing it (a malformed key then fails its
   owner's C0, not every dealer's C3); and C5's `pk0_agg`, because `verify_pk_for_basis` pins it only
   modulo `q_l`. — `flow-trace/04`
@@ -285,7 +287,10 @@ every section.
 - Every prover-chosen modular quotient needs a bound. This includes the `e_sm` CRT lift (C1 on
   trBFV, the C2b chunk leaves on l-BFV), the reduced encryption quotients in ct0, ct1, and C3, and
   the reduced key quotients `r` of `lbfv_pk_generation` and `rd0`/`rd2` of `rlk_generation`. Bounds
-  on the other operands must also prevent field wraparound. — `flow-trace/04`
+  on the other operands must also prevent field wraparound. A bound can be a power-of-two window
+  when every other term is exactly bounded: the integer identity then fixes the quotient, so the
+  window only has to keep `q_i * r` far below the field modulus. The trBFV ct0 and ct1 legs check
+  `r` in `[-2^BIT_R, 2^BIT_R)` (`range_check_signed_power_of_two`) on this basis. — `flow-trace/04`
 - `rlk_generation` uses `delta_l = (row_index == l)` for limb `l` in place of the row's Garner
   coefficient. This is correct only because each Garner coefficient is `1 mod q_row` and `0 mod`
   every other modulus; `garner_coefficient_is_the_crt_unit_vector` checks this for each l-BFV
@@ -406,17 +411,23 @@ every section.
   an artifact of the sweep, not of the change under test: rebuild with `pnpm build:circuits` before
   believing it. — `flow-trace/04`
 - A soundness fix can be blocked by the browser prover, and the ceiling is a cliff rather than a
-  slope. CRISP proves ct0 in-browser against a hardcoded `srsSize: 2**21` (2,097,152); the checked
-  pk and ciphertext commitments put ct0 at 2,229,363, which stops browser proving rather than
-  slowing it. The soundness fix landed first and the pending arithmetic optimisation restores the
-  margin, but the two must ship together: ct0 has to be re-measured against 2,097,152 before CRISP
-  ships. Measure ct0 against that number before adding any constraint to it. — `flow-trace/04`
-- Anchoring a value off-circuit still needs an injective packing in-circuit. ct0/ct1 bound the
-  public-key components before commitment generation. `CRISPProgram` supplies the registry's
-  C5-proven committee key as `noirPublicInputs[8]`. This binds the ballot to the round's key only
-  because the packing has one opening. Non-injective packing defeats a chain-supplied anchor as it
-  defeats an in-circuit commitment comparison. The same requirement applies to the `u`-commitment
-  equality in the `user_data_encryption` fold. — `flow-trace/04`
+  slope. The SDK proves the trBFV `user_data_encryption` circuit in-browser against a hardcoded
+  `srsSize: 2**21` (2,097,152). That one circuit proves both legs: at `secure-8192` it is 1,891,256
+  gates, 205,896 below the ceiling. A circuit above the ceiling stops browser proving rather than
+  slowing it. Measure `user_data_encryption` against 2,097,152 before adding any constraint to
+  either leg. — `flow-trace/04`
+- Anchoring a value off-circuit still needs an injective packing in-circuit. The public-key
+  commitment is anchored off-circuit: `CRISPProgram` supplies the registry's C5-proven committee key
+  as `noirPublicInputs[8]`. This binds the ballot to the round's key only because the packing has
+  one opening. Non-injective packing defeats a chain-supplied anchor as it defeats an in-circuit
+  commitment comparison. In the trBFV `user_data_encryption` circuit, ct0 opens `pk0is` with checked
+  packing, and ct1 hard-codes `pk1` as the circuit-constant CRS (`CRP`), so `pk1` has no witness to
+  open. Only a key on the default-seed CRP, which every committee key is, can be proven. Do not make
+  `pk1is` a witness again without a checked opening. Both legs read one `u` witness, and
+  `user_data_encryption::execute` asserts that equality before ct1 reuses ct0's `u` commitment
+  (`execute_with_u_commitment`, crate-private for that reason). The chunked l-BFV identity circuits
+  (`*_eval_chunk_identity`) open `pk0is` and `pk1is` with checked packing. The same requirement
+  applies to the `u`-root equality in the `user_data_encryption_chunked` wrapper. — `flow-trace/04`
 - The class is "every circuit that opens a commitment it did not create". Its members are C2a, C2b,
   C3 (C0's key; on l-BFV also the C2 chunk root of its message), C4, C5 and C6 (three), plus the
   l-BFV PK and RLK aggregation. The trBFV ones open through checked packing (`pack_checked` /
@@ -430,13 +441,13 @@ every section.
   relation that is linear and aligned coefficient by coefficient across ciphertexts packed with the
   same `BIT_CT`, so an opening that keeps the carriers proves the same relation for the committed
   coefficients. The exemption holds only for that shape of relation, and only while every commitment
-  in it has a bounded opening that something else fixes: the ballot through the range checks of
-  `user_data_encryption_ct0/ct1`, and the parent and the published result because
-  `chain_head_per_slot` takes an entry only when its bytes reproduce its commitment and it extends
-  the selected head. A check at one point over those commitments, or a Secure Process that follows a
-  parent by its stored commitment without its bytes, needs injective openings: chained masks could
-  then carry a coefficient past the radix and shift a plaintext coefficient by a carry. —
-  `flow-trace/04`
+  in it has a bounded opening that something else fixes: the ballot through the range checks of the
+  chunked ct0 and ct1 legs (`user_data_encryption_chunked`), and the parent and the published result
+  because `chain_head_per_slot` takes an entry only when its bytes reproduce its commitment and it
+  extends the selected head. A check at one point over those commitments, or a Secure Process that
+  follows a parent by its stored commitment without its bytes, needs injective openings: chained
+  masks could then carry a coefficient past the radix and shift a plaintext coefficient by a carry.
+  — `flow-trace/04`
 - A bound that is not tight enough for the slot is no bound for this purpose. C2b's `as u64` cast
   limited coefficients to `2^64` while the slot was `radix = 2^64` with `base = 2^60`, so a digit
   could still overflow. — `flow-trace/04`
@@ -660,12 +671,12 @@ every section.
   coefficient, the hinted weight, and the quotient to `[0, t)`. Then `k1 + t * r == Q_MOD_T * v`
   holds over the integers, and `v` is the value that the coefficient decrypts to. The bound on the
   coefficient also gives the packed `k1_commitment` one opening. Thus the fold's equality check
-  binds this `k1` to the plaintext that `user_data_encryption_ct0` encrypts. Without that bound, a
-  prover can open the commitment to shifted option coefficients that decode to other weights.
-  Indexing as if the polynomial were the message width makes both checks read only padding: every
-  vote passes any balance bound, and a mask — which needs no signature and may be written to any
-  eligible slot — can carry an arbitrary payload into someone else's ballot. Tests must build `k1`
-  at the compiled degree, not at `MAX_MSG_NON_ZERO_COEFFS`. — `flow-trace/04`
+  binds this `k1` to the plaintext that the ct0 leg of `user_data_encryption_chunked` encrypts.
+  Without that bound, a prover can open the commitment to shifted option coefficients that decode to
+  other weights. Indexing as if the polynomial were the message width makes both checks read only
+  padding: every vote passes any balance bound, and a mask — which needs no signature and may be
+  written to any eligible slot — can carry an arbitrary payload into someone else's ballot. Tests
+  must build `k1` at the compiled degree, not at `MAX_MSG_NON_ZERO_COEFFS`. — `flow-trace/04`
 - **The SAFE ciphertext commitment requires exactly two components.** It covers `c[0]` and `c[1]`
   only, matching the Noir circuit, so `bfv_ciphertext_to_greco` rejects any other component count. A
   padded ciphertext would otherwise share a commitment with its two-component prefix while threshold
@@ -784,22 +795,24 @@ every section.
   initial sidecar, validates any `DocumentsDurable` bundle, re-arms the earliest retry, redrives a
   persisted dispatch, or applies an immutable sealed set. Persisted V1 candidate sets of `H..=N`
   remain valid; all new V1 candidate sets contain exactly `H`. — `flow-trace/04`
-- **Complete user-data-encryption recursive VK binding:** each ciphertext leg is a tree of circuits,
-  and every VK in the tree must reach an anchor. The identity circuit (`*_eval_chunk_identity`)
-  verifies the leaf and outputs its key hash first. Each top-level circuit
-  (`user_data_encryption_ct0/ct1`) folds the identity, leaf and ciphertext key hashes, in that
-  order, into `compute_ude_vk_manifest`. The `user_data_encryption` wrapper outputs
-  `compute_ude_vk_chain(top_key_hash, manifest)` per leg, in the positions that held the bare ct0
-  and ct1 key hashes. The verifier must compare both chain values to anchors. Do not drop a key hash
-  at any layer: a key hash that no layer passes up lets a prover replace that circuit with any
-  circuit that has the same public-input shape, for example a leaf without its range checks. The
-  wrapper also asserts that ct0 and ct1 share one `u` root. The ct0 top-level circuit rebuilds the
-  `k1` chunk root from the complete polynomial before it outputs the whole-polynomial commitment
-  that CRISP checks. Its proof must use the ZK recursive target because that circuit receives the
-  private `k1` polynomial directly. The identity proofs must use the ZK recursive target too,
-  because each receives the private `u` polynomial to open it and evaluate `pk * u`. Each SDK proof
-  request must use the circuit bundle compiled for the witness's BFV preset and polynomial degree. —
-  `lib::core::threshold::user_data_encryption_chunk`, `examples/CRISP/scripts/compute_vk_hash.sh`
+- **Complete user-data-encryption recursive VK binding:** in the chunked l-BFV flow, each ciphertext
+  leg is a tree of circuits, and every VK in the tree must reach an anchor. The trBFV
+  `user_data_encryption` circuit verifies no inner proof, so its own VK is the only key to anchor.
+  The identity circuit (`*_eval_chunk_identity`) verifies the leaf and outputs its key hash first.
+  Each top-level circuit (`user_data_encryption_ct0_chunked/ct1_chunked`) folds the identity, leaf
+  and ciphertext key hashes, in that order, into `compute_ude_vk_manifest`. The
+  `user_data_encryption_chunked` wrapper outputs `compute_ude_vk_chain(top_key_hash, manifest)` per
+  leg, in the positions that held the bare ct0 and ct1 key hashes. The verifier must compare both
+  chain values to anchors. Do not drop a key hash at any layer: a key hash that no layer passes up
+  lets a prover replace that circuit with any circuit that has the same public-input shape, for
+  example a leaf without its range checks. The wrapper also asserts that ct0 and ct1 share one `u`
+  root. The ct0 top-level circuit rebuilds the `k1` chunk root from the complete polynomial before
+  it outputs the whole-polynomial commitment that CRISP checks. Its proof must use the ZK recursive
+  target because that circuit receives the private `k1` polynomial directly. The identity proofs
+  must use the ZK recursive target too, because each receives the private `u` polynomial to open it
+  and evaluate `pk * u`. Each SDK proof request must use the circuit bundle compiled for the
+  witness's BFV preset and polynomial degree. — `lib::core::threshold::user_data_encryption_chunk`,
+  `examples/CRISP/scripts/compute_vk_hash.sh`
 - Circuit soundness fixes to preserve: `ModU64::div_mod` verifies
   `result*divisor == dividend (mod modulus)` (IF-001); C7 compares **every** decoded coefficient,
   including zeros, to the claimed message (IF-002). The l-BFV C7

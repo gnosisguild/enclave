@@ -721,7 +721,7 @@ function circuits() {
         title: 'CRISP fold',
         lines: ['P3 + the voter proof'],
         mono: true,
-        ref: 'examples/CRISP/circuits/bin/fold/src/main.nr@41@user_data_encryption_proof,',
+        ref: 'examples/CRISP/circuits/bin/fold/src/main.nr@43@user_data_encryption_proof,',
       },
       {
         id: 'crispver',

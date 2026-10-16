@@ -1409,17 +1409,35 @@ deadlines, recovery flow, and remaining trust.
 
 ### User-data encryption proof tree (P3)
 
-The client gets one raw BFV witness from Rust or WASM. The shared proof-tree builder at
-`packages/user-data-encryption-prover/src/index.ts` passes the whole witness to one leaf per round.
-Each leg's identity is checked reduced modulo `X^N + 1`, so the witness has no cyclotomic quotient
-and its modulus-switch quotients (`r1is`, `p1is`) have `N` coefficients. The Interfold SDK uses this
-builder. The CRISP SDK still builds the earlier two-chunk tree and must be updated before CRISP uses
-these circuits. `e3-bfv-client` serializes witness integers outside JavaScript's safe range as
-decimal strings. This preserves exact coefficients when WASM returns JSON to the SDK. The SDK
-selects its proof bundle by BFV degree. Its artifact guard checks the minimum committee and a
-supported local preset; the active local preset does not select the bundle.
-`zk_cli --circuit user-data-encryption` generates this raw witness. The shared builder, not one Noir
-circuit, uses the witness to produce the recursive tree.
+The key type selects one of two P3 flows. `e3_fhe_params::is_lbfv_path` in `crates/bfv-client` and
+`LBFV_PRESETS` in `packages/interfold-sdk/src/crypto/user-data-encryption.ts` make the same choice.
+
+- **trBFV keys (`secure-8192`):** one circuit, `circuits/bin/threshold/user_data_encryption`, proves
+  both legs over one `u`. Its inputs are `pk0is`, `ct0is`, `ct1is`, `u`, `e0`, `e1`, `k1`, `r`, and
+  `r_ct1`. `lib::core::threshold::user_data_encryption::execute` asserts that both legs read the
+  same `u`. It then runs `UserDataEncryptionCt0::execute`, which bounds `u` to `{-1, 0, 1}` and
+  commits it, and `UserDataEncryptionCt1::execute_with_u_commitment`, which takes that commitment
+  into the ct1 transcript. ct1 hard-codes `pk1` as the circuit-constant CRS (`CRP`), so only a key
+  on the default-seed CRP, which every committee key is, can be proven. ct0 opens `pk0` with checked
+  packing. Both legs bound `r` to `[-2^BIT_R, 2^BIT_R)`. The public inputs are
+  `(pk_commitment, ct_commitment, k1_commitment)`. At `secure-8192` the circuit is 1,891,256 gates,
+  one `2^21` proof. The witness generator
+  (`crates/zk-helpers/src/circuits/threshold/user_data_encryption/computation.rs`) computes `pk * u`
+  exactly with a two-prime NTT (`negacyclic_mul_exact`) and derives `r` directly. It rejects a key
+  that is not on the default-seed CRP; `public_key_on_protocol_crs` builds keys on it.
+- **l-BFV keys (`insecure`, `secure-16384`) and all CRISP rounds:** the chunked proof tree below.
+
+The rest of this section describes the chunked tree. The client gets one raw BFV witness from Rust
+or WASM. The shared proof-tree builder at `packages/user-data-encryption-prover/src/index.ts` passes
+the whole witness to one leaf per round. Each leg's identity is checked reduced modulo `X^N + 1`, so
+the witness has no cyclotomic quotient and its modulus-switch quotients (`r1is`, `p1is`) have `N`
+coefficients. The Interfold SDK uses this builder. The CRISP SDK still builds the earlier two-chunk
+tree and must be updated before CRISP uses these circuits. `e3-bfv-client` serializes witness
+integers outside JavaScript's safe range as decimal strings. This preserves exact coefficients when
+WASM returns JSON to the SDK. The SDK selects its proof bundle by BFV degree. Its artifact guard
+checks the minimum committee and a supported local preset; the active local preset does not select
+the bundle. `zk_cli --circuit user-data-encryption` generates this raw witness. The shared builder,
+not one Noir circuit, uses the witness to produce the recursive tree.
 
 Each ciphertext leg uses four proofs:
 
@@ -1433,9 +1451,9 @@ Each ciphertext leg uses four proofs:
    against the leaf's public-key commitment and `u` against the leaf's `u` root, evaluates
    `pk * u mod X^N + 1` at the leaf's challenge through `negacyclic_kernel`, and evaluates the
    batched right-hand side of the reduced identity.
-4. `user_data_encryption_ct0` or `user_data_encryption_ct1` verifies the identity and ciphertext
-   proofs. It requires the ciphertext commitment and challenge to be the leaf's, checks the batched
-   identity, and commits every child VK to the leg manifest.
+4. `user_data_encryption_ct0_chunked` or `user_data_encryption_ct1_chunked` verifies the identity
+   and ciphertext proofs. It requires the ciphertext commitment and challenge to be the leaf's,
+   checks the batched identity, and commits every child VK to the leg manifest.
 
 The ct0 top-level circuit also receives the complete `k1` polynomial. It rebuilds the `k1` chunk
 root and compares it with the leaf's. It then outputs the whole-polynomial commitment under
@@ -1444,11 +1462,11 @@ circuit computes. The ct0 top-level proof uses the ZK recursive target because i
 the private `k1` polynomial. The ct1 top-level proof remains non-ZK because it receives only proofs
 and public inputs.
 
-The `user_data_encryption` wrapper verifies both top-level proofs. It requires the same `u` root in
-both legs and outputs one complete VK chain for each leg. The CRISP fold circuit compares these
-chains with separate anchors for `insecure`, `secure-8192`, and `secure-16384`. The anchor order is
-defined by `compute_ude_vk_manifest`; `examples/CRISP/scripts/compute_vk_hash.sh` computes the same
-order from the generated VK hashes.
+The `user_data_encryption_chunked` wrapper verifies both top-level proofs. It requires the same `u`
+root in both legs and outputs one complete VK chain for each leg. The CRISP fold circuit compares
+these chains with separate anchors for `insecure`, `secure-8192`, and `secure-16384`. The anchor
+order is defined by `compute_ude_vk_manifest`; `examples/CRISP/scripts/compute_vk_hash.sh` computes
+the same order from the generated VK hashes.
 
 The Interfold SDK stages a complete proof bundle for each BFV preset. It selects the bundle from the
 requested preset and verifies that the raw witness has the matching polynomial degree. The preset
@@ -2595,9 +2613,8 @@ requires every coefficient outside the first `num_options` message positions to 
 each option weight. The prover hints the weight `v` and a quotient `r`. `check_weight` range-checks
 the coefficient, `v`, and `r` to `[0, t)` and checks `k1 + t * r == Q_MOD_T * v`. With every value
 below `t`, the equation holds over the integers, so `v` is the value that the coefficient decrypts
-to. The fold binds this `k1` to the plaintext of `user_data_encryption_ct0` through `k1_commitment`.
-A packed commitment has one opening only while every coefficient fits its slot.
-`user_data_encryption_ct0` range-checks its `k1` to `[0, t)`, and the ballot circuit bounds every
-coefficient of its own `k1`. The weights must sum to at most the slot's bound, and with two options
-at most one weight is nonzero. `check_coefficient_zero` requires the whole polynomial to be zero for
-a mask.
+to. The fold binds this `k1` to the plaintext of the ct0 leg of `user_data_encryption_chunked`
+through `k1_commitment`. A packed commitment has one opening only while every coefficient fits its
+slot. The ct0 leg range-checks its `k1` to `[0, t)`, and the ballot circuit bounds every coefficient
+of its own `k1`. The weights must sum to at most the slot's bound, and with two options at most one
+weight is nonzero. `check_coefficient_zero` requires the whole polynomial to be zero for a mask.

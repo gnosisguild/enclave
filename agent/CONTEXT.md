@@ -212,7 +212,8 @@ persistence · opentelemetry/tracing.
 - **DKG** (`circuits/bin/dkg/`): C0 `pk` (PkBfv) · C2a `sk_share_computation_chunk` · C2b
   `esm_share_computation_chunk` · C3 `share_encryption` · C4 `share_decryption`
 - **Threshold** (`circuits/bin/threshold/`): C1 `pk_generation` · C5 `pk_aggregation` · P3
-  `user_data_encryption_ct0/ct1` (+ wrapper) · C6 `share_decryption` · C7
+  `user_data_encryption` (trBFV keys: one circuit proves both legs) or
+  `user_data_encryption_chunked` (l-BFV keys: chunked ct0 and ct1 legs) · C6 `share_decryption` · C7
   `decrypted_shares_aggregation` · secure-16384 l-BFV row proofs `lbfv_pk_generation`
   (`CircuitName::LbfvPkGeneration = 29`), `lbfv_pk_aggregation`
   (`CircuitName::LbfvPkAggregation = 30`), `rlk_generation` (`CircuitName::RlkGeneration = 27`), and
