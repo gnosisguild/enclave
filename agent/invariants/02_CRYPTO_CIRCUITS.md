@@ -252,7 +252,11 @@ every section.
 - C7 derives `u` through bounded interpolation and `garner_reconstruct`; it accepts neither
   `u_global` nor CRT reconstruction quotients as witnesses. `reduce_mod_bounded` and
   `inv_mod_bounded` constrain every reduction and inverse hint used by that path. The rounded decode
-  constrains its own quotient and remainder. — `flow-trace/04`
+  constrains its own quotient and remainder. Every input to those helpers must also have a quotient
+  under `BIT_K`, or valid inputs cannot be proven. The Lagrange products are reduced after every
+  factor, so their quotients stay below the largest party id for any committee. Unreduced, the
+  product of the other ids reaches `n! / (n - T)!` (about 2^35 at 19 parties), above the 33-bit
+  bound of the 27-bit insecure moduli. — `flow-trace/04`
 - **`ModU128::reduce_mod` does not pin its remainder; use `reduce_mod_bounded` for anything a prover
   controls.** It asserts `n == q * quotient + remainder` with `remainder < q` but never bounds the
   quotient, and the equation is over the field — so a prover picks any `remainder` in `[0, q)` and
