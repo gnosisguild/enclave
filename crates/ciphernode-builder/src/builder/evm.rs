@@ -304,6 +304,7 @@ async fn attach_slashing_manager(
     readers.system.with_contract(slashing_manager, move |next| {
         SlashingManagerSolReader::setup(&next).recipient()
     });
+    readers.system.with_slashing_manager(slashing_manager);
     match provider_cache.ensure_write_provider(readers.chain).await {
         Ok(write_provider) => match SlashingManagerSolWriter::attach_with_recovery(
             readers.bus,
