@@ -58,12 +58,12 @@ pub struct OperationParams {
 impl OperationParams {
     pub fn both() -> Result<Self> {
         Ok(Self {
-            insecure: PresetMaterial::new(BfvPreset::InsecureThreshold512)?,
+            insecure: PresetMaterial::new(BfvPreset::InsecureThreshold64)?,
             secure: PresetMaterial::new(BfvPreset::SecureThreshold8192)?,
         })
     }
     pub fn get(&self, preset: BfvPreset) -> &PresetMaterial {
-        if preset == BfvPreset::InsecureThreshold512 {
+        if preset == BfvPreset::InsecureThreshold64 {
             &self.insecure
         } else {
             &self.secure
@@ -520,7 +520,7 @@ pub fn protocol_contract(
         )
         .replace("@CIRCUIT_VERSION@", CIRCUIT_VERSION);
     for (label, preset, param_set) in [
-        ("INSECURE", BfvPreset::InsecureThreshold512, 0),
+        ("INSECURE", BfvPreset::InsecureThreshold64, 0),
         ("SECURE", BfvPreset::SecureThreshold8192, 2),
     ] {
         let material = params.get(preset);
@@ -571,7 +571,7 @@ pub fn protocol_utils(
         .iter()
         .position(|name| *name == committee.to_string())
         .context("committee index")?;
-    let param_set = if preset == BfvPreset::InsecureThreshold512 {
+    let param_set = if preset == BfvPreset::InsecureThreshold64 {
         0
     } else {
         2
@@ -591,7 +591,7 @@ pub fn protocol_utils(
         )?;
     }
     for (prefix, preset) in [
-        ("INSECURE", BfvPreset::InsecureThreshold512),
+        ("INSECURE", BfvPreset::InsecureThreshold64),
         ("SECURE", BfvPreset::SecureThreshold8192),
     ] {
         let material = params.get(preset);

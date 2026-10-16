@@ -588,7 +588,7 @@ mod tests {
     fn request() -> Request {
         Request {
             operation: super::super::Operation::Build,
-            preset: super::super::PresetSelection::Single(BfvPreset::InsecureThreshold512),
+            preset: super::super::PresetSelection::Single(BfvPreset::InsecureThreshold64),
             committee: super::super::CommitteeSelection::Single(
                 e3_committee::CiphernodesCommitteeSize::Minimum,
             ),
@@ -618,7 +618,7 @@ mod tests {
         fs::create_dir_all(root.join("scripts")).unwrap();
         fs::write(
             root.join("scripts/circuit-build-pairs.json"),
-            r#"[["insecure-512","minimum"],["secure-8192","minimum"]]"#,
+            r#"[["insecure-64","minimum"],["secure-8192","minimum"]]"#,
         )
         .unwrap();
         copy_tree(
@@ -632,7 +632,7 @@ mod tests {
         fs::copy(repo.join(utils), root.join(utils)).unwrap();
         let mut selection = configuration::prepare_selection(
             root,
-            e3_fhe_params::BfvPreset::InsecureThreshold512,
+            e3_fhe_params::BfvPreset::InsecureThreshold64,
             e3_committee::CiphernodesCommitteeSize::Minimum,
             false,
         )
@@ -657,7 +657,7 @@ mod tests {
         let before = crate::tests::snapshot(root);
         let mut selection = configuration::prepare_selection(
             root,
-            BfvPreset::InsecureThreshold512,
+            BfvPreset::InsecureThreshold64,
             e3_committee::CiphernodesCommitteeSize::Minimum,
             false,
         )
@@ -667,7 +667,7 @@ mod tests {
         assert_eq!(crate::tests::snapshot(root), before);
         crate::tests::write_pins(root);
 
-        let pair = root.join("dist/circuits/insecure-512/minimum");
+        let pair = root.join("dist/circuits/insecure-64/minimum");
         for (group, name) in [("dkg", "pk"), ("threshold", "pk_generation")] {
             let path = root.join("circuits/bin").join(group).join(name);
             fs::create_dir_all(path.join("src")).unwrap();
@@ -772,7 +772,7 @@ mod tests {
                 .unwrap();
         assert_eq!(manifest["files"].as_object().unwrap().len(), 33);
         let hash =
-            identity::source_hash(root, &request(), Some("insecure-512"), Some("minimum")).unwrap();
+            identity::source_hash(root, &request(), Some("insecure-64"), Some("minimum")).unwrap();
         let built_stamp = read_stamp(&pair.join(".build-stamp.json"))
             .unwrap()
             .unwrap();
@@ -800,15 +800,15 @@ mod tests {
             }
         }
         let hash =
-            identity::source_hash(root, &request(), Some("insecure-512"), Some("minimum")).unwrap();
+            identity::source_hash(root, &request(), Some("insecure-64"), Some("minimum")).unwrap();
         let mut stamp = Stamp {
-            preset: "insecure-512".into(),
+            preset: "insecure-64".into(),
             committee: "minimum".into(),
             source_hash: hash.clone(),
             built_at: "published-time".into(),
         };
         write_json(&pair.join(".build-stamp.json"), &stamp).unwrap();
-        active_stamp(root, "insecure-512", "minimum", &hash).unwrap();
+        active_stamp(root, "insecure-64", "minimum", &hash).unwrap();
         let mut reuse = request();
         reuse.skip_if_built = true;
         let before = crate::tests::snapshot(root);

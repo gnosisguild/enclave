@@ -14,7 +14,7 @@ use std::time::{Duration, SystemTime};
 fn request() -> Request {
     Request {
         operation: Operation::Build,
-        preset: PresetSelection::Single(BfvPreset::InsecureThreshold512),
+        preset: PresetSelection::Single(BfvPreset::InsecureThreshold64),
         committee: CommitteeSelection::Single(CiphernodesCommitteeSize::Minimum),
         groups: GroupSelection::All,
         circuits: Vec::new(),
@@ -60,7 +60,7 @@ fn circuit_root_without_tools() -> tempfile::TempDir {
     write(
         root,
         "scripts/circuit-build-pairs.json",
-        r#"[["insecure-512","minimum"]]"#,
+        r#"[["insecure-64","minimum"]]"#,
     );
     artifacts::copy_tree(
         &repo.join("circuits/lib"),
@@ -132,7 +132,7 @@ fn build_policy_rejects_disabled_pairs_before_tools_and_filters_all_selectors() 
     assert!(!temp.path().join("circuits").exists());
     assert!(!temp.path().join("dist").exists());
     assert_eq!(all.selected_pairs(temp.path()).unwrap(), pairs);
-    for preset in [BfvPreset::InsecureDkg512, BfvPreset::SecureDkg8192] {
+    for preset in [BfvPreset::InsecureDkg64, BfvPreset::SecureDkg8192] {
         let mut invalid = request();
         invalid.preset = PresetSelection::Single(preset);
         assert!(execute(temp.path(), &invalid)
@@ -239,7 +239,7 @@ fn current_selection_sync_preserves_bytes_and_mtimes_without_tools() {
     let preset = if selector.contains("super::secure::") {
         BfvPreset::SecureThreshold8192
     } else {
-        BfvPreset::InsecureThreshold512
+        BfvPreset::InsecureThreshold64
     };
     let active =
         fs::read_to_string(repo.join("circuits/lib/src/configs/committee/active.nr")).unwrap();
@@ -324,7 +324,7 @@ fn source_identity_tracks_inputs_not_generated_selections_or_tests() {
     let root = temp.path();
     fs::create_dir_all(root.join("crates/zk/build/src")).unwrap();
     let opts = request();
-    let hash = || identity::source_hash(root, &opts, Some("insecure-512"), Some("micro")).unwrap();
+    let hash = || identity::source_hash(root, &opts, Some("insecure-64"), Some("micro")).unwrap();
     let config = "circuits/lib/src/configs/insecure/threshold.nr";
     write(root, config, "pub global PK_GENERATION_E_SM_BOUND: Field = 10;\npub global PK_GENERATION_E_SM_QUOTIENT_BOUNDS: [Field; L] =\n    [1, 2];\npub global L: u32 = 2;\n");
     let before = hash();
@@ -356,7 +356,7 @@ fn source_identity_tracks_inputs_not_generated_selections_or_tests() {
         assert_ne!(hash(), before, "generator edit of {path}");
     }
     let selector = "circuits/lib/src/configs/default/mod.nr";
-    write(root, selector, "// preset: insecure-512\npub use super::insecure::threshold;\npub global MAX_MSG_NON_ZERO_COEFFS: u32 = 50;\n");
+    write(root, selector, "// preset: insecure-64\npub use super::insecure::threshold;\npub global MAX_MSG_NON_ZERO_COEFFS: u32 = 50;\n");
     let before = hash();
     write(root, selector, "// preset: secure-8192\npub use super::secure::threshold;\npub global MAX_MSG_NON_ZERO_COEFFS: u32 = 50;\n");
     assert_eq!(hash(), before);
@@ -381,7 +381,7 @@ fn source_identity_tracks_inputs_not_generated_selections_or_tests() {
     let projected = identity::source_hash_with_updates(
         root,
         &opts,
-        Some("insecure-512"),
+        Some("insecure-64"),
         Some("micro"),
         &updates,
     )
@@ -417,8 +417,7 @@ fn source_identity_tracks_external_pins_and_pinned_tools() {
         "crates/zk-prover/versions.json",
         r#"{"required_bb_version":"5.2.0","required_circuits_version":"0.19.0"}"#,
     );
-    let hash =
-        || identity::source_hash(root, &opts, Some("insecure-512"), Some("minimum")).unwrap();
+    let hash = || identity::source_hash(root, &opts, Some("insecure-64"), Some("minimum")).unwrap();
     let before = hash();
     write(
         root,
@@ -523,9 +522,9 @@ fn checksum_streams_files_of_any_size_to_the_same_digest() {
 fn protocol_generation_preserves_deployed_parameter_hashes() {
     for (preset, expected_hash, expected_id) in [
         (
-            BfvPreset::InsecureThreshold512,
-            "18c6d8650486b997d48aa2d285fae878fb267b268332d056a3e8527d50e87b4f",
-            "7d3f52af7ad13baa9f34ce2426e980907ffeb86b4b374308e6c590d5d43f9e41",
+            BfvPreset::InsecureThreshold64,
+            "aff065a7d6e3d8c830dfcd37c2af8a25b3dcc6cd74ba458894075e8264f1ab1e",
+            "92c8b373eb72cc3600a5a818cf8599db16e618ee3ece2dadd14f8608c1a43ac9",
         ),
         (
             BfvPreset::SecureThreshold8192,
@@ -561,17 +560,17 @@ fn shared_operation_material_serves_parity_bounds_and_protocol_renderers() {
         let parity = configuration::parity_files(committee, &params).unwrap();
         assert_eq!(parity.len(), 2);
     }
-    let material = params.get(BfvPreset::InsecureThreshold512);
+    let material = params.get(BfvPreset::InsecureThreshold64);
     let bounds = configuration::bound_updates(
         root,
-        BfvPreset::InsecureThreshold512,
+        BfvPreset::InsecureThreshold64,
         CiphernodesCommitteeSize::Minimum,
         material,
     )
     .unwrap();
     assert_eq!(bounds.len(), 2);
     let contract = configuration::protocol_contract(
-        BfvPreset::InsecureThreshold512,
+        BfvPreset::InsecureThreshold64,
         CiphernodesCommitteeSize::Minimum,
         &params,
     )
@@ -591,7 +590,7 @@ fn crisp_binding_update_preserves_input_order_and_other_preset() {
     write(
         root,
         "circuits/bin/.active-preset.json",
-        r#"{"preset":"insecure-512","committee":"minimum"}"#,
+        r#"{"preset":"insecure-64","committee":"minimum"}"#,
     );
     let threshold = "circuits/bin/threshold/target";
     for (name, value) in [
@@ -623,7 +622,7 @@ fn crisp_binding_update_preserves_input_order_and_other_preset() {
     }
     configuration::sync_crisp(
         root,
-        BfvPreset::InsecureThreshold512,
+        BfvPreset::InsecureThreshold64,
         CiphernodesCommitteeSize::Minimum,
     )
     .unwrap();
@@ -653,7 +652,7 @@ fn crisp_binding_update_preserves_input_order_and_other_preset() {
     );
     assert!(configuration::sync_crisp(
         root,
-        BfvPreset::InsecureThreshold512,
+        BfvPreset::InsecureThreshold64,
         CiphernodesCommitteeSize::Minimum
     )
     .unwrap_err()
@@ -733,13 +732,13 @@ fn hydration_accepts_other_source_but_records_actual_artifact_identity() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path();
     let opts = request();
-    let pair = root.join("dist/circuits/insecure-512/minimum");
+    let pair = root.join("dist/circuits/insecure-64/minimum");
     for marker in artifacts::dist_markers(&pair) {
         fs::create_dir_all(marker.parent().unwrap()).unwrap();
         fs::write(marker, b"marker").unwrap();
     }
     let stamp = artifacts::Stamp {
-        preset: "insecure-512".into(),
+        preset: "insecure-64".into(),
         committee: "minimum".into(),
         source_hash: "published-source".into(),
         built_at: "published-time".into(),
@@ -777,7 +776,7 @@ fn hydration_accepts_other_source_but_records_actual_artifact_identity() {
         }
     }
     let accepted =
-        artifacts::hydration_stamp(&pair, "insecure-512", "minimum", "current-source").unwrap();
+        artifacts::hydration_stamp(&pair, "insecure-64", "minimum", "current-source").unwrap();
     artifacts::hydrate(root, &pair, &opts, &accepted).unwrap();
     assert_eq!(
         fs::read_to_string(root.join("circuits/bin/dkg/target/pk.json")).unwrap(),
@@ -808,9 +807,7 @@ fn hydration_accepts_other_source_but_records_actual_artifact_identity() {
     assert!(artifacts::hydration_stamp(&pair, "secure-8192", "minimum", "current-source").is_err());
     fs::remove_file(pair.join("default/recursive_aggregation/c6_fold/c6_fold.vk_tree_hash"))
         .unwrap();
-    assert!(
-        artifacts::hydration_stamp(&pair, "insecure-512", "minimum", "current-source").is_err()
-    );
+    assert!(artifacts::hydration_stamp(&pair, "insecure-64", "minimum", "current-source").is_err());
 }
 
 const VK_PATHS: &[(&str, &str, &str)] = &[
@@ -912,7 +909,7 @@ fn anchors_bind_all_descendants_in_circuit_order_and_reject_noncanonical_keys() 
 fn partial_build_removes_anchors_and_manifests_cover_complete_anchors() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path();
-    let pair = root.join("dist/circuits/insecure-512/minimum");
+    let pair = root.join("dist/circuits/insecure-64/minimum");
     seed_anchor_keys(&pair);
     artifacts::refresh_anchors(root, &pair, true).unwrap();
     artifacts::checksums(&root.join("dist/circuits")).unwrap();
@@ -920,9 +917,8 @@ fn partial_build_removes_anchors_and_manifests_cover_complete_anchors() {
         serde_json::from_slice(&fs::read(root.join("dist/circuits/checksums.json")).unwrap())
             .unwrap();
     for name in ["nodes_fold", "c6_fold"] {
-        let relative = format!(
-            "insecure-512/minimum/default/recursive_aggregation/{name}/{name}.vk_tree_hash"
-        );
+        let relative =
+            format!("insecure-64/minimum/default/recursive_aggregation/{name}/{name}.vk_tree_hash");
         let digest = checksum(&root.join("dist/circuits").join(&relative)).unwrap();
         assert_eq!(manifest["files"][&relative], digest);
     }

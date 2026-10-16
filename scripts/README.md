@@ -227,7 +227,7 @@ pnpm build:circuits hash
 pnpm build:circuits sync-config --preset insecure-64 --committee minimum
 
 # Update the selected bundled CRISP fold bindings from compiled inner verification keys
-pnpm build:circuits sync-crisp --preset insecure-512 --committee minimum
+pnpm build:circuits sync-crisp --preset insecure-64 --committee minimum
 
 # Check all generated parity files without changing the working tree
 pnpm build:circuits check --committee all

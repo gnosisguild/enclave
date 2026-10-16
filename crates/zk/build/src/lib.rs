@@ -335,21 +335,21 @@ impl fmt::Display for CommitteeSelection {
 
 fn preset(value: &str) -> Result<BfvPreset> {
     match value {
-        "insecure-512" => Ok(BfvPreset::InsecureThreshold512),
+        "insecure-64" => Ok(BfvPreset::InsecureThreshold64),
         "secure-8192" => Ok(BfvPreset::SecureThreshold8192),
         _ => bail!("Select one supported preset, not {value}"),
     }
 }
 fn tier(preset: BfvPreset) -> &'static str {
     match preset {
-        BfvPreset::InsecureThreshold512 => "insecure",
+        BfvPreset::InsecureThreshold64 => "insecure",
         BfvPreset::SecureThreshold8192 => "secure",
         _ => unreachable!("build selects threshold presets"),
     }
 }
 fn preset_name(preset: BfvPreset) -> &'static str {
     match preset {
-        BfvPreset::InsecureThreshold512 => "insecure-512",
+        BfvPreset::InsecureThreshold64 => "insecure-64",
         BfvPreset::SecureThreshold8192 => "secure-8192",
         _ => unreachable!("build selects threshold presets"),
     }

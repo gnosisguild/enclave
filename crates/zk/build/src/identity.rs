@@ -303,7 +303,7 @@ pub fn source_hash_with_updates(
             None => fs::read_to_string(root.join(path))?,
         };
         if path == "circuits/lib/src/configs/default/mod.nr" {
-            source = Regex::new(r"preset: (insecure-512|secure-8192)")?
+            source = Regex::new(r"preset: (insecure-64|secure-8192)")?
                 .replace_all(&source, "preset: <selected>")
                 .into_owned();
             source = Regex::new(r"super::(insecure|secure)::")?
