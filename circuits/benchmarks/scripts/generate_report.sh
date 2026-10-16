@@ -72,18 +72,24 @@ print(gas)
 PY
 }
 
+# A circuit whose path ends with `frag` wins over one that only contains it.
 find_json_by_path_fragment() {
     local frag="$1"
+    local contains=""
     for json_file in "$INPUT_DIR"/*.json; do
         [ -f "$json_file" ] || continue
         local circuit_path
         circuit_path=$(jq -r '.circuit_path // ""' "$json_file")
-        if [[ "$circuit_path" == *"$frag"* ]]; then
+        circuit_path="${circuit_path%/}"
+        if [[ "$circuit_path" == *"$frag" ]]; then
             echo "$json_file"
             return
         fi
+        if [ -z "$contains" ] && [[ "$circuit_path" == *"$frag"* ]]; then
+            contains="$json_file"
+        fi
     done
-    echo ""
+    echo "$contains"
 }
 
 find_json_by_exact_path() {
@@ -118,10 +124,8 @@ emit_circuit_row() {
 }
 
 emit_user_data_enc_row() {
-    local wrapper ct0 ct1
+    local wrapper
     wrapper=$(find_json_by_exact_path "threshold/user_data_encryption")
-    ct0=$(find_json_by_path_fragment "/threshold/user_data_encryption_ct0")
-    ct1=$(find_json_by_path_fragment "/threshold/user_data_encryption_ct1")
 
     if [ -n "$wrapper" ]; then
         local constraints prove verify proof_size
@@ -133,16 +137,6 @@ emit_user_data_enc_row() {
             echo "| user_data_encryption | $constraints | $(format_s "$prove") | $(format_ms "$verify") | $(format_kb "$proof_size") |" >> "$OUTPUT_FILE"
             return
         fi
-    fi
-
-    if [ -n "$ct0" ] && [ -n "$ct1" ]; then
-        local constraints prove verify proof_size
-        constraints=$(echo "$(jq -r '.gates.total_gates // 0' "$ct0") + $(jq -r '.gates.total_gates // 0' "$ct1")" | bc)
-        prove=$(echo "$(jq -r '.proof_generation.time_seconds // 0' "$ct0") + $(jq -r '.proof_generation.time_seconds // 0' "$ct1")" | bc -l)
-        verify=$(echo "$(jq -r '.verification.time_seconds // 0' "$ct0") + $(jq -r '.verification.time_seconds // 0' "$ct1")" | bc -l)
-        proof_size=$(echo "$(jq -r '.proof_generation.proof_size_bytes // 0' "$ct0") + $(jq -r '.proof_generation.proof_size_bytes // 0' "$ct1")" | bc)
-        echo "| user_data_encryption | $constraints | $(format_s "$prove") | $(format_ms "$verify") | $(format_kb "$proof_size") |" >> "$OUTPUT_FILE"
-        return
     fi
 
     echo "| user_data_encryption | N/A | N/A | N/A | N/A |" >> "$OUTPUT_FILE"
@@ -196,7 +190,7 @@ artifact_metrics() {
         wrapper=$(find_json_by_exact_path "threshold/user_data_encryption")
         local proof_size public_size calldata total
 
-        # Prefer the wrapper artifact when available; it matches what is posted/verified on-chain.
+        # Prefer the `user_data_encryption` artifact: it is the one proof a client produces.
         if [ -n "$wrapper" ]; then
             proof_size=$(jq -r '.proof_generation.proof_size_bytes // 0' "$wrapper")
             public_size=$(jq -r '.verification.public_inputs_size_bytes // 0' "$wrapper")
@@ -698,7 +692,8 @@ artifact_metrics "Π_dec" "/threshold/decrypted_shares_aggregation" "$(verify_ga
 
 p1=$(sum_phase_metrics "/dkg/pk /threshold/pk_generation /dkg/sk_share_computation_chunk /dkg/esm_share_computation_chunk /dkg/share_encryption /dkg/share_encryption /dkg/share_decryption /dkg/share_decryption /recursive_aggregation/c2ab_chunk_fold /recursive_aggregation/c3ab_fold /recursive_aggregation/c4ab_fold /recursive_aggregation/node_fold")
 p2=$(sum_phase_metrics "/threshold/pk_aggregation")
-p3=$(sum_phase_metrics "/threshold/user_data_encryption_ct0 /threshold/user_data_encryption_ct1")
+# Clients prove ct0 and ct1 together in one `user_data_encryption` proof.
+p3=$(sum_phase_metrics "/threshold/user_data_encryption")
 p4n=$(sum_phase_metrics "/threshold/share_decryption")
 p4a=$(sum_phase_metrics "/threshold/decrypted_shares_aggregation")
 IFS='|' read -r p1t p1s p1b <<< "$p1"

@@ -16,10 +16,9 @@ export interface PolynomialInput {
   coefficients: Field[]
 }
 
-/** Inputs of the trBFV path's user-data encryption circuits (`user_data_encryption_ct0` / `_ct1`). */
+/** Inputs of the trBFV path's user-data encryption circuit (`user_data_encryption`). */
 export interface TrbfvCircuitInputs {
   pk0is: PolynomialInput[]
-  pk1is: PolynomialInput[]
   ct0is: PolynomialInput[]
   ct1is: PolynomialInput[]
   u: PolynomialInput
