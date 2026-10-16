@@ -442,3 +442,43 @@ fn a_replayed_failure_is_accused_once_effects_run_unless_the_log_holds_the_accus
     assert_eq!(accused, vec![third.address()]);
     assert_eq!(v.pending[&by_peer_id].accusation.accuser, peer.address());
 }
+
+/// A held failure is skipped only when this node has voted on the matching peer accusation. A peer
+/// accusation that still waits for this node's re-verification does not stop this node from
+/// accusing at `EffectsEnabled`.
+#[test]
+fn a_held_failure_is_accused_when_the_peer_accusation_lacks_this_nodes_vote() {
+    let me = signer(1);
+    let accused = signer(2);
+    let peer = signer(3);
+    let committee = vec![
+        me.address(),
+        accused.address(),
+        peer.address(),
+        signer(4).address(),
+        signer(5).address(),
+    ];
+    let mut v = voting_with(&me, committee, 1, 3);
+    v.hold_accusations_until_effects();
+    let failure = proof_failure(&accused, 1, ProofType::C1PkGeneration);
+    assert!(v.on_local_proof_failure(failure.clone(), &ctx()).is_empty());
+    let by_peer = accusation_from_failure(&peer, &failure, false, NOW - 30);
+    v.pending.insert(
+        AccusationVoting::accusation_id(&by_peer),
+        PendingAccusation {
+            accusation: by_peer,
+            votes_for: Vec::new(),
+            ec: ctx(),
+        },
+    );
+
+    let accused_now: Vec<Address> = v
+        .on_effects_enabled()
+        .iter()
+        .filter_map(|action| match action {
+            VoteAction::PublishAccusation { accusation, .. } => Some(accusation.accused),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(accused_now, vec![accused.address()]);
+}

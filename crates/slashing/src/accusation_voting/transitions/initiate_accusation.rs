@@ -139,11 +139,15 @@ impl AccusationVoting {
         let mut actions = Vec::new();
         for accusation in std::mem::take(&mut self.deferred_accusations) {
             let key = (accusation.accused_address, accusation.proof_type);
-            if self
-                .pending
-                .values()
-                .any(|pending| (pending.accusation.accused, pending.accusation.proof_type) == key)
-            {
+            // A peer accusation that still waits for this node's re-verification has no vote from
+            // it yet, and the re-verification can fail or end late, so it does not count.
+            if self.pending.values().any(|pending| {
+                (pending.accusation.accused, pending.accusation.proof_type) == key
+                    && pending
+                        .votes_for
+                        .iter()
+                        .any(|vote| vote.voter == self.my_address)
+            }) {
                 self.accused_proofs.insert(key);
                 continue;
             }
