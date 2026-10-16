@@ -133,6 +133,28 @@ const maskProof = await generateMaskVoteProof({
 })
 ```
 
+#### Report Proving Progress
+
+A ballot proof is five proofs in sequence, listed in `PROOF_STAGES`. `finishBallotProof`,
+`finishMaskProof` and `CrispSDK.finishBallot` take an optional `onProgress`, called as each stage
+starts:
+
+```typescript
+import { finishBallotProof } from '@crisp-e3/sdk'
+
+const proof = await finishBallotProof(prepared, digest, signature, {
+  onProgress: ({ stage, index, total }) => console.log(`${index + 1}/${total}: ${stage}`),
+})
+```
+
+| Stage            | Circuit                    | What it proves                                                        |
+| ---------------- | -------------------------- | --------------------------------------------------------------------- |
+| `encryption_ct0` | `user_data_encryption_ct0` | The first ciphertext half encrypts the ballot under the committee key |
+| `encryption_ct1` | `user_data_encryption_ct1` | The second half uses the same encryption randomness                   |
+| `ballot`         | `crisp` / `crisp_onchain`  | A vote is signed and within voting power, or a mask is zero           |
+| `encryption`     | `user_data_encryption`     | Both encryption proofs verify together                                |
+| `fold`           | `fold` / `fold_onchain`    | One proof binds the encryption and ballot proofs for the contract     |
+
 #### Verify Proof
 
 ```typescript
@@ -294,6 +316,7 @@ const { stage, retryOffered } = getSubmissionStage({
 - `MAX_VOTE_OPTIONS` - Maximum number of options in a round
 - `MAX_MSG_NON_ZERO_COEFFS` - Number of plaintext coefficients published as the tally
 - `SIGNATURE_MESSAGE_HASH` - Hash of the signature message
+- `PROOF_STAGES` - The ballot proof stages in the order they run
 
 ### Types
 

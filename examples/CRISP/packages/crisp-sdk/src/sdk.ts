@@ -45,6 +45,7 @@ import type {
   PrepareBallotRequest,
   PreparedBallot,
   ProofData,
+  ProofOptions,
   RoundDetails,
   SlotHead,
   TokenDetails,
@@ -128,10 +129,16 @@ export class CrispSDK {
    * @param prepared - The output of {@link prepareBallot}.
    * @param digest - The digest read from `CRISPProgram.ballotDigest`.
    * @param signature - The voter signature, omitted for a mask.
+   * @param options - `onProgress` reports each proof stage as it starts.
    * @returns A promise that resolves to the generated proof data.
    */
-  async finishBallot(prepared: PreparedBallot, digest: `0x${string}`, signature?: `0x${string}`): Promise<ProofData> {
-    return signature ? finishBallotProof(prepared, digest, signature) : finishMaskProof(prepared, digest)
+  async finishBallot(
+    prepared: PreparedBallot,
+    digest: `0x${string}`,
+    signature?: `0x${string}`,
+    options: ProofOptions = {},
+  ): Promise<ProofData> {
+    return signature ? finishBallotProof(prepared, digest, signature, options) : finishMaskProof(prepared, digest, options)
   }
 
   /**
