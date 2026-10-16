@@ -1119,7 +1119,7 @@ mod threshold_share_decryption_tests {
     #[actix::test]
     async fn c6_validates_the_published_key_before_reading_secret_witnesses() {
         let cipher = Cipher::from_password("test-password").await.unwrap();
-        let preset = BfvPreset::InsecureThreshold512;
+        let preset = BfvPreset::InsecureThreshold64;
         let (params, _) = preset.build_pair().unwrap();
         let sk = SecretKey::random(&params, &mut rand::rng());
         let valid_pk = PublicKey::new(&sk, &mut rand::rng()).to_bytes();
@@ -2306,13 +2306,13 @@ mod decrypted_shares_aggregation_tests {
     use fhe_traits::Serialize;
 
     #[test]
-    #[ignore = "requires E3_TEST_ARTIFACTS_ROOT insecure-512/small artifacts and E3_CUSTOM_BB"]
+    #[ignore = "requires E3_TEST_ARTIFACTS_ROOT insecure-64/small artifacts and E3_CUSTOM_BB"]
     fn local_small_c7_request_proves_ten_shares_with_the_canonical_committee() {
         let committee_size = CiphernodesCommitteeSize::Small;
         let committee = committee_size.values();
         assert_eq!(committee.threshold + 1, 10);
         assert_eq!(committee.h, 14);
-        let params_preset = BfvPreset::InsecureThreshold512;
+        let params_preset = BfvPreset::InsecureThreshold64;
         let (params, _) = params_preset.build_pair().unwrap();
         let zero = fhe_math::rq::Poly::<PowerBasis>::zero(params.context_at_level(0).unwrap());
         let bytes = ArcBytes::from_bytes(&zero.to_bytes());

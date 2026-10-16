@@ -143,10 +143,10 @@ mod tests {
             &std::fs::read_to_string(root.join(".active-preset.json")).unwrap(),
         )
         .unwrap();
-        assert_eq!(active["preset"], "insecure-512");
+        assert_eq!(active["preset"], "insecure-64");
         assert_eq!(active["committee"], "minimum");
         let mut config7 = c7::Configs::for_preset(
-            BfvPreset::InsecureThreshold512,
+            BfvPreset::InsecureThreshold64,
             CiphernodesCommitteeSize::Minimum,
         )
         .unwrap();
@@ -211,13 +211,13 @@ mod tests {
             .is_err());
         let sample6 = e3_zk_samples::threshold::share_decryption::generate(
             &config6.params,
-            BfvPreset::InsecureThreshold512,
+            BfvPreset::InsecureThreshold64,
             CiphernodesCommitteeSize::Minimum.values(),
         )
         .unwrap();
         let sample7 = e3_zk_samples::threshold::decrypted_shares_aggregation::generate(
             &config7,
-            BfvPreset::InsecureThreshold512,
+            BfvPreset::InsecureThreshold64,
         )
         .unwrap();
         for (compiled, json) in [
