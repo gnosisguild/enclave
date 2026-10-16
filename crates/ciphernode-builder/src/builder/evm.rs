@@ -313,6 +313,9 @@ async fn attach_slashing_manager(
             storage
                 .repositories
                 .slashing_writer_recovery(readers.chain_id),
+            storage
+                .repositories
+                .slashing_writer_intent_times(readers.chain_id),
         )
         .await
         {

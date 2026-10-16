@@ -1114,9 +1114,10 @@ E3-scoped `CommitteeMemberExcluded` fact instead of a transaction that must reve
 an on-chain expulsion: it changes only the current E3's collectors and aggregator selection. The
 canonical N-member roster remains unchanged for proof binding, rewards, and registry state.
 
-The slash writer has two state layers. Its deferred, in-flight, and completed admission sets are
+The slash writer has three state layers. Its deferred, in-flight, and completed admission sets are
 process-local. Its semantic intent outbox is durable and is written before policy reads or
-submission. A matching canonical exclusion or slash execution acknowledges the outbox, and startup
+submission. A separate durable record keeps when it first recorded each intent, so a fallback
+submitter waits only for the rest of its rank delay after a restart. A matching canonical exclusion or slash execution acknowledges the outbox, and startup
 backfills a missing outbox from EventStore history. A crash after transaction broadcast can still
 require on-chain reconciliation to distinguish landed from missing work; contract replay protection
 makes a repeated proposal safe.
