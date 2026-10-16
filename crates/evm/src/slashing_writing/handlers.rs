@@ -161,6 +161,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<SubmitSlashIntent>
             let address = ctx.address();
             async move {
                 let SubmitSlashIntent { key, event, .. } = msg;
+                let attempt_started = tokio::time::Instant::now();
                 // The workflow decides; this loop only runs the effect of each step.
                 let (submission, mut step) = SlashSubmission::new(event, my_addr, recorded_ago);
                 let end = loop {
@@ -179,7 +180,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<SubmitSlashIntent>
                                 warn!(%error, "Could not read slash policy before submission");
                                 error.to_string()
                             });
-                            submission.policy_read(policy)
+                            submission.policy_read(policy, attempt_started.elapsed())
                         }
                         SubmissionStep::Exclude(exclusion) => {
                             info!(

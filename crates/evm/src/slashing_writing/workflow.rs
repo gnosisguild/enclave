@@ -276,9 +276,14 @@ impl SlashSubmission {
         &self.event
     }
 
-    /// The policy, or the error of its read. A failed read must not invent an exclusion: eligible
-    /// submitters go on, so a temporary RPC failure cannot suppress an enabled slash.
-    pub(crate) fn policy_read(&self, policy: Result<SlashPolicyState, String>) -> SubmissionStep {
+    /// The policy, or the error of its read, which took `read_took`. A failed read must not invent
+    /// an exclusion: eligible submitters go on, so a temporary RPC failure cannot suppress an
+    /// enabled slash.
+    pub(crate) fn policy_read(
+        &self,
+        policy: Result<SlashPolicyState, String>,
+        read_took: Duration,
+    ) -> SubmissionStep {
         match policy {
             Ok(SlashPolicyState::Disabled) => SubmissionStep::Exclude(CommitteeMemberExcluded {
                 e3_id: self.event.e3_id.clone(),
@@ -293,13 +298,14 @@ impl SlashSubmission {
                     self.event.proof_type
                 ))),
             },
-            Ok(SlashPolicyState::ProofEnabled) | Err(_) => self.submission(),
+            Ok(SlashPolicyState::ProofEnabled) | Err(_) => self.submission(read_took),
         }
     }
 
     /// Only the first `MAX_SLASH_SUBMITTERS` voters submit, with evidence, rank 0 at once and the
-    /// fallback ranks after their delay.
-    fn submission(&self) -> SubmissionStep {
+    /// fallback ranks after their delay. The delay counts from when the intent was first recorded,
+    /// and the policy read that took `read_took` is part of it.
+    fn submission(&self, read_took: Duration) -> SubmissionStep {
         let rank = match self.rank {
             Some(rank) if should_submit_slash(true, &self.event.outcome, Some(rank)) => rank,
             _ => {
@@ -318,7 +324,7 @@ impl SlashSubmission {
                 ))),
             };
         }
-        let delay = submission_delay(rank).saturating_sub(self.recorded_ago);
+        let delay = submission_delay(rank).saturating_sub(self.recorded_ago + read_took);
         if delay.is_zero() {
             SubmissionStep::Submit { rank }
         } else {
@@ -528,11 +534,22 @@ mod tests {
             let (submission, _) =
                 SlashSubmission::new(quorum(voters.clone()), voters[2], recorded_ago);
             assert_eq!(
-                submission.policy_read(Ok(SlashPolicyState::ProofEnabled)),
+                submission.policy_read(Ok(SlashPolicyState::ProofEnabled), Duration::ZERO),
                 step,
                 "recorded {recorded_ago:?} ago"
             );
         }
+
+        // A slow policy read is part of the delay too.
+        let (submission, _) =
+            SlashSubmission::new(quorum(voters.clone()), voters[2], Duration::ZERO);
+        assert_eq!(
+            submission.policy_read(Ok(SlashPolicyState::ProofEnabled), Duration::from_secs(45)),
+            SubmissionStep::Wait {
+                rank: 2,
+                delay: full - Duration::from_secs(45),
+            }
+        );
     }
 
     #[test]
@@ -541,7 +558,7 @@ mod tests {
             let submission = submission_by(rank);
             let event = submission.event().clone();
             assert_eq!(
-                submission.policy_read(Ok(SlashPolicyState::Disabled)),
+                submission.policy_read(Ok(SlashPolicyState::Disabled), Duration::ZERO),
                 SubmissionStep::Exclude(CommitteeMemberExcluded {
                     e3_id: event.e3_id,
                     node: event.accused,
@@ -571,7 +588,8 @@ mod tests {
 
     #[test]
     fn a_policy_without_attestations_ends_the_submission_with_an_error() {
-        let step = submission_by(Some(0)).policy_read(Ok(SlashPolicyState::InvalidForAttestations));
+        let step = submission_by(Some(0))
+            .policy_read(Ok(SlashPolicyState::InvalidForAttestations), Duration::ZERO);
         assert!(matches!(
             step,
             SubmissionStep::End {
@@ -592,12 +610,12 @@ mod tests {
             Err("rpc unavailable".to_string()),
         ] {
             assert_eq!(
-                submission_by(Some(0)).policy_read(policy.clone()),
+                submission_by(Some(0)).policy_read(policy.clone(), Duration::ZERO),
                 SubmissionStep::Submit { rank: 0 }
             );
             for rank in [1, 2] {
                 assert_eq!(
-                    submission_by(Some(rank)).policy_read(policy.clone()),
+                    submission_by(Some(rank)).policy_read(policy.clone(), Duration::ZERO),
                     SubmissionStep::Wait {
                         rank,
                         delay: Duration::from_secs(rank as u64 * SUBMITTER_DELAY_SECS)
@@ -607,7 +625,7 @@ mod tests {
             // Rank 3 and non-voters do not submit; the intent is settled for them.
             for rank in [Some(3), None] {
                 assert_eq!(
-                    submission_by(rank).policy_read(policy.clone()),
+                    submission_by(rank).policy_read(policy.clone(), Duration::ZERO),
                     SubmissionStep::End {
                         end: end_settled_acknowledged(),
                         report: None
@@ -624,7 +642,7 @@ mod tests {
         event.evidence = Bytes::new();
         let (submission, _) = SlashSubmission::new(event, voters[0], Duration::ZERO);
         assert!(matches!(
-            submission.policy_read(Ok(SlashPolicyState::ProofEnabled)),
+            submission.policy_read(Ok(SlashPolicyState::ProofEnabled), Duration::ZERO),
             SubmissionStep::End {
                 end,
                 report: Some(SubmissionReport::Error(_)),
