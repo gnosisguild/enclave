@@ -8,7 +8,6 @@ import { hardhat } from 'viem/chains'
 import { InterfoldSDK } from '../../src/interfold-sdk'
 import { generateProof } from '../../src/crypto/user-data-encryption'
 import circuit from '../../../../circuits/bin/threshold/target/user_data_encryption.json'
-import ct0Circuit from '../../../../circuits/bin/threshold/target/user_data_encryption_ct0.json'
 
 const options = { verifierTarget: 'noir-recursive-no-zk' } as const
 const sdk = new InterfoldSDK({
@@ -41,19 +40,13 @@ describe('real encryption proof', () => {
     publicKeyCommitment = bytesToBigInt(await sdk.computePublicKeyCommitment(publicKey))
     ciphertextCommitment = bytesToBigInt(await sdk.computeCiphertextCommitment(encryptedData))
 
-    // The circuit returns ct0's `k1_commitment`. Derive the same value with the standalone ct0
-    // circuit, so the assertion fails if the merged circuit returns a different output.
-    // `CircuitInputs` carries Noir structs that the `InputMap` index signature does not accept,
-    // so the witness map is cast in the same way as the production prover.
-    const { returnValue: ct0Outputs } = await new Noir(ct0Circuit as CompiledCircuit).execute({
-      pk0is: circuitInputs.pk0is,
-      ct0is: circuitInputs.ct0is,
-      u: circuitInputs.u,
-      e0: circuitInputs.e0,
-      k1: circuitInputs.k1,
-      r: circuitInputs.r,
-    } as any)
-    k1Commitment = BigInt((ct0Outputs as string[])[2])
+    // The circuit returns `k1_commitment` itself; that it is ct0's commitment of `k1` is checked by
+    // the Noir test `both_legs_over_one_u_are_accepted`. Execute the circuit here, so the assertion
+    // fails if the proof's public inputs are not the circuit's outputs. `CircuitInputs` carries Noir
+    // structs that the `InputMap` index signature does not accept, so the witness map is cast in
+    // the same way as the production prover.
+    const { returnValue: outputs } = await new Noir(circuit as CompiledCircuit).execute(circuitInputs as any)
+    k1Commitment = BigInt((outputs as string[])[2])
 
     api = await Barretenberg.new({ srsSize: 2 ** 21 })
     verificationKey = await new UltraHonkBackend(circuit.bytecode, api).getVerificationKey(options)

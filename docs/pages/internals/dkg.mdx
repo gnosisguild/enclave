@@ -101,9 +101,8 @@ proof. Its numeric value is the `proofType` that slashing evidence uses. The `Ci
 | C7  | `C7DecryptedSharesAggregation` (10) | `DecryptedSharesAggregation` | `threshold/decrypted_shares_aggregation` | P4    | Lagrange interpolation, CRT reconstruction, and decoding give the plaintext.   |
 
 P3 uses the user-data encryption package `threshold/user_data_encryption`, which proves both parts
-of the ciphertext in one circuit. The packages `threshold/user_data_encryption_ct0` and
-`threshold/user_data_encryption_ct1` build each part as a standalone circuit for benchmarks. No
-client proves them. P3 has no `ProofType` because data providers, not ciphernodes, make this proof.
+of the ciphertext in one circuit. P3 has no `ProofType` because data providers, not ciphernodes,
+make this proof.
 
 ### Recursive aggregation circuits
 

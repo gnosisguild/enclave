@@ -81,14 +81,6 @@ get_zk_args() {
             echo "user-data-encryption"
             return
             ;;
-        threshold/user_data_encryption_ct0)
-            echo "user-data-encryption"
-            return
-            ;;
-        threshold/user_data_encryption_ct1)
-            echo "user-data-encryption"
-            return
-            ;;
         threshold/pk_generation)
             echo "pk-generation"
             return

@@ -235,8 +235,8 @@ keys only (`invariants/02`).
 | circuit                   | main      | + IF-013  | final         | vs main |
 | ------------------------- | --------- | --------- | ------------- | ------- |
 | P3 `user_data_encryption` | —         | —         | **1,891,256** | —       |
-| ct0 (standalone)          | 1,688,639 | 2,229,363 | **1,219,509** | -27.8%  |
-| ct1 (standalone)          | 1,398,622 | 1,625,997 | **700,155**   | -49.9%  |
+| ct0 (leg)                 | 1,688,639 | 2,229,363 | **1,219,509** | -27.8%  |
+| ct1 (leg)                 | 1,398,622 | 1,625,997 | **700,155**   | -49.9%  |
 | C3                        | 3,475,203 | 3,589,892 | **2,125,396** | -38.8%  |
 | C7                        | 108,461   | 112,591   | **26,808**    | -75.3%  |
 | C4                        | 1,746,030 | 1,954,926 | **1,098,865** | -37.1%  |
@@ -251,8 +251,8 @@ is polynomial shaped, so it is built per preset. At secure-8192 it is one 2^21 p
 gates, under the 2,097,152 browser SRS and the 2,000,000 budget. It replaces three client proofs:
 ct0 1,219,509 (2^21), ct1 700,155 (2^20), and the recursive wrapper that verified both and asserted
 their `u` commitments equal, 1,426,442 (2^21). Before ct1 hard-coded the CRS and both legs bounded
-`r` by a window, the legs were ct0 1,405,835 and ct1 1,216,955. The ct0 and ct1 binaries still build
-for per-leg benchmarks and for the SDK proof test; no client proves them.
+`r` by a window, the legs were ct0 1,405,835 and ct1 1,216,955. The legs are lib modules now; no
+circuit proves either on its own.
 
 **The shared mechanism.** `negacyclic_kernel(u, x)[j]` is `(X^(N-1-j) * u mod X^N + 1)(x)`, so
 `a.dot(kernel)` evaluates `a * u mod X^N + 1` without the product entering the witness. Folding the

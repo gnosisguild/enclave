@@ -367,7 +367,7 @@ every section.
   `srsSize: 2**21` (2,097,152). A circuit above that size stops browser proving rather than slowing
   it: the checked pk and ciphertext commitments once put ct0 alone at 2,229,363. At secure-8192
   `user_data_encryption`, which proves both legs, is 1,891,256, under the ceiling and under its
-  2,000,000 budget (108,744 spare). The standalone legs are ct0 1,219,509 and ct1 700,155, since ct1
+  2,000,000 budget (108,744 spare). Its legs measured 1,219,509 (ct0) and 700,155 (ct1), since ct1
   hard-codes the CRS and both legs bound `r` by a window and `u` as ternary. A constraint added to
   either leg also lands in `user_data_encryption`, so measure `user_data_encryption` against the
   budget before adding one. — `flow-trace/04`

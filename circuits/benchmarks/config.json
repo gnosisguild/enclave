@@ -7,8 +7,6 @@
     "dkg/share_encryption",
     "dkg/share_decryption",
     "threshold/user_data_encryption",
-    "threshold/user_data_encryption_ct0",
-    "threshold/user_data_encryption_ct1",
     "threshold/pk_generation",
     "threshold/pk_aggregation",
     "threshold/share_decryption",

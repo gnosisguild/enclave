@@ -72,8 +72,7 @@ print(gas)
 PY
 }
 
-# A circuit whose path ends with `frag` wins over one that only contains it, so
-# `/threshold/user_data_encryption` finds that circuit and not `user_data_encryption_ct0`.
+# A circuit whose path ends with `frag` wins over one that only contains it.
 find_json_by_path_fragment() {
     local frag="$1"
     local contains=""
@@ -111,10 +110,8 @@ emit_circuit_row() {
 }
 
 emit_user_data_enc_row() {
-    local wrapper ct0 ct1
+    local wrapper
     wrapper=$(find_json_by_path_fragment "/threshold/user_data_encryption")
-    ct0=$(find_json_by_path_fragment "/threshold/user_data_encryption_ct0")
-    ct1=$(find_json_by_path_fragment "/threshold/user_data_encryption_ct1")
 
     if [ -n "$wrapper" ]; then
         local constraints prove verify proof_size
@@ -126,16 +123,6 @@ emit_user_data_enc_row() {
             echo "| user_data_encryption | $constraints | $(format_s "$prove") | $(format_ms "$verify") | $(format_kb "$proof_size") |" >> "$OUTPUT_FILE"
             return
         fi
-    fi
-
-    if [ -n "$ct0" ] && [ -n "$ct1" ]; then
-        local constraints prove verify proof_size
-        constraints=$(echo "$(jq -r '.gates.total_gates // 0' "$ct0") + $(jq -r '.gates.total_gates // 0' "$ct1")" | bc)
-        prove=$(echo "$(jq -r '.proof_generation.time_seconds // 0' "$ct0") + $(jq -r '.proof_generation.time_seconds // 0' "$ct1")" | bc -l)
-        verify=$(echo "$(jq -r '.verification.time_seconds // 0' "$ct0") + $(jq -r '.verification.time_seconds // 0' "$ct1")" | bc -l)
-        proof_size=$(echo "$(jq -r '.proof_generation.proof_size_bytes // 0' "$ct0") + $(jq -r '.proof_generation.proof_size_bytes // 0' "$ct1")" | bc)
-        echo "| user_data_encryption | $constraints | $(format_s "$prove") | $(format_ms "$verify") | $(format_kb "$proof_size") |" >> "$OUTPUT_FILE"
-        return
     fi
 
     echo "| user_data_encryption | N/A | N/A | N/A | N/A |" >> "$OUTPUT_FILE"

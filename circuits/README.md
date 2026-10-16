@@ -62,15 +62,13 @@ aggregation is enabled.
 
 ### Threshold (`bin/threshold/`)
 
-| Path                           | ID     | `CircuitName`                | Role                                              |
-| ------------------------------ | ------ | ---------------------------- | ------------------------------------------------- |
-| `pk_generation`                | C1     | `PkGeneration`               | Threshold public-key contribution                 |
-| `pk_aggregation`               | C5     | `PkAggregation`              | Aggregate contributions into threshold public key |
-| `user_data_encryption`         | P3     | —                            | User ciphertext: both legs over one `u`           |
-| `user_data_encryption_ct0`     | P3 leg | —                            | Standalone first leg (benchmarks, SDK test)       |
-| `user_data_encryption_ct1`     | P3 leg | —                            | Standalone second leg (benchmarks)                |
-| `share_decryption`             | C6     | `ThresholdShareDecryption`   | Partial decryption share                          |
-| `decrypted_shares_aggregation` | C7     | `DecryptedSharesAggregation` | Combine shares; CRT; decode                       |
+| Path                           | ID  | `CircuitName`                | Role                                              |
+| ------------------------------ | --- | ---------------------------- | ------------------------------------------------- |
+| `pk_generation`                | C1  | `PkGeneration`               | Threshold public-key contribution                 |
+| `pk_aggregation`               | C5  | `PkAggregation`              | Aggregate contributions into threshold public key |
+| `user_data_encryption`         | P3  | —                            | User ciphertext: both legs over one `u`           |
+| `share_decryption`             | C6  | `ThresholdShareDecryption`   | Partial decryption share                          |
+| `decrypted_shares_aggregation` | C7  | `DecryptedSharesAggregation` | Combine shares; CRT; decode                       |
 
 ### Recursive aggregation (`bin/recursive_aggregation/`)
 
