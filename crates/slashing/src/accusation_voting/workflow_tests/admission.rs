@@ -482,3 +482,59 @@ fn a_held_failure_is_accused_when_the_peer_accusation_lacks_this_nodes_vote() {
         .collect();
     assert_eq!(accused_now, vec![accused.address()]);
 }
+
+/// During startup a peer's forwarded C3 accusation can start re-verification before this node's
+/// own failure of the proof is held. When this node then accuses at `EffectsEnabled`, the late
+/// re-verification result adds no second vote from it, so the quorum still needs H distinct voters.
+#[test]
+fn a_late_reverification_does_not_count_this_node_twice() {
+    let me = signer(1);
+    let accuser = signer(2);
+    let accused = signer(3);
+    let committee = vec![me.address(), accuser.address(), accused.address()];
+    let mut v = voting_with(&me, committee, 1, 2);
+    v.hold_accusations_until_effects();
+    let failure = proof_failure(&accused, 2, ProofType::C3aSkShareEncryption);
+    let accusation = accusation_from_failure(&accuser, &failure, true, NOW);
+    let id = AccusationVoting::accusation_id(&accusation);
+
+    // The peer's accusation comes first: without local data, this node re-verifies the proof.
+    let request = v
+        .on_accusation_received(accusation, &ctx())
+        .into_iter()
+        .find_map(|action| match action {
+            VoteAction::DispatchZk { request, .. } => Some(request),
+            _ => None,
+        })
+        .expect("forwarded C3 is re-verified");
+    // Then this node's own failure of the proof arrives and is held.
+    assert!(v.on_local_proof_failure(failure.clone(), &ctx()).is_empty());
+    assert!(v
+        .on_effects_enabled()
+        .iter()
+        .any(|action| matches!(action, VoteAction::PublishAccusation { .. })));
+
+    let response = ComputeResponse::zk(
+        ZkResponse::VerifyShareProofs(VerifyShareProofsResponse {
+            party_results: vec![PartyVerificationResult {
+                sender_party_id: 2,
+                all_verified: false,
+                failed_signed_payload: Some(failure.signed_payload),
+                recovered_address: Some(accused.address()),
+            }],
+        }),
+        request.correlation_id,
+        v.e3_id.clone(),
+    );
+    let actions = v.handle_reverification_response(TypedEvent::new(response, ctx()));
+    assert!(!actions.iter().any(|action| matches!(
+        action,
+        VoteAction::PublishVote { .. } | VoteAction::PublishQuorum { .. }
+    )));
+    let my_votes = v.pending[&id]
+        .votes_for
+        .iter()
+        .filter(|vote| vote.voter == me.address())
+        .count();
+    assert_eq!(my_votes, 1);
+}

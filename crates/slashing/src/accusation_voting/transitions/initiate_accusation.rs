@@ -231,6 +231,11 @@ impl AccusationVoting {
         }
 
         let accusation_id = Self::accusation_id(&accusation);
+        // This node votes now from its own failure. A re-verification that a peer's accusation of
+        // the same proof started is no longer needed, and its late result must not add a second
+        // vote from this node.
+        self.pending_reverifications
+            .retain(|_, reverification| reverification.accusation_id != accusation_id);
 
         info!(
             "Broadcasting accusation against {} for {:?} failure",
