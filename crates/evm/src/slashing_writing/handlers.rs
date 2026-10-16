@@ -266,6 +266,9 @@ impl<P: Provider + WalletProvider + Clone + 'static> Handler<SlashSubmissionFini
         let Some(event) = msg.retry_event else {
             return;
         };
+        // A retry waits the full rank delay again. Forgetting the first record time keeps that true
+        // after a restart, so a restarted retry does not submit at once.
+        self.forget_intent_time(&msg.key, None);
 
         ctx.run_later(SLASH_SUBMISSION_RETRY_DELAY, move |actor, ctx| match actor
             .submissions

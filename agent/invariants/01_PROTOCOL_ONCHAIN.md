@@ -514,9 +514,9 @@ every section.
   (`SlashSubmission` in `crates/evm/src/slashing_writing/workflow.rs`); the writer only runs its
   effects. Restarts must not reset the fallback delay: the writer saves when it first recorded each
   intent (`SlashIntentTimes`), and a fallback submitter waits only for the rest of its delay from
-  that time. A retry after a failed attempt waits the full delay again. A crash before the intent's
-  snapshot is written records the time again at restart, which only lengthens the wait. —
-  `flow-trace/05`
+  that time. A retry after a failed attempt waits the full delay again, also after a restart,
+  because the failed attempt forgets the time. A crash before the intent's snapshot is written
+  records the time again at restart, which only lengthens the wait. — `flow-trace/05`
 - **Deferred-slash collateral gate:** every manager atomically records proposal locks in
   `BondingRegistry`. Ticket withdrawal, ciphernode bond unbonding, deregistration, and exit claims
   read the registry's aggregate lock count and stay blocked until resolution. User exits must not

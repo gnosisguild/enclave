@@ -344,6 +344,66 @@ mod tests {
         Ok(())
     }
 
+    /// A failed attempt forgets when the intent was first recorded, so a retry after a restart waits
+    /// its full rank delay again instead of submitting at once.
+    #[actix::test]
+    async fn a_retry_forgets_the_first_record_time() -> Result<()> {
+        use crate::SlashingWriterRepositoryFactory;
+        use alloy::{
+            network::EthereumWallet, providers::ProviderBuilder, signers::local::PrivateKeySigner,
+            transports::mock::Asserter,
+        };
+        use e3_data::{DataStore, InMemStore, RepositoriesFactory};
+        use e3_event_system::EventSystem;
+
+        let system = EventSystem::new().with_fresh_bus();
+        let bus = system.handle()?.enable("slash-retry");
+        let asserter = Asserter::new();
+        asserter.push_success(&"0x1");
+        let provider = EthProvider::new(
+            ProviderBuilder::new()
+                .wallet(EthereumWallet::from(PrivateKeySigner::random()))
+                .connect_mocked_client(asserter),
+        )
+        .await?;
+
+        let repositories = DataStore::from_in_mem(&InMemStore::new(false).start()).repositories();
+        let intent = slash_intent();
+        let key = SlashIntentKey::from_quorum(&intent)?;
+        let mut recovery = SlashingWriterRecoveryState::default();
+        recovery.record(intent.clone())?;
+        let mut times = SlashIntentTimes::default();
+        times.record(key.clone(), 1_000);
+        let recovery_repository = repositories.slashing_writer_recovery(1);
+        recovery_repository.write_sync(&recovery).await?;
+        let times_repository = repositories.slashing_writer_intent_times(1);
+        times_repository.write_sync(&times).await?;
+
+        let writer = SlashingManagerSolWriter::attach_with_recovery(
+            &bus,
+            provider,
+            Address::ZERO,
+            recovery_repository.clone(),
+            times_repository.clone(),
+        )
+        .await?;
+        writer
+            .send(SlashSubmissionFinished {
+                key: key.clone(),
+                terminal: false,
+                acknowledge_recovery: false,
+                retry_event: Some(intent),
+            })
+            .await?;
+
+        let times = times_repository.read().await?.expect("intent times");
+        assert_eq!(times.recorded_ago(&key, 2_000), std::time::Duration::ZERO);
+        // The intent itself stays pending for the retry.
+        let recovery = recovery_repository.read().await?.expect("recovery state");
+        assert_eq!(recovery.pending_count(), 1);
+        Ok(())
+    }
+
     /// After the chain confirms a slash, an equivalent quorum that arrives again is not recorded:
     /// the durable state keeps no report that the node has already submitted.
     #[test]
