@@ -512,9 +512,11 @@ every section.
   N waits N × 30 s. Every node reads the policy first: a disabled policy excludes the member locally
   on every node, and a failed read never invents an exclusion. These decisions are one pure workflow
   (`SlashSubmission` in `crates/evm/src/slashing_writing/workflow.rs`); the writer only runs its
-  effects. Restarts must not reset the fallback delay. **Gap:** the slashing writer persists the
-  intent but not its due time, so a restart waits the full delay again
-  (`crates/evm/src/slashing_writing/handlers.rs`). — `flow-trace/05`
+  effects. Restarts must not reset the fallback delay: the writer saves when it first recorded each
+  intent (`SlashIntentTimes`), and a fallback submitter waits only for the rest of its delay from
+  that time. A retry after a failed attempt waits the full delay again. A crash before the intent's
+  snapshot is written records the time again at restart, which only lengthens the wait. —
+  `flow-trace/05`
 - **Deferred-slash collateral gate:** every manager atomically records proposal locks in
   `BondingRegistry`. Ticket withdrawal, ciphernode bond unbonding, deregistration, and exit claims
   read the registry's aggregate lock count and stay blocked until resolution. User exits must not

@@ -33,7 +33,9 @@ use e3_events::EventType;
 use e3_events::InterfoldEvent;
 use e3_events::InterfoldEventData;
 use e3_events::Shutdown;
-use e3_events::{AccusationQuorumReached, CommitteeMemberExcluded, EType, SlashExecuted};
+use e3_events::{
+    AccusationQuorumReached, CommitteeMemberExcluded, EType, EventContext, Sequenced, SlashExecuted,
+};
 use e3_utils::{require_successful_receipt, NotifySync, MAILBOX_LIMIT};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -51,6 +53,7 @@ pub struct SlashingManagerSolWriter<P> {
     bus: BusHandle,
     submissions: SlashSubmissionGate,
     recovery: Option<Persistable<SlashingWriterRecoveryState>>,
+    intent_times: Option<Persistable<SlashIntentTimes>>,
 }
 
 const SLASH_SUBMISSION_RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(30);
@@ -105,11 +108,46 @@ impl SlashingWriterRecoveryState {
     }
 }
 
+/// When this node first recorded each pending slash intent, in Unix seconds. A fallback submitter
+/// counts its delay from this time, so a restart does not start the wait again.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct SlashIntentTimes {
+    recorded_at: BTreeMap<SlashIntentKey, u64>,
+}
+
+impl SlashIntentTimes {
+    fn record(&mut self, key: SlashIntentKey, now: u64) {
+        self.recorded_at.entry(key).or_insert(now);
+    }
+
+    fn acknowledge(&mut self, key: &SlashIntentKey) {
+        self.recorded_at.remove(key);
+    }
+
+    /// How long ago the intent was first recorded; zero when it was not.
+    fn recorded_ago(&self, key: &SlashIntentKey, now: u64) -> std::time::Duration {
+        std::time::Duration::from_secs(
+            self.recorded_at
+                .get(key)
+                .map_or(0, |recorded_at| now.saturating_sub(*recorded_at)),
+        )
+    }
+}
+
+pub(super) fn now_unix_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_secs())
+        .unwrap_or(0)
+}
+
 #[derive(Message)]
 #[rtype(result = "()")]
 struct SubmitSlashIntent {
     key: SlashIntentKey,
     event: AccusationQuorumReached,
+    /// A retry after a failed attempt waits the full rank delay again, so the ranks stay apart.
+    retry: bool,
 }
 
 #[derive(Message)]
@@ -133,6 +171,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> SlashingManagerSolWriter<P>
             bus: bus.clone(),
             submissions: SlashSubmissionGate::new(),
             recovery: None,
+            intent_times: None,
         })
     }
 
@@ -141,6 +180,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> SlashingManagerSolWriter<P>
         provider: EthProvider<P>,
         contract_address: Address,
         recovery: Persistable<SlashingWriterRecoveryState>,
+        intent_times: Persistable<SlashIntentTimes>,
     ) -> Result<Self> {
         let mut submissions = SlashSubmissionGate::new();
         for event in recovery.try_get()?.pending_events() {
@@ -152,6 +192,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> SlashingManagerSolWriter<P>
             bus: bus.clone(),
             submissions,
             recovery: Some(recovery),
+            intent_times: Some(intent_times),
         })
     }
 
@@ -179,6 +220,7 @@ impl<P: Provider + WalletProvider + Clone + 'static> SlashingManagerSolWriter<P>
         provider: EthProvider<P>,
         contract_address: Address,
         repository: Repository<SlashingWriterRecoveryState>,
+        intent_times: Repository<SlashIntentTimes>,
     ) -> Result<Addr<SlashingManagerSolWriter<P>>> {
         let recovery = repository
             .load_or_default(SlashingWriterRecoveryState::default())
@@ -187,7 +229,11 @@ impl<P: Provider + WalletProvider + Clone + 'static> SlashingManagerSolWriter<P>
             recovery.try_get()?.schema_version == SLASHING_WRITER_RECOVERY_SCHEMA_VERSION,
             "unsupported slashing-writer recovery schema"
         );
-        let addr = Self::from_recovery(bus, provider, contract_address, recovery)?.start();
+        let intent_times = intent_times
+            .load_or_default(SlashIntentTimes::default())
+            .await?;
+        let addr =
+            Self::from_recovery(bus, provider, contract_address, recovery, intent_times)?.start();
         bus.subscribe_all(
             &[
                 EventType::AccusationQuorumReached,
@@ -199,6 +245,26 @@ impl<P: Provider + WalletProvider + Clone + 'static> SlashingManagerSolWriter<P>
             addr.clone().into(),
         );
         Ok(addr)
+    }
+}
+
+impl<P: Provider + WalletProvider + Clone + 'static> SlashingManagerSolWriter<P> {
+    /// Drop the record time of a settled intent.
+    fn forget_intent_time(&mut self, key: &SlashIntentKey, ec: Option<&EventContext<Sequenced>>) {
+        let Some(intent_times) = self.intent_times.as_mut() else {
+            return;
+        };
+        let forget = |mut times: SlashIntentTimes| {
+            times.acknowledge(key);
+            Ok(times)
+        };
+        let result = match ec {
+            Some(ec) => intent_times.try_mutate(ec, forget),
+            None => intent_times.try_mutate_without_context(forget),
+        };
+        if let Err(error) = result {
+            self.bus.err(EType::Evm, error);
+        }
     }
 }
 
@@ -253,6 +319,28 @@ mod tests {
             ciphernode_bond_amount: 0,
         })?;
         assert!(recovery.pending_events().is_empty());
+        Ok(())
+    }
+
+    /// The first record time of an intent stays, so a later quorum does not restart the wait, and
+    /// an acknowledged intent forgets it.
+    #[test]
+    fn an_intent_keeps_its_first_record_time_until_acknowledged() -> Result<()> {
+        let key = SlashIntentKey::from_quorum(&slash_intent())?;
+        let mut times = SlashIntentTimes::default();
+        assert_eq!(times.recorded_ago(&key, 1_000), std::time::Duration::ZERO);
+
+        times.record(key.clone(), 1_000);
+        times.record(key.clone(), 1_030);
+        assert_eq!(
+            times.recorded_ago(&key, 1_040),
+            std::time::Duration::from_secs(40)
+        );
+        // A clock that went back counts no time.
+        assert_eq!(times.recorded_ago(&key, 900), std::time::Duration::ZERO);
+
+        times.acknowledge(&key);
+        assert_eq!(times.recorded_ago(&key, 1_040), std::time::Duration::ZERO);
         Ok(())
     }
 

@@ -269,9 +269,8 @@ the code does not meet yet.
 - Timers: persist the absolute deadline + purpose, not an in-memory handle; on restart, compare to
   the injected clock and deterministically re-arm or fire overdue. Accusation vote timers re-arm
   from their saved timeout at `EffectsEnabled`. **Gap:** the request router's slashable-failure
-  teardown grace is a memory-only `run_later` handle; keyshare collectors read `SystemTime::now()`
-  instead of an injected clock; the slash fallback delay restarts in full (see
-  `01_PROTOCOL_ONCHAIN.md`). — `ARCHITECTURE.md`
+  teardown grace is a memory-only `run_later` handle; keyshare collectors and the slash writer's
+  fallback wait read `SystemTime::now()` instead of an injected clock. — `ARCHITECTURE.md`
 - Effects stay disabled until durable replay completes and both historical sources merge in HLC
   order. Startup fences `EffectsEnabled` → `SyncEffect` → canonical history → `SyncEnded` in that
   order. `ComputeEffectGate` buffers and deduplicates until `EffectsEnabled`. It sends a live

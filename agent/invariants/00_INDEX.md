@@ -84,8 +84,6 @@ The "Verified Bugs & Protocol Concerns" table in `flow-trace/00_INDEX.md` record
 wrong. This list and the **Gap:** notes in the section files are the open-issue list. Verify each
 item in code before you rely on it.
 
-- Slashing: a restart resets the fallback submission delay. — `01_PROTOCOL_ONCHAIN.md` §Slashing and
-  failure settlement
 - Startup reconciles restored request contexts with finalized chain state, but concern #48 stays
   open for a local Failed stage whose reason needs accusation work (restart completes it; follow-up
   work). A canonical Failed stage from that read is only in the lifecycle snapshot, not in the event

@@ -674,6 +674,8 @@ AccusationQuorumReached event arrives at SlashingManagerSolWriter
 │     ├─ Rank 1: wait 30 seconds, then submit
 │     ├─ Rank 2: wait 60 seconds, then submit
 │     └─ ... (each rank waits rank × 30 seconds)
+│     → The wait counts from when this node first recorded the intent (SlashIntentTimes), so
+│       a restart waits only for the rest of it
 │     → Prevents multiple nodes wasting gas on same slash
 │     → Higher-rank submitters expect DuplicateEvidence revert
 │

@@ -248,16 +248,28 @@ pub(crate) enum SubmissionStep {
 pub(crate) struct SlashSubmission {
     event: AccusationQuorumReached,
     rank: Option<usize>,
+    /// How long ago this node first recorded the intent. A fallback submitter waits only for the
+    /// rest of its delay, so a restart does not start the wait again.
+    recorded_ago: Duration,
 }
 
 impl SlashSubmission {
-    /// A submission of `event` by `submitter`, and its first step.
+    /// A submission of `event` by `submitter`, which first recorded it `recorded_ago`, and its
+    /// first step.
     pub(crate) fn new(
         event: AccusationQuorumReached,
         submitter: Address,
+        recorded_ago: Duration,
     ) -> (Self, SubmissionStep) {
         let rank = submission_rank(event.votes_for.iter().map(|vote| vote.voter), submitter);
-        (Self { event, rank }, SubmissionStep::ReadPolicy)
+        (
+            Self {
+                event,
+                rank,
+                recorded_ago,
+            },
+            SubmissionStep::ReadPolicy,
+        )
     }
 
     pub(crate) fn event(&self) -> &AccusationQuorumReached {
@@ -306,13 +318,11 @@ impl SlashSubmission {
                 ))),
             };
         }
-        if rank > 0 {
-            SubmissionStep::Wait {
-                rank,
-                delay: submission_delay(rank),
-            }
-        } else {
+        let delay = submission_delay(rank).saturating_sub(self.recorded_ago);
+        if delay.is_zero() {
             SubmissionStep::Submit { rank }
+        } else {
+            SubmissionStep::Wait { rank, delay }
         }
     }
 
@@ -487,9 +497,42 @@ mod tests {
     fn submission_by(rank: Option<usize>) -> SlashSubmission {
         let voters: Vec<_> = (1..=4).map(Address::repeat_byte).collect();
         let submitter = rank.map_or(Address::repeat_byte(0xee), |rank| voters[rank]);
-        let (submission, first) = SlashSubmission::new(quorum(voters), submitter);
+        let (submission, first) = SlashSubmission::new(quorum(voters), submitter, Duration::ZERO);
         assert_eq!(first, SubmissionStep::ReadPolicy);
         submission
+    }
+
+    /// A fallback submitter counts its delay from when it first recorded the intent, so after a
+    /// restart it waits only for the rest of the delay.
+    #[test]
+    fn a_fallback_submitter_waits_only_for_the_rest_of_its_delay() {
+        let voters: Vec<_> = (1..=4).map(Address::repeat_byte).collect();
+        let full = submission_delay(2);
+        for (recorded_ago, step) in [
+            (
+                Duration::ZERO,
+                SubmissionStep::Wait {
+                    rank: 2,
+                    delay: full,
+                },
+            ),
+            (
+                Duration::from_secs(40),
+                SubmissionStep::Wait {
+                    rank: 2,
+                    delay: full - Duration::from_secs(40),
+                },
+            ),
+            (full, SubmissionStep::Submit { rank: 2 }),
+        ] {
+            let (submission, _) =
+                SlashSubmission::new(quorum(voters.clone()), voters[2], recorded_ago);
+            assert_eq!(
+                submission.policy_read(Ok(SlashPolicyState::ProofEnabled)),
+                step,
+                "recorded {recorded_ago:?} ago"
+            );
+        }
     }
 
     #[test]
@@ -579,7 +622,7 @@ mod tests {
         let voters = vec![Address::repeat_byte(1)];
         let mut event = quorum(voters.clone());
         event.evidence = Bytes::new();
-        let (submission, _) = SlashSubmission::new(event, voters[0]);
+        let (submission, _) = SlashSubmission::new(event, voters[0], Duration::ZERO);
         assert!(matches!(
             submission.policy_read(Ok(SlashPolicyState::ProofEnabled)),
             SubmissionStep::End {
