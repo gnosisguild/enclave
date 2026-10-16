@@ -5,7 +5,6 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use actix::Message;
-use e3_utils::major_issue;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Display},
@@ -97,69 +96,4 @@ where
             bus.err(err_type, e);
         }
     })
-}
-
-// The following dispatchers should be used where you don't have the BusHandle available.
-
-// A struct that panics on errors
-pub struct PanicDispatcher;
-
-impl Default for PanicDispatcher {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl PanicDispatcher {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl ErrorDispatcher<InterfoldEvent<Unsequenced>> for PanicDispatcher {
-    fn err(&self, _: EType, error: anyhow::Error) {
-        panic!("{}", major_issue("Failure!", error));
-    }
-}
-
-// A struct that warns on errors
-pub struct WarningDispatcher;
-
-impl Default for WarningDispatcher {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl WarningDispatcher {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-impl ErrorDispatcher<InterfoldEvent<Unsequenced>> for WarningDispatcher {
-    fn err(&self, err_type: EType, error: anyhow::Error) {
-        tracing::warn!("{:?} Failure! {}", err_type, error);
-    }
-}
-
-// A struct that logs errors on errors
-// Avoid using this over BusHandle
-pub struct LogErrorDispatcher;
-
-impl Default for LogErrorDispatcher {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl LogErrorDispatcher {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl ErrorDispatcher<InterfoldEvent<Unsequenced>> for LogErrorDispatcher {
-    fn err(&self, err_type: EType, error: anyhow::Error) {
-        tracing::error!("{:?} Failure! {}", err_type, error);
-    }
 }
