@@ -18,37 +18,48 @@ use num_traits::Signed;
 
 #[test]
 fn test_bound_and_bits_computation_consistency() {
-    let bounds = Configs::for_preset(BfvPreset::InsecureThreshold512)
+    let bounds = Configs::for_preset(BfvPreset::InsecureThreshold64)
         .map(|config| config.bounds)
         .unwrap();
-    let bits = Configs::for_preset(BfvPreset::InsecureThreshold512)
+    let bits = Configs::for_preset(BfvPreset::InsecureThreshold64)
         .map(|config| config.bits)
         .unwrap();
     let max_pk_bound = bounds.pk_bounds.iter().max().unwrap();
     let expected_bits = calculate_bit_width(max_pk_bound);
-    assert_eq!(max_pk_bound.clone(), BigUint::from(34359701504u64));
+    assert_eq!(
+        max_pk_bound.clone(),
+        BigUint::from(
+            (e3_fhe_params::constants::insecure_64::threshold::MODULI
+                .iter()
+                .max()
+                .unwrap()
+                - 1)
+                / 2
+        )
+    );
     assert_eq!(bits.pk_bit, expected_bits);
 }
 
 #[test]
 fn insecure_e0_bound_matches_error1_sampler() {
-    let preset = BfvPreset::InsecureThreshold512;
+    let preset = BfvPreset::InsecureThreshold64;
     let bounds = Configs::for_preset(preset)
         .map(|config| config.bounds)
         .unwrap();
     let bits = Configs::for_preset(preset)
         .map(|config| config.bits)
         .unwrap();
-    assert_eq!(bounds.e0_bound, BigUint::from(6u32));
+    // B_Enc of the insecure-64 search: ⌊B_Enc(B_Enc+1)/3⌋ is its error1 variance.
+    assert_eq!(bounds.e0_bound, BigUint::from(194560u32));
     assert_eq!(bounds.e1_bound, BigUint::from(20u32));
-    assert_eq!(bits.e0_bit, 3);
+    assert_eq!(bits.e0_bit, 18);
 }
 
 #[test]
 fn exact_encryption_material_is_repeatable_and_closes_both_reduced_identities() {
     use fhe_traits::{FheDecoder, Serialize};
     for preset in [
-        BfvPreset::InsecureThreshold512,
+        BfvPreset::InsecureThreshold64,
         BfvPreset::SecureThreshold8192,
     ] {
         let config = Configs::for_preset(preset).unwrap();
@@ -139,11 +150,11 @@ fn reduce_by_long_division(poly: &Polynomial, n: usize) -> Polynomial {
 
 #[test]
 fn test_bfv_public_key_to_greco() {
-    let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
+    let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold64).unwrap();
     let sample =
         e3_zk_samples::threshold::user_data_encryption::generate(&threshold_params).unwrap();
     let (_, inputs) = encrypt_and_prepare(
-        &Configs::for_preset(BfvPreset::InsecureThreshold512).unwrap(),
+        &Configs::for_preset(BfvPreset::InsecureThreshold64).unwrap(),
         &sample,
     )
     .unwrap();
@@ -156,11 +167,11 @@ fn test_bfv_public_key_to_greco() {
 /// Both components must stay centered, and conversion must not modify the ciphertext.
 #[test]
 fn conversion_centers_both_components_and_is_repeatable() {
-    let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
+    let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold64).unwrap();
     let sample =
         e3_zk_samples::threshold::user_data_encryption::generate(&threshold_params).unwrap();
     let (ciphertext, _) = encrypt_and_prepare(
-        &Configs::for_preset(BfvPreset::InsecureThreshold512).unwrap(),
+        &Configs::for_preset(BfvPreset::InsecureThreshold64).unwrap(),
         &sample,
     )
     .unwrap();
@@ -187,11 +198,11 @@ fn conversion_centers_both_components_and_is_repeatable() {
 /// An extra component must not share the commitment of its two-component prefix.
 #[test]
 fn ciphertext_with_more_than_two_components_is_rejected() {
-    let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
+    let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold64).unwrap();
     let sample =
         e3_zk_samples::threshold::user_data_encryption::generate(&threshold_params).unwrap();
     let (ciphertext, _) = encrypt_and_prepare(
-        &Configs::for_preset(BfvPreset::InsecureThreshold512).unwrap(),
+        &Configs::for_preset(BfvPreset::InsecureThreshold64).unwrap(),
         &sample,
     )
     .unwrap();
@@ -218,11 +229,11 @@ fn ciphertext_with_more_than_two_components_is_rejected() {
 
 #[test]
 fn test_bfv_ciphertext_to_greco() {
-    let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
+    let (threshold_params, _) = build_pair_for_preset(BfvPreset::InsecureThreshold64).unwrap();
     let sample =
         e3_zk_samples::threshold::user_data_encryption::generate(&threshold_params).unwrap();
     let (ciphertext, inputs) = encrypt_and_prepare(
-        &Configs::for_preset(BfvPreset::InsecureThreshold512).unwrap(),
+        &Configs::for_preset(BfvPreset::InsecureThreshold64).unwrap(),
         &sample,
     )
     .unwrap();

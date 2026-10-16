@@ -141,7 +141,7 @@ mod tests {
     fn test_generate_template_succeeds_and_has_correct_structure() {
         for (preset, committee) in [
             (
-                BfvPreset::InsecureThreshold512,
+                BfvPreset::InsecureThreshold64,
                 CiphernodesCommitteeSize::Small,
             ),
             (

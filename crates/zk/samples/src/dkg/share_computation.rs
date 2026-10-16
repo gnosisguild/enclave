@@ -108,39 +108,51 @@ mod tests {
     fn test_generate_secret_key_sample() {
         let committee = CiphernodesCommitteeSize::Small.values();
         let config = e3_zk_config::dkg::share_computation::Configs::for_preset(
-            BfvPreset::InsecureThreshold512,
+            BfvPreset::InsecureThreshold64,
             CiphernodesCommitteeSize::Small,
         )
         .unwrap();
         let sample = generate(
             &config,
-            BfvPreset::InsecureThreshold512,
+            BfvPreset::InsecureThreshold64,
             DkgInputType::SecretKey,
         )
         .unwrap();
         assert_eq!(sample.secret_sss[0].nrows(), committee.n);
         assert_eq!(sample.dkg_input_type, DkgInputType::SecretKey);
-        assert_eq!(sample.secret_sss.len(), 2);
-        assert_eq!(sample.secret.limbs.len(), 2);
+        assert_eq!(
+            sample.secret_sss.len(),
+            e3_fhe_params::constants::insecure_64::threshold::MODULI.len()
+        );
+        assert_eq!(
+            sample.secret.limbs.len(),
+            e3_fhe_params::constants::insecure_64::threshold::MODULI.len()
+        );
     }
 
     #[test]
     fn test_generate_smudging_noise_sample() {
         let committee = CiphernodesCommitteeSize::Small.values();
         let config = e3_zk_config::dkg::share_computation::Configs::for_preset(
-            BfvPreset::InsecureThreshold512,
+            BfvPreset::InsecureThreshold64,
             CiphernodesCommitteeSize::Small,
         )
         .unwrap();
         let sample = generate(
             &config,
-            BfvPreset::InsecureThreshold512,
+            BfvPreset::InsecureThreshold64,
             DkgInputType::SmudgingNoise,
         )
         .unwrap();
         assert_eq!(sample.secret_sss[0].nrows(), committee.n);
         assert_eq!(sample.dkg_input_type, DkgInputType::SmudgingNoise);
-        assert_eq!(sample.secret_sss.len(), 2);
-        assert_eq!(sample.secret.limbs.len(), 2);
+        assert_eq!(
+            sample.secret_sss.len(),
+            e3_fhe_params::constants::insecure_64::threshold::MODULI.len()
+        );
+        assert_eq!(
+            sample.secret.limbs.len(),
+            e3_fhe_params::constants::insecure_64::threshold::MODULI.len()
+        );
     }
 }

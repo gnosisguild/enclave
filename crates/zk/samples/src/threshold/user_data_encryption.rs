@@ -42,7 +42,7 @@ mod tests {
     #[test]
     fn test_generate_sample() {
         let config = e3_zk_config::threshold::user_data_encryption::Configs::for_preset(
-            BfvPreset::InsecureThreshold512,
+            BfvPreset::InsecureThreshold64,
         )
         .unwrap();
         let sample = generate(&config.params).unwrap();
@@ -52,7 +52,7 @@ mod tests {
             Vec::<u64>::try_decode(&sample.plaintext, Encoding::poly())
                 .unwrap()
                 .len(),
-            BfvPreset::InsecureThreshold512.metadata().degree
+            BfvPreset::InsecureThreshold64.metadata().degree
         );
     }
 }

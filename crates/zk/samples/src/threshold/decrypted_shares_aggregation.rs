@@ -186,7 +186,7 @@ mod tests {
         use e3_zk_config::threshold::decrypted_shares_aggregation::Configs;
         for (preset, committee, width) in [
             (
-                BfvPreset::InsecureThreshold512,
+                BfvPreset::InsecureThreshold64,
                 CiphernodesCommitteeSize::Small,
                 50,
             ),

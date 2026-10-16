@@ -68,14 +68,24 @@ mod tests {
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
-        let (_, dkg_params) = build_pair_for_preset(BfvPreset::InsecureThreshold512).unwrap();
+        let (_, dkg_params) = build_pair_for_preset(BfvPreset::InsecureThreshold64).unwrap();
 
         let config = Configs::new(&dkg_params).unwrap();
         let expected_bits = compute_modulus_bit(&dkg_params);
 
         let modulus_bound =
             (BigUint::from(*dkg_params.moduli().iter().max().unwrap()) - 1u32) / 2u32;
-        assert_eq!(modulus_bound, BigUint::from(1125899906777088u128));
+        assert_eq!(
+            modulus_bound,
+            BigUint::from(
+                (e3_fhe_params::constants::insecure_64::dkg::MODULI
+                    .iter()
+                    .max()
+                    .unwrap()
+                    - 1)
+                    / 2
+            )
+        );
         assert_eq!(config.pk_bit, expected_bits);
     }
 }

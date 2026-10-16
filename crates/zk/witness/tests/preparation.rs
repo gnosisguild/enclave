@@ -17,7 +17,7 @@ use num_traits::Zero;
 
 #[test]
 fn c0_binds_public_key_material_to_the_supplied_configuration() {
-    let preset = BfvPreset::InsecureThreshold512;
+    let preset = BfvPreset::InsecureThreshold64;
     let config = dkg_config::pk::Configs::for_preset(preset).unwrap();
     let key = e3_zk_samples::dkg::pk::generate(&config.params).unwrap();
     assert!(dkg::pk::Inputs::compute(&config, &key).is_ok());
@@ -48,7 +48,7 @@ fn c0_binds_public_key_material_to_the_supplied_configuration() {
 
 #[test]
 fn malformed_c1_c2_c5_shapes_return_errors_before_computation() {
-    let preset = BfvPreset::InsecureThreshold512;
+    let preset = BfvPreset::InsecureThreshold64;
     let committee = CiphernodesCommitteeSize::Minimum;
     let c1 = config::pk_generation::Configs::for_preset(preset, committee).unwrap();
     let sample = e3_zk_samples::threshold::pk_generation::generate(&c1).unwrap();
@@ -160,7 +160,7 @@ fn malformed_c1_c2_c5_shapes_return_errors_before_computation() {
 
 #[test]
 fn zero_products_prepare_full_circuit_shapes_without_changing_polynomial_zero() {
-    let preset = BfvPreset::InsecureThreshold512;
+    let preset = BfvPreset::InsecureThreshold64;
     let committee = CiphernodesCommitteeSize::Minimum;
     let c1 = config::pk_generation::Configs::for_preset(preset, committee).unwrap();
     let zero = Polynomial::new(vec![BigInt::zero(); c1.params.degree()]);
@@ -244,7 +244,7 @@ fn zero_products_prepare_full_circuit_shapes_without_changing_polynomial_zero() 
 
 #[test]
 fn c6_c7_native_prefix_commitments_agree_and_c7_pads_short_messages() {
-    let preset = BfvPreset::InsecureThreshold512;
+    let preset = BfvPreset::InsecureThreshold64;
     let committee = CiphernodesCommitteeSize::Small;
     let mut c7 =
         config::decrypted_shares_aggregation::Configs::for_preset(preset, committee).unwrap();

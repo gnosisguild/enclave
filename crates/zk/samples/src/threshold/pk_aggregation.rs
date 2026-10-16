@@ -64,7 +64,7 @@ mod tests {
 
     #[test]
     fn test_generate_sample() {
-        let preset = BfvPreset::InsecureThreshold512;
+        let preset = BfvPreset::InsecureThreshold64;
         let committee = CiphernodesCommitteeSize::Small;
         let configs =
             e3_zk_config::threshold::pk_aggregation::Configs::for_preset(preset, committee)

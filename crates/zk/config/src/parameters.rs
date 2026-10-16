@@ -22,9 +22,9 @@ fn sampler_matches(preset: BfvPreset, params: &BfvParameters) -> bool {
     // explicitly selects its smaller CBD variance, which also selects error1 variance.
     let standard = params.variance() == constants::defaults::VARIANCE
         && params.get_error1_variance() == &error1;
-    let insecure_pair = preset == BfvPreset::InsecureDkg512
-        && params.variance() == constants::insecure_512::dkg::VARIANCE as usize
-        && params.get_error1_variance() == &BigUint::from(constants::insecure_512::dkg::VARIANCE);
+    let insecure_pair = preset == BfvPreset::InsecureDkg64
+        && params.variance() == constants::insecure_64::dkg::VARIANCE as usize
+        && params.get_error1_variance() == &BigUint::from(constants::insecure_64::dkg::VARIANCE);
     standard || insecure_pair
 }
 
@@ -111,7 +111,7 @@ mod tests {
 
     #[test]
     fn constructors_reject_other_parameter_families_and_tiers() {
-        let preset = BfvPreset::InsecureThreshold512;
+        let preset = BfvPreset::InsecureThreshold64;
         let (threshold_params, dkg_params) = preset.build_pair().unwrap();
         let (_, secure_dkg) = BfvPreset::SecureThreshold8192.build_pair().unwrap();
         let committee = CiphernodesCommitteeSize::Minimum;

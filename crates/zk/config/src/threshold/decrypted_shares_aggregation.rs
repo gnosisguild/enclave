@@ -181,7 +181,7 @@ mod tests {
     #[test]
     fn rounding_constants_use_the_full_level_zero_modulus() {
         for preset in [
-            BfvPreset::InsecureThreshold512,
+            BfvPreset::InsecureThreshold64,
             BfvPreset::SecureThreshold8192,
         ] {
             let configs = Configs::for_preset(preset, CiphernodesCommitteeSize::Minimum).unwrap();

@@ -109,7 +109,7 @@ mod tests {
     fn test_recipient_outside_dealer_set_decrypts_every_row() {
         use e3_zk_witness::dkg::share_decryption::Inputs;
         let committee = CiphernodesCommitteeSize::Small.values();
-        let preset = BfvPreset::InsecureThreshold512;
+        let preset = BfvPreset::InsecureThreshold64;
         let config = Configs::for_preset(preset).unwrap();
         let mut sample = generate(&config, preset, committee, DkgInputType::SecretKey).unwrap();
         let dkg_params = &config.params;
@@ -140,10 +140,10 @@ mod tests {
     #[test]
     fn test_generate_secret_key_sample() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let config = Configs::for_preset(BfvPreset::InsecureThreshold512).unwrap();
+        let config = Configs::for_preset(BfvPreset::InsecureThreshold64).unwrap();
         let sample = generate(
             &config,
-            BfvPreset::InsecureThreshold512,
+            BfvPreset::InsecureThreshold64,
             committee.clone(),
             DkgInputType::SecretKey,
         )
@@ -152,17 +152,17 @@ mod tests {
         assert_eq!(sample.honest_ciphertexts.len(), committee.h);
         assert_eq!(
             sample.secret_key.coeffs.len(),
-            BfvPreset::InsecureThreshold512.metadata().degree
+            BfvPreset::InsecureThreshold64.metadata().degree
         );
     }
 
     #[test]
     fn test_generate_smudging_noise_sample() {
         let committee = CiphernodesCommitteeSize::Small.values();
-        let config = Configs::for_preset(BfvPreset::InsecureThreshold512).unwrap();
+        let config = Configs::for_preset(BfvPreset::InsecureThreshold64).unwrap();
         let sample = generate(
             &config,
-            BfvPreset::InsecureThreshold512,
+            BfvPreset::InsecureThreshold64,
             committee.clone(),
             DkgInputType::SmudgingNoise,
         )
@@ -171,7 +171,7 @@ mod tests {
         assert_eq!(sample.honest_ciphertexts.len(), committee.h);
         assert_eq!(
             sample.secret_key.coeffs.len(),
-            BfvPreset::InsecureThreshold512.metadata().degree
+            BfvPreset::InsecureThreshold64.metadata().degree
         );
     }
 }

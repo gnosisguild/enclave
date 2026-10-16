@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_bound_and_bits_computation_consistency() {
-        let preset = BfvPreset::InsecureThreshold512;
+        let preset = BfvPreset::InsecureThreshold64;
         use e3_committee::CiphernodesCommitteeSize;
         let config = Configs::for_preset(preset, CiphernodesCommitteeSize::Micro).unwrap();
         let bits = &config.bits;
