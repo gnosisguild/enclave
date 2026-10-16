@@ -534,12 +534,11 @@ reconciled durable committee state inside existing E3 contexts. It does not appe
 `CiphernodeSelected` event. Runtime log-read failures are returned in the correlated query response
 and flow through the existing error paths; a remote sync query therefore cannot panic the EventStore
 actor. The fail-stop behavior below applies to durable append/index-write failures. An event-log or
-timestamp-index write error panics the affected EventStore before live dispatch. This preserves
-durable-before-dispatch safety, but under the default unwind profile an Actix actor panic is
-contained at its spawned task boundary: it can kill the store actor and stall the sequencer without
-terminating the process. Process-level health supervision would need to detect the stalled pipeline,
-but the current runtime does not provide that guarantee. A restart, when it occurs, treats the event
-log as authoritative and reconciles missing derived index rows.
+timestamp-index write error makes the affected EventStore set the shared storage failure signal and
+stop before live dispatch, which preserves durable-before-dispatch safety. An event whose aggregate
+has no EventStore sets the same signal in the `EventStoreRouter`. The CLI watches the signal and
+exits with an error. A restart treats the event log as authoritative and reconciles missing derived
+index rows.
 
 Those replay guarantees bound local replay memory and file-descriptor use, but they do not make the
 whole persistence path synchronously acknowledged. Live publication and the sequencer/store response
@@ -1359,9 +1358,8 @@ flowchart TD
     Buffer[network startup overflow or broadcast lag] --> Readiness[fail readiness]
     Readiness --> StartResult
 
-    StoreFailure[event-log or index write failure] --> StoreDeath[affected EventStore panics before dispatch]
-    StoreDeath --> PipelineStall[sequencer loses its acknowledgement path]
-    StoreDeath --> ProcessAlive[process may remain alive because unwind stops at the actor task]
+    StoreFailure[event-log or index write failure, or an aggregate without a store] --> StoreSignal[storage failure signal; the store stops before dispatch]
+    StoreSignal --> CLIExit
 
     Signal[SIGINT / SIGTERM] --> Close[close BusHandle admission]
     Close --> Shutdown[acknowledged Shutdown fanout]
@@ -1376,17 +1374,16 @@ flowchart TD
     Detached[detached protocol or program-server tasks] -. not uniformly joined .-> ProcessExit[process exit]
 
     classDef residual fill:#fff1f0,stroke:#cf222e,color:#82071e
-    class PipelineStall,ProcessAlive,Detached residual
+    class Detached residual
 ```
 
 Startup barriers propagate errors to the caller and fail closed where continuing would drop
 historical or live input. Awaited network bridges stop when their destination actor closes.
 Recoverable handler failures are generally converted into durable `InterfoldError` events by the
 existing `trap` helpers; a logged error is not itself a supervision restart. EventStore write
-failures preserve safety by panicking before dispatch, but the default unwind build does not turn a
-spawned Actix actor panic into a guaranteed process exit. The store actor can die while the process
-remains present and the sequencer stalls; current code has no supervisor that converts that
-condition into a deterministic restart. Shutdown closes event admission, waits for admitted
+failures, and an event whose aggregate has no store, set the storage failure signal before dispatch,
+and the CLI exits with an error. A panic in another actor still stops only that actor; no supervisor
+restarts it. Shutdown closes event admission, waits for admitted
 publishers, persists and fans out `Shutdown`, flushes the durable pipeline, then drains snapshot
 batches and the backing store under one deadline. Any failed shutdown stage reaches the CLI and
 causes an unsuccessful exit.
