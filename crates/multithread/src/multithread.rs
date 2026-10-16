@@ -2141,6 +2141,42 @@ fn handle_verify_share_decryption_proofs(
     ))
 }
 
+/// The committee C7 is proven against: the canonical row for `(threshold_m, threshold_n)`.
+///
+/// Its `h` is the DKG's honest-party count, which the circuits are compiled with. The decryption
+/// shares C7 combines number `threshold_m + 1`, which equals `h` only at the minimum committee, so
+/// the share count cannot stand in for `h`.
+fn c7_committee(
+    threshold_m: usize,
+    threshold_n: usize,
+) -> anyhow::Result<e3_committee::CiphernodesCommittee> {
+    Ok(e3_committee::CiphernodesCommitteeSize::from_threshold(threshold_m, threshold_n)?.values())
+}
+
+#[cfg(test)]
+mod c7_committee_tests {
+    use super::c7_committee;
+    use e3_committee::CiphernodesCommitteeSize;
+
+    /// At the small committee `t + 1 = 10` shares are combined while `h = 14`; C7 still gets `h = 14`.
+    #[test]
+    fn c7_uses_the_canonical_h_not_the_share_count() {
+        for size in [
+            CiphernodesCommitteeSize::Minimum,
+            CiphernodesCommitteeSize::Micro,
+            CiphernodesCommitteeSize::Small,
+        ] {
+            let canonical = size.values();
+            assert_eq!(
+                c7_committee(canonical.threshold, canonical.n).unwrap(),
+                canonical
+            );
+        }
+        let small = CiphernodesCommitteeSize::Small.values();
+        assert_ne!(small.h, small.threshold + 1);
+    }
+}
+
 fn handle_decrypted_shares_aggregation_proof(
     prover: &ZkProver,
     mut req: DecryptedSharesAggregationProofRequest,
@@ -2163,7 +2199,6 @@ fn handle_decrypted_shares_aggregation_proof(
 
     // 4. Determine dimensions
     let num_indices = req.plaintext.len();
-    let num_parties = req.d_share_polys.len();
 
     for (party_id, shares) in &req.d_share_polys {
         if shares.len() < num_indices {
@@ -2204,12 +2239,9 @@ fn handle_decrypted_shares_aggregation_proof(
         let message_vec = e3_bfv_client::decode_bytes_to_vec_u64(&req.plaintext[i].extract_bytes())
             .map_err(|e| make_zk_error(&request, format!("plaintext[{}] decode: {:?}", i, e)))?;
 
-        // d. Build committee
-        let committee = e3_committee::CiphernodesCommittee {
-            n: req.threshold_n as usize,
-            h: num_parties,
-            threshold: req.threshold_m as usize,
-        };
+        // d. The canonical committee row the circuits were compiled for.
+        let committee = c7_committee(req.threshold_m as usize, req.threshold_n as usize)
+            .map_err(|e| make_zk_error(&request, format!("committee: {}", e)))?;
 
         // e. C7 uses noir-recursive-no-zk (non-ZK recursive); it is verified inside
         // `DecryptionAggregator` via `verify_honk_proof_non_zk`. The EVM-facing proof for on-chain
