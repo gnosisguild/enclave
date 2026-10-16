@@ -86,7 +86,7 @@ impl Clock for SystemClock {
 /// - [`ProofVerificationPassed`] — cache successful verification for voting
 /// - [`ProofFailureAccusation`] — incoming accusations from other nodes via gossip
 /// - [`AccusationVote`] — incoming votes from other nodes via gossip
-/// - [`SlashExecuted`] — on-chain slash confirmation for committee updates
+/// - [`CommitteeMemberExpelled`] — on-chain expulsion, which removes a voter
 ///
 /// Publishes:
 /// - [`ProofFailureAccusation`] — broadcast own accusations via gossip
@@ -96,7 +96,7 @@ impl Clock for SystemClock {
 /// [`AccusationManagerExtension`]: crate::accusation_manager_ext::AccusationManagerExtension
 /// [`CommitteeFinalized`]: e3_events::CommitteeFinalized
 /// [`AccusationQuorumReached`]: e3_events::AccusationQuorumReached
-/// [`SlashExecuted`]: e3_events::SlashExecuted
+/// [`CommitteeMemberExpelled`]: e3_events::CommitteeMemberExpelled
 pub struct AccusationManager {
     bus: BusHandle,
     /// Plain, synchronous protocol core. Owns all accusation/vote state.

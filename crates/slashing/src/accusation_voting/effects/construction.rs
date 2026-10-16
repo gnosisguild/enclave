@@ -207,7 +207,7 @@ impl AccusationManager {
         bus.subscribe(EventType::AccusationVote, addr.clone().into());
         bus.subscribe(EventType::ComputeResponse, addr.clone().into());
         bus.subscribe(EventType::ComputeRequestError, addr.clone().into());
-        bus.subscribe(EventType::SlashExecuted, addr.clone().into());
+        bus.subscribe(EventType::CommitteeMemberExpelled, addr.clone().into());
         bus.subscribe(
             EventType::CommitmentConsistencyViolation,
             addr.clone().into(),
