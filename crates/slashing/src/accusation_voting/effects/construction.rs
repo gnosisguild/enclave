@@ -213,6 +213,13 @@ impl AccusationManager {
         addr
     }
 
+    /// Hold local accusations until `EffectsEnabled`, for a manager that startup rebuilds before
+    /// it replays the event log.
+    pub(crate) fn hold_accusations_until_effects(mut self) -> Self {
+        self.voting.hold_accusations_until_effects();
+        self
+    }
+
     /// Canonical EIP-712 typed-data hash for a vote.
     ///
     /// Delegates to [`AccusationVoting::vote_digest`]. Exposed `pub` so the

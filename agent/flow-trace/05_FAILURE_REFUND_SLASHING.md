@@ -431,7 +431,12 @@ LIFECYCLE:
 
 A restart does not reconstruct a partially collected vote tally. The actor can accept new valid
 messages after hydration, but peers must resend any vote that existed only in the old process.
-Signed accusation deadlines bound how long that recovery remains useful.
+Signed accusation deadlines bound how long that recovery remains useful. A hydrated actor receives
+the replayed event log before `EffectsEnabled`: it holds the local failures and commitment
+violations from the log, one per proof, and accuses them at `EffectsEnabled`. This node's own
+accusation in the log marks its proof as accused, so a held failure of that proof is not signed
+again. Neither is one whose proof has a pending peer accusation with this node's vote: that
+accusation goes on.
 
 #### Step 1: Local Proof Failure Detection
 
@@ -463,6 +468,9 @@ ProofVerificationFailed OR CommitmentConsistencyViolation event arrives
 │   │     received_data[(accused, proof_type)] = { data_hash, passed: false }
 │   │
 │   └─ 2. Delegate to initiate_accusation() (no forwarded payload)
+│
+├─ Before EffectsEnabled (a hydrated actor during replay): hold the input; initiate it at
+│   EffectsEnabled, after the replayed log has marked this node's own accusations
 │
 └─ initiate_accusation() — shared logic:
     │
@@ -499,6 +507,9 @@ ProofVerificationFailed OR CommitmentConsistencyViolation event arrives
 
 ```text
 ProofFailureAccusation arrives via P2P from another committee member
+│
+├─ While the actor holds accusations (replay before EffectsEnabled): this node's own accusation,
+│   with its signature, only marks its proof as accused; live, it is rejected as Own
 │
 ├─ Reject self-accusations: signed accuser and accused addresses are equal
 │   accused_party_id is not in the accusation digest and does not decide this check

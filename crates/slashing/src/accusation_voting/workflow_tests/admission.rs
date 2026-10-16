@@ -398,3 +398,47 @@ fn received_accusations_with_changed_party_ids_reach_quorum() {
         }
     }
 }
+
+/// Startup replays the event log before `EffectsEnabled`. A replayed failure signs no accusation
+/// then. At `EffectsEnabled` it is accused, unless the log holds this node's own accusation of the
+/// proof, or a peer's accusation of it that this node voted on.
+#[test]
+fn a_replayed_failure_is_accused_once_effects_run_unless_the_log_holds_the_accusation() {
+    let me = signer(1);
+    let first = signer(2);
+    let second = signer(3);
+    let third = signer(4);
+    let peer = signer(5);
+    let committee = vec![
+        me.address(),
+        first.address(),
+        second.address(),
+        third.address(),
+        peer.address(),
+    ];
+    let mut v = voting_with(&me, committee, 1, 3);
+    v.hold_accusations_until_effects();
+    let accused_by_me = proof_failure(&first, 1, ProofType::C1PkGeneration);
+    let accused_by_peer = proof_failure(&second, 2, ProofType::C1PkGeneration);
+    let not_yet_accused = proof_failure(&third, 3, ProofType::C1PkGeneration);
+
+    for failure in [&accused_by_me, &accused_by_peer, &not_yet_accused] {
+        assert!(v.on_local_proof_failure(failure.clone(), &ctx()).is_empty());
+    }
+    let own = accusation_from_failure(&me, &accused_by_me, false, NOW - 60);
+    assert!(v.on_accusation_received(own, &ctx()).is_empty());
+    let by_peer = accusation_from_failure(&peer, &accused_by_peer, false, NOW - 30);
+    let by_peer_id = AccusationVoting::accusation_id(&by_peer);
+    v.on_accusation_received(by_peer, &ctx());
+
+    let accused: Vec<Address> = v
+        .on_effects_enabled()
+        .iter()
+        .filter_map(|action| match action {
+            VoteAction::PublishAccusation { accusation, .. } => Some(accusation.accused),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(accused, vec![third.address()]);
+    assert_eq!(v.pending[&by_peer_id].accusation.accuser, peer.address());
+}

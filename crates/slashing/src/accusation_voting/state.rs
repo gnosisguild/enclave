@@ -36,6 +36,17 @@ pub(crate) enum VoteAction {
     CancelTimeout([u8; 32]),
 }
 
+/// A local failure that arrived while startup replayed the event log. It is accused once effects
+/// run, unless this node's own accusation of the same proof arrived first.
+pub(crate) struct DeferredAccusation {
+    pub(super) accused_address: Address,
+    pub(super) accused_party_id: u64,
+    pub(super) proof_type: ProofType,
+    pub(super) data_hash: [u8; 32],
+    pub(super) forwarded_payload: Option<SignedProofPayload>,
+    pub(super) ec: EventContext<Sequenced>,
+}
+
 /// An active accusation awaiting agreement votes from committee members.
 pub(crate) struct PendingAccusation {
     pub(crate) accusation: ProofFailureAccusation,
@@ -85,4 +96,8 @@ pub(crate) struct AccusationVoting {
     pub(super) accusation_deadline_skew_secs: u64,
     pub(super) clock: Arc<dyn Clock>,
     pub(super) params_preset: e3_fhe_params::BfvPreset,
+    /// Off while startup replays the event log: a replayed local failure must not sign a new
+    /// accusation with a vote window from the current clock.
+    pub(super) effects_enabled: bool,
+    pub(super) deferred_accusations: Vec<DeferredAccusation>,
 }
