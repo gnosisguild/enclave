@@ -16,6 +16,7 @@ use e3_fhe_params::search::bfv::{
 };
 use e3_fhe_params::search::constants::{K_MAX, MIN_MARGIN_BITS};
 use e3_fhe_params::search::prime::{build_prime_items, build_prime_items_for_second};
+use e3_fhe_params::search::security::{max_log2_q, LimitSource};
 use e3_fhe_params::search::utils::{approx_bits_from_log2, fmt_big_summary, variance_uniform_sym};
 use num_bigint::BigUint;
 
@@ -239,6 +240,16 @@ fn main() {
         eprintln!("Try reducing n, z, k, λ, B, B_χ or min_margin.");
         std::process::exit(1);
     };
+
+    if max_log2_q(args.b, args.b_chi, bfv.d).1 == LimitSource::Formula {
+        println!();
+        println!(
+            "WARNING: no lattice-estimator limit for d = {}, B = {}, B_χ = {}.",
+            bfv.d, args.b, args.b_chi
+        );
+        println!("  The security limit is the formula log2(B) + (d-75)/37.5, which can allow");
+        println!("  q with less than 128 bits of security. Estimate this set before you use it.");
+    }
 
     // Decide distributions: CBD for B ≤ 32, otherwise Uniform
     let (dist_b, var_b) = if args.b <= 32 {

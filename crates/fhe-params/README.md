@@ -84,7 +84,11 @@ The search validates four key security equations:
 - **Equation 2**: `2*d*n*B ≤ B_Enc * 2^{-λ}` (encryption noise bound)
 - **Equation 3**: `B_sm = 2^{λ+1} * d * B_C` (smudging noise bound, the same bound that fhe.rs and
   the C1 circuit config use)
-- **Equation 4**: `d ≥ 37.5*log2(q/B) + 75` (degree constraint)
+- **Equation 4**: `log2(q) ≤ max_log2_q(d)` (RLWE security). For B = 20 and B_χ = 1,
+  `search::security` holds the largest log2(q) with at least 128 bits of security at each
+  d = 4096 ... 32768. The values come from the lattice-estimator. For other B, B_χ or d, the search
+  uses `d ≥ 37.5*log2(q/B) + 75` and the CLI prints a warning. That formula allows 5 to 9 more bits
+  of q than the estimator.
 
 #### Search Parameters
 

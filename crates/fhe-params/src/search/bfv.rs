@@ -17,6 +17,7 @@ use crate::search::prime::PrimeItem;
 use crate::search::prime::{
     build_prime_items, build_prime_items_for_second, is_ntt_friendly, select_max_q_under_cap,
 };
+use crate::search::security::max_log2_q;
 use crate::search::utils::{approx_bits_from_log2, big_shift_pow2, log2_big};
 use num_bigint::BigUint;
 use num_integer::Integer;
@@ -118,7 +119,6 @@ pub fn bfv_search(bfv_search_config: &BfvSearchConfig) -> BfvParamsResult<BfvSea
 
     let verbose = bfv_search_config.verbose;
     let prime_items = build_prime_items();
-    let log2_b = (bfv_search_config.b as f64).log2();
 
     // Buckets sorted DESCENDING within each bit-length (largest prime first), so
     // taking the first `num_primes` of a bucket maximises q for that prime size.
@@ -165,12 +165,13 @@ pub fn bfv_search(bfv_search_config: &BfvSearchConfig) -> BfvParamsResult<BfvSea
 
         // Minimum log2(q) for correctness (Eq1); exact margin check is in finalize.
         let min_log2_q = calculate_min_q_bits(bfv_search_config, d);
-        // Eq4 security upper bound: log2(q) <= log2(B) + (d-75)/37.5.
-        let log2_q_limit = log2_b + ((d as f64) - 75.0) / 37.5;
+        // Eq4 security upper bound: 128-bit ceiling on log2(q) for this d.
+        let (log2_q_limit, limit_source) =
+            max_log2_q(bfv_search_config.b, bfv_search_config.b_chi, d);
 
         if verbose {
             println!("\n[BFV-1st] d={d}");
-            println!("  Security limit: log2(q) <= {log2_q_limit:.1}");
+            println!("  Security limit: log2(q) <= {log2_q_limit:.1} ({limit_source:?})");
             println!("  Correctness requires: log2(q) >= {min_log2_q:.1}");
         }
 
@@ -545,9 +546,8 @@ pub fn bfv_search_second_param(
     // Centered-RNS gap rule: qi > 2*k.
     let min_qi_second = &max_qi_first << 1;
 
-    // Eq4 security upper bound: log2(q) <= log2(B) + (d-75)/37.5.
-    let log2_b = (bfv_search_config.b as f64).log2();
-    let log2_q_limit = log2_b + ((d as f64) - 75.0) / 37.5;
+    // Eq4 security upper bound: 128-bit ceiling on log2(q) for this d.
+    let (log2_q_limit, limit_source) = max_log2_q(bfv_search_config.b, bfv_search_config.b_chi, d);
 
     if verbose {
         println!(
@@ -558,7 +558,7 @@ pub fn bfv_search_second_param(
             "  Minimum qi required: {:.2} bits (fhe.rs centered RNS: qi > 2*k)",
             log2_big(&min_qi_second)
         );
-        println!("  Security limit: log2(q) <= {log2_q_limit:.1}");
+        println!("  Security limit: log2(q) <= {log2_q_limit:.1} ({limit_source:?})");
     }
 
     let prime_items = build_prime_items_for_second();
@@ -943,6 +943,20 @@ mod tests {
             second.k_plain_eff,
             secure_8192::dkg::PLAINTEXT_MODULUS as u128
         );
+    }
+
+    #[test]
+    fn search_keeps_q_under_the_estimator_limit() {
+        // At λ = 66 the smallest correct q at d = 8192 has log2(q) = 220. The formula
+        // log2(B) + (d-75)/37.5 accepts it (limit 220.8), but it has about 124 bits of
+        // security. The estimator limit (213.9) rejects it, so the search moves to d = 16384.
+        let mut config = preset_config(crate::presets::BfvPreset::SecureThreshold8192);
+        config.lambda = 66;
+        let result = bfv_search(&config).expect("a set exists at d = 16384");
+        let (limit, source) = crate::search::security::max_log2_q(config.b, config.b_chi, result.d);
+        assert_eq!(source, crate::search::security::LimitSource::Estimator);
+        assert_eq!(result.d, 16384);
+        assert!(log2_big(&result.q_bfv) <= limit);
     }
 
     fn create_test_config() -> BfvSearchConfig {
