@@ -16,7 +16,7 @@ use e3_events::{
     hlc_factory::HlcFactory, BusHandle, CiphernodeSelected, CommitteeFinalized,
     DkgFoldAttestationContext, DkgFoldAttestationContextEstablished, E3Failed, E3Requested,
     E3Stage, EffectsEnabled, EventBus, EventSource, EventStore, FailureReason, InterfoldEventData,
-    RequestRouterCheckpoint, Sequencer, SyncEffect, Unsequenced,
+    RequestRouterCheckpoint, Sequencer, SyncEffect, TestEvent, Unsequenced,
     DKG_FOLD_ATTESTATION_CONTEXT_SCHEMA_VERSION,
 };
 use std::sync::{
@@ -919,5 +919,77 @@ async fn peer_events_before_the_request_reach_its_recipients_after_it() -> Resul
     .to_vec();
     assert_eq!(*at_request.lock().unwrap(), expected);
     assert_eq!(*at_selection.lock().unwrap(), expected);
+    Ok(())
+}
+
+type EffectFlags = Arc<std::sync::Mutex<Vec<(E3id, bool)>>>;
+
+/// Records whether effects run each time a context's extensions see an event.
+struct EffectsFlagExtension {
+    flags: EffectFlags,
+}
+
+#[async_trait]
+impl E3Extension for EffectsFlagExtension {
+    fn on_event(&self, ctx: &mut E3Context, _: &InterfoldEvent) {
+        self.flags
+            .lock()
+            .unwrap()
+            .push((ctx.e3_id.clone(), ctx.effects_enabled()));
+    }
+
+    async fn hydrate(&self, _: &mut E3Context, _: &E3ContextSnapshot) -> Result<()> {
+        Ok(())
+    }
+}
+
+#[actix::test]
+async fn contexts_tell_extensions_whether_effects_run() -> Result<()> {
+    let (replayed, live) = (E3id::new("41", 31337), E3id::new("42", 31337));
+    let flags = EffectFlags::default();
+    let store = DataStore::from_in_mem(&InMemStore::new(false).start());
+    let bus = test_bus();
+    let router = E3Router::builder(&bus, store)
+        .with(Box::new(EffectsFlagExtension {
+            flags: flags.clone(),
+        }))
+        .build()
+        .await?;
+
+    send_in_order(
+        &router,
+        vec![
+            // Startup replay creates this context.
+            (
+                E3Requested {
+                    e3_id: replayed.clone(),
+                    ..Default::default()
+                }
+                .into(),
+                1,
+            ),
+            (EffectsEnabled::new().into(), 2),
+            (
+                InterfoldEventData::TestEvent(
+                    TestEvent::new("after", 0).with_e3_id(replayed.clone()),
+                ),
+                3,
+            ),
+            (
+                E3Requested {
+                    e3_id: live.clone(),
+                    ..Default::default()
+                }
+                .into(),
+                4,
+            ),
+        ],
+    )
+    .await?;
+
+    assert_eq!(
+        *flags.lock().unwrap(),
+        vec![(replayed.clone(), false), (replayed, true), (live, true)]
+    );
     Ok(())
 }

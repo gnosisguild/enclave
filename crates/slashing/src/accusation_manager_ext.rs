@@ -215,7 +215,10 @@ impl E3Extension for AccusationManagerExtension {
         if data.e3_id != ctx.e3_id {
             return;
         }
-        self.start_manager(ctx, &data.committee, true, None);
+        // Replay of a committee that the restored context lacks starts the manager before
+        // `EffectsEnabled`; it then holds local accusations like a restored manager.
+        let effects_enabled = ctx.effects_enabled();
+        self.start_manager(ctx, &data.committee, effects_enabled, None);
     }
 
     /// Recreate the per-E3 actor so this node can process new accusations after a restart. It
@@ -440,6 +443,106 @@ mod tests {
         assert_eq!(accusations().await?, 0, "accused before EffectsEnabled");
 
         manager.send(event(EffectsEnabled::new().into(), 2)).await?;
+        actix::clock::timeout(std::time::Duration::from_secs(5), async {
+            while accusations().await? == 0 {
+                actix::clock::sleep(std::time::Duration::from_millis(10)).await;
+            }
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
+        assert_eq!(accusations().await?, 1);
+        Ok(())
+    }
+
+    /// Replay of a `CommitteeFinalized` that the restored context lacks starts the manager before
+    /// `EffectsEnabled`. A local input from the log then signs an accusation only once effects run.
+    #[actix::test]
+    async fn a_manager_that_replay_starts_accuses_only_after_effects_enabled() -> Result<()> {
+        let bus = test_bus();
+        let history = bus.history();
+        let e3_id = E3id::new("8", 31337);
+        let me = PrivateKeySigner::random();
+        let accused = Address::repeat_byte(0x22);
+        let members = vec![
+            me.address().to_string(),
+            accused.to_string(),
+            Address::repeat_byte(0x33).to_string(),
+        ];
+        let extension = AccusationManagerExtension::create(
+            &bus,
+            me,
+            HashMap::from([(31337, Address::repeat_byte(0x44))]),
+            HashMap::from([(31337, 300)]),
+            30,
+            HashMap::new(),
+            &DataStore::from_in_mem(&InMemStore::new(false).start()),
+        );
+        let mut context = test_context(e3_id.clone());
+        context.set_dependency(META_KEY, test_meta());
+        // The router's context before `EffectsEnabled`.
+        context.set_effects_enabled(false);
+        let event = |data: e3_events::InterfoldEventData, seq: u64| {
+            InterfoldEvent::<Unsequenced>::new_with_timestamp(
+                data,
+                None,
+                seq as u128,
+                None,
+                EventSource::Local,
+            )
+            .into_sequenced(seq)
+        };
+        extension.on_event(
+            &mut context,
+            &event(
+                e3_events::CommitteeFinalized {
+                    e3_id: e3_id.clone(),
+                    committee: members.clone(),
+                    scores: Vec::new(),
+                    chain_id: 31337,
+                }
+                .into(),
+                1,
+            ),
+        );
+        let manager = context
+            .get_event_recipient("accusation_manager")
+            .expect("the committee starts the manager");
+        let accused_party_id = Committee::new(members)
+            .party_id_for(&accused.to_string())
+            .expect("accused member");
+        let accusations = || async {
+            let events = history.send(GetEvents::new()).await?;
+            Ok::<_, anyhow::Error>(
+                events
+                    .into_iter()
+                    .filter(|event| {
+                        matches!(
+                            event.get_data(),
+                            InterfoldEventData::ProofFailureAccusation(_)
+                        )
+                    })
+                    .count(),
+            )
+        };
+
+        manager
+            .send(event(
+                CommitmentConsistencyViolation {
+                    e3_id: e3_id.clone(),
+                    accused_address: accused,
+                    accused_party_id,
+                    proof_type: ProofType::C1PkGeneration,
+                    data_hash: [7; 32],
+                    evidence: Default::default(),
+                }
+                .into(),
+                2,
+            ))
+            .await?;
+        actix::clock::sleep(std::time::Duration::from_millis(200)).await;
+        assert_eq!(accusations().await?, 0, "accused before EffectsEnabled");
+
+        manager.send(event(EffectsEnabled::new().into(), 3)).await?;
         actix::clock::timeout(std::time::Duration::from_secs(5), async {
             while accusations().await? == 0 {
                 actix::clock::sleep(std::time::Duration::from_millis(10)).await;

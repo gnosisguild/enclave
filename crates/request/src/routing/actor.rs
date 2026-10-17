@@ -103,6 +103,8 @@ pub struct E3Router {
     buffer: EventBuffer,
     /// Peer events of E3s that the chain has not admitted yet, in memory only.
     unadmitted: UnadmittedInputs,
+    /// False until `EffectsEnabled` ends startup replay.
+    effects_enabled: bool,
     /// The EventBus
     bus: BusHandle,
     /// A repository for storing snapshots
@@ -162,6 +164,7 @@ impl E3Router {
             contexts: HashMap::new(),
             buffer: EventBuffer::default(),
             unadmitted: UnadmittedInputs::default(),
+            effects_enabled: false,
             replay_cursors: params.replay_cursors,
             recovery_store: params.recovery_store,
             recovered_selections: params.recovered_selections,

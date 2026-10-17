@@ -131,6 +131,10 @@ impl Handler<InterfoldEvent> for E3Router {
                     // resume its work. It completes instead.
                     let finished =
                         if matches!(msg.get_data(), InterfoldEventData::EffectsEnabled(_)) {
+                            self.effects_enabled = true;
+                            for context in self.contexts.values_mut() {
+                                context.set_effects_enabled(true);
+                            }
                             self.end_protocol_work_of_failed_contexts()?;
                             std::mem::take(&mut self.complete_on_restart)
                         } else {
@@ -177,12 +181,15 @@ impl Handler<InterfoldEvent> for E3Router {
                 } => {
                     let repositories = self.store.repositories();
                     let created = !self.contexts.contains_key(&e3_id);
+                    let effects_enabled = self.effects_enabled;
                     let context = self.contexts.entry(e3_id.clone()).or_insert_with(|| {
-                        E3Context::from_params(E3ContextParams {
+                        let mut context = E3Context::from_params(E3ContextParams {
                             e3_id: e3_id.clone(),
                             repository: repositories.context(&e3_id),
                             extensions: self.extensions.clone(),
-                        })
+                        });
+                        context.set_effects_enabled(effects_enabled);
+                        context
                     });
 
                     // A selection of a failed E3 kept for accusation or slashing work starts no
