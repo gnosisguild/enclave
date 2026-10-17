@@ -282,7 +282,7 @@ fn calculate_min_q_bits(bfv_search_config: &BfvSearchConfig, d: u64) -> f64 {
     let b_fresh = &benc_min + &term_d_b_b_chi_n + &term_d_b_b_chi_n;
 
     let b_c = BigUint::from(bfv_search_config.z) * &b_fresh;
-    let b_sm_min = &b_c * &two_pow_lambda;
+    let b_sm_min = smudging_bound(&b_c, bfv_search_config.lambda, d);
 
     let lhs = (&b_c + BigUint::from(bfv_search_config.n) * &b_sm_min) << 1;
     let lhs_log2 = log2_big(&lhs);
@@ -292,6 +292,16 @@ fn calculate_min_q_bits(bfv_search_config: &BfvSearchConfig, d: u64) -> f64 {
 }
 
 /// Group primes by bit-length, sorting each bucket descending by value.
+/// Smudging noise bound `B_sm = 2^(λ+1) · d · B_C`.
+///
+/// fhe.rs derives the additive smudging bound with this formula, and the C1 circuit config
+/// (`circuits/bin/config/src/main.nr`, `verify_e_sm_bound`) checks `PK_GENERATION_E_SM_BOUND`
+/// against it. The search must use the same bound, or it sizes q for less noise than the
+/// protocol adds.
+fn smudging_bound(b_c: &BigUint, lambda: u32, d: u64) -> BigUint {
+    b_c * big_shift_pow2(lambda + 1) * BigUint::from(d)
+}
+
 fn group_by_bits_desc(prime_items: &[PrimeItem]) -> BTreeMap<u8, Vec<PrimeItem>> {
     let mut by_bits: BTreeMap<u8, Vec<PrimeItem>> = BTreeMap::new();
     for p in prime_items {
@@ -342,8 +352,7 @@ pub fn finalize_bfv_candidate(
     // B_C = z (B_fresh + r_k(q))
     let b_c = BigUint::from(bfv_search_config.z) * (&b_fresh + BigUint::from(rkq));
 
-    // Eq3: B_C ≤ B_sm * 2^{-λ}  =>  B_sm ≥ B_C * 2^{λ}
-    let b_sm_min = &b_c * &two_pow_lambda;
+    let b_sm_min = smudging_bound(&b_c, bfv_search_config.lambda, d);
 
     // Eq1: 2*(B_C + n*B_sm) < Δ
     let lhs = (&b_c + BigUint::from(bfv_search_config.n) * &b_sm_min) << 1;
@@ -891,6 +900,50 @@ mod tests {
     use crate::search::prime::build_prime_items_for_second;
     use num_bigint::BigUint;
     use num_traits::One;
+
+    /// Search inputs of a preset, with the margin the presets were searched with.
+    fn preset_config(preset: crate::presets::BfvPreset) -> BfvSearchConfig {
+        let sd = preset
+            .search_defaults()
+            .expect("threshold preset has search inputs");
+        BfvSearchConfig {
+            n: sd.n,
+            z: sd.z,
+            k: sd.k,
+            lambda: sd.lambda,
+            b: sd.b,
+            b_chi: sd.b_chi,
+            min_margin: crate::search::constants::MIN_MARGIN_BITS,
+            verbose: false,
+        }
+    }
+
+    #[test]
+    fn search_reproduces_secure_presets() {
+        use crate::constants::secure_8192;
+        use crate::search::utils::variance_uniform_sym;
+
+        let config = preset_config(crate::presets::BfvPreset::SecureThreshold8192);
+        let first = bfv_search(&config).expect("secure threshold set must be feasible");
+        assert_eq!(first.d, secure_8192::DEGREE as u64);
+        assert_eq!(first.qi_values(), secure_8192::threshold::MODULI);
+        assert_eq!(
+            first.k_plain_eff,
+            secure_8192::threshold::PLAINTEXT_MODULUS as u128
+        );
+        assert_eq!(
+            variance_uniform_sym(&first.benc_min).to_str_radix(10),
+            secure_8192::threshold::ERROR1_VARIANCE
+        );
+
+        let second =
+            bfv_search_second_param(&config, &first).expect("secure DKG set must be feasible");
+        assert_eq!(second.qi_values(), secure_8192::dkg::MODULI);
+        assert_eq!(
+            second.k_plain_eff,
+            secure_8192::dkg::PLAINTEXT_MODULUS as u128
+        );
+    }
 
     fn create_test_config() -> BfvSearchConfig {
         BfvSearchConfig {

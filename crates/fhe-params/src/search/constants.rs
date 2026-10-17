@@ -470,6 +470,9 @@ pub const D_POW2_START: u64 = 256;
 pub const D_POW2_MAX: u64 = 32768;
 /// Maximum number of votes/plaintext additions (k_plain_eff)
 pub const K_MAX: u128 = 1u128 << 25; // 33,554,432
+/// Minimum correctness margin in bits, `log2(Δ) - log2(LHS)`. The secure and insecure
+/// presets were searched with this margin.
+pub const MIN_MARGIN_BITS: f64 = 2.0;
 
 #[cfg(test)]
 mod tests {

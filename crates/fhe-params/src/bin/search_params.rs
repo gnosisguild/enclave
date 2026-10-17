@@ -9,12 +9,14 @@
 //! Standalone command-line tool for searching BFV parameters using NTT-friendly primes.
 
 use clap::Parser;
+use e3_fhe_params::constants::defaults::DEFAULT_SECURE_LAMBDA;
+use e3_fhe_params::constants::search_defaults::{B, B_CHI, SEARCH_K, SEARCH_N, SEARCH_Z};
 use e3_fhe_params::search::bfv::{
     bfv_search, bfv_search_second_param, BfvSearchConfig, BfvSearchResult,
 };
-use e3_fhe_params::search::constants::K_MAX;
+use e3_fhe_params::search::constants::{K_MAX, MIN_MARGIN_BITS};
 use e3_fhe_params::search::prime::{build_prime_items, build_prime_items_for_second};
-use e3_fhe_params::search::utils::{approx_bits_from_log2, fmt_big_summary};
+use e3_fhe_params::search::utils::{approx_bits_from_log2, fmt_big_summary, variance_uniform_sym};
 use num_bigint::BigUint;
 
 #[derive(Parser, Debug, Clone)]
@@ -23,34 +25,32 @@ use num_bigint::BigUint;
     about = "Search BFV params with NTT-friendly CRT primes (40..63 bits)"
 )]
 struct Args {
-    /// Number of parties n (e.g. ciphernodes, default is 1000)
-    #[arg(long, default_value_t = 1000u128)]
+    /// Number of parties n (ciphernodes). Defaults to the SecureThreshold8192 search inputs.
+    #[arg(long, default_value_t = SEARCH_N)]
     n: u128,
 
-    /// Number of fresh ciphertext z, i.e. number of votes. Note that the BFV plaintext modulus k will be defined as k = z
-    #[arg(long, default_value_t = 1000u128)]
+    /// Number of fresh ciphertexts z summed (number of votes).
+    #[arg(long, default_value_t = SEARCH_Z)]
     z: u128,
 
-    /// Plaintext modulus k (plaintext space).
-    #[arg(long, default_value_t = 1000u128)]
+    /// Plaintext modulus k (plaintext space). The search uses max(k, z).
+    #[arg(long, default_value_t = SEARCH_K)]
     k: u128,
 
-    /// Statistical Security parameter λ (negl(λ)=2^{-λ}).
-    #[arg(long, default_value_t = 80u32)]
+    /// Statistical security parameter λ (negl(λ)=2^{-λ}).
+    #[arg(long, default_value_t = DEFAULT_SECURE_LAMBDA as u32)]
     lambda: u32,
 
-    /// Bound B on the error distribution \psi (see pdf) used generate e1 when encrypting (e.g., 20 for CBD with σ≈3.2).
-    #[arg(long, default_value_t = 20u128)]
+    /// Bound B on the error distribution ψ used to generate e1 when encrypting (20 for CBD with σ≈3.2).
+    #[arg(long, default_value_t = B)]
     b: u128,
 
-    /// Bound B_{\chi} on the distribution \chi (see pdf) used generate the secret key sk_i of each party i.
-    /// By default, it is fixed to be 20 (that is the case when \chi is CBD with with σ≈3.2, which
-    /// is the distribution by default in fhe.rs).
-    #[arg(long, default_value_t = 1u128)]
+    /// Bound B_χ on the distribution χ used to generate the secret key sk_i of each party i.
+    #[arg(long, default_value_t = B_CHI)]
     b_chi: u128,
 
-    /// Min margin.
-    #[arg(long, default_value_t = 1f64)]
+    /// Minimum correctness margin in bits, log2(Δ) - log2(LHS).
+    #[arg(long, default_value_t = MIN_MARGIN_BITS)]
     min_margin: f64,
 
     /// Verbose per-candidate logging
@@ -73,9 +73,7 @@ fn variance_uniform_str(b: u128) -> String {
 }
 
 fn variance_uniform_big_str(b: &BigUint) -> String {
-    // Variance for Uniform(-B..B): Var = B^2 / 3
-    let var = (b * b) / 3u32;
-    var.to_str_radix(10)
+    variance_uniform_sym(b).to_str_radix(10)
 }
 
 #[allow(clippy::too_many_arguments)]

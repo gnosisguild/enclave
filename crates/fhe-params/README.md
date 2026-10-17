@@ -82,7 +82,8 @@ The search validates four key security equations:
 
 - **Equation 1**: `2*(B_C + n*B_sm) < Δ` (decryption correctness)
 - **Equation 2**: `2*d*n*B ≤ B_Enc * 2^{-λ}` (encryption noise bound)
-- **Equation 3**: `B_C ≤ B_sm * 2^{-λ}` (ciphertext noise bound)
+- **Equation 3**: `B_sm = 2^{λ+1} * d * B_C` (smudging noise bound, the same bound that fhe.rs and
+  the C1 circuit config use)
 - **Equation 4**: `d ≥ 37.5*log2(q/B) + 75` (degree constraint)
 
 #### Search Parameters
@@ -95,6 +96,7 @@ The `BfvSearchConfig` struct defines the search constraints:
 - **`lambda`**: Statistical security parameter (negl(λ) = 2^{-λ})
 - **`b`**: Bound on error distribution ψ (e.g., 20 for CBD with σ≈3.2)
 - **`b_chi`**: Bound on distribution χ used for secret key generation
+- **`min_margin`**: Minimum correctness margin in bits, `log2(Δ) - log2(LHS)`
 - **`verbose`**: Enable detailed search process output
 
 The search iterates through polynomial degrees `d` (powers of 2: 1024, 2048, 4096, 8192, 16384,
@@ -183,6 +185,7 @@ let config = BfvSearchConfig {
     lambda: 80,      // Security parameter
     b: 20,            // Error bound
     b_chi: 1,         // Secret key bound
+    min_margin: 2.0,  // Correctness margin in bits
     verbose: true,    // Show detailed output
 };
 
@@ -206,7 +209,7 @@ The crate includes a command-line tool `search_params` for searching BFV paramet
 # Build the binary
 cargo build --bin search_params --package e3-fhe-params
 
-# Run with default parameters
+# Run with default parameters (the SecureThreshold8192 search inputs)
 cargo run --bin search_params --package e3-fhe-params
 
 # Run with custom parameters
@@ -225,37 +228,35 @@ cargo run --bin search_params --package e3-fhe-params -- \
 
 **CLI Options:**
 
-- `--n <N>`: Number of parties (ciphernodes). Default: `1000`
-- `--z <Z>`: Number of fresh ciphertext additions (number of votes). Also used as plaintext modulus
-  k. Default: `1000`
-- `--k <K>`: Plaintext modulus (plaintext space). Default: `1000`
-- `--lambda <LAMBDA>`: Statistical security parameter λ (negl(λ) = 2^{-λ}). Default: `80`
+The defaults are the search inputs of `SecureThreshold8192` (`constants::search_defaults`).
+
+- `--n <N>`: Number of parties (ciphernodes). Default: `20`
+- `--z <Z>`: Number of fresh ciphertext additions (number of votes). The search uses
+  `max(k, z)` as the plaintext modulus. Default: `100000`
+- `--k <K>`: Plaintext modulus (plaintext space). Default: `17000000`
+- `--lambda <LAMBDA>`: Statistical security parameter λ (negl(λ) = 2^{-λ}). Default: `45`
 - `--b <B>`: Bound on error distribution ψ (e.g., 20 for CBD with σ≈3.2). Default: `20`
 - `--b-chi <B_CHI>`: Bound on distribution χ for secret key generation. Default: `1`
+- `--min-margin <BITS>`: Minimum correctness margin in bits. Default: `2`
 - `--verbose`: Enable verbose output showing detailed search process
 - `--help`: Show help message
 - `--version`: Show version information
 
 **Example: Reproducing Production Preset**
 
-The production preset `SecureThresholdBfv8192` can be reproduced using:
+A run with the defaults gives the `SecureThreshold8192` preset as the first set and the
+`SecureDkg8192` preset as the second set:
 
 ```bash
-cargo run --bin search_params --package e3-fhe-params -- \
-    --n 100 \
-    --z 100 \
-    --k 100 \
-    --lambda 80 \
-    --b 20 \
-    --b-chi 1
+cargo run --bin search_params --package e3-fhe-params
 ```
 
-This will output the same parameter set as the preset, including:
-
 - Degree: 8192
-- 4 NTT-friendly primes (52-53 bits each)
+- First set: 3 NTT-friendly 60-bit primes, `ERROR1_VARIANCE` from `Var(e_1)`
+- Second set: 2 NTT-friendly 62-bit primes, plaintext modulus = largest first-set prime
 - All noise budgets and validation metrics
-- A second parameter set (if found)
+
+The test `search_reproduces_secure_presets` keeps the search and the preset constants in sync.
 
 **Output Format:**
 
