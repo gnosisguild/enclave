@@ -443,7 +443,10 @@ the quorum event that it publishes, which comes back to the actor. Buffered vote
 limits, in-flight re-verifications of forwarded proofs, and the rest of the verification cache are
 not saved. A hydrated actor receives the replayed event log before `EffectsEnabled`: it holds the
 local failures and commitment violations from the log, one per proof, and accuses them at
-`EffectsEnabled`. This node's own accusation in the log marks its proof as accused, so a held
+`EffectsEnabled`. An actor that replay starts, from a `CommitteeFinalized` after the router
+checkpoint, holds them too: the router's `E3Context::effects_enabled` is false until
+`EffectsEnabled`, and the extension starts the actor with it. This node's own accusation in the log
+marks its proof as accused, so a held
 failure of that proof is not signed again. Neither is one whose proof has a pending peer accusation
 with this node's vote: that accusation goes on.
 

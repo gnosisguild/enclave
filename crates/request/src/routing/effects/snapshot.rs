@@ -104,6 +104,7 @@ impl FromSnapshotWithParams for E3Router {
             extensions: params.extensions,
             buffer: EventBuffer::default(),
             unadmitted: UnadmittedInputs::default(),
+            effects_enabled: false,
             bus: params.bus,
             store: params.store,
             replay_cursors: params.replay_cursors,

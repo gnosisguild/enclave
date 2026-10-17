@@ -283,8 +283,11 @@ the code does not meet yet.
   again. A request under a new ID whose result has not reached the gate 10 minutes after it went to
   the worker goes to the worker again, because fan-out can drop that result, but only when no run of
   it is left in the worker, so one request runs once at a time. A hung run holds back the re-send
-  until the prover's cap ends it. — `crates/multithread/src/effect_gate.rs`;
-  `crates/events/src/correlation_id.rs`; `CRATES_ARCHITECTURE.md`
+  until the prover's cap ends it. `E3Context::effects_enabled` is false until the router sees
+  `EffectsEnabled`, so an extension can start an actor during replay with its effects held; the
+  accusation manager does. **Gap:** a keyshare actor that replay starts still runs with effects on,
+  and its collectors start their deadlines during replay. — `crates/multithread/src/effect_gate.rs`;
+  `crates/events/src/correlation_id.rs`; `crates/request/src/context.rs`; `CRATES_ARCHITECTURE.md`
 - Keyshare coalesces decryption work per phase in each process. Admission of an already-retained
   canonical key is a no-op. Repeated chain observations and resume signals cannot add share
   correlations or repeat C6 proof intents. Hydration clears the dispatch markers, and the worker
