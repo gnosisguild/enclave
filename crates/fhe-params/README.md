@@ -80,7 +80,8 @@ The library implements security analysis from:
 
 The search validates four key security equations:
 
-- **Equation 1**: `2*(B_C + n*B_sm) < Δ` (decryption correctness)
+- **Equation 1**: `2*(B_C + n*B_sm) < Δ` (decryption correctness). With `mult_depth > 0`, `B_C` is
+  the noise after the multiplications (below), and `B_sm` follows from it.
 - **Equation 2**: `2*d*n*B ≤ B_Enc * 2^{-λ}` (encryption noise bound)
 - **Equation 3**: `B_sm = 2^{λ+1} * d * B_C` (smudging noise bound, the same bound that fhe.rs and
   the C1 circuit config use)
@@ -104,11 +105,28 @@ The `BfvSearchConfig` struct defines the search constraints:
 - **`d`**: Ring dimension. `None` searches d = 8192, 16384 and 32768
 - **`insecure`**: Skip the security limit (Eq4). Only for insecure test presets
 - **`min_prime_bits`**: Smallest prime bit-length for both parameter sets (10 to 60)
+- **`mult_depth`**: Levels of multiplication and relinearization after the `z` additions. `0` is
+  summation only
 - **`verbose`**: Enable detailed search process output
 
 Without `d`, the search tries d = 8192, 16384 and 32768 in that order. For d ≥ 8192 it uses the
 prime table (primes ≡ 1 mod 16384, filtered to ≡ 1 mod 2d). For a smaller d it generates the
 largest NTT-friendly primes of each bit-length with fhe-math.
+
+#### Multiplication
+
+The circuit is `z` fresh ciphertexts added together, then `mult_depth` levels of multiplication and
+relinearization. Each level applies the Prop. 20 recursion
+`B_C(i+1) = 2·k·d²·‖sk‖·B_C(i) + B_relin`, with `‖sk‖ = n·B_χ`. The relinearization noise is
+Eq. 30, `d·l·‖sk‖·B_g·B_agg + 2·d²·l²·‖sk‖²·B_g·B_agg`, where `l` is the number of moduli,
+`B_g` is the largest modulus (RNS gadget base), and `B_agg = n·B` because the n ciphernodes make
+the relinearization key together. Additions after a multiplication are not in this model.
+
+```bash
+# 3 additions, then depth 3: 5 × 59-bit primes at d = 16384
+cargo run --bin search_params --package e3-fhe-params -- \
+    --n 20 --k 1000 --z 3 --mult-depth 3 --lambda 50
+```
 
 #### Search Algorithm
 
@@ -250,6 +268,7 @@ The defaults are the search inputs of `SecureThreshold8192` (`constants::search_
 - `--insecure <true|false>`: Skip the security limit. Use only for insecure test presets.
   Default: `false`
 - `--min-prime-bits <BITS>`: Smallest prime bit-length for both parameter sets. Default: `50`
+- `--mult-depth <D>`: Levels of multiplication after the `z` additions. Default: `0`
 - `--verbose`: Enable verbose output showing detailed search process
 - `--help`: Show help message
 - `--version`: Show version information

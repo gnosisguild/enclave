@@ -200,7 +200,8 @@ every section.
   `flow-trace/04`; `scripts/build-circuits.ts`
 - The preset search (`crates/fhe-params/src/search`) uses the same smudging bound
   `2^(lambda + 1) * degree * B_C` and a lattice-estimator 128-bit ceiling on `log2(q)`
-  (`search::security`). Its CLI defaults reproduce `SecureThreshold8192` and `SecureDkg8192`;
+  (`search::security`). With `mult_depth > 0`, `B_C` is the noise after the multiplications, and
+  the relinearization bound uses the aggregate key error `n * B`, as fhe.rs enforces it. Its CLI defaults reproduce `SecureThreshold8192` and `SecureDkg8192`;
   `--d 64 --insecure true --min-prime-bits 12` with the insecure search inputs reproduces the
   insecure pair. `search_reproduces_secure_presets` and `search_reproduces_insecure_presets`
   compare the search with `constants.rs`, so a preset or bound change must keep them equal. —

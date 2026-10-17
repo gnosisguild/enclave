@@ -66,6 +66,10 @@ struct Args {
     #[arg(long, default_value_t = DEFAULT_MIN_PRIME_BITS)]
     min_prime_bits: u8,
 
+    /// Levels of multiplication and relinearization after the z additions (0 = summation only).
+    #[arg(long, default_value_t = 0u32)]
+    mult_depth: u32,
+
     /// Verbose per-candidate logging
     #[arg(long, default_value_t = false)]
     verbose: bool,
@@ -148,6 +152,17 @@ fn print_param_set(
             result.b_fresh.to_str_radix(10)
         );
         println!("  B_C                   = {}", result.b_c.to_str_radix(10));
+        if result.mult_depth > 0 {
+            println!("  mult depth            = {}", result.mult_depth);
+            println!(
+                "  B_relin (Eq. 30)      = {}",
+                result.b_relin.to_str_radix(10)
+            );
+            println!(
+                "  B_C (after mult)      = {}",
+                result.b_c_final.to_str_radix(10)
+            );
+        }
         println!(
             "  B_sm                  = {}",
             result.b_sm_min.to_str_radix(10)
@@ -189,6 +204,7 @@ fn main() {
     println!("Inputs:");
     println!("  n (ciphernodes)     = {}", args.n);
     println!("  z (votes)           = {}", args.z);
+    println!("  mult depth          = {}", args.mult_depth);
     println!("  k (plaintext space) = {}", args.k);
     println!("  λ (statistical sec) = {}", args.lambda);
     println!("  B (error bound)     = {}", args.b);
@@ -234,6 +250,7 @@ fn main() {
         min_margin: args.min_margin,
         d: args.d,
         insecure: args.insecure,
+        mult_depth: args.mult_depth,
         min_prime_bits: args.min_prime_bits,
         verbose: args.verbose,
     };
