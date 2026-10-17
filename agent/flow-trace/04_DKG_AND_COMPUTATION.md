@@ -40,6 +40,11 @@ CiphernodeSelected event arrives at ThresholdKeyshare
 │   │     → A peer key that arrives in `Init` is only recorded.
 │   │       `replay_encryption_keys` sends every recorded key to the new
 │   │       EncryptionKeyCollector, as restart recovery does
+│   │     → While startup replays the event log (effects off), no collector
+│   │       starts, here or for a key, share or C4 share that arrives: the input
+│   │       is only recorded, and `resume_in_flight_work` builds the collectors
+│   │       at EffectsEnabled. A keyshare that replay starts gets effects off from
+│   │       `E3Context::effects_enabled`, like a restored one
 │   │
 │   ├─ 2. Reuse the recorded BFV keypair, or generate a fresh one:
 │   │     (secret_key, public_key) = BFV::keygen(share_encryption_preset)
