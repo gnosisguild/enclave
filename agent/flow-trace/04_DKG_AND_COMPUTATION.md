@@ -1447,10 +1447,12 @@ not one Noir circuit, uses the witness to produce the recursive tree.
 
 Each ciphertext leg uses four proofs:
 
-1. The leaf (`*_chunk_main`, ZK) range-checks every private coefficient and commits each polynomial.
-   It derives the Fiat-Shamir challenge from those commitments and the public-key and ciphertext
-   commitments, then evaluates its polynomials at the challenge. The challenge is derived after
-   every input is committed, so one circuit can both commit and evaluate.
+1. The leaf (`*_chunk_main`, ZK) range-checks every private coefficient (`u` ternary, `e0`/`k1`/`e1`
+   to their bounds, the quotients `r1`/`p1` in a power-of-two window) and commits each polynomial
+   with the bounded packing, since it has just bounded the values. It derives the Fiat-Shamir
+   challenge from those commitments and the public-key and ciphertext commitments, then evaluates
+   its polynomials at the challenge. The challenge is derived after every input is committed, so one
+   circuit can both commit and evaluate.
 2. The ciphertext circuit (`*_pk_ct_commit`, ZK) range-checks the ciphertext limbs to their centered
    residues, commits them, and evaluates them at the leaf's challenge.
 3. The identity circuit (`*_eval_chunk_identity`, ZK) verifies the leaf. It opens the public key

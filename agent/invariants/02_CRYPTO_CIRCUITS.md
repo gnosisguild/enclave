@@ -293,10 +293,14 @@ every section.
   window only has to keep `q_i * r` far below the field modulus. On this basis
   `range_check_signed_power_of_two` checks `[-2^BIT, 2^BIT)` with one assert per coefficient for:
   `r` in the trBFV ct0 and ct1 legs; C1's `r` and `e_sm` CRT quotients; C6's `r`;
-  `lbfv_pk_generation`'s `r`; and `rlk_generation`'s `rd0`/`rd2`. The generated bound arrays then
-  only document the honest range; `bin/config` checks that C1's and C6's widths cover theirs.
-  Bound-1 values (C1, `lbfv_pk_generation` and `rlk_generation` `sk`, `rlk_generation` `r`, C3 and
-  user-data `u`) use `assert_ternary` (`c^3 = c`) instead of a range check. — `flow-trace/04`
+  `lbfv_pk_generation`'s `r`; `rlk_generation`'s `rd0`/`rd2`; and `r1`/`p1` in the chunked l-BFV
+  leaves (`*_chunk_main`). The generated bound arrays then only document the honest range;
+  `bin/config` checks that C1's and C6's widths cover theirs. Bound-1 values (C1,
+  `lbfv_pk_generation` and `rlk_generation` `sk`, `rlk_generation` `r`, C3 and user-data `u` on both
+  paths) use `assert_ternary` (`c^3 = c`) instead of a range check. A circuit that creates a
+  commitment over values it range-checks packs it without per-digit asserts (the chunk leaves'
+  `*_bounded` helpers, `*_pk_ct_commit` after centering); every opener keeps the checked packing,
+  which computes the same value. — `flow-trace/04`
 - `rlk_generation` uses `delta_l = (row_index == l)` for limb `l` in place of the row's Garner
   coefficient. This is correct only because each Garner coefficient is `1 mod q_row` and `0 mod`
   every other modulus; `garner_coefficient_is_the_crt_unit_vector` checks this for each l-BFV
