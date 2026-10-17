@@ -14,7 +14,7 @@ use e3_fhe_params::constants::search_defaults::{B, B_CHI, SEARCH_K, SEARCH_N, SE
 use e3_fhe_params::search::bfv::{
     bfv_search, bfv_search_second_param, BfvSearchConfig, BfvSearchResult,
 };
-use e3_fhe_params::search::constants::{K_MAX, MIN_MARGIN_BITS};
+use e3_fhe_params::search::constants::{DEFAULT_MIN_PRIME_BITS, K_MAX, MIN_MARGIN_BITS};
 use e3_fhe_params::search::prime::{build_prime_items, build_prime_items_for_second};
 use e3_fhe_params::search::security::{max_log2_q, LimitSource};
 use e3_fhe_params::search::utils::{approx_bits_from_log2, fmt_big_summary, variance_uniform_sym};
@@ -53,6 +53,18 @@ struct Args {
     /// Minimum correctness margin in bits, log2(Δ) - log2(LHS).
     #[arg(long, default_value_t = MIN_MARGIN_BITS)]
     min_margin: f64,
+
+    /// Ring dimension d (power of two). Without it, the search tries d = 8192, 16384, 32768.
+    #[arg(long)]
+    d: Option<u64>,
+
+    /// Skip the RLWE security limit. Only for insecure test presets; correctness is still checked.
+    #[arg(long, action = clap::ArgAction::Set, default_value_t = false)]
+    insecure: bool,
+
+    /// Smallest prime bit-length for both parameter sets (10..=60).
+    #[arg(long, default_value_t = DEFAULT_MIN_PRIME_BITS)]
+    min_prime_bits: u8,
 
     /// Verbose per-candidate logging
     #[arg(long, default_value_t = false)]
@@ -181,7 +193,14 @@ fn main() {
     println!("  λ (statistical sec) = {}", args.lambda);
     println!("  B (error bound)     = {}", args.b);
     println!("  B_χ (secret bound)  = {}", args.b_chi);
+    if let Some(d) = args.d {
+        println!("  d (ring dimension)  = {d}");
+    }
     println!();
+    if args.insecure {
+        println!("WARNING: --insecure skips the RLWE security limit. Use the result for test presets only.");
+        println!();
+    }
 
     // Enforce constraints on z and k
     if args.z == 0 {
@@ -213,6 +232,9 @@ fn main() {
         b: args.b,
         b_chi: args.b_chi,
         min_margin: args.min_margin,
+        d: args.d,
+        insecure: args.insecure,
+        min_prime_bits: args.min_prime_bits,
         verbose: args.verbose,
     };
 
@@ -235,13 +257,16 @@ fn main() {
         );
     }
 
-    let Ok(bfv) = bfv_search(&config) else {
-        eprintln!("\nERROR: No feasible first parameter set found.");
-        eprintln!("Try reducing n, z, k, λ, B, B_χ or min_margin.");
-        std::process::exit(1);
+    let bfv = match bfv_search(&config) {
+        Ok(bfv) => bfv,
+        Err(e) => {
+            eprintln!("\nERROR: {e}");
+            eprintln!("Try reducing n, z, k, λ, B, B_χ or min_margin.");
+            std::process::exit(1);
+        }
     };
 
-    if max_log2_q(args.b, args.b_chi, bfv.d).1 == LimitSource::Formula {
+    if !args.insecure && max_log2_q(args.b, args.b_chi, bfv.d).1 == LimitSource::Formula {
         println!();
         println!(
             "WARNING: no lattice-estimator limit for d = {}, B = {}, B_χ = {}.",

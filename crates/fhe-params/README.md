@@ -101,19 +101,23 @@ The `BfvSearchConfig` struct defines the search constraints:
 - **`b`**: Bound on error distribution ψ (e.g., 20 for CBD with σ≈3.2)
 - **`b_chi`**: Bound on distribution χ used for secret key generation
 - **`min_margin`**: Minimum correctness margin in bits, `log2(Δ) - log2(LHS)`
+- **`d`**: Ring dimension. `None` searches d = 8192, 16384 and 32768
+- **`insecure`**: Skip the security limit (Eq4). Only for insecure test presets
+- **`min_prime_bits`**: Smallest prime bit-length for both parameter sets (10 to 60)
 - **`verbose`**: Enable detailed search process output
 
-The search iterates through polynomial degrees `d` (powers of 2: 1024, 2048, 4096, 8192, 16384,
-32768).
+Without `d`, the search tries d = 8192, 16384 and 32768 in that order. For d ≥ 8192 it uses the
+prime table (primes ≡ 1 mod 16384, filtered to ≡ 1 mod 2d). For a smaller d it generates the
+largest NTT-friendly primes of each bit-length with fhe-math.
 
 #### Search Algorithm
 
 The `bfv_search()` function implements a search algorithm that:
 
-1. Iterates through polynomial degrees `d` (powers of 2)
-2. For each `d`, finds the maximum `q` under the Eq4 constraint
-3. Validates the candidate against Eq1 (noise bound)
-4. Refines the result by decreasing `q` to find minimal valid parameters
+1. Iterates through polynomial degrees `d` (powers of 2), or uses the given `d`
+2. Tries 3 to 6 primes, and for each count the prime bit-lengths from `min_prime_bits` up to 60
+3. In each bit-length, takes the largest primes whose product q is under the Eq4 limit
+4. Validates that q against Eq1 (noise bound). If it fails, moves to the next bit-length
 
 Returns the first feasible parameter set found, or an error if none exist.
 
@@ -242,6 +246,10 @@ The defaults are the search inputs of `SecureThreshold8192` (`constants::search_
 - `--b <B>`: Bound on error distribution ψ (e.g., 20 for CBD with σ≈3.2). Default: `20`
 - `--b-chi <B_CHI>`: Bound on distribution χ for secret key generation. Default: `1`
 - `--min-margin <BITS>`: Minimum correctness margin in bits. Default: `2`
+- `--d <D>`: Ring dimension (power of two). Default: try 8192, 16384 and 32768
+- `--insecure <true|false>`: Skip the security limit. Use only for insecure test presets.
+  Default: `false`
+- `--min-prime-bits <BITS>`: Smallest prime bit-length for both parameter sets. Default: `50`
 - `--verbose`: Enable verbose output showing detailed search process
 - `--help`: Show help message
 - `--version`: Show version information
@@ -260,7 +268,16 @@ cargo run --bin search_params --package e3-fhe-params
 - Second set: 2 NTT-friendly 62-bit primes, plaintext modulus = largest first-set prime
 - All noise budgets and validation metrics
 
-The test `search_reproduces_secure_presets` keeps the search and the preset constants in sync.
+The insecure presets `InsecureThreshold64` and `InsecureDkg64` come from the insecure search
+inputs (`constants::insecure_search_defaults`, λ = 2) at d = 64:
+
+```bash
+cargo run --bin search_params --package e3-fhe-params -- \
+    --n 19 --lambda 2 --d 64 --insecure true --min-prime-bits 12
+```
+
+The tests `search_reproduces_secure_presets` and `search_reproduces_insecure_presets` keep the
+search and the preset constants in sync.
 
 **Output Format:**
 

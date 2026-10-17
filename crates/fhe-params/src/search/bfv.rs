@@ -15,7 +15,8 @@ use crate::search::constants::{D_POW2_MAX, K_MAX};
 use crate::search::errors::{BfvParamsResult, SearchError, ValidationError};
 use crate::search::prime::PrimeItem;
 use crate::search::prime::{
-    build_prime_items, build_prime_items_for_second, is_ntt_friendly, select_max_q_under_cap,
+    build_prime_items, build_prime_items_for_second, generate_prime_items, is_ntt_friendly,
+    select_max_q_under_cap,
 };
 use crate::search::security::max_log2_q;
 use crate::search::utils::{approx_bits_from_log2, big_shift_pow2, log2_big};
@@ -28,19 +29,19 @@ use std::collections::HashSet;
 /// Fixed ring dimension used for both parameter sets.
 const RING_DIM: u64 = 8192;
 
-/// First-set prime bit-size bounds. The 50-bit floor avoids the <0.2-bit
-/// correctness margin of 49-bit primes; the 60-bit cap leaves 61/62-bit primes
-/// for the second set (centered-RNS gap requirement).
-const FIRST_MIN_PRIME_BITS: u8 = 50;
+/// First-set largest prime bit-size. The 60-bit cap leaves 61/62-bit primes for the second set
+/// (centered-RNS gap requirement). `BfvSearchConfig::min_prime_bits` sets the floor of both sets.
 const FIRST_MAX_PRIME_BITS: u8 = 60;
 const FIRST_TARGET_NUM_PRIMES: usize = 3;
 const FIRST_MAX_NUM_PRIMES: usize = 6;
 
 /// Second-set search bounds.
-const SECOND_MIN_PRIME_BITS: u8 = 50;
 const SECOND_MAX_PRIME_BITS: u8 = 62;
 const SECOND_TARGET_NUM_PRIMES: usize = 2;
 const SECOND_MAX_NUM_PRIMES: usize = 8;
+
+/// Primes generated per bit-length for ring dimensions below `RING_DIM`.
+const GENERATED_PRIMES_PER_BITS: usize = 12;
 
 /// Configuration for BFV parameter search
 #[derive(Debug, Clone)]
@@ -59,6 +60,14 @@ pub struct BfvSearchConfig {
     pub b_chi: u128,
     /// Min supported margin.
     pub min_margin: f64,
+    /// Ring dimension. `None` searches d = 8192, 16384 and 32768, and returns the first feasible set.
+    pub d: Option<u64>,
+    /// Skip the RLWE security limit (Eq4). Only for insecure test presets such as
+    /// `InsecureThreshold64`. The search still checks correctness (Eq1).
+    pub insecure: bool,
+    /// Smallest prime bit-length for both parameter sets (10..=60). Ring dimensions below
+    /// `RING_DIM` generate their primes, so a toy preset can use primes below the table's 40 bits.
+    pub min_prime_bits: u8,
     /// Verbose output showing detailed parameter search process
     pub verbose: bool,
 }
@@ -117,51 +126,78 @@ pub fn bfv_search(bfv_search_config: &BfvSearchConfig) -> BfvParamsResult<BfvSea
         .into());
     }
 
+    if let Some(d) = bfv_search_config.d {
+        if !d.is_power_of_two() || !(4..=D_POW2_MAX).contains(&d) {
+            return Err(ValidationError::InvalidRingDimension { d }.into());
+        }
+    }
+    let min_prime_bits = bfv_search_config.min_prime_bits;
+    if !(10..=FIRST_MAX_PRIME_BITS).contains(&min_prime_bits) {
+        return Err(ValidationError::InvalidPrimeBits {
+            bits: min_prime_bits,
+            reason: format!("must be in 10..={FIRST_MAX_PRIME_BITS}"),
+        }
+        .into());
+    }
+
     let verbose = bfv_search_config.verbose;
-    let prime_items = build_prime_items();
 
     // Buckets sorted DESCENDING within each bit-length (largest prime first), so
     // taking the first `num_primes` of a bucket maximises q for that prime size.
-    let by_bits = group_by_bits_desc(&prime_items);
-
-    // Show available buckets (pool is independent of d, so print once).
-    if verbose {
-        for bb in FIRST_MIN_PRIME_BITS..=FIRST_MAX_PRIME_BITS {
-            if let Some(bucket) = by_bits.get(&bb) {
-                let max_log2 = bucket.first().map(|p| p.log2).unwrap_or(0.0);
-                let min_log2 = bucket.last().map(|p| p.log2).unwrap_or(0.0);
-                println!(
-                    "  {}-bit bucket: {} primes, log2 range [{:.2}, {:.2}]",
-                    bb,
-                    bucket.len(),
-                    min_log2,
-                    max_log2
-                );
-            }
-        }
-    }
+    let by_bits = group_by_bits_desc(&build_prime_items());
 
     // Search increasing ring dimensions: start at RING_DIM and only step up when
     // no q satisfies both correctness (lower) and Eq4 security (upper) bounds at
     // the current d. A larger d raises the security limit far faster than the
     // correctness requirement, so high-λ requests resolve at a bigger ring.
-    let mut d = RING_DIM;
-    while d <= D_POW2_MAX {
+    // A fixed `d` searches that ring dimension only.
+    let ring_dims: Vec<u64> = match bfv_search_config.d {
+        Some(d) => vec![d],
+        None => std::iter::successors(Some(RING_DIM), |d| Some(d << 1))
+            .take_while(|d| *d <= D_POW2_MAX)
+            .collect(),
+    };
+    for d in ring_dims {
         // Keep only primes that are NTT-friendly for this ring dimension
         // (p ≡ 1 mod 2d). At d == RING_DIM every table entry already qualifies,
         // but doubling d below can exclude primes (e.g. 60-bit) that only
-        // satisfy the smaller modulus.
-        let by_bits_d: BTreeMap<u8, Vec<PrimeItem>> = by_bits
-            .iter()
-            .filter_map(|(&bb, bucket)| {
-                let filtered: Vec<PrimeItem> = bucket
-                    .iter()
-                    .filter(|p| is_ntt_friendly(&p.value, d))
-                    .cloned()
-                    .collect();
-                (!filtered.is_empty()).then_some((bb, filtered))
-            })
-            .collect();
+        // satisfy the smaller modulus. Below RING_DIM the primes are generated.
+        let by_bits_d: BTreeMap<u8, Vec<PrimeItem>> = if d < RING_DIM {
+            group_by_bits_desc(&generate_prime_items(
+                d,
+                min_prime_bits,
+                FIRST_MAX_PRIME_BITS,
+                GENERATED_PRIMES_PER_BITS,
+            ))
+        } else {
+            by_bits
+                .iter()
+                .filter_map(|(&bb, bucket)| {
+                    let filtered: Vec<PrimeItem> = bucket
+                        .iter()
+                        .filter(|p| is_ntt_friendly(&p.value, d))
+                        .cloned()
+                        .collect();
+                    (!filtered.is_empty()).then_some((bb, filtered))
+                })
+                .collect()
+        };
+
+        if verbose {
+            for bb in min_prime_bits..=FIRST_MAX_PRIME_BITS {
+                if let Some(bucket) = by_bits_d.get(&bb) {
+                    let max_log2 = bucket.first().map(|p| p.log2).unwrap_or(0.0);
+                    let min_log2 = bucket.last().map(|p| p.log2).unwrap_or(0.0);
+                    println!(
+                        "  {}-bit bucket: {} primes, log2 range [{:.2}, {:.2}]",
+                        bb,
+                        bucket.len(),
+                        min_log2,
+                        max_log2
+                    );
+                }
+            }
+        }
 
         // Minimum log2(q) for correctness (Eq1); exact margin check is in finalize.
         let min_log2_q = calculate_min_q_bits(bfv_search_config, d);
@@ -171,7 +207,12 @@ pub fn bfv_search(bfv_search_config: &BfvSearchConfig) -> BfvParamsResult<BfvSea
 
         if verbose {
             println!("\n[BFV-1st] d={d}");
-            println!("  Security limit: log2(q) <= {log2_q_limit:.1} ({limit_source:?})");
+            let ignored = if bfv_search_config.insecure {
+                "  [IGNORED: insecure]"
+            } else {
+                ""
+            };
+            println!("  Security limit: log2(q) <= {log2_q_limit:.1} ({limit_source:?}){ignored}");
             println!("  Correctness requires: log2(q) >= {min_log2_q:.1}");
         }
 
@@ -182,7 +223,7 @@ pub fn bfv_search(bfv_search_config: &BfvSearchConfig) -> BfvParamsResult<BfvSea
                 println!("\n  === Trying {num_primes} primes ===");
             }
 
-            for bb in FIRST_MIN_PRIME_BITS..=FIRST_MAX_PRIME_BITS {
+            for bb in min_prime_bits..=FIRST_MAX_PRIME_BITS {
                 let bucket = match by_bits_d.get(&bb) {
                     Some(b) => b,
                     None => continue,
@@ -204,7 +245,10 @@ pub fn bfv_search(bfv_search_config: &BfvSearchConfig) -> BfvParamsResult<BfvSea
                 // Slide a window of `num_primes` over the descending bucket. The
                 // largest window is tried first; if it exceeds the security cap,
                 // smaller windows in the same bucket may still fit
-                // [min_log2_q, log2_q_limit].
+                // [min_log2_q, log2_q_limit]. The first window under the cap decides
+                // the bucket: if it fails correctness, the search moves to the next
+                // bucket. A smaller window can pass only through a smaller
+                // r_k(q) = q mod k, and the presets take the largest primes instead.
                 for start in 0..=(bucket.len() - num_primes) {
                     let sel: Vec<PrimeItem> = bucket[start..start + num_primes].to_vec();
                     let q = sel.iter().map(|pi| &pi.value).product::<BigUint>();
@@ -222,7 +266,7 @@ pub fn bfv_search(bfv_search_config: &BfvSearchConfig) -> BfvParamsResult<BfvSea
                         break;
                     }
 
-                    if q_bits > log2_q_limit {
+                    if q_bits > log2_q_limit && !bfv_search_config.insecure {
                         if verbose {
                             println!(
                                 "  {} × {}-bit: log2(q)={:.2} > {:.1} security limit, trying smaller primes",
@@ -240,20 +284,21 @@ pub fn bfv_search(bfv_search_config: &BfvSearchConfig) -> BfvParamsResult<BfvSea
                             );
                         }
                         return Ok(res);
-                    } else if verbose {
+                    }
+                    if verbose {
                         println!(
                             "  {} × {}-bit: log2(q)={:.2} ❌ fails correctness or margin < {:.1} bits",
                             num_primes, bb, q_bits, bfv_search_config.min_margin
                         );
                     }
+                    break;
                 }
             }
         }
 
         if verbose {
-            println!("\n  no feasible set at d={d}; increasing ring dimension…");
+            println!("\n  no feasible set at d={d}");
         }
-        d <<= 1;
     }
 
     if verbose {
@@ -561,7 +606,17 @@ pub fn bfv_search_second_param(
         println!("  Security limit: log2(q) <= {log2_q_limit:.1} ({limit_source:?})");
     }
 
-    let prime_items = build_prime_items_for_second();
+    // Ring dimensions below RING_DIM use generated primes (see `generate_prime_items`).
+    let prime_items = if d < RING_DIM {
+        generate_prime_items(
+            d,
+            bfv_search_config.min_prime_bits,
+            SECOND_MAX_PRIME_BITS,
+            GENERATED_PRIMES_PER_BITS,
+        )
+    } else {
+        build_prime_items_for_second()
+    };
 
     // Exclude primes already used by the first set.
     let first_set_primes: HashSet<String> = first
@@ -588,7 +643,7 @@ pub fn bfv_search_second_param(
 
     // Show available primes per bit-length (gap rule applied, first-set excluded).
     if verbose {
-        for bb in SECOND_MIN_PRIME_BITS..=SECOND_MAX_PRIME_BITS {
+        for bb in bfv_search_config.min_prime_bits..=SECOND_MAX_PRIME_BITS {
             if let Some(bucket) = by_bits.get(&bb) {
                 let available: Vec<&PrimeItem> = bucket
                     .iter()
@@ -615,7 +670,7 @@ pub fn bfv_search_second_param(
             println!("\n  === Trying {num_primes} primes ===");
         }
 
-        for bb in SECOND_MIN_PRIME_BITS..=SECOND_MAX_PRIME_BITS {
+        for bb in bfv_search_config.min_prime_bits..=SECOND_MAX_PRIME_BITS {
             let bucket = match by_bits.get(&bb) {
                 Some(b) => b,
                 None => continue,
@@ -662,7 +717,7 @@ pub fn bfv_search_second_param(
 
                 // Eq4 security upper bound: q grows monotonically with `start`,
                 // so once it exceeds the security limit no later window can pass.
-                if q_bits > log2_q_limit {
+                if q_bits > log2_q_limit && !bfv_search_config.insecure {
                     if verbose {
                         println!(
                             "    log2(q)={:.2} > {:.1} security limit, abandoning bucket",
@@ -914,8 +969,46 @@ mod tests {
             b: sd.b,
             b_chi: sd.b_chi,
             min_margin: crate::search::constants::MIN_MARGIN_BITS,
+            d: None,
+            insecure: false,
+            min_prime_bits: crate::search::constants::DEFAULT_MIN_PRIME_BITS,
             verbose: false,
         }
+    }
+
+    #[test]
+    fn search_reproduces_insecure_presets() {
+        use crate::constants::insecure_64;
+        use crate::search::utils::variance_uniform_sym;
+
+        let mut config = preset_config(crate::presets::BfvPreset::InsecureThreshold64);
+        config.d = Some(insecure_64::DEGREE as u64);
+        config.insecure = true;
+        config.min_prime_bits = 12;
+
+        let first = bfv_search(&config).expect("insecure threshold set must be feasible");
+        assert_eq!(first.d, insecure_64::DEGREE as u64);
+        assert_eq!(first.qi_values(), insecure_64::threshold::MODULI);
+        assert_eq!(
+            first.k_plain_eff,
+            insecure_64::threshold::PLAINTEXT_MODULUS as u128
+        );
+        assert_eq!(
+            variance_uniform_sym(&first.benc_min).to_str_radix(10),
+            insecure_64::threshold::ERROR1_VARIANCE
+        );
+
+        let second =
+            bfv_search_second_param(&config, &first).expect("insecure DKG set must be feasible");
+        assert_eq!(second.qi_values(), insecure_64::dkg::MODULI);
+        assert_eq!(
+            second.k_plain_eff,
+            insecure_64::dkg::PLAINTEXT_MODULUS as u128
+        );
+
+        // The security limit rejects every q at d = 64.
+        config.insecure = false;
+        assert!(bfv_search(&config).is_err());
     }
 
     #[test]
@@ -968,6 +1061,9 @@ mod tests {
             b: 20,
             b_chi: 1,
             min_margin: 1.0,
+            d: None,
+            insecure: false,
+            min_prime_bits: crate::search::constants::DEFAULT_MIN_PRIME_BITS,
             verbose: false,
         }
     }
