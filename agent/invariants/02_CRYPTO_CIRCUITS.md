@@ -46,9 +46,10 @@ every section.
   the preset and committee. The build regenerates them for the selected pair and replaces each whole
   declaration, array bounds included. It rejects a declaration with its config file's prefix that
   the generator does not emit, because the pair source hash ignores those declarations. The C1
-  `e_sm` quotient bounds grow with the committee, so an array kept from another committee makes
-  honest C1 proofs fail. The committed configs hold the `minimum` values. —
-  `scripts/build-circuits.ts` (`committeeBoundUpdates`); `scripts/circuit-artifacts.test.ts`
+  `e_sm` quotient bounds grow with the committee. C1 checks those quotients in the
+  `BIT_E_SM_QUOTIENT` window, so a width kept from another committee makes honest C1 proofs fail.
+  The committed configs hold the `minimum` values. — `scripts/build-circuits.ts`
+  (`committeeBoundUpdates`); `scripts/circuit-artifacts.test.ts`
 
 ### Noir / Barretenberg compatibility
 
@@ -247,8 +248,12 @@ every section.
 - Every prover-chosen modular quotient needs a bound. This includes C1's `e_sm` CRT lift and the
   reduced encryption quotients in ct0, ct1, and C3. Bounds on the other operands must also prevent
   field wraparound. When every other term of the identity is exactly bounded, the integer identity
-  already pins the quotient, so its bound only has to rule out wraparound: ct0 and ct1 check `r` in
-  the power-of-two window `[-2^BIT_R, 2^BIT_R)`, one assert per coefficient. — `flow-trace/04`
+  already pins the quotient, so its bound only has to rule out wraparound. The power-of-two window
+  `[-2^BIT, 2^BIT)` does that with one assert per coefficient: ct0 and ct1 check `r` in it, C1
+  checks `r` and the `e_sm` CRT quotients, and C6 checks `r`. The generated bound arrays then only
+  document the honest range; `bin/config` checks that each `BIT` covers its array. Bound-1 values
+  (C1 `sk`, C3 and user-data `u`) use `assert_ternary` (`c^3 = c`) instead of a range check. —
+  `flow-trace/04`
 - C7 derives `u` through bounded interpolation and `garner_reconstruct`; it accepts neither
   `u_global` nor CRT reconstruction quotients as witnesses. `reduce_mod_bounded` and
   `inv_mod_bounded` constrain every reduction and inverse hint used by that path. The rounded decode
@@ -437,6 +442,11 @@ every section.
   input zero commits to the complete nodes or C6 tree. Deployment pins that value from the pair's
   `.vk_tree_hash`, not from its immediate `.vk_hash`. A prover-supplied hash without this immutable
   anchor does not establish trust. — `math/recursive_vk.nr`; `flow-trace/04`
+- **A fold step adds one leaf to an empty slot and keeps every other row.** The kernel proof holds
+  the chain's first leaf, and the first fold step carries its rows like any predecessor's. A step
+  that reset the rows when `is_first_step` is set would drop the kernel's leaf. A kernel proven at a
+  slot other than its leaf's would put the leaf in the wrong place. — `c3_fold`, `c6_fold`,
+  `nodes_fold`
 - **PK domain binding (C-08):** `publishCommittee` sets
   `committeeHash = CommitteeHashLib.hash(c.topNodes)`: keccak256 over the ordered raw 20-byte
   addresses, not `abi.encodePacked(address[])`, which pads each address to 32 bytes.
