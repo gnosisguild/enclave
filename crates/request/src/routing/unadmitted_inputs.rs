@@ -21,8 +21,8 @@ use super::event_buffer::event_bytes;
 /// Bounds for the held peer events.
 ///
 /// A DKG of 19 parties sends about 160 such events before the last party starts (six readiness
-/// updates, one key share and one fold proof from each party), and a decryption 19 shares of about
-/// 0.2 MB. The totals match the network event buffer that holds gossip during startup.
+/// updates, one key share and one fold proof from each party). A decryption sends 19 shares of
+/// about 0.2 MB each. The totals match the network event buffer that holds gossip during startup.
 #[derive(Clone, Copy)]
 pub(crate) struct UnadmittedLimits {
     pub per_e3_items: usize,
