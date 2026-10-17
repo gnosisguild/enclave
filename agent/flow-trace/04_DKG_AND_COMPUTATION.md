@@ -448,6 +448,12 @@ Sequential C3, C6, and nodes folds expose the fixed `(leaf, fold, genesis)` VK h
 three hashes. The first step verifies the genesis VK. Each continuation verifies the fold VK. The
 final consumer also requires the declared fold hash to match the VK that verified its proof.
 
+The kernel proves the chain's first leaf on its own, and its proof carries that leaf's row. Every
+fold step carries its predecessor's rows forward, the kernel's included, and puts its own leaf in an
+empty slot. A chain of `n` leaves is therefore one kernel proof and `n - 1` fold proofs, and needs
+`n >= 2` so that it ends on a fold proof. The first fold step checks the C6 domain against the
+kernel's, as every later step does.
+
 `compute_vk_hash` uses the SAFE `DS_VK_HASH` sponge and preserves input order. The DKG trust anchor
 includes every descendant key:
 

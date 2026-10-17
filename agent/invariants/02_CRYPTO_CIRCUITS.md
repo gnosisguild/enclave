@@ -47,9 +47,10 @@ every section.
   the preset and committee. The build regenerates them for the selected pair and replaces each whole
   declaration, array bounds included. It rejects a declaration with its config file's prefix that
   the generator does not emit, because the pair source hash ignores those declarations. The C1
-  `e_sm` quotient bounds grow with the committee, so an array kept from another committee makes
-  honest C1 proofs fail. The committed configs hold the `minimum` values. —
-  `scripts/build-circuits.ts` (`committeeBoundUpdates`); `scripts/circuit-artifacts.test.ts`
+  `e_sm` quotient bounds grow with the committee. C1 checks those quotients in the
+  `BIT_E_SM_QUOTIENT` window, so a width kept from another committee makes honest C1 proofs fail.
+  The committed configs hold the `minimum` values. — `scripts/build-circuits.ts`
+  (`committeeBoundUpdates`); `scripts/circuit-artifacts.test.ts`
 
 ### Noir / Barretenberg compatibility
 
@@ -289,8 +290,13 @@ every section.
   the reduced key quotients `r` of `lbfv_pk_generation` and `rd0`/`rd2` of `rlk_generation`. Bounds
   on the other operands must also prevent field wraparound. A bound can be a power-of-two window
   when every other term is exactly bounded: the integer identity then fixes the quotient, so the
-  window only has to keep `q_i * r` far below the field modulus. The trBFV ct0 and ct1 legs check
-  `r` in `[-2^BIT_R, 2^BIT_R)` (`range_check_signed_power_of_two`) on this basis. — `flow-trace/04`
+  window only has to keep `q_i * r` far below the field modulus. On this basis
+  `range_check_signed_power_of_two` checks `[-2^BIT, 2^BIT)` with one assert per coefficient for:
+  `r` in the trBFV ct0 and ct1 legs; C1's `r` and `e_sm` CRT quotients; C6's `r`;
+  `lbfv_pk_generation`'s `r`; and `rlk_generation`'s `rd0`/`rd2`. The generated bound arrays then
+  only document the honest range; `bin/config` checks that C1's and C6's widths cover theirs.
+  Bound-1 values (C1, `lbfv_pk_generation` and `rlk_generation` `sk`, `rlk_generation` `r`, C3 and
+  user-data `u`) use `assert_ternary` (`c^3 = c`) instead of a range check. — `flow-trace/04`
 - `rlk_generation` uses `delta_l = (row_index == l)` for limb `l` in place of the row's Garner
   coefficient. This is correct only because each Garner coefficient is `1 mod q_row` and `0 mod`
   every other modulus; `garner_coefficient_is_the_crt_unit_vector` checks this for each l-BFV
@@ -487,6 +493,11 @@ every section.
   input zero commits to the complete nodes or C6 tree. Deployment pins that value from the pair's
   `.vk_tree_hash`, not from its immediate `.vk_hash`. A prover-supplied hash without this immutable
   anchor does not establish trust. — `math/recursive_vk.nr`; `flow-trace/04`
+- **A fold step adds one leaf to an empty slot and keeps every other row.** The kernel proof holds
+  the chain's first leaf, and the first fold step carries its rows like any predecessor's. A step
+  that reset the rows when `is_first_step` is set would drop the kernel's leaf. A kernel proven at a
+  slot other than its leaf's would put the leaf in the wrong place. — `c3_fold`, `c3_fold_chunked`,
+  `c6_fold`, `nodes_fold`
 - **PK domain binding (C-08):** `publishCommittee` sets
   `committeeHash = CommitteeHashLib.hash(c.topNodes)`: keccak256 over the ordered raw 20-byte
   addresses, not `abi.encodePacked(address[])`, which pads each address to 32 bytes.
