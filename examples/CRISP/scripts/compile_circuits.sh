@@ -28,16 +28,15 @@ STACKS=(
 
 echo "Compiling the Interfold user-data encryption proof tree..."
 
-# A circuit that receives raw private coefficients must use the ZK recursive target. Other tree
-# circuits receive only proofs and public inputs, so they can use the smaller non-ZK target.
+# A circuit that receives raw private coefficients must be proved with the ZK recursive target:
+# the leaves, the pk/ct commitments, the identity circuits (they open `u`), and the ct0 top level
+# (it receives `k1`). The rest receive only proofs and public inputs. bb 5.2.0 writes the same key
+# for both targets; the two lists keep the hash file names that compute_vk_hash.sh reads.
 UDE_ZK_CIRCUITS=(
-    ct0_chunk_main ct0_pk_ct_commit ct0_eval_chunk_main ct0_eval_pk_ct
-    user_data_encryption_ct0_chunked
-    ct1_chunk_main ct1_pk_ct_commit ct1_eval_chunk_main ct1_eval_pk_ct
+    ct0_chunk_main ct0_pk_ct_commit ct0_eval_chunk_identity user_data_encryption_ct0_chunked
+    ct1_chunk_main ct1_pk_ct_commit ct1_eval_chunk_identity
 )
 UDE_NON_ZK_CIRCUITS=(
-    ct0_chunk_main_root ct0_chunk_gamma ct0_eval_chunk_main_root ct0_eval_chunk_identity
-    ct1_chunk_main_root ct1_chunk_gamma ct1_eval_chunk_main_root ct1_eval_chunk_identity
     user_data_encryption_ct1_chunked user_data_encryption_chunked
 )
 
@@ -57,6 +56,10 @@ for name in "${UDE_ZK_CIRCUITS[@]}"; do
     fi
     mv "${THRESHOLD_TARGET}/vk" "${THRESHOLD_TARGET}/${name}.vk_noir"
     mv "${THRESHOLD_TARGET}/vk_hash" "${THRESHOLD_TARGET}/${name}.vk_noir_hash"
+    # The SDK ships this key with the bytecode instead of rebuilding the circuit for it per ballot.
+    cp "${THRESHOLD_TARGET}/${name}.vk_noir" "${THRESHOLD_TARGET}/${name}.vk_recursive"
+    cp "${THRESHOLD_TARGET}/${name}.vk_noir_hash" "${THRESHOLD_TARGET}/${name}.vk_recursive_hash"
+    node "$CRISP/scripts/vk-json.mjs" "${THRESHOLD_TARGET}/${name}.vk_recursive"
 done
 for name in "${UDE_NON_ZK_CIRCUITS[@]}"; do
     if ! bb write_vk -b "${THRESHOLD_TARGET}/${name}.json" -o "${THRESHOLD_TARGET}" -t noir-recursive-no-zk; then
@@ -65,6 +68,7 @@ for name in "${UDE_NON_ZK_CIRCUITS[@]}"; do
     fi
     mv "${THRESHOLD_TARGET}/vk" "${THRESHOLD_TARGET}/${name}.vk_recursive"
     mv "${THRESHOLD_TARGET}/vk_hash" "${THRESHOLD_TARGET}/${name}.vk_recursive_hash"
+    node "$CRISP/scripts/vk-json.mjs" "${THRESHOLD_TARGET}/${name}.vk_recursive"
 done
 
 # Apply project-specific checks that the generated verifier does not emit.
@@ -155,6 +159,7 @@ for stack in "${STACKS[@]}"; do
     fi
     mv "${crisp_target}/vk" "${crisp_target}/${crisp_dir}.vk_recursive"
     mv "${crisp_target}/vk_hash" "${crisp_target}/${crisp_dir}.vk_recursive_hash"
+    node "$CRISP/scripts/vk-json.mjs" "${crisp_target}/${crisp_dir}.vk_recursive"
 
     echo "Compiling ${fold_dir} circuit (verifies user_data_encryption_chunked + ${crisp_dir})..."
     if ! (cd "$CRISP_CIRCUITS/bin/${fold_dir}" && nargo compile); then

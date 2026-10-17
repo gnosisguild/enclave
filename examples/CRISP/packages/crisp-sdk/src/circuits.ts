@@ -18,29 +18,28 @@ export type CircuitPreset = 'insecure' | 'secure-8192' | 'secure-16384'
  * `chain_key_hash` against the insecure *or* the secure constant for exactly that reason. They ship
  * in the main entry point, which is why `verifyProof` works without a preset loaded.
  */
-export type CircuitBundle = {
-  readonly preset: CircuitPreset
-  readonly crisp: CompiledCircuit
-  readonly crispOnchain: CompiledCircuit
-  readonly ct0ChunkMain: CompiledCircuit
-  readonly ct0ChunkMainRoot: CompiledCircuit
-  readonly ct0PkCtCommit: CompiledCircuit
-  readonly ct0ChunkGamma: CompiledCircuit
-  readonly ct0EvalChunkMain: CompiledCircuit
-  readonly ct0EvalChunkMainRoot: CompiledCircuit
-  readonly ct0EvalPkCt: CompiledCircuit
-  readonly ct0EvalChunkIdentity: CompiledCircuit
-  readonly userDataEncryptionCt0: CompiledCircuit
-  readonly ct1ChunkMain: CompiledCircuit
-  readonly ct1ChunkMainRoot: CompiledCircuit
-  readonly ct1PkCtCommit: CompiledCircuit
-  readonly ct1ChunkGamma: CompiledCircuit
-  readonly ct1EvalChunkMain: CompiledCircuit
-  readonly ct1EvalChunkMainRoot: CompiledCircuit
-  readonly ct1EvalPkCt: CompiledCircuit
-  readonly ct1EvalChunkIdentity: CompiledCircuit
-  readonly userDataEncryptionCt1: CompiledCircuit
+export type PresetCircuitName =
+  | 'crisp'
+  | 'crispOnchain'
+  | 'ct0ChunkMain'
+  | 'ct0PkCtCommit'
+  | 'ct0EvalChunkIdentity'
+  | 'userDataEncryptionCt0'
+  | 'ct1ChunkMain'
+  | 'ct1PkCtCommit'
+  | 'ct1EvalChunkIdentity'
+  | 'userDataEncryptionCt1'
+
+export type CircuitBundle = { readonly preset: CircuitPreset } & { readonly [K in PresetCircuitName]: CompiledCircuit } & {
+  /**
+   * Each circuit's recursive verification key, written with its bytecode. bb.js rebuilds a whole
+   * circuit to return its key, so shipping them saves one circuit build per proof in a ballot.
+   */
+  readonly vks: { readonly [K in PresetCircuitName]: RecursiveVk }
 }
+
+/** A recursive verification key, as bb.js `generateRecursiveProofArtifacts` returns it. */
+export type RecursiveVk = { readonly vkAsFields: string[]; readonly vkHash: string }
 
 let registered: CircuitBundle | null = null
 

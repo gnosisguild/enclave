@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fold public key_hash = compute_vk_hash(ude, crisp, ct0_vk_chain, ct1_vk_chain).
+# Fold public key_hash = compute_vk_hash(user_data_encryption_chunked, crisp, ct0_vk_chain, ct1_vk_chain).
 # Needs pnpm compile:circuits.
 #
 # Prints one hash per ballot stack. Each belongs in the matching fold circuit:
@@ -9,14 +9,14 @@
 # The `crisp` hash changes whenever the crisp circuit changes, not only when a new stack is added.
 #
 # ct0 and ct1 are each a tree of chunk circuits, so the fold cannot anchor them with one key hash.
-# The user_data_encryption wrapper outputs one VK chain per leg instead, and this script computes the
-# same values:
-#   manifest = compute_vk_hash(gamma, root, leaf, pk_ct, identity, eval_root, eval_leaf, eval_pk_ct)
+# The user_data_encryption_chunked wrapper outputs one VK chain per leg instead, and this script
+# computes the same values:
+#   manifest = compute_vk_hash(identity, leaf, pk_ct)
 #   chain    = compute_vk_hash(top_level, manifest)
 # The order must match `compute_ude_vk_manifest` in
-# circuits/lib/src/core/threshold/user_data_encryption_chunk.nr. Circuits that their parent verifies
-# with ZK (leaves, pk/ct, and the ct0 top level that contains `k1`) use the `noir-recursive` hash.
-# Every other circuit uses the `noir-recursive-no-zk` hash.
+# circuits/lib/src/core/threshold/user_data_encryption_chunk.nr. Circuits proved with the ZK
+# recursive target use the `noir-recursive` hash file, the others the `noir-recursive-no-zk` one
+# (bb 5.2.0 writes the same hash for both).
 set -euo pipefail
 
 CRISP="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -45,18 +45,13 @@ to_file() {
 leg_chain() {
   local ct="$1"
   local manifest_files=(
-    "$T/${ct}_chunk_gamma.vk_recursive_hash"
-    "$T/${ct}_chunk_main_root.vk_recursive_hash"
+    "$T/${ct}_eval_chunk_identity.vk_noir_hash"
     "$T/${ct}_chunk_main.vk_noir_hash"
     "$T/${ct}_pk_ct_commit.vk_noir_hash"
-    "$T/${ct}_eval_chunk_identity.vk_recursive_hash"
-    "$T/${ct}_eval_chunk_main_root.vk_recursive_hash"
-    "$T/${ct}_eval_chunk_main.vk_noir_hash"
-    "$T/${ct}_eval_pk_ct.vk_noir_hash"
   )
-  local top_hash="$T/user_data_encryption_${ct}.vk_recursive_hash"
+  local top_hash="$T/user_data_encryption_${ct}_chunked.vk_recursive_hash"
   if [[ "$ct" == "ct0" ]]; then
-    top_hash="$T/user_data_encryption_${ct}.vk_noir_hash"
+    top_hash="$T/user_data_encryption_${ct}_chunked.vk_noir_hash"
   fi
   need "${manifest_files[@]}" "$top_hash"
   local manifest_hash
@@ -72,7 +67,7 @@ to_file "$ct1_chain" "$TMP/ct1_vk_chain"
 
 for name in crisp crisp_onchain; do
   VK=(
-    "$T/user_data_encryption.vk_recursive_hash"
+    "$T/user_data_encryption_chunked.vk_recursive_hash"
     "$CRISP/circuits/bin/${name}/target/${name}.vk_recursive_hash"
     "$TMP/ct0_vk_chain"
     "$TMP/ct1_vk_chain"

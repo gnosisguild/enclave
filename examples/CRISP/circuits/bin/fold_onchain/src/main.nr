@@ -11,11 +11,11 @@ use interfold_lib::math::commitments::compute_vk_hash;
 /// Run `pnpm compute:vk-hash` in `examples/CRISP` after a circuit or preset change.
 /// Each preset has a different circuit tree and must have a different anchor.
 pub global CRISP_ONCHAIN_FOLD_EXPECTED_KEY_HASH_INSECURE: Field =
-    0x090d43b8bbd50e0840fd14a5918216321b0fc5dc5696da80da7cca2b22614696;
+    0x08c86e453611c753836c488b5c04f2e52e8d522d91b98353608db1ccd72db754;
 pub global CRISP_ONCHAIN_FOLD_EXPECTED_KEY_HASH_SECURE_8192: Field =
-    0x225abc9d92035e910c9bd0deac6060640ad49b30ed6ef4de6d094397010ebdac;
+    0x29bc6fde74170ee76b999f64b1e54da7238636dd1ba1475003fb6634f7fb18d9;
 pub global CRISP_ONCHAIN_FOLD_EXPECTED_KEY_HASH_SECURE_16384: Field =
-    0x29ef5fc0b104605ead5b7d55cbb4144f11206771213ee248ea8b9f9618c4674b;
+    0x27eee460bb2ff9347a6fb954aeceb629b833c034c8e5437f5a57ffbbdd58d33d;
 
 fn main(
     // User Data Encryption Section.

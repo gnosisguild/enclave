@@ -20,6 +20,8 @@ import { proveUserDataEncryptionTree } from '@interfold/user-data-encryption-pro
 import foldCircuit from '../../../circuits/bin/fold/target/crisp_fold.json'
 import foldOnchainCircuit from '../../../circuits/bin/fold_onchain/target/crisp_onchain_fold.json'
 import userDataEncryptionCircuit from '../../../../../circuits/bin/threshold/target/user_data_encryption_chunked.json'
+// Written with the bytecode above by compile_circuits.sh; see `CircuitBundle.vks`.
+import userDataEncryptionVk from '../../../../../circuits/bin/threshold/target/user_data_encryption_chunked.vk_recursive.json'
 import { requireCircuits } from './circuits'
 
 // Cached Barretenberg API instance — avoids re-initialising WASM + SRS on every proof.
@@ -159,9 +161,8 @@ export const generateProof = async (circuitInputs: any, censusMode: CensusVarian
     verifierTarget: 'noir-recursive-no-zk',
   })
 
-  const crispArtifacts = await crispBackend.generateRecursiveProofArtifacts(crispProof, crispPublicInputs.length, {
-    verifierTarget: 'noir-recursive-no-zk',
-  })
+  // Precomputed with the bytecode (see `CircuitBundle.vks`): bb.js would rebuild each circuit to get them.
+  const crispArtifacts = censusMode === 'onchain' ? circuits.vks.crispOnchain : circuits.vks.crisp
 
   const { witness: userDataEncryptionWitness } = await executeCircuit(userDataEncryptionCircuit as CompiledCircuit, {
     ct0_verification_key: ct0.vkAsFields,
@@ -180,13 +181,7 @@ export const generateProof = async (circuitInputs: any, censusMode: CensusVarian
       verifierTarget: 'noir-recursive-no-zk',
     },
   )
-  const userDataEncryptionArtifacts = await userDataEncryptionBackend.generateRecursiveProofArtifacts(
-    userDataEncryptionProof,
-    userDataEncryptionPublicInputs.length,
-    {
-      verifierTarget: 'noir-recursive-no-zk',
-    },
-  )
+  const userDataEncryptionArtifacts = userDataEncryptionVk
 
   const { witness: foldWitness } = await executeCircuit(foldCircuitForMode as CompiledCircuit, {
     user_data_encryption_verification_key: userDataEncryptionArtifacts.vkAsFields,

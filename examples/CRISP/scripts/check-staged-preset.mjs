@@ -60,6 +60,9 @@ for (const name of manifest.circuits) {
   if (!existsSync(join(stagedDir, `${name}.json`))) {
     fail(`✗ ${preset}: preset.json lists ${name}, but ${name}.json is missing.`, `  ${RESTAGE}`)
   }
+  if (!existsSync(join(stagedDir, `${name}.vk.json`))) {
+    fail(`✗ ${preset}: ${name}.vk.json is missing, so the SDK would have no verification key for it.`, `  ${RESTAGE}`)
+  }
 }
 
 // An archive from before the digest existed cannot be shown to match, so treat it as stale.
