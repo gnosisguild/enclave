@@ -1108,6 +1108,9 @@ attributable to a canonical party before they become slashing evidence. Replayed
 `EffectsEnabled`, then coalesced by the contract's semantic replay domain across deferred,
 in-flight, and completed submissions. Retryable submission failures release the process-local
 in-flight key but retain the outbox intent. Confirmed or known-benign terminal results resolve it.
+A failure is terminal when its decoded revert names an error in `TERMINAL_SLASH_SUBMISSION_ERRORS`,
+for example `SlashSubmissionDeadlinePassed`. Each listed error must be in the Rust
+`ISlashingManager` ABI: a revert that does not decode is retried every 30 seconds.
 
 Every node reads the proof-type policy after a fault quorum. A disabled policy produces a durable,
 E3-scoped `CommitteeMemberExcluded` fact instead of a transaction that must revert. This fact is not
