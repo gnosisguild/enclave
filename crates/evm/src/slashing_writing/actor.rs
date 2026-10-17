@@ -54,6 +54,11 @@ pub struct SlashingManagerSolWriter<P> {
     intent_times: Option<Persistable<SlashIntentTimes>>,
 }
 
+/// The wait before the writer tries a failed slash submission again. The retry also waits its rank
+/// delay again, so the fallback submitters keep their order. The wait does not grow: the proposal
+/// must land before its signed deadline, and an `AccusationIssuedInFuture` revert from clock skew
+/// can clear when time advances. The retries stop at an error that no retry can change, for example
+/// `SignatureExpired` or `SlashSubmissionDeadlinePassed` (`slash_submission_error_is_terminal`).
 const SLASH_SUBMISSION_RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(30);
 pub const SLASHING_WRITER_RECOVERY_SCHEMA_VERSION: u32 = 1;
 

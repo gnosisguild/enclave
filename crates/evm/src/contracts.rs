@@ -207,6 +207,10 @@ sol! {
         error ProofRequired();
         error InvalidProof();
         error Unauthorized();
+        error ZeroAddress();
+        error InvalidAccusationWindow();
+        error AccusationIssuedInFuture();
+        error SlashSubmissionDeadlinePassed();
     }
 }
 

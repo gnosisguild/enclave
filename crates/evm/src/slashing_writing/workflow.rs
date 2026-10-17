@@ -434,30 +434,34 @@ pub(crate) fn submission_delay(rank: usize) -> Duration {
     Duration::from_secs(rank as u64 * SUBMITTER_DELAY_SECS)
 }
 
-/// Return true when retrying the same attestation cannot change the contract outcome.
+/// The `SlashingManager` errors that no retry of the same attestation can change. Each one must be
+/// in the `ISlashingManager` ABI, or its raw revert does not decode and looks like a transport error.
 ///
 /// `AccusationIssuedInFuture` is deliberately absent: a bounded clock skew can become valid after
 /// time advances. Transport, RPC, nonce, and unknown errors also remain retryable.
+const TERMINAL_SLASH_SUBMISSION_ERRORS: [&str; 15] = [
+    "ZeroAddress",
+    "ProofRequired",
+    "OperatorNotInCommittee",
+    "DuplicateEvidence",
+    "ChainIdMismatch",
+    "InvalidProof",
+    "InsufficientAttestations",
+    "DuplicateVoter",
+    "VoterNotInCommittee",
+    "InvalidVoteSignature",
+    "VoterIsAccused",
+    "EquivocationDetected",
+    "SignatureExpired",
+    "InvalidAccusationWindow",
+    "SlashSubmissionDeadlinePassed",
+];
+
+/// Return true when retrying the same attestation cannot change the contract outcome.
 pub(crate) fn slash_submission_error_is_terminal(decoded: &str) -> bool {
-    [
-        "ZeroAddress",
-        "ProofRequired",
-        "OperatorNotInCommittee",
-        "DuplicateEvidence",
-        "ChainIdMismatch",
-        "InvalidProof",
-        "InsufficientAttestations",
-        "DuplicateVoter",
-        "VoterNotInCommittee",
-        "InvalidVoteSignature",
-        "VoterIsAccused",
-        "EquivocationDetected",
-        "SignatureExpired",
-        "InvalidAccusationWindow",
-        "SlashSubmissionDeadlinePassed",
-    ]
-    .iter()
-    .any(|name| decoded.contains(name))
+    TERMINAL_SLASH_SUBMISSION_ERRORS
+        .iter()
+        .any(|name| decoded.contains(name))
 }
 
 #[cfg(test)]
@@ -864,5 +868,28 @@ mod tests {
             "execution reverted: SlashReasonDisabled()"
         ));
         assert!(!slash_submission_error_is_terminal("temporary RPC timeout"));
+    }
+
+    /// The RPC error of a reverted call carries the custom error as raw revert data. The writer
+    /// decodes it with `format_evm_error` before it decides whether to try again.
+    fn raw_revert(name: &str) -> String {
+        let selector = hex::encode(&keccak256(format!("{name}()"))[..4]);
+        crate::domain::error_decoder::format_evm_error(&anyhow::anyhow!(
+            "server returned an error response: error code 3: execution reverted, data: \"0x{selector}\""
+        ))
+    }
+
+    #[test]
+    fn every_terminal_revert_decodes_from_its_raw_data() {
+        for name in TERMINAL_SLASH_SUBMISSION_ERRORS {
+            let decoded = raw_revert(name);
+            assert!(
+                slash_submission_error_is_terminal(&decoded),
+                "{name} does not stop the retries: {decoded}"
+            );
+        }
+        let decoded = raw_revert("AccusationIssuedInFuture");
+        assert!(decoded.contains("AccusationIssuedInFuture"), "{decoded}");
+        assert!(!slash_submission_error_is_terminal(&decoded));
     }
 }
