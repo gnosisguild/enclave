@@ -301,7 +301,11 @@ every section.
   constrains its own quotient and remainder. The l-BFV path's `decrypted_shares_aggregation_wide`
   proves the same statement for Q near 2^250: `garner_mixed_radix` keeps every reduction below 128
   bits, `exact_q_total` proves Q is below the field, and the decode divides in U384 with the
-  constrained `udiv_mod`. — `flow-trace/04`
+  constrained `udiv_mod`. Every input to the bounded helpers must also have a quotient under
+  `BIT_K`, or valid inputs cannot be proven. Both variants share `lagrange_coefficients`, which
+  reduces its products after every factor, so their quotients stay below the largest party id for
+  any committee. Unreduced, the product of the other ids reaches `n! / (n - T)!` (about 2^35 at 19
+  parties). — `flow-trace/04`
 - **`ModU128::reduce_mod` does not pin its remainder; use `reduce_mod_bounded` for anything a prover
   controls.** It asserts `n == q * quotient + remainder` with `remainder < q` but never bounds the
   quotient, and the equation is over the field — so a prover picks any `remainder` in `[0, q)` and
