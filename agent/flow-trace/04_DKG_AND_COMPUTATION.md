@@ -35,8 +35,9 @@ CiphernodeSelected event arrives at ThresholdKeyshare
 │   ├─ 1. Create child actors:
 │   │     ├─ EncryptionKeyCollector (accepts all N keys or at least H at cutoff)
 │   │     └─ ThresholdShareCollector (accepts all N−1 external shares or at least H−1 at cutoff)
-│   │     → These collectors start immediately so early peer keys/shares can
-│   │       be buffered while this node is still finishing earlier DKG phases
+│   │     → Once effects run, these collectors start immediately so early peer
+│   │       keys/shares can be buffered while this node is still finishing earlier
+│   │       DKG phases
 │   │     → A peer key that arrives in `Init` is only recorded.
 │   │       `replay_encryption_keys` sends every recorded key to the new
 │   │       EncryptionKeyCollector, as restart recovery does
