@@ -556,6 +556,13 @@ These events show the progress of an E3 in the node log:
 | `PlaintextOutputPublished`  | The result is on-chain.                                   |
 | `E3RequestComplete`         | The node started its cleanup for the E3.                  |
 
+The node writes one heartbeat file for each chain after every successful read of the chain head:
+`chain-<chain ID>.heartbeat` in `ingestion/` in the node data directory, for example
+`data/_default/ingestion/chain-1.heartbeat`. The file holds `key=value` lines: `chain_id`, `head`,
+`cursor`, `polled_at`, and `progressed_at` (Unix seconds). A monitoring script can read these files,
+and they need no RPC request. The DAppNode health check fails when `polled_at` is older than 120
+seconds, or when `progressed_at` is older than 10 minutes.
+
 When the node runs, some commands run inside the node through the local control port:
 `ciphernode status`, `wallet get`, `net get-peer-id`, `config get`, `rev`,
 `print-env --chain <name>`, `noir status`, and `events query`. See

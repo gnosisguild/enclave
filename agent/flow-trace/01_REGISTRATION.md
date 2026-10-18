@@ -205,10 +205,14 @@ User runs: interfold ciphernode status
 │   └─ bondingRegistry.eligibilityAt(operator, latest block timestamp) → eligible for new
 │       committees (admission cooldown and policy applied; `active` alone does not include them)
 │
-├─ Lists the committees that hold the collateral:
+├─ Lists the committees that hold the collateral (`--no-committees` skips this step):
 │   e3_evm::fetch_operator_committees()  (crates/evm/src/operator_status.rs)
-│   ├─ eth_getLogs BondingRegistry.CommitteeObligationUpdated with topic3 = operator,
-│   │   from bonding_registry.deploy_block (block 0 when unset) to head (adaptive window)
+│   ├─ eth_getLogs BondingRegistry.CommitteeObligationUpdated with topic3 = operator, to the
+│   │   confirmed head (head − ingestion_confirmations), adaptive window
+│   ├─ Resumes the saved scan <node data dir>/committee-scans/ (operator_status/scan_cache.rs)
+│   │   when the provider still has its last block under the saved hash, before and after the
+│   │   read; otherwise reads from bonding_registry.deploy_block (block 0 when unset). Saves the
+│   │   new last block.
 │   ├─ The last update of each E3 in chain order decides whether its obligation is open
 │   └─ For each open E3:
 │       ├─ registry (from the event).isCommitteeMemberActive / isCommitteeMember
