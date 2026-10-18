@@ -105,9 +105,9 @@ const ALLOWED: Record<string, string> = {
   // it. Until then no check can tell a correct value here from a stale one.
   '0xe172e9b6cfbeeb5593bdce3f077356fdb33af904': 'InterfoldToken (FOLD), mainnet — no top-level deployment record',
 
-  // Not an address: the first 20 bytes of the 32-byte RISC Zero guest image ID that the mainnet
-  // Risc0BfvCiphertextVerifier checks. The address pattern matches the start of the hash.
-  '0x9d3e21fd7cc08e629cb467e5ca6bfc8e1a645b48': 'prefix of the mainnet ciphertext guest image ID (a hash, not an address)',
+  // Not an address: the first 20 bytes of the 32-byte OpenVM guest image ID that the mainnet
+  // OpenVmBfvCiphertextVerifier checks. The address pattern matches the start of the hash.
+  '0x126eb3ea8c2d24cbf8e89f7e41dd2f0be5050be7': 'prefix of the mainnet ciphertext guest image ID (a hash, not an address)',
 
   // Deterministic Anvil accounts used by the local CRISP stack.
   '0x70997970c51812dc3a010c7d01b50e0d17dc79c8': 'Anvil account 1',
