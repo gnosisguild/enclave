@@ -207,15 +207,20 @@ User runs: interfold ciphernode status
 │
 ├─ Lists the committees that hold the collateral (`--no-committees` skips this step):
 │   e3_evm::fetch_operator_committees()  (crates/evm/src/operator_status.rs)
+│   ├─ BondingRegistry.unresolvedCommitteesOf, then committeeObligationAt for each index below
+│   │   it, at the hash of the confirmed head (head − ingestion_confirmations): when every index
+│   │   answers, no events are read. Any failed read falls through to the event scan: a registry
+│   │   without the views, an index that reverts with CommitteeObligationNotTracked (a
+│   │   pre-upgrade committee), or an RPC error:
 │   ├─ eth_getLogs BondingRegistry.CommitteeObligationUpdated with topic3 = operator, to the
-│   │   confirmed head (head − ingestion_confirmations), adaptive window
+│   │   confirmed head, adaptive window
 │   ├─ Resumes the saved scan <node data dir>/committee-scans/ (operator_status/scan_cache.rs)
 │   │   when the provider still has its last block under the saved hash, before and after the
 │   │   read; otherwise reads from bonding_registry.deploy_block (block 0 when unset). Saves the
 │   │   new last block.
 │   ├─ The last update of each E3 in chain order decides whether its obligation is open
 │   └─ For each open E3:
-│       ├─ registry (from the event).isCommitteeMemberActive / isCommitteeMember
+│       ├─ registry (from the view or the event).isCommitteeMemberActive / isCommitteeMember
 │       │   → member, expelled, or sortition candidate
 │       └─ interfold.getE3Stage(e3Id)
 │

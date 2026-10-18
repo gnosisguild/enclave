@@ -590,12 +590,15 @@ The output shows these values:
 A committee stays in the list until `releaseCommittee(e3Id)` releases it, also after its E3 is
 complete or failed. A `candidate` holds a provisional seat while the sortition of the E3 is open.
 
-To find the committees, the command reads the `CommitteeObligationUpdated` events of
-`BondingRegistry`. The first run reads from the `deploy_block` of the contract. When the
-configuration has no `deploy_block` for `bonding_registry`, the read starts at block 0. The first
-run sends one `eth_getLogs` request for each 10,000 blocks (or the chain's `rpc_log_range_blocks`),
-or for each smaller range that the RPC endpoint accepts. Thus the first run can take some seconds,
-and longer on an endpoint with a small range limit.
+To find the committees, the command reads the `unresolvedCommitteesOf` and `committeeObligationAt`
+views of `BondingRegistry`: one block read, one call for the number, and one call for each
+committee. These calls read no event history. A registry deployed before these views, or one that
+holds committees requested before them, does not list every committee. The command then reads the
+`CommitteeObligationUpdated` events of `BondingRegistry`. The first run reads from the
+`deploy_block` of the contract. When the configuration has no `deploy_block` for `bonding_registry`,
+the read starts at block 0. The first run sends one `eth_getLogs` request for each 10,000 blocks (or
+the chain's `rpc_log_range_blocks`), or for each smaller range that the RPC endpoint accepts. Thus
+the first run can take some seconds, and longer on an endpoint with a small range limit.
 
 The command saves the result in `committee-scans/` in the node data directory, one file for each
 operator. A later run reads only the blocks after the saved block: usually one `eth_getLogs`

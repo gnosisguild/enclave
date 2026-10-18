@@ -16,6 +16,7 @@ use crate::{
     ProviderConfig,
 };
 use alloy::{
+    eips::BlockId,
     primitives::{Address, U256},
     providers::Provider,
     rpc::types::{Filter, Log},
@@ -152,13 +153,14 @@ pub struct CommitteeScan {
 
 /// Lists the committees that hold `operator`'s collateral, in E3 ID order.
 ///
-/// `BondingRegistry` has no view of the obligations of one operator. It emits
-/// `CommitteeObligationUpdated`, with the operator as an indexed topic, each time a registry opens
-/// or releases an obligation, so the last event for an E3 tells whether the obligation is open. An
-/// open obligation makes an exit claim revert with `OperatorInActiveCommittee`.
-///
-/// The history grows with the chain, and scripts run `ciphernode status` often, so the scan saves
-/// its progress and the next call reads only the new blocks. See [`scan_open_obligations`].
+/// An open obligation makes an exit claim revert with `OperatorInActiveCommittee`. The bonding
+/// registry indexes the open obligations of an operator in `committeeObligationAt`, which
+/// [`tracked_obligations`] reads. A registry deployed before that view, or one with committees
+/// requested before it, needs the events instead: the registry emits `CommitteeObligationUpdated`,
+/// with the operator as an indexed topic, each time it opens or releases an obligation, so the
+/// last event for an E3 tells whether the obligation is open. That history grows with the chain,
+/// and scripts run `ciphernode status` often, so the scan saves its progress and the next call
+/// reads only the new blocks. See [`scan_open_obligations`].
 pub async fn fetch_operator_committees<P: Provider + Clone>(
     provider: &P,
     contracts: &ContractAddresses,
@@ -170,18 +172,26 @@ pub async fn fetch_operator_committees<P: Provider + Clone>(
         .address()
         .context("invalid interfold address")?;
     let interfold = IInterfold::new(interfold, provider.clone());
-    let key = ScanKey {
-        chain_id: provider.get_chain_id().await?,
-        bonding_registry: contracts
-            .bonding_registry
-            .address()
-            .context("invalid bonding_registry address")?,
-        deploy_block: contracts.bonding_registry.deploy_block().unwrap_or(0),
-        operator,
-    };
+    let bonding_registry = contracts
+        .bonding_registry
+        .address()
+        .context("invalid bonding_registry address")?;
+    let open =
+        match tracked_obligations(provider, bonding_registry, operator, scan.confirmations).await {
+            Some(open) => open,
+            None => {
+                let key = ScanKey {
+                    chain_id: provider.get_chain_id().await?,
+                    bonding_registry,
+                    deploy_block: contracts.bonding_registry.deploy_block().unwrap_or(0),
+                    operator,
+                };
+                scan_open_obligations(provider, &key, scan).await?
+            }
+        };
 
     let mut committees = Vec::new();
-    for (e3_id, registry) in scan_open_obligations(provider, &key, scan).await? {
+    for (e3_id, registry) in open {
         // The registry that opened the obligation owns the committee of that E3.
         let registry = ICiphernodeRegistry::new(registry, provider.clone());
         let (active, member, stage) = tokio::try_join!(
@@ -209,6 +219,64 @@ pub async fn fetch_operator_committees<P: Provider + Clone>(
         });
     }
     Ok(committees)
+}
+
+/// The open obligations of `operator` from the views of the bonding registry, by E3 ID, with the
+/// registry that owns each committee.
+///
+/// All views are read at the confirmed head, the block where the event scan stops, named by its
+/// hash ([`confirmed_block`]). The registry indexes only the committees that it tracks, which are
+/// some of the open ones, so an obligation at every index below `unresolvedCommitteesOf` means that
+/// it tracks them all. Returns `None` when a read fails: the registry has no such views, as a
+/// registry deployed before them, or an index reverts because the operator is in a committee
+/// requested before the registry tracked them, and only the events list it.
+async fn tracked_obligations<P: Provider + Clone>(
+    provider: &P,
+    bonding_registry: Address,
+    operator: Address,
+    confirmations: u64,
+) -> Option<BTreeMap<U256, Address>> {
+    let bonding = IBondingRegistry::new(bonding_registry, provider.clone());
+    let reads = async {
+        let block = confirmed_block(provider, confirmations).await?;
+        let count: u64 = bonding
+            .unresolvedCommitteesOf(operator)
+            .block(block)
+            .call()
+            .await?
+            .try_into()?;
+        let mut open = BTreeMap::new();
+        for index in 0..count {
+            let obligation = bonding
+                .committeeObligationAt(operator, U256::from(index))
+                .block(block)
+                .call()
+                .await?;
+            open.insert(obligation.e3Id, obligation.registry);
+        }
+        anyhow::ensure!(
+            open.len() as u64 == count,
+            "the registry indexed an E3 twice"
+        );
+        anyhow::Ok(open)
+    };
+    reads
+        .await
+        .inspect_err(|error| {
+            debug!(%error, "Bonding registry obligation views incomplete; reading the events");
+        })
+        .ok()
+}
+
+/// The confirmed head, named by its hash: two branches hold different states at one height, and a
+/// load-balanced endpoint can serve both, so reads at one number can see two states.
+async fn confirmed_block<P: Provider>(provider: &P, confirmations: u64) -> anyhow::Result<BlockId> {
+    let number = confirmed_head(provider.get_block_number().await?, confirmations);
+    let block = provider
+        .get_block_by_number(number.into())
+        .await?
+        .with_context(|| format!("the provider has no block {number}"))?;
+    Ok(BlockId::hash_canonical(block.header.hash))
 }
 
 /// Returns the obligations of `key.operator` that are open at the confirmed head, by E3 ID, with
@@ -313,8 +381,18 @@ fn apply_obligation_updates(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy::primitives::B256;
+    use alloy::{
+        primitives::{Bytes, B256},
+        providers::ProviderBuilder,
+        rpc::{
+            client::RpcClient,
+            json_rpc::{RequestPacket, Response, ResponsePacket, ResponsePayload},
+        },
+        sol_types::{SolCall, SolValue},
+        transports::{TransportErrorKind, TransportFut},
+    };
     use async_trait::async_trait;
+    use serde_json::value::RawValue;
     use std::sync::Mutex;
 
     /// A chain that serves `logs` by block range and counts the `eth_getLogs` requests. Each block
@@ -509,6 +587,101 @@ mod tests {
             "the saved scan is of the new branch"
         );
         assert_eq!(chain.get_logs_calls(), 22);
+    }
+
+    /// A node at height 100 that serves the obligation views of `obligations`, with `count` as the
+    /// operator's count, and checks that every view call names the confirmed head by its hash. An
+    /// index past `obligations` reverts.
+    fn views_node(count: u64, obligations: Vec<(u64, Address)>) -> impl Provider + Clone {
+        let block_hash = B256::repeat_byte(0x42);
+        let transport = tower::service_fn(move |packet: RequestPacket| -> TransportFut<'static> {
+            let obligations = obligations.clone();
+            Box::pin(async move {
+                let RequestPacket::Single(request) = packet else {
+                    panic!("unexpected RPC batch")
+                };
+                let params: serde_json::Value = request
+                    .params()
+                    .map(|params| serde_json::from_str(params.get()).unwrap())
+                    .unwrap_or_default();
+                let result = match request.method() {
+                    "eth_blockNumber" => serde_json::json!("0x64"),
+                    "eth_getBlockByNumber" => {
+                        assert_eq!(params[0], "0x63", "the head minus one confirmation");
+                        let mut block: alloy::rpc::types::Block = Default::default();
+                        block.header.hash = block_hash;
+                        serde_json::to_value(block).unwrap()
+                    }
+                    "eth_call" => {
+                        let at = serde_json::to_value(BlockId::hash_canonical(block_hash)).unwrap();
+                        assert_eq!(params[1], at, "a view read at another block");
+                        let input = params[0]["input"]
+                            .as_str()
+                            .or_else(|| params[0]["data"].as_str())
+                            .unwrap();
+                        let input = hex::decode(input.trim_start_matches("0x")).unwrap();
+                        if input
+                            .starts_with(&IBondingRegistry::unresolvedCommitteesOfCall::SELECTOR)
+                        {
+                            serde_json::json!(Bytes::from(U256::from(count).abi_encode()))
+                        } else {
+                            let call =
+                                IBondingRegistry::committeeObligationAtCall::abi_decode(&input)
+                                    .unwrap();
+                            let Some(&(e3_id, registry)) =
+                                obligations.get(call.index.to::<usize>())
+                            else {
+                                return Err(TransportErrorKind::custom_str("execution reverted"));
+                            };
+                            serde_json::json!(Bytes::from(
+                                (U256::from(e3_id), registry).abi_encode_params()
+                            ))
+                        }
+                    }
+                    method => panic!("unexpected RPC {method}"),
+                };
+                Ok(ResponsePacket::Single(Response {
+                    id: request.id().clone(),
+                    payload: ResponsePayload::Success(
+                        RawValue::from_string(result.to_string()).unwrap(),
+                    ),
+                }))
+            })
+        });
+        ProviderBuilder::new().connect_client(RpcClient::new(transport, true))
+    }
+
+    #[tokio::test]
+    async fn the_views_list_every_obligation() {
+        let (registry, operator) = (Address::repeat_byte(0x01), Address::repeat_byte(0xaa));
+        let node = views_node(2, vec![(9, registry), (7, registry)]);
+
+        let open = tracked_obligations(&node, Address::ZERO, operator, 1).await;
+        assert_eq!(
+            open,
+            Some(BTreeMap::from([
+                (U256::from(7), registry),
+                (U256::from(9), registry)
+            ]))
+        );
+    }
+
+    /// The registry tracks only the committees requested after its upgrade. An index of an
+    /// untracked one reverts, and an index that answers twice for one E3 leaves another out.
+    #[tokio::test]
+    async fn an_incomplete_index_falls_back_to_the_events() {
+        let (registry, operator) = (Address::repeat_byte(0x01), Address::repeat_byte(0xaa));
+        let untracked = views_node(2, vec![(7, registry)]);
+        assert_eq!(
+            tracked_obligations(&untracked, Address::ZERO, operator, 1).await,
+            None
+        );
+
+        let repeated = views_node(2, vec![(7, registry), (7, registry)]);
+        assert_eq!(
+            tracked_obligations(&repeated, Address::ZERO, operator, 1).await,
+            None
+        );
     }
 
     fn obligation_log(block: u64, index: u64, e3_id: u64, registry: Address, active: bool) -> Log {
