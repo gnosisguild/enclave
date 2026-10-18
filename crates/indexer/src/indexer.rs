@@ -14,7 +14,7 @@ use alloy::consensus::BlockHeader;
 use alloy::hex;
 use alloy::primitives::{keccak256, Address, Uint, B256};
 use alloy::providers::Provider;
-use alloy::sol_types::{SolEvent, SolValue};
+use alloy::sol_types::SolEvent;
 use async_trait::async_trait;
 use e3_bfv_client::validate_pk_commitment;
 use e3_evm_helpers::{
@@ -427,20 +427,9 @@ fn request_bfv_params(
     request_config_id: B256,
     historical_params: Option<&[u8]>,
 ) -> Result<Vec<u8>> {
-    let config_id = |params: &[u8], version: &[u8]| {
-        keccak256(
-            (
-                keccak256(b"fhe.rs:BFV"),
-                keccak256(params),
-                keccak256(version),
-            )
-                .abi_encode(),
-        )
-    };
-
     if let Some(preset) = BfvPreset::from_on_chain_param_set(param_set) {
         let params = encode_bfv_params(&BfvParamSet::from(preset).build_arc());
-        if request_config_id == config_id(&params, b"interfold-bfv-v5") {
+        if request_config_id == e3_fhe_params::crypto_config_id(&params) {
             return Ok(params);
         }
     }
@@ -454,7 +443,8 @@ fn request_bfv_params(
         .ok_or_else(|| eyre!("historical BFV parameter set {param_set} is not registered"))?;
     decode_bfv_params(params)
         .map_err(|error| eyre!("invalid historical BFV parameters: {error}"))?;
-    if request_config_id != config_id(params, b"interfold-bfv-v1") {
+    if request_config_id != e3_fhe_params::crypto_config_id_with_label(params, b"interfold-bfv-v1")
+    {
         return Err(eyre!(
             "local circuit configuration does not match request-time config for parameter set {param_set}"
         ));
