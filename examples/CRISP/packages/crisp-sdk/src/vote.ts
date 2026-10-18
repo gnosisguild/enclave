@@ -157,7 +157,7 @@ export const generateProof = async (circuitInputs: any, censusMode: CensusVarian
   const crispBackend = new UltraHonkBackend((ballotCircuit as CompiledCircuit).bytecode, api)
   const foldBackend = new UltraHonkBackend((foldCircuitForMode as CompiledCircuit).bytecode, api)
 
-  const { proof: crispProof, publicInputs: crispPublicInputs } = await crispBackend.generateProof(crispWitness, {
+  const { proof: crispProof } = await crispBackend.generateProof(crispWitness, {
     verifierTarget: 'noir-recursive-no-zk',
   })
 
