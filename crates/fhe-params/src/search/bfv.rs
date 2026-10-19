@@ -26,7 +26,8 @@ use num_traits::ToPrimitive;
 use num_traits::Zero;
 use std::collections::HashSet;
 
-/// Fixed ring dimension used for both parameter sets.
+/// Smallest ring dimension served by the prime table, and the first d that the search tries
+/// when `BfvSearchConfig::d` is `None`. Smaller ring dimensions generate their primes.
 const RING_DIM: u64 = 8192;
 
 /// First-set largest prime bit-size. The 60-bit cap leaves 61/62-bit primes for the second set
@@ -40,7 +41,10 @@ const SECOND_MAX_PRIME_BITS: u8 = 62;
 const SECOND_TARGET_NUM_PRIMES: usize = 2;
 const SECOND_MAX_NUM_PRIMES: usize = 8;
 
-/// Primes generated per bit-length for ring dimensions below `RING_DIM`.
+/// Primes generated per bit-length for ring dimensions below `RING_DIM`: the 12 largest of each
+/// bit-length. The insecure presets were searched with this pool. The second set takes the
+/// smallest primes of the pool, so InsecureDkg64 is the 11th and 12th largest 29-bit primes, and a
+/// different count changes it.
 const GENERATED_PRIMES_PER_BITS: usize = 12;
 
 /// Configuration for BFV parameter search
@@ -67,9 +71,13 @@ pub struct BfvSearchConfig {
     pub insecure: bool,
     /// Levels of BFV multiplication and relinearization after the `z` additions. 0 is summation
     /// only. Each level applies the Prop. 20 noise recursion with the Eq. 30 relinearization noise.
+    /// The security limit on q assumes m = 2d LWE samples (`search::security`). The relinearization
+    /// keys expose more samples under the same secret, so estimate a set with `mult_depth > 0`
+    /// for its real key exposure before you use it.
     pub mult_depth: u32,
     /// Smallest prime bit-length for both parameter sets (10..=60). Ring dimensions below
-    /// `RING_DIM` generate their primes, so a toy preset can use primes below the table's 40 bits.
+    /// `RING_DIM` generate their primes, so a toy preset can use primes from 10 bits. For
+    /// d >= `RING_DIM` the table pool starts at 50 bits, so a value below 50 has no effect there.
     pub min_prime_bits: u8,
     /// Verbose output showing detailed parameter search process
     pub verbose: bool,
@@ -117,10 +125,10 @@ impl BfvSearchResult {
 /// Search for optimal BFV parameters that satisfy all security constraints.
 ///
 /// This function implements a search algorithm that:
-/// 1. Iterates through polynomial degrees d (powers of 2)
-/// 2. For each d, finds the maximum q under the Eq4 constraint
-/// 3. Validates the candidate against Eq1 (noise bound)
-/// 4. Refines the result by decreasing q to find the minimal valid parameters
+/// 1. Iterates through polynomial degrees d (powers of 2), or uses `BfvSearchConfig::d`
+/// 2. For each prime count from 3 to 6, scans the prime bit-lengths from smallest to largest
+/// 3. Pass 1 takes the largest primes of each bit-length under the Eq4 limit and validates them
+///    against Eq1. Pass 2, only when pass 1 finds nothing, tries every window under the limit
 ///
 /// Returns the first feasible parameter set found, or an error if none exist.
 ///
@@ -137,7 +145,8 @@ pub fn bfv_search(bfv_search_config: &BfvSearchConfig) -> BfvParamsResult<BfvSea
     }
 
     if let Some(d) = bfv_search_config.d {
-        if !d.is_power_of_two() || !(4..=D_POW2_MAX).contains(&d) {
+        // fhe.rs builds BFV parameters only for degree >= 8.
+        if !d.is_power_of_two() || !(8..=D_POW2_MAX).contains(&d) {
             return Err(ValidationError::InvalidRingDimension { d }.into());
         }
     }
@@ -229,79 +238,86 @@ pub fn bfv_search(bfv_search_config: &BfvSearchConfig) -> BfvParamsResult<BfvSea
         // Try the fewest primes first, then the smallest prime bit-size that
         // meets the correctness bound. This mirrors the reference bucket scan.
         for num_primes in FIRST_TARGET_NUM_PRIMES..=FIRST_MAX_NUM_PRIMES {
-            if verbose {
-                println!("\n  === Trying {num_primes} primes ===");
-            }
-
-            for bb in min_prime_bits..=FIRST_MAX_PRIME_BITS {
-                let bucket = match by_bits_d.get(&bb) {
-                    Some(b) => b,
-                    None => continue,
-                };
-
-                if bucket.len() < num_primes {
-                    if verbose {
-                        println!(
-                            "  {} × {}-bit: only {} primes available (need {})",
-                            num_primes,
-                            bb,
-                            bucket.len(),
-                            num_primes
-                        );
-                    }
-                    continue;
+            // Two passes per prime count. Pass 1 takes, in each bucket, the largest primes under
+            // the security cap, as the presets do. Pass 2 runs only when pass 1 finds nothing and
+            // scans every window, so a smaller window whose r_k(q) = q mod k passes still counts
+            // before the search adds a prime.
+            for full_scan in [false, true] {
+                if verbose {
+                    let pass = if full_scan { " (all windows)" } else { "" };
+                    println!("\n  === Trying {num_primes} primes{pass} ===");
                 }
 
-                // Slide a window of `num_primes` over the descending bucket. The
-                // largest window is tried first; if it exceeds the security cap,
-                // smaller windows in the same bucket may still fit
-                // [min_log2_q, log2_q_limit]. The first window under the cap decides
-                // the bucket: if it fails correctness, the search moves to the next
-                // bucket. A smaller window can pass only through a smaller
-                // r_k(q) = q mod k, and the presets take the largest primes instead.
-                for start in 0..=(bucket.len() - num_primes) {
-                    let sel: Vec<PrimeItem> = bucket[start..start + num_primes].to_vec();
-                    let q = sel.iter().map(|pi| &pi.value).product::<BigUint>();
-                    let q_bits = log2_big(&q);
-                    let max_qi_log2 = sel.iter().map(|p| p.log2).fold(0.0_f64, f64::max);
+                for bb in min_prime_bits..=FIRST_MAX_PRIME_BITS {
+                    let bucket = match by_bits_d.get(&bb) {
+                        Some(b) => b,
+                        None => continue,
+                    };
 
-                    // Because the bucket is descending, later windows only get smaller.
-                    if q_bits < min_log2_q {
+                    if bucket.len() < num_primes {
                         if verbose {
                             println!(
-                                "  {} × {}-bit: log2(q)={:.2} < {:.1} needed, abandoning bucket",
-                                num_primes, bb, q_bits, min_log2_q
-                            );
-                        }
-                        break;
-                    }
-
-                    if q_bits > log2_q_limit && !bfv_search_config.insecure {
-                        if verbose {
-                            println!(
-                                "  {} × {}-bit: log2(q)={:.2} > {:.1} security limit, trying smaller primes",
-                                num_primes, bb, q_bits, log2_q_limit
+                                "  {} × {}-bit: only {} primes available (need {})",
+                                num_primes,
+                                bb,
+                                bucket.len(),
+                                num_primes
                             );
                         }
                         continue;
                     }
 
-                    if let Some(res) = finalize_bfv_candidate(bfv_search_config, d, sel) {
-                        if verbose {
-                            println!(
+                    // Slide a window of `num_primes` over the descending bucket. The
+                    // largest window is tried first; if it exceeds the security cap,
+                    // smaller windows in the same bucket may still fit
+                    // [min_log2_q, log2_q_limit]. In pass 1 the first window under the cap
+                    // decides the bucket; in pass 2 the search keeps sliding.
+                    for start in 0..=(bucket.len() - num_primes) {
+                        let sel: Vec<PrimeItem> = bucket[start..start + num_primes].to_vec();
+                        let q = sel.iter().map(|pi| &pi.value).product::<BigUint>();
+                        let q_bits = log2_big(&q);
+                        let max_qi_log2 = sel.iter().map(|p| p.log2).fold(0.0_f64, f64::max);
+
+                        // Because the bucket is descending, later windows only get smaller.
+                        if q_bits < min_log2_q {
+                            if verbose {
+                                println!(
+                                "  {} × {}-bit: log2(q)={:.2} < {:.1} needed, abandoning bucket",
+                                num_primes, bb, q_bits, min_log2_q
+                            );
+                            }
+                            break;
+                        }
+
+                        if q_bits > log2_q_limit && !bfv_search_config.insecure {
+                            if verbose {
+                                println!(
+                                "  {} × {}-bit: log2(q)={:.2} > {:.1} security limit, trying smaller primes",
+                                num_primes, bb, q_bits, log2_q_limit
+                            );
+                            }
+                            continue;
+                        }
+
+                        if let Some(res) = finalize_bfv_candidate(bfv_search_config, d, sel) {
+                            if verbose {
+                                println!(
                                 "\n✓ Found first set: {} × {}-bit primes, d={}, log2(q)={:.2}, max_qi={:.2} bits",
                                 num_primes, bb, d, q_bits, max_qi_log2
                             );
+                            }
+                            return Ok(res);
                         }
-                        return Ok(res);
-                    }
-                    if verbose {
-                        println!(
+                        if verbose {
+                            println!(
                             "  {} × {}-bit: log2(q)={:.2} ❌ fails correctness or margin < {:.1} bits",
                             num_primes, bb, q_bits, bfv_search_config.min_margin
                         );
+                        }
+                        if !full_scan {
+                            break;
+                        }
                     }
-                    break;
                 }
             }
         }
@@ -360,7 +376,6 @@ fn calculate_min_q_bits(bfv_search_config: &BfvSearchConfig, d: u64) -> f64 {
     lhs_log2 + log2_k
 }
 
-/// Group primes by bit-length, sorting each bucket descending by value.
 /// Smudging noise bound `B_sm = 2^(λ+1) · d · B_C`.
 ///
 /// fhe.rs derives the additive smudging bound with this formula, and the C1 circuit config
@@ -380,8 +395,8 @@ fn smudging_bound(b_c: &BigUint, lambda: u32, d: u64) -> BigUint {
 fn relin_bound(config: &BfvSearchConfig, d: u64, l: u64, b_g: &BigUint) -> BigUint {
     let d_big = BigUint::from(d);
     let l_big = BigUint::from(l);
-    let sk_norm = BigUint::from(config.n * config.b_chi);
-    let b_agg = BigUint::from(config.n * config.b);
+    let sk_norm = BigUint::from(config.n) * BigUint::from(config.b_chi);
+    let b_agg = BigUint::from(config.n) * BigUint::from(config.b);
     let term1 = &d_big * &l_big * &sk_norm * b_g * &b_agg;
     let term2 = BigUint::from(2u32)
         * &d_big
@@ -414,7 +429,8 @@ fn mult_noise(
         * BigUint::from(k)
         * BigUint::from(d)
         * BigUint::from(d)
-        * BigUint::from(config.n * config.b_chi);
+        * BigUint::from(config.n)
+        * BigUint::from(config.b_chi);
     let mut b_c_final = b_c.clone();
     for _ in 0..config.mult_depth {
         b_c_final = &coeff * &b_c_final + &b_relin;
@@ -422,6 +438,7 @@ fn mult_noise(
     (b_c_final, b_relin)
 }
 
+/// Group primes by bit-length, sorting each bucket descending by value.
 fn group_by_bits_desc(prime_items: &[PrimeItem]) -> BTreeMap<u8, Vec<PrimeItem>> {
     let mut by_bits: BTreeMap<u8, Vec<PrimeItem>> = BTreeMap::new();
     for p in prime_items {
@@ -660,9 +677,11 @@ pub fn construct_qi_for_target_bits(
 ///
 /// The plaintext modulus k is set to the actual maximum qi value of the first set.
 /// fhe.rs centered RNS requires every second-set qi > 2*k (the "large gap" rule),
-/// and second-set primes must be disjoint from the first set. The smallest valid
-/// primes (fewest and smallest) that satisfy correctness are chosen. Uses a
-/// separate prime pool that includes 62-bit primes.
+/// and second-set primes must be disjoint from the first set. The fewest and smallest
+/// primes of the pool that satisfy correctness are chosen. For d >= 8192 the pool is the
+/// table, which includes 62-bit primes. For a smaller d it holds the 12 largest generated
+/// primes of each bit-length, so the choice is the smallest of those 12, not the smallest
+/// valid prime overall.
 pub fn bfv_search_second_param(
     bfv_search_config: &BfvSearchConfig,
     first: &BfvSearchResult,
@@ -1075,7 +1094,7 @@ mod tests {
     #[test]
     fn search_reproduces_insecure_presets() {
         use crate::constants::insecure_64;
-        use crate::search::utils::variance_uniform_sym;
+        use crate::search::utils::{variance_cbd_str, variance_uniform_sym};
 
         let mut config = preset_config(crate::presets::BfvPreset::InsecureThreshold64);
         config.d = Some(insecure_64::DEGREE as u64);
@@ -1101,6 +1120,10 @@ mod tests {
             second.k_plain_eff,
             insecure_64::dkg::PLAINTEXT_MODULUS as u128
         );
+        assert_eq!(
+            variance_cbd_str(config.b),
+            insecure_64::dkg::ERROR1_VARIANCE
+        );
 
         // The security limit rejects every q at d = 64.
         config.insecure = false;
@@ -1110,7 +1133,7 @@ mod tests {
     #[test]
     fn search_reproduces_secure_presets() {
         use crate::constants::secure_8192;
-        use crate::search::utils::variance_uniform_sym;
+        use crate::search::utils::{variance_cbd_str, variance_uniform_sym};
 
         let config = preset_config(crate::presets::BfvPreset::SecureThreshold8192);
         let first = bfv_search(&config).expect("secure threshold set must be feasible");
@@ -1132,6 +1155,24 @@ mod tests {
             second.k_plain_eff,
             secure_8192::dkg::PLAINTEXT_MODULUS as u128
         );
+        assert_eq!(
+            variance_cbd_str(config.b),
+            secure_8192::dkg::ERROR1_VARIANCE
+        );
+
+        // The search's smudging bound is the one fhe.rs computes for the built preset.
+        let preset = crate::presets::BfvPreset::SecureThreshold8192;
+        let sm_config = fhe::trbfv::SmudgingBoundCalculatorConfig::new(
+            crate::presets::BfvParamSet::from(preset).build_arc(),
+            config.n as usize,
+            config.z as usize,
+            preset.lambda().unwrap(),
+        )
+        .unwrap();
+        let fhe_b_sm = fhe::trbfv::SmudgingBoundCalculator::new(sm_config)
+            .calculate_sm_bound()
+            .unwrap();
+        assert_eq!(first.b_sm_min, fhe_b_sm);
     }
 
     #[test]
@@ -1204,6 +1245,34 @@ mod tests {
             "2915363831777978269497576960"
         );
         assert!(result.lhs_log2 + config.min_margin <= result.rhs_log2);
+    }
+
+    #[test]
+    fn search_scans_every_window_before_adding_a_prime() {
+        // At this k, the largest 3 × 60-bit window misses the 2-bit margin by about 5e-6 bits,
+        // and the next window passes. Pass 1 rejects the bucket; pass 2 must find the 3-prime
+        // set before the search moves to 4 primes.
+        let mut config = preset_config(crate::presets::BfvPreset::SecureThreshold8192);
+        config.n = 1;
+        config.z = 1;
+        config.k = 3_601_790_000_000_000;
+        for min_prime_bits in [60, 50] {
+            config.min_prime_bits = min_prime_bits;
+            let result = bfv_search(&config).expect("a 3-prime set exists");
+            assert_eq!(result.selected_primes.len(), 3);
+            assert!(result.selected_primes.iter().all(|p| p.bitlen == 60));
+        }
+    }
+
+    #[test]
+    fn search_rejects_ring_dimensions_fhe_rs_cannot_build() {
+        let mut config = preset_config(crate::presets::BfvPreset::InsecureThreshold64);
+        config.insecure = true;
+        config.min_prime_bits = 12;
+        config.d = Some(4);
+        assert!(bfv_search(&config).is_err());
+        config.d = Some(8);
+        assert!(bfv_search(&config).is_ok());
     }
 
     fn create_test_config() -> BfvSearchConfig {

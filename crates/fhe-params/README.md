@@ -89,7 +89,9 @@ The search validates four key security equations:
   `search::security` holds the largest log2(q) with at least 128 bits of security at each
   d = 4096 ... 32768. The values come from the lattice-estimator. For other B, B_χ or d, the search
   uses `d ≥ 37.5*log2(q/B) + 75` and the CLI prints a warning. That formula allows 5 to 9 more bits
-  of q than the estimator.
+  of q than the estimator. The table assumes that an attacker sees m = 2d LWE samples. With
+  `mult_depth > 0`, the relinearization keys give more samples under the same secret, so estimate
+  such a set for its real key exposure before you use it.
 
 #### Search Parameters
 
@@ -104,7 +106,8 @@ The `BfvSearchConfig` struct defines the search constraints:
 - **`min_margin`**: Minimum correctness margin in bits, `log2(Δ) - log2(LHS)`
 - **`d`**: Ring dimension. `None` searches d = 8192, 16384 and 32768
 - **`insecure`**: Skip the security limit (Eq4). Only for insecure test presets
-- **`min_prime_bits`**: Smallest prime bit-length for both parameter sets (10 to 60)
+- **`min_prime_bits`**: Smallest prime bit-length for both parameter sets (10 to 60). For
+  d ≥ 8192 the prime table starts at 50 bits, so a value below 50 has no effect there
 - **`mult_depth`**: Levels of multiplication and relinearization after the `z` additions. `0` is
   summation only
 - **`verbose`**: Enable detailed search process output
@@ -212,6 +215,10 @@ let config = BfvSearchConfig {
     b: 20,            // Error bound
     b_chi: 1,         // Secret key bound
     min_margin: 2.0,  // Correctness margin in bits
+    d: None,          // Try d = 8192, 16384, 32768
+    insecure: false,  // Enforce the security limit
+    mult_depth: 0,    // Summation only
+    min_prime_bits: 50,
     verbose: true,    // Show detailed output
 };
 

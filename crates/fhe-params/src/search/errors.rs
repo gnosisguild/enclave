@@ -40,7 +40,7 @@ pub enum ValidationError {
     #[error("Invalid number of votes: {z} - {reason}")]
     InvalidVotes { z: u128, reason: String },
     /// Ring dimension that is not a power of two in 4..=32768
-    #[error("Invalid ring dimension: {d} - must be a power of two in 4..=32768")]
+    #[error("Invalid ring dimension: {d} - must be a power of two in 8..=32768")]
     InvalidRingDimension { d: u64 },
     /// Smallest prime bit-length outside the range that the search supports
     #[error("Invalid minimum prime size: {bits} bits - {reason}")]

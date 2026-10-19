@@ -17,14 +17,13 @@ use e3_fhe_params::search::bfv::{
 use e3_fhe_params::search::constants::{DEFAULT_MIN_PRIME_BITS, K_MAX, MIN_MARGIN_BITS};
 use e3_fhe_params::search::prime::{build_prime_items, build_prime_items_for_second};
 use e3_fhe_params::search::security::{max_log2_q, LimitSource};
-use e3_fhe_params::search::utils::{approx_bits_from_log2, fmt_big_summary, variance_uniform_sym};
+use e3_fhe_params::search::utils::{
+    approx_bits_from_log2, fmt_big_summary, variance_cbd_str, variance_uniform_sym,
+};
 use num_bigint::BigUint;
 
 #[derive(Parser, Debug, Clone)]
-#[command(
-    version,
-    about = "Search BFV params with NTT-friendly CRT primes (40..63 bits)"
-)]
+#[command(version, about = "Search BFV params with NTT-friendly CRT primes")]
 struct Args {
     /// Number of parties n (ciphernodes). Defaults to the SecureThreshold8192 search inputs.
     #[arg(long, default_value_t = SEARCH_N)]
@@ -62,7 +61,8 @@ struct Args {
     #[arg(long, action = clap::ArgAction::Set, default_value_t = false)]
     insecure: bool,
 
-    /// Smallest prime bit-length for both parameter sets (10..=60).
+    /// Smallest prime bit-length for both parameter sets (10..=60). For d >= 8192 the prime
+    /// table starts at 50 bits, so a value below 50 has no effect there.
     #[arg(long, default_value_t = DEFAULT_MIN_PRIME_BITS)]
     min_prime_bits: u8,
 
@@ -75,18 +75,8 @@ struct Args {
     verbose: bool,
 }
 
-fn variance_cbd_str(b: u128) -> String {
-    if b.is_multiple_of(2) {
-        (b / 2).to_string()
-    } else {
-        format!("{}/2", b)
-    }
-}
-
 fn variance_uniform_str(b: u128) -> String {
-    let b_big = BigUint::from(b);
-    let var = (&b_big * (b + 1)) / 3u32;
-    var.to_str_radix(10)
+    variance_uniform_sym(&BigUint::from(b)).to_str_radix(10)
 }
 
 fn variance_uniform_big_str(b: &BigUint) -> String {
@@ -255,12 +245,19 @@ fn main() {
         verbose: args.verbose,
     };
 
-    println!("Prime pools:");
-    println!("  First set:  {} primes", build_prime_items().len());
-    println!(
-        "  Second set: {} primes",
-        build_prime_items_for_second().len()
-    );
+    if args.d.is_none_or(|d| d >= 8192) {
+        println!("Prime pools (table, d >= 8192):");
+        println!("  First set:  {} primes", build_prime_items().len());
+        println!(
+            "  Second set: {} primes",
+            build_prime_items_for_second().len()
+        );
+    } else {
+        println!(
+            "Prime pools: generated for d = {} (p ≡ 1 mod 2d)",
+            args.d.unwrap_or_default()
+        );
+    }
 
     // Search for first parameter set
     if args.verbose {
