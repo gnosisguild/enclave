@@ -72,6 +72,16 @@ export function checkReleaseSafeguards(rootDir = ROOT_DIR) {
   requireText(candidateGate, 'build-binaries', 'publication can start without release binaries')
   requireText(candidateGate, 'download-circuits', 'publication can start without source-matched circuits')
 
+  // C-02: only the test-only archive may carry `test-only-skip-proof-aggregation`.
+  const binaries = jobSource(release, 'build-binaries')
+  requireText(binaries, 'test "$compiled" = "$FEATURES"', 'release archives do not check their compiled features')
+  requireText(binaries, 'interfold-test-only-*) ;;', 'a feature build can publish under a production archive name')
+  for (const asset of ['interfold-linux-x86_64', 'interfold-macos-aarch64']) {
+    if (!new RegExp(`asset: ${asset}\\n {12}features: ''\\n`).test(binaries)) {
+      fail(`the ${asset} release archive is not built without features`)
+    }
+  }
+
   requireText(release, 'Required circuit-artifacts branch is missing', 'missing circuit artifacts do not fail closed')
   requireText(release, 'if-no-files-found: error', 'missing release archives do not fail artifact upload')
   requireText(release, 'node scripts/release.mjs publish-npm', 'npm publication cannot resume safely')

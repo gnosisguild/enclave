@@ -623,7 +623,10 @@ every section.
   candidate cannot block a valid candidate from another member. — INDEX concerns #33, Z-31
 - **No proof-disabled bypass (C-02):** both final verifier calls are mandatory in production;
   `skip_proof_aggregation` works only under the `test-only-skip-proof-aggregation` Cargo feature;
-  mock placeholders carry the final roster or canonical decryption domain fields, but production
+  the release workflow builds that feature only into the
+  `interfold-test-only-skip-proof-aggregation-linux-x86_64` archive and checks `rev --features` of
+  every archive, and the install script and `interfold update` never select that archive; mock
+  placeholders carry the final roster or canonical decryption domain fields, but production
   verifiers reject their C5/C7 proof bytes. — INDEX concern #32
 - Circuit soundness fixes to preserve: `ModU64::div_mod` verifies
   `result*divisor == dividend (mod modulus)` (IF-001); C7 compares **every** decoded coefficient,

@@ -199,8 +199,8 @@ When the EVM buffer overflows during startup, the start fails. The node does not
 <Callout type='info'>
   `skip_proof_aggregation: true` skips recursive proof aggregation for DKG and decryption. The node
   refuses to start with this value unless the binary has the `test-only-skip-proof-aggregation`
-  Cargo feature. Release binaries do not have this feature. On-chain verification still applies, so
-  the value works only against mock verifiers.
+  Cargo feature. Of the release archives, only the test-only archive for Linux x86_64 has this
+  feature. On-chain verification still applies, so the value works only against mock verifiers.
 </Callout>
 
 ## Network profiles

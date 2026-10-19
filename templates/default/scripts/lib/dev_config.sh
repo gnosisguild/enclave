@@ -44,7 +44,7 @@ template_monorepo_build_available() {
 # monorepo checkout proves nothing about the binary on PATH: a stale or
 # release-profile install passes a checkout test and still rejects the feature at
 # startup. Ask the binary instead. `rev --features` needs no config and prints
-# nothing for a release build.
+# nothing for a binary built without features.
 template_cli_has_feature() {
   local feature="$1"
   local compiled
