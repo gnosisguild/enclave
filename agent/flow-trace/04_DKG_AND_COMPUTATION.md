@@ -446,7 +446,10 @@ change.
 Sequential C3, C6, and nodes folds expose the fixed `(leaf, fold, genesis)` VK hashes before
 `is_first_step` and `slot_index`. `predecessor_key_hash` requires the predecessor to carry the same
 three hashes. The first step verifies the genesis VK. Each continuation verifies the fold VK. The
-final consumer also requires the declared fold hash to match the VK that verified its proof.
+final consumer also requires the declared fold hash to match the VK that verified its proof. The
+l-BFV `c3_fold_chunked` keeps its own layout (child, predecessor, `is_first_step`, slot, genesis,
+fold) and maps it into the same `predecessor_key_hash` check, so its predecessor's three declared
+keys are checked on every step too.
 
 The kernel proves the chain's first leaf on its own, and its proof carries that leaf's row. Every
 fold step carries its predecessor's rows forward, the kernel's included, and puts its own leaf in an

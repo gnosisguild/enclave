@@ -500,8 +500,12 @@ every section.
 - **A fold step adds one leaf to an empty slot and keeps every other row.** The kernel proof holds
   the chain's first leaf, and the first fold step carries its rows like any predecessor's. A step
   that reset the rows when `is_first_step` is set would drop the kernel's leaf. A kernel proven at a
-  slot other than its leaf's would put the leaf in the wrong place. — `c3_fold`, `c3_fold_chunked`,
-  `c6_fold`, `nodes_fold`
+  slot other than its leaf's would put the leaf in the wrong place. Carrying rows forward is safe
+  only because every step checks all three declared keys of its predecessor
+  (`predecessor_key_hash`). A step that checks the kernel key only after a first step lets a genesis
+  proof from any circuit prefill rows: a later step swaps the declared kernel key back to the
+  canonical one, and the terminal fold looks canonical. — `c3_fold`, `c3_fold_chunked`, `c6_fold`,
+  `nodes_fold`
 - **PK domain binding (C-08):** `publishCommittee` sets
   `committeeHash = CommitteeHashLib.hash(c.topNodes)`: keccak256 over the ordered raw 20-byte
   addresses, not `abi.encodePacked(address[])`, which pads each address to 32 bytes.
