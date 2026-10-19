@@ -297,6 +297,28 @@ pnpm protocol --network localhost --action deploy --config packages/interfold-co
 This will ensure that you are a local node running, as well as that there are no
 conflicting deployments stored in localhost.
 
+### Deploying from the npm package
+
+The deploy scripts of the published package do not need an Interfold checkout.
+The package build writes the node release (version, protocol version and node
+generation) to `dist/node-release.json`, and the deploy reads it from there.
+
+With `ENABLE_ZK_VERIFICATION=true`, the deploy reads the VK hashes of the BFV
+aggregation circuits. Outside the monorepo, set `INTERFOLD_CIRCUITS_DIR` to a
+circuit directory in the release layout (`<preset>/<committee>/default/...`).
+The circuits must come from the release of the package version. Use one of these
+directories:
+
+- The `circuits/` directory of `circuits-<version>.tar.gz` from the GitHub
+  release.
+- The `circuits` directory that `interfold noir setup` of the same release
+  installs.
+
+The deploy uses the preset and committee of the generated `ACTIVE_BFV_*`
+constants in `scripts/utils.ts`, which `ActiveCryptoConfig.sol` also uses.
+Inside the monorepo, the deploy ignores `INTERFOLD_CIRCUITS_DIR` and reads its
+own circuit build.
+
 ## Configuration
 
 ### Using Environment Variables (Development)

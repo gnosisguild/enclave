@@ -131,6 +131,13 @@ relevant files; CI source builds compile/check the selected default pair using t
 Releases require the complete supported matrix. A wrapper name alone does not identify its accepted
 statement.
 
+Published `@interfold/contracts` deploys do not require a checkout. Outside the monorepo,
+node-release metadata comes from `dist/node-release.json`, written by `compile:ts`, and BFV VK paths
+use `INTERFOLD_CIRCUITS_DIR`. The circuits must match the package release. Monorepo deployments
+ignore that override and retain repository release files and local artifact selection. See
+[npm-package deployment](../../packages/interfold-contracts/README.md#deploying-from-the-npm-package)
+for layout and setup.
+
 Storage baselines are committed read-only CI inputs; missing baseline, compiler drift, incompatible
 nested layout, and bad gap consumption fail. Creating a baseline is explicit maintainer work, never
 an automatic fix. Tracked contract artifacts feed CLI `sol!`; after `pnpm evm:build`,
