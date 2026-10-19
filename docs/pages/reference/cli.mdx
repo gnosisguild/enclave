@@ -166,8 +166,7 @@ These commands make and run an E3 project from the template. For a walkthrough, 
 ### `interfold init`
 
 Makes a new Interfold project from a template. The command clones the template, pins its Interfold
-crates to the cloned commit, copies the development runner and the OpenVM proving service to
-`.interfold/support`, runs `pnpm install`, and makes the first Git commit. It needs `git` and
+crates to the cloned commit, runs `pnpm install`, and makes the first Git commit. It needs `git` and
 `pnpm`.
 
 ```bash
@@ -197,17 +196,17 @@ interfold compile [--dev <true|false>]
 
 ### `interfold program`
 
-Manages the E3 program of the project. Each subcommand runs a script in `.interfold/support` in the
-current directory. `interfold init` puts these scripts in the project.
+Manages the E3 program of the project. Each subcommand runs in the current directory and builds or
+runs the `program-runner` binary of the project's `runner/` crate.
 
-The `--dev` flag selects the script set. When the flag is absent, the CLI uses `program.dev` from
-the configuration, which defaults to `false`.
+The `--dev` flag selects the mode. When the flag is absent, the CLI uses `program.dev` from the
+configuration, which defaults to `false`.
 
-| Subcommand                      | Purpose                                                                                                                                                                                              | Script                            |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| `program start [--dev <DEV>]`   | Starts the program server. In Dev Mode, the program runs without a proving backend, so nothing verifies the result. Otherwise the OpenVM service checks its worker and keys, then proves each round. | `dev/start` or `openvm/start`     |
-| `program compile [--dev <DEV>]` | Compiles the program. Outside Dev Mode, it also builds the OpenVM guest, its keys, the receipt identity, and the worker configuration.                                                               | `dev/compile` or `openvm/compile` |
-| `program cache purge`           | Deletes `.interfold/caches`, including the OpenVM guest build and keys. The next compilation takes longer.                                                                                           | None                              |
+| Subcommand                      | Purpose                                                                                                                                                                                              | Command                                                                                                        |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `program start [--dev <DEV>]`   | Starts the program server. In Dev Mode, the program runs without a proving backend, so nothing verifies the result. Otherwise the OpenVM service checks its worker and keys, then proves each round. | `cargo run --bin program-runner -- dev` or `cargo run --release --bin program-runner -- openvm`                |
+| `program compile [--dev <DEV>]` | Compiles the program. Outside Dev Mode, it also builds the OpenVM guest, its keys, the receipt identity, and the worker configuration.                                                               | `cargo build --bin program-runner` or, outside Dev Mode, a build script that ends with `cargo build --release` |
+| `program cache purge`           | Deletes `.interfold/caches`, including the OpenVM guest build and keys. The next compilation takes longer.                                                                                           | None                                                                                                           |
 
 Outside Dev Mode, `program compile` and `program start` need a `program.openvm` section with at
 least one worker. The CLI refuses the removed `program.risc0` section. See
@@ -376,7 +375,7 @@ The detached supervisor does not receive the `--otel` flag. Set `otel` in the co
 
 Manages the Noir prover tools that the node uses to make zero-knowledge proofs: the Barretenberg
 binary (`bb`) and the compiled circuits. The required versions come from
-`crates/zk-prover/versions.json`. For release 0.18.0, they are `bb` 5.1.0 and circuits 0.18.0.
+`crates/zk/prover/versions.json`. For release 0.18.0, they are `bb` 5.1.0 and circuits 0.18.0.
 
 | Subcommand    | Flags                                                                                                                                                                                                                                                                                                                                                                                      | Purpose                                                                                                             |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
@@ -388,7 +387,7 @@ to `~/.interfold/noir`. A custom `bb` from `custom_bb` or `E3_CUSTOM_BB` replace
 one.
 
 Circuit downloads require an archive SHA-256 compiled in for the required version from
-`crates/zk-prover/versions.json` or the release build input. `noir status` reports the required
+`crates/zk/prover/versions.json` or the release build input. `noir status` reports the required
 version and this pin. The installer checks this digest before extraction. It then requires a
 nonempty `checksums.json` that covers every artifact file and verifies each entry. The archive must
 contain the full supported preset/committee matrix and the complete artifact inventory used by

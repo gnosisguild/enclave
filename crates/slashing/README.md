@@ -58,5 +58,5 @@ Run `cargo test --locked -p e3-slashing`. Voting workflow tests cover admission,
 equivocation, and timeouts; actor/extension tests cover signature digests/windows, saved vote
 recovery, replay deferral, and expulsion. Consistency tests cover link/roster indices, snapshot
 versions, and hydration. `pnpm rust:test:slashing` is the separate proof-to-contract suite with
-[prover prerequisites](../zk-prover/README.md). See [AGENTS.md](AGENTS.md) for evidence/quorum
+[prover prerequisites](../zk/prover/README.md). See [AGENTS.md](AGENTS.md) for evidence/quorum
 change constraints.

@@ -10,7 +10,8 @@ Maintain finite-field parity-matrix derivation here, not generated Noir configur
 - Modular inverses and elimination must surface unsupported/noninvertible cases; ordinary integer
   division is not finite-field division.
 - A different valid null-space basis can change committed generated output. Review deterministic
-  row/pivot order and regenerate through `pnpm zk parity-matrices`, not hand edits to circuit files.
+  row/pivot order and regenerate through `pnpm build:circuits --committee <name>`, not hand edits to
+  circuit files. `pnpm build:circuits check --committee all` compares an isolated rendered copy.
 
 Use the [README tests](README.md#testing), retaining independent parity/property checks.
 Generator/output changes also need the

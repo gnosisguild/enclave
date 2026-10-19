@@ -10,6 +10,7 @@ import { test } from 'node:test'
 function repositoryFixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'interfold-repository-check-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
+  assert.equal(spawnSync('git', ['init', '--quiet'], { cwd: root }).status, 0)
   const write = (path, content) => {
     mkdirSync(dirname(join(root, path)), { recursive: true })
     writeFileSync(join(root, path), content)
@@ -61,7 +62,7 @@ test('repository checks reject insufficient grace, missing Docker members, and p
     '[package]\nname = "core"\n[features]\ndefault = ["indirect"]\nindirect = ["test-only-skip-proof-aggregation"]\n',
   )
   assert.equal(run().status, 1)
-  assert.match(run().stdout, /escaped test-only containment/)
+  assert.match(run().stdout, /Cargo development-only containment/)
 })
 
 test('repository checks reject a missing startup proof guard or its configuration call', (t) => {

@@ -4,8 +4,8 @@ DKG creates a collective BFV key without revealing its secret to one operator. T
 signs protocol messages; delegated collateral ownership does not change that identity.
 
 Owners: [keyshare](../../crates/keyshare/src/threshold_keyshare/),
-[proof requests](../../crates/zk-prover/src/proof_request/),
-[share verification](../../crates/zk-prover/src/share_verification/),
+[proof requests](../../crates/zk/prover/src/proof_request/),
+[share verification](../../crates/zk/prover/src/share_verification/),
 [public-key aggregation](../../crates/aggregator/src/public_key_aggregation/), and the
 [registry](../../packages/interfold-contracts/contracts/registry/).
 [Proof statements](proof-statements.md) owns arithmetic and recursive trust;
@@ -32,7 +32,7 @@ Recipient bundles contain one C2a and one C2b plus C3a/C3b per **threshold Shami
 share-encryption/DKG CRT limb. Shape validation normalizes a DKG preset to its threshold counterpart
 before reading row count. Current TrBFV generates one smudging set (Z=1); extending C3b to multiple
 sets needs coordinated producer, validator, NodeFold, wire, and circuit changes, not inferred vector
-sizes. [Shape tests](../../crates/zk-prover/src/share_verification/workflow_tests/shape.rs) pin that
+sizes. [Shape tests](../../crates/zk/prover/src/share_verification/workflow_tests/shape.rs) pin that
 distinction for both presets.
 
 Both insecure-64 and secure-8192 use three threshold Shamir rows. Each recipient bundle therefore

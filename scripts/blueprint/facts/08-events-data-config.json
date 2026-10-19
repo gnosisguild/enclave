@@ -119,7 +119,7 @@
         {
           "name": "CircuitName",
           "what": "names of the ZK circuits (PkBfv, PkGeneration, ThresholdShareDecryption, DecryptedSharesAggregation, fold circuits) with as_str",
-          "ref": "crates/events/src/interfold_event/proof.rs@108@pub enum CircuitName {"
+          "ref": "crates/events/src/interfold_event/proof.rs@109@pub enum CircuitName {"
         },
         {
           "name": "ProofType",
@@ -223,7 +223,7 @@
         {
           "pattern": "enum-match",
           "note": "CircuitName::as_str maps each circuit to its name string",
-          "ref": "crates/events/src/interfold_event/proof.rs@156@CircuitName::PkBfv => \"pk\","
+          "ref": "crates/events/src/interfold_event/proof.rs@157@CircuitName::PkBfv => \"pk\","
         },
         {
           "pattern": "newtype",
@@ -231,7 +231,7 @@
           "ref": "crates/events/src/event_context.rs@24@pub struct AggregateId(usize);"
         }
       ],
-      "depends_on": ["e3-committee", "e3-crypto", "e3-committee-hash", "e3-trbfv", "e3-utils", "e3-fhe-params", "e3-zk-helpers"],
+      "depends_on": ["e3-committee", "e3-crypto", "e3-committee-hash", "e3-trbfv", "e3-utils", "e3-fhe-params", "e3-zk-config"],
       "tests": "Unit tests sit in #[cfg(test)] modules in eventbus.rs, eventstore.rs and sequencer.rs. Run: cargo test -p e3-events",
       "unverified": [
         "The replay path that feeds stored events back into the EventBus after a restart lives outside these four crates and was not traced here."

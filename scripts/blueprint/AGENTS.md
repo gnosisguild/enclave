@@ -3,7 +3,7 @@
 The blueprint navigates source and owner documentation; it is not a second protocol specification.
 [README.md](README.md) covers building, browsing, checking, and PR previews.
 
-- Add a crate's path under `crates/` (for example `zk/cli`) to `LAYERS` in `lib/inventory.mjs`. On
+- Add a crate's path under `crates/` (for example `zk/build`) to `LAYERS` in `lib/inventory.mjs`. On
   removal/rename, update that inventory and its `facts/` entries together; contracts and circuits
   have their own inventories in the same file.
 - Keep facts to short summaries and navigation/state/output details. Put detailed rules and limits

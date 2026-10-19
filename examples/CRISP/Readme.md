@@ -52,7 +52,7 @@ Before getting started, ensure you have installed:
   [`bb`](https://barretenberg.aztec.network/docs/getting_started). Install the versions CI pins,
   since other versions may not compile the circuits:
   - `nargo`: `noirup -v v1.0.0-beta.26` (`NOIR_TOOLCHAIN` in `.github/workflows/ci.yml`)
-  - `bb`: version and per-platform checksums live in `crates/zk-prover/versions.json`
+  - `bb`: version and per-platform checksums live in `crates/zk/prover/versions.json`
 
 Local development runs the unproved development runner unless `CRISP_REAL_PROOFS=1` (see
 `crisp.dev.env.example`). Real proofs use OpenVM: build the workers, configure `program.openvm` in
@@ -67,8 +67,8 @@ Outside `CRISP_UNPROVED_TEST=1`, it never selects a mock compute verifier. `CRIS
 deploys `MockOpenVmReceiptVerifier`, which accepts every receipt. It works on the local chain (chain
 ID 31337), and on Sepolia (chain ID 11155111) only with `ALLOW_SEPOLIA_UNPROVED_COMPUTE=true`. Every
 other chain, mainnet included, refuses it. A Sepolia deployment with this verifier does not verify
-compute proofs. It runs `e3-support-scripts-dev`, the unproved development runner, instead of the
-OpenVM service.
+compute proofs. It runs `program-runner dev`, the unproved development runner, instead of the OpenVM
+service.
 
 ## Quick Start
 
@@ -157,8 +157,9 @@ sets `program.dev: false`. The local scripts override that with `E3_PROGRAM__DEV
 ### OpenVM configuration
 
 The real-proof compute service uses OpenVM. CRISP's guest is `examples/CRISP/guest`, and its service
-is `.interfold/support/openvm`; both link `program/`, the processor and policy the contract agrees
-with. Follow the [OpenVM guide](../../crates/openvm-prover/README.md) to build the workers, then run
+is the `program-runner` binary of `examples/CRISP/runner`; the guest and the runner both link
+`program/`, the processor and policy the contract agrees with. Follow the
+[OpenVM guide](../../crates/openvm-prover/README.md) to build the workers, then run
 `interfold program compile` for the guest, keys, identity and service.
 
 Set `program.dev: false` and supply deployment-local `program.openvm.prover_bin` and, on a GPU

@@ -10,8 +10,8 @@ import { createHash } from 'crypto'
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs'
 import { join, relative, resolve } from 'path'
 import type { CircuitCommittee, CircuitPreset } from './constants'
-import requiredArtifacts from '../../crates/zk-prover/required-artifacts.json'
-import supportedConfigurations from '../../crates/zk-prover/supported-configurations.json'
+import requiredArtifacts from '../../crates/zk/prover/required-artifacts.json'
+import supportedConfigurations from '../../crates/zk/prover/supported-configurations.json'
 
 const BRANCH = 'circuit-artifacts'
 const ROOT = resolve(__dirname, '../..')
@@ -75,7 +75,7 @@ function refreshChecksums(dir: string): void {
 }
 
 /**
- * Check `checksums.json` as a node's installer does (`crates/zk-prover/src/backend/download.rs`):
+ * Check `checksums.json` as a node's installer does (`crates/zk/prover/src/backend/download.rs`):
  * sha256, at least one file, plain relative paths, every listed file present with its digest, and
  * every artifact listed. Build stamps and the root manifests need no entry.
  */
@@ -123,7 +123,7 @@ type BuildStamp = {
 }
 
 function sourceHashForPair(preset: string, committee: string): string {
-  return execFileSync('pnpm', ['tsx', 'scripts/circuits/build.ts', 'hash', '--preset', preset, '--committee', committee], {
+  return execFileSync('pnpm', ['--silent', 'build:circuits', 'hash', '--preset', preset, '--committee', committee], {
     cwd: ROOT,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -225,7 +225,7 @@ async function push() {
   }
 
   const replace = process.argv.includes('--replace')
-  const hash = run('pnpm tsx scripts/circuits/build.ts hash')
+  const hash = run('pnpm --silent build:circuits hash')
   const remote = run('git remote get-url origin')
   const tmp = join(ROOT, '.tmp-circuits')
 
@@ -278,7 +278,7 @@ async function restamp() {
     process.exit(1)
   }
 
-  const hash = run('pnpm tsx scripts/circuits/build.ts hash')
+  const hash = run('pnpm --silent build:circuits hash')
   const remote = run('git remote get-url origin')
   const tmp = join(ROOT, '.tmp-circuits')
   if (existsSync(tmp)) rmSync(tmp, { recursive: true })
@@ -325,8 +325,9 @@ async function restamp() {
   rmSync(tmp, { recursive: true })
 }
 
-export function findArtifactRevision(root: string, reference: string, sourceHash: string): string {
+export function findArtifactRevision(root: string, reference: string, sourceHash?: string): string {
   const git = (...args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()
+  if (sourceHash === undefined) return git('rev-parse', reference)
   const revisions = git('rev-list', '--first-parent', reference).split('\n')
   for (const revision of revisions) {
     if (!git('ls-tree', '--name-only', revision, '--', 'SOURCE_HASH')) continue
@@ -349,11 +350,10 @@ async function pull() {
     process.exit(1)
   }
 
-  // `--latest` takes the branch tip without a SOURCE_HASH match. CI and the integration tests use it
-  // until the drift workflow is designed; the release workflow still requires a match.
+  // Non-release consumers can use the newest published build. Release pulls stay source-bound.
   const latest = process.argv.includes('--latest')
-  const hash = latest ? undefined : run('pnpm tsx scripts/circuits/build.ts hash')
-  const revision = hash ? findArtifactRevision(ROOT, `origin/${BRANCH}`, hash) : run(`git rev-parse origin/${BRANCH}`)
+  const hash = latest ? undefined : run('pnpm --silent build:circuits hash')
+  const revision = findArtifactRevision(ROOT, `origin/${BRANCH}`, hash)
 
   if (existsSync(DIST)) rmSync(DIST, { recursive: true })
   mkdirSync(DIST, { recursive: true })
@@ -363,7 +363,7 @@ async function pull() {
 }
 
 async function verifyRelease() {
-  const expectedHash = argValue('--source-hash') ?? run('pnpm tsx scripts/circuits/build.ts hash')
+  const expectedHash = argValue('--source-hash') ?? run('pnpm --silent build:circuits hash')
 
   try {
     validateSourceHash(DIST, expectedHash)

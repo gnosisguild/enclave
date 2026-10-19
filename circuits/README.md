@@ -100,7 +100,7 @@ pnpm noir:lint                    # nargo fmt --check; nargo check (skipped if n
 pnpm noir:test                    # nargo test: lib, decryption_aggregator, dkg_aggregator and node_fold (3 preset/committee pairs); nargo execute: config
 ```
 
-Pin **nargo** and **bb** to the versions in `crates/zk-prover` and `versions.json`. For local work,
+Pin **nargo** and **bb** to the versions in `crates/zk/prover` and `versions.json`. For local work,
 **`interfold noir setup`** installs a toolchain that lines up with the prover and the artifacts CI
 produces. Install options and CLI flags are on the
 [Noir Circuits](https://docs.theinterfold.com/build/noir-circuits) page

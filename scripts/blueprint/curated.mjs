@@ -187,7 +187,7 @@ function system({ units, tag }) {
         fa: 0.3,
         label: 'witness in-process · bb proves',
         tip: 'Noir is linked as a library to compute the witness; the bb binary runs as a child process to make the proof.',
-        refs: ['crates/zk-prover/src/witness.rs@59@execute_program(', 'crates/zk-prover/src/prover.rs@104@StdCommand::new(bb)'],
+        refs: ['crates/zk/prover/src/witness.rs@59@execute_program(', 'crates/zk/prover/src/prover.rs@104@StdCommand::new(bb)'],
       },
       { from: 'circuits', to: 'contracts', fs: 'l', ts: 'r', label: 'Honk verifiers', refs: [...ev('A20'), ...ev('D9', 'D10')] },
       {
@@ -1095,7 +1095,7 @@ function ciphernode({ units }) {
         ta: 0.3,
         label: 'spawn bb',
         lt: 0.3,
-        refs: ['crates/zk-prover/src/prover.rs@104@StdCommand::new(bb)', 'crates/zk-prover/src/witness.rs@59@execute_program('],
+        refs: ['crates/zk/prover/src/prover.rs@104@StdCommand::new(bb)', 'crates/zk/prover/src/witness.rs@59@execute_program('],
       },
     ],
   }
@@ -1338,8 +1338,8 @@ function apps() {
         label: 'OpenVM runner',
         tip: 'The OpenVM service builds the program server with a callback that calls prover.prove(...)',
         refs: [
-          H('crates/support-scripts/openvm/service/src/main.rs', 40, 'E3ProgramServer::builder(move |job| {'),
-          H('crates/support-scripts/openvm/service/src/main.rs', 51, '.prove('),
+          H('crates/program-runner/src/openvm.rs', 38, 'E3ProgramServer::builder(move |job| {'),
+          H('crates/program-runner/src/openvm.rs', 49, '.prove('),
         ],
       },
       {
@@ -1354,7 +1354,7 @@ function apps() {
         label: 'dev',
         lp: 'left',
         tip: 'The dev runner calls compute-provider directly, with no proof',
-        refs: [H('crates/support-scripts/dev/src/main.rs', 61, 'ComputeManager::with_published(')],
+        refs: [H('crates/program-runner/src/dev.rs', 63, 'ComputeManager::with_published(')],
       },
       {
         from: 'ovm',

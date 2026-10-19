@@ -18,6 +18,9 @@ to their existing owners rather than implementing another startup path.
   artifacts silently choose an unproved production mode.
 - Retain the actor-thread panic watch before startup and its bounded shutdown/error path. Do not
   widen it to compute or dashboard worker threads whose failures have separate owners.
+- Project compile/start runs the project's `program-runner` from its root and rejects legacy
+  `.interfold/support`. Preserve absolute worker/setup paths, environment forwarding, and errors
+  that omit child arguments. Cache purge owns only `.interfold/caches`, not sources or node state.
 
 Use the [README tests/build prerequisites](README.md#tests). Command changes need the affected
 executable/daemon path, not only parser assertions. Contract API changes also need the binding check

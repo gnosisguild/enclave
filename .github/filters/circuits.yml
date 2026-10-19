@@ -9,7 +9,8 @@
 circuits:
   - 'circuits/**'
   - 'scripts/circuits/**'
-  - 'crates/zk-prover/supported-configurations.json'
+  - 'crates/zk/build/**'
+  - 'crates/zk/prover/supported-configurations.json'
   - '!**/*.md'
   - '!**/*.mdx'
 
@@ -17,9 +18,9 @@ circuits:
 # which runs `check:verifiers`.
 verifiers:
   - 'packages/interfold-contracts/contracts/verifiers/**'
-  - 'crates/zk-prover/versions.json'
-  - 'crates/zk-helpers/**'
-  - 'crates/zk/cli/**'
+  - 'crates/zk/prover/versions.json'
+  - 'crates/zk/config/**'
+  - 'crates/zk/witness/**'
   - 'crates/fhe-params/**'
   - 'crates/committee/**'
   - 'crates/polynomial/**'

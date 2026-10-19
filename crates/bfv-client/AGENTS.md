@@ -2,7 +2,7 @@
 
 This is the client-side BFV/commitment boundary shared by native callers and WASM.
 
-- Keep commitment calculations delegated to `e3-zk-helpers`; a byte hash is not a SAFE circuit
+- Keep commitment calculations delegated to `e3-zk-witness`; a byte hash is not a SAFE circuit
   commitment. Preserve explicit parameter validation before decoding untrusted keys/ciphertexts.
 - Public-key admission compares the decoded key's commitment, not decode/re-encode byte equality:
   fhe.rs normalizes an internal flag during threshold-key decoding.

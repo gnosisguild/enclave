@@ -18,7 +18,7 @@ on:
       - main
       - dev
 env:
-  SUPPORT_DOCKERFILE_PATH: crates/support/Dockerfile
+  SUPPORT_DOCKERFILE_PATH: examples/CRISP/runner/Dockerfile
   CIPHERNODE_DOCKERFILE_PATH: crates/Dockerfile
   SUPPORT_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/e3-support
   CIPHERNODE_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/ciphernode
@@ -102,7 +102,8 @@ jobs:
               - 'Cargo.lock'
               - 'rust-toolchain.toml'
               # The OpenVM worker is a workspace of its own, and no cargo build reads the image
-              # files. The `openvm_worker` and `docker` filters select their jobs.
+              # files or the frozen CRISP image ID. The `openvm_worker` and `docker` filters select
+              # their jobs.
               - '!crates/openvm-prover/**'
               - '!crates/Dockerfile'
               - '!crates/support/**'
@@ -125,7 +126,8 @@ jobs:
               - 'crates/parity-matrix/**'
               - 'crates/polynomial/**'
               - 'crates/safe/**'
-              - 'crates/zk-helpers/**'
+              - 'crates/zk/config/**'
+              - 'crates/zk/witness/**'
               # The programs inherit dependencies from their project workspace, and the native
               # fixture builds in CRISP's.
               - 'examples/CRISP/Cargo.toml'
@@ -168,9 +170,7 @@ jobs:
               - 'examples/CRISP/Cargo.toml'
               - 'examples/CRISP/Cargo.lock'
               - 'examples/CRISP/rust-toolchain.toml'
-              # Symlinks to members of the CRISP cargo workspace.
-              - 'examples/CRISP/.interfold/support/dev'
-              - 'examples/CRISP/.interfold/support/openvm'
+              - 'examples/CRISP/runner/**'
               - 'examples/CRISP/crates/**'
               - 'examples/CRISP/program/**'
               - 'examples/CRISP/server/**'
@@ -252,8 +252,7 @@ jobs:
             docker:
               - 'crates/Dockerfile'
               - 'crates/ciphernode-entrypoint.sh'
-              - 'crates/support/Dockerfile'
-              - 'crates/support/**'
+              - 'examples/CRISP/runner/Dockerfile'
               - '.dockerignore'
               - '!**/*.md'
               - '!**/*.mdx'
@@ -273,7 +272,7 @@ jobs:
               - 'pnpm-workspace.yaml'
             # Inputs of build_circuits that the `circuits` and `verifiers` filters do not list: the
             # circuit artifact store and its test (`store:circuits`, `test:circuit-tooling`), and
-            # the BFV parameters. scripts/circuits/build.ts derives generated constants in
+            # the BFV parameters. The Rust circuit builder derives the generated constants in
             # ActiveCryptoConfig.sol and utils.ts from them, and hashes their file into SOURCE_HASH.
             # check:verifiers reads none of these files, so they stay out of
             # .github/filters/circuits.yml, which also starts check:verifiers in pre-push.
@@ -499,6 +498,10 @@ jobs:
         run:
           cargo nextest run -p e3-entrypoint --test reset_data_guard --test purge_guard --test validate_older_schema --test
           validate_snapshot_errors -p e3-cli --bins --test cli_secrets
+
+      - name: Run circuit benchmark unit tests
+        if: matrix.suite == 'doc'
+        run: pnpm test:circuit-bench
 
       # `parallel` is off by default, so the library tests compile the sequential fallback of
       # `recompute_commitments` and the rayon body of that function ships untested. This step is
@@ -1560,7 +1563,7 @@ jobs:
             packages/interfold-contracts/scripts/utils.ts
 
       - name: Test circuit artifact validation and verifier selection
-        run: pnpm test:circuit-tooling
+        run: pnpm test:circuit-build -- --include-ignored && pnpm test:circuit-tooling
 
       # The generated verifier contracts must match the freshly built verification keys. A drift
       # means the deployed verifier accepts a different circuit from the one in this tree.
@@ -1577,9 +1580,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-  # Proves with the newest published circuit set. The published set is not checked against this
-  # tree's SOURCE_HASH until the circuit drift workflow is designed. The proof suites run in two
-  # legs; the correlated node test alone sets the floor.
+  # Proves with the newest published circuit set without a local SOURCE_HASH match.
+  # Source builds still compile and check their selected pair. Releases verify the complete matrix.
+  # The proof suites run in two legs; the correlated node test alone sets the floor.
   zk_prover_e2e:
     needs: [detect_changes]
     if: needs.detect_changes.outputs.zk == 'true'
@@ -1643,7 +1646,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Takes the branch tip without a SOURCE_HASH match.
+      # Non-release proof suites reuse the published branch tip.
       - name: Pull the published circuits
         timeout-minutes: 10
         run: pnpm store:circuits pull --latest
@@ -1684,6 +1687,10 @@ jobs:
             test -f "$artifact" || { echo "Missing required artifact: $artifact"; exit 1; }
             echo "  ok $artifact"
           done
+
+      - name: Check C6/C7 witness and ABI compatibility
+        if: matrix.leg == 'suites'
+        run: cargo test --locked -p e3-zk-prover --test witness_compatibility -- --include-ignored --nocapture
 
       - name: Run ZK prover e2e tests
         if: matrix.leg == 'suites'
@@ -1726,24 +1733,23 @@ jobs:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Install protoc
         uses: ./.github/actions/install-protoc
-      # The e3-support-scripts tests run in rust_unit_tests: every input of that crate selects it.
-      - name: Build support scripts
-        run: cd templates/default && cargo build --locked --bin e3-support-scripts-dev
-      # The OpenVM proving service links the template program. Its guest needs cargo-openvm and a GPU
-      # host for proofs, so CI builds only the service.
-      - name: Build the OpenVM proving service
-        run: cd templates/default && cargo build --locked --bin e3-support-scripts-openvm
+      # The e3-cli and e3-program-runner tests run in rust_unit_tests: every input of
+      # those crates selects it. One binary serves both the development runner and the OpenVM
+      # proving service; the OpenVM guest needs cargo-openvm and a GPU host for proofs, so CI builds
+      # only the runner.
+      - name: Build the program runner
+        run: cd templates/default && cargo build --locked --bin program-runner
       - name: Verify build artifacts
         run: |
-          echo "Checking for support scripts binary:"
-          find templates/default/target/ -name "e3-support-scripts-dev" -type f -ls || echo "Binary not found"
-      - name: Upload support scripts artifacts
+          echo "Checking for the program runner binary:"
+          find templates/default/target/ -name "program-runner" -type f -ls || echo "Binary not found"
+      - name: Upload the program runner
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: support-scripts-artifacts
+          name: program-runner-artifacts
           # Only the binary. template_integration is the one consumer and needs nothing else from
           # the cargo target directory.
-          path: templates/default/target/debug/e3-support-scripts-dev
+          path: templates/default/target/debug/program-runner
           retention-days: 1
           if-no-files-found: error
 
@@ -1962,8 +1968,7 @@ jobs:
         with:
           toolchain: ${{ env.NOIR_TOOLCHAIN }}
 
-      # The preset build runs the circuit tools (scripts/circuits/build.ts), which took about two
-      # and a half of this step's six minutes when built from scratch. rust-cache.yml warms them.
+      # rust-cache.yml warms the Rust circuit builder's dependencies.
       - name: Cache Rust dependencies
         uses: ./.github/actions/cache-dependencies
 
@@ -2047,10 +2052,10 @@ jobs:
           name: interfold-binary
           path: ~/.cargo/bin/
 
-      - name: Download support scripts artifacts
+      - name: Download the program runner
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: support-scripts-artifacts
+          name: program-runner-artifacts
           path: templates/default/target/debug/
 
       - name: Download SDK artifacts
@@ -2062,7 +2067,7 @@ jobs:
       - name: Make binaries executable
         run: |
           chmod +x ~/.cargo/bin/interfold
-          chmod +x templates/default/target/debug/e3-support-scripts-dev
+          chmod +x templates/default/target/debug/program-runner
 
       - name: Install Nargo
         uses: noir-lang/noirup@7dbe69ccc78877f0200ffa5a40836c953d2cfd8f # v0.1.4
@@ -2101,12 +2106,12 @@ jobs:
         run: |
           echo "Checking downloaded artifacts:"
           ls -la ~/.cargo/bin/interfold || echo "interfold binary not found"
-          ls -la templates/default/target/debug/e3-support-scripts-dev || echo "support scripts not found"
+          ls -la templates/default/target/debug/program-runner || echo "program runner not found"
           ls -la packages/interfold-contracts/dist || echo "SDK dist not found"
           ls -la crates/wasm/dist || echo "WASM dist not found"
           test -f circuits/bin/.active-preset.json || (echo "ERROR: circuit preset stamp not found" && exit 1)
-          echo "Support scripts permissions:"
-          ls -la templates/default/target/debug/e3-support-scripts-dev
+          echo "Program runner permissions:"
+          ls -la templates/default/target/debug/program-runner
 
       - name: Test Template
         run: |

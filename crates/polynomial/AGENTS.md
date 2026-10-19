@@ -1,18 +1,14 @@
 # e3-polynomial
 
 Keep exact integer arithmetic independent of FHE, witness encodings, and actors.
-[README.md](README.md) explains the separate `e3-polynomial-fhe` child package and coefficient
-conventions.
+[README.md](README.md) owns coefficient order, CRT limbs, the FHE adapter, and focused tests.
 
-- Arithmetic uses descending coefficients, while constructors preserve order and padding. FHE views
-  may still be ascending until explicitly reversed; do not normalize order implicitly.
-- Preserve integer quotients and exact-division errors. Replacing these operations with modular FHE
-  ring arithmetic loses witness information even when residues look identical.
-- Most operations retain shape, but multiplication of a zero operand returns canonical scalar zero.
-  Witness padding belongs to the circuit owner; do not globally normalize constructors to fix it.
-- CRT limbs are ordered residue polynomials, not words of one integer. The optional serde layout,
-  including the `limbs` name and padding, is a consumer compatibility boundary.
-
-Use the [README tests](README.md#tests), preserving independent arithmetic references and
-overflow/fallback cases. Circuit folding and witness-shape changes belong in
-[zk-helpers](../zk-helpers/README.md), not generic polynomial APIs.
+- A representation change can preserve a polynomial but change a witness, commitment, or serialized
+  value. Treat serialization changes as compatibility decisions, not incidental cleanup.
+- Keep integer quotients and exact-division errors. Modular ring arithmetic cannot replace them
+  merely because residues match.
+- Keep circuit-specific shape, reversal, encoding, and padding at the
+  [witness boundary](../zk/witness/README.md). Do not change generic arithmetic to make a witness
+  failure disappear.
+- Preserve canonical scalar zero from multiplication and constructor order/padding. Keep independent
+  arithmetic references and overflow/fallback cases in tests.

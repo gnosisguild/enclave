@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 
-// check:verifiers reads only the checked-out tree, so pre-push must stop the push of another branch that changes its inputs.
+// check:verifiers reads the checked-out tree, not an independently pushed branch.
 test('the pre-push path helper stops a pushed branch that differs from HEAD in a filter path', (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'interfold-pushed-paths-'))
   t.after(() => rmSync(dir, { recursive: true, force: true }))
@@ -50,7 +50,6 @@ test('the pre-push path helper stops a pushed branch that differs from HEAD in a
       input: `refs/heads/${branch} ${git('rev-parse', branch)} refs/heads/${branch} ${'0'.repeat(40)}\n`,
       encoding: 'utf8',
     })
-
   const stopped = push('feature')
   assert.equal(stopped.status, 2)
   assert.match(stopped.stderr, /Check out refs\/heads\/feature, then push again/)

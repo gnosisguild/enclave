@@ -10,15 +10,16 @@ artifacts, binary updates/removal, and program compilation/services. It delegate
 
 ## Map
 
-| Location                                                                             | Responsibility                                                                   |
-| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| [`main.rs`](src/main.rs), [`cli.rs`](src/cli.rs)                                     | Process entry, argument parsing, configuration, and dispatch.                    |
-| [`ciphernode/`](src/ciphernode)                                                      | Operator onboarding, bonds/tickets, and on-chain lifecycle commands.             |
-| [`start.rs`](src/start.rs), [`nodes.rs`](src/nodes.rs), [`node.rs`](src/node.rs)     | Running-node monitoring, managed nodes, and offline maintenance commands.        |
-| [`noir.rs`](src/noir.rs), [`program.rs`](src/program.rs), [`init.rs`](src/init.rs)   | Proof artifact and application-project commands.                                 |
-| [`helpers/telemetry.rs`](src/helpers/telemetry.rs), [`manifest.rs`](src/manifest.rs) | Tracing/redaction and deployed-network comparison.                               |
-| [`update.rs`](src/update.rs)                                                         | Release selection, atomic installed-binary replacement, and binary-only removal. |
-| [`build.rs`](build.rs)                                                               | Deployment bindings and embedded build identity.                                 |
+| Location                                                                                         | Responsibility                                                                           |
+| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| [`main.rs`](src/main.rs), [`cli.rs`](src/cli.rs)                                                 | Process entry, argument parsing, configuration, and dispatch.                            |
+| [`ciphernode/`](src/ciphernode)                                                                  | Operator onboarding, bonds/tickets, and on-chain lifecycle commands.                     |
+| [`start.rs`](src/start.rs), [`nodes.rs`](src/nodes.rs), [`node.rs`](src/node.rs)                 | Running-node monitoring, managed nodes, and offline maintenance commands.                |
+| [`noir.rs`](src/noir.rs), [`program.rs`](src/program.rs), [`init.rs`](src/init.rs)               | Proof artifact and application-project commands.                                         |
+| [`program_support.rs`](src/program_support.rs), [`openvm-compile.sh`](scripts/openvm-compile.sh) | Project runner compile/start, worker environment, cache purge, and embedded guest build. |
+| [`helpers/telemetry.rs`](src/helpers/telemetry.rs), [`manifest.rs`](src/manifest.rs)             | Tracing/redaction and deployed-network comparison.                                       |
+| [`update.rs`](src/update.rs)                                                                     | Release selection, atomic installed-binary replacement, and binary-only removal.         |
+| [`build.rs`](build.rs)                                                                           | Deployment bindings and embedded build identity.                                         |
 
 The CLI loads a named configuration, establishes output/telemetry, and delegates effects to their
 library owners. Allowed read commands can use the local daemon while a node runs. Startup returns a
@@ -39,7 +40,7 @@ pnpm fixtures:build
 cargo run --locked -p e3-cli --bin interfold -- --help
 ```
 
-Builds need bash, solc, and jq; transitive [prover fixture preparation](../zk-prover/README.md) can
+Builds need bash, solc, and jq; transitive [prover fixture preparation](../zk/prover/README.md) can
 run Noir/pnpm commands even for a Cargo check. `build.rs` reads the tracked deployed-contract
 manifest and embeds build identity; `GIT_SHA` overrides revision discovery for source builds. For
 installation and operator onboarding see the [root README](../../README.md).
@@ -60,7 +61,7 @@ interfold uninstall --help
 Global `--config <path>` and `--name <node>` select configuration and a named node.
 `start --bootstrap` runs discovery/history without committee/proof/transaction work; persisted
 full/bootstrap directories cannot be interchanged. Use `interfold init <path>` outside an existing
-project, then the [project support workflow](../support-scripts/README.md) for `compile` and
+project, then the [project runner workflow](../program-runner/README.md) for `compile` and
 `program start`.
 
 Some read commands route to the local daemon while a node runs; mutating/offline operations are

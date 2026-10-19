@@ -17,7 +17,7 @@ Shared constraints belong in `lib/src/`; `bin/` packages expose their witness/pu
   restores them on exit; neither is safe to run concurrently with another preset build in this
   checkout.
 
-Use the pinned nargo/bb versions from `crates/zk-prover/versions.json`. Start with the changed
+Use the pinned nargo/bb versions from `crates/zk/prover/versions.json`. Start with the changed
 package's `nargo test`, then the affected root Noir suite. Statement/aggregation changes also need
 the prepared Rust real-proof and contract acceptance paths in the
 [artifact workflow](../docs/architecture/circuit-artifacts.md); report missing tools and skips.

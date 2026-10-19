@@ -26,7 +26,7 @@ converted before coefficients are read.
 
 The conversion does **not** reverse, center, pack, or encode a circuit witness. Arithmetic in
 [e3-polynomial](../README.md) uses descending coefficients, so consumers must explicitly cross that
-ordering boundary before arithmetic. [e3-zk-helpers](../../zk-helpers/README.md) owns the
+ordering boundary before arithmetic. [e3-zk-witness](../../zk/witness/README.md) owns the
 circuit-specific reversal/centering and witness encoding rather than this generic adapter.
 
 In a workspace package, depend on both `e3-polynomial` and `e3-polynomial-fhe` with
@@ -37,6 +37,6 @@ In a workspace package, depend on both `e3-polynomial` and `e3-polynomial-fhe` w
 
 `cargo test --locked -p e3-polynomial-fhe` compiles this root workspace package and its test target;
 it currently has no dedicated tests. Conversion behavior is exercised by
-[zk-helpers computation tests](../../zk-helpers/README.md#tests), including witness coefficient and
+[witness preparation tests](../../zk/witness/README.md#tests), including witness coefficient and
 commitment calculations. Parent polynomial tests cover arithmetic, not FHE conversion. See
 [AGENTS.md](AGENTS.md) for representation/order changes.

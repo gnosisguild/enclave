@@ -12,9 +12,9 @@ server/program packages. [Readme.md](Readme.md) owns setup, profiles, service ex
 - Index-0 degree-512 rounds cannot use degree-64 circuits or stores. Follow the shared
   [testnet reset/redeployment requirement](../../docs/architecture/upgrades.md#insecure-testnet-preset-reset)
   and use the SDK entry point matching the deployed parameter set.
-- The native service and separate guest both link `program/`; shared runner sources belong in
-  `crates/support-scripts`, not copied `.interfold` caches. Follow their
-  [project-context guidance](../../crates/support-scripts/AGENTS.md) for changes there.
+- The project `runner/` and separate guest both link `program/`. Shared modes belong in
+  [e3-program-runner](../../crates/program-runner/AGENTS.md); CLI compile/start belongs in
+  `crates/cli/src/program_support.rs`. The CLI rejects legacy `.interfold/support` projects.
 - The Vercel client installs published packages outside the workspace. After dependency bumps,
   update `client/pnpm-lock.yaml` with `pnpm install --ignore-workspace` in that directory; a local
   workspace build does not verify the published-package deployment.

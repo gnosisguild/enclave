@@ -46,7 +46,7 @@ cargo test --locked -p e3-test-helpers
 ```
 
 Have bash, solc, and jq available. Foundry's Anvil is needed for chain paths. The transitive
-[prover build script](../zk-prover/README.md) can invoke pnpm/Noir builds and rewrite fixtures even
+[prover build script](../zk/prover/README.md) can invoke pnpm/Noir builds and rewrite fixtures even
 during a Cargo check; read its compile-only flag and real-proof prerequisites first. Use the pinned
 [Rust toolchain](../../rust-toolchain.toml) and matching circuit/Barretenberg tools.
 

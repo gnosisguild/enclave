@@ -62,7 +62,12 @@ for (const preset of PRESETS) {
   // and ActiveCryptoConfig.sol, which a bare `nargo compile` would leave describing the old one.
   // `--skip-vk`: compile_circuits.sh writes every key that CRISP uses. The `bb` that the SDK's
   // scripts find is @aztec/bb.js's, which reports a nightly version that the builder refuses.
-  run('pnpm', ['tsx', 'scripts/circuits/build.ts', '--preset', preset, '--group', 'threshold', '--skip-vk'], REPO)
+  // This partial build must not replace a complete node artifact pair in dist/circuits.
+  run(
+    'pnpm',
+    ['build:circuits', '--preset', preset, '--group', 'threshold', '--skip-vk', '--output', join(CRISP, 'circuits/dist/threshold-build')],
+    REPO,
+  )
 
   // Compiles the CRISP circuits and writes the generated Solidity verifiers into
   // packages/crisp-contracts/contracts/verifiers/<preset>/. It recompiles the threshold circuits on
@@ -74,7 +79,9 @@ for (const preset of PRESETS) {
 }
 
 console.log(`\n✓ staged ${PRESETS.length} preset(s); tree left on ${PRESETS.at(-1)}`)
-console.log('  If the ballot circuits changed, regenerate the fold key hashes: scripts/compute_vk_hash.sh')
+console.log(
+  '  If ballot circuits changed, update the selected fold binding with pnpm build:circuits sync-crisp --preset <preset> --committee <committee>.',
+)
 if (requested === 'all') {
   console.log('  Then rebuild the production SDK: pnpm -C packages/crisp-sdk build:prod')
   console.log('  Then check it: CRISP_CHANNEL=latest pnpm -C packages/crisp-sdk check:presets')

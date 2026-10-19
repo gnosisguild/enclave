@@ -2,29 +2,29 @@
 
 ## Purpose
 
-Use the root `pnpm check:*` commands. `repository.sh` checks Cargo feature containment, ciphernode
-Docker workspace membership, production Compose shutdown grace, startup proof-guard presence, and
-the `.do_send(` line-count ceiling. It is static configuration validation, not runtime/proof
-assurance. The grace check accepts the maintained two-space service / four-space integer-second
-`stop_grace_period` layout and requires exactly one budget above 60 seconds per service. It rejects
-duplicate, missing, quoted, or non-integer-second fields; it is not a general YAML/Compose validator
-(aliases and other valid duration notations are not supported).
+Use the root `pnpm check:*` commands. `repository.sh` checks Cargo feature/sample containment,
+ciphernode Docker workspace membership, production Compose shutdown grace, startup proof-guard
+presence, and the `.do_send(` line-count ceiling. It is static configuration validation, not
+runtime/proof assurance. The grace check accepts the maintained two-space service / four-space
+integer-second `stop_grace_period` layout and requires exactly one budget above 60 seconds per
+service. It rejects duplicate, missing, quoted, or non-integer-second fields; it is not a general
+YAML/Compose validator (aliases and other valid duration notations are not supported).
 
 ## Map
 
-| File                                                           | Responsibility                                                                       |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| [`repository.sh`](repository.sh)                               | Runs configuration, startup proof-guard, and send-count checks.                      |
-| [`repository-baselines.env`](repository-baselines.env)         | Owns the send-count ceiling; increases need explicit call-site review.               |
-| [`cargo-feature-containment.py`](cargo-feature-containment.py) | Reads Cargo manifests to detect production proof-skip feature enablement.            |
-| [`ciphernode-docker-members.py`](ciphernode-docker-members.py) | Compares workspace members with Docker manifest copies.                              |
-| [`committee.sh`](committee.sh)                                 | Compares cross-language committee and BFV configuration.                             |
-| [`addresses.ts`](addresses.ts)                                 | Checks published addresses and classified consumers against the deployment manifest. |
-| [`cli-bindings.ts`](cli-bindings.ts)                           | Compares tracked ABIs with freshly built contract artifacts.                         |
-| [`license-headers.sh`](license-headers.sh)                     | Checks SPDX headers and optionally adds missing headers.                             |
-| [`pnpm.sh`](pnpm.sh)                                           | Checks the package-manager version against the root pin.                             |
-| [`shell-syntax.mjs`](shell-syntax.mjs)                         | Parses shell sources individually.                                                   |
-| [`changed-format.mjs`](changed-format.mjs)                     | Checks supported files changed between two Git revisions.                            |
+| File                                                           | Responsibility                                                                                                 |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| [`repository.sh`](repository.sh)                               | Runs configuration, startup proof-guard, and send-count checks.                                                |
+| [`repository-baselines.env`](repository-baselines.env)         | Owns the send-count ceiling; increases need explicit call-site review.                                         |
+| [`cargo-feature-containment.py`](cargo-feature-containment.py) | Checks proof-skip features and dev-only ZK sample/benchmark dependencies, including aliases and target tables. |
+| [`ciphernode-docker-members.py`](ciphernode-docker-members.py) | Compares workspace members with Docker manifest copies.                                                        |
+| [`committee.sh`](committee.sh)                                 | Compares cross-language committee and BFV configuration.                                                       |
+| [`addresses.ts`](addresses.ts)                                 | Checks published addresses and classified consumers against the deployment manifest.                           |
+| [`cli-bindings.ts`](cli-bindings.ts)                           | Compares tracked ABIs with freshly built contract artifacts.                                                   |
+| [`license-headers.sh`](license-headers.sh)                     | Checks SPDX headers and optionally adds missing headers.                                                       |
+| [`pnpm.sh`](pnpm.sh)                                           | Checks the package-manager version against the root pin.                                                       |
+| [`shell-syntax.mjs`](shell-syntax.mjs)                         | Parses shell sources individually.                                                                             |
+| [`changed-format.mjs`](changed-format.mjs)                     | Checks supported files changed between two Git revisions.                                                      |
 
 ## Usage
 

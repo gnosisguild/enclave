@@ -12,8 +12,9 @@ completeness.
 The 2026-08-17 Zenith protocol audit (`Z-` IDs) reviewed six Solidity files at `c2097da6`, with a
 mitigation review at `c64bcfb8`: E3RefundManager, Interfold, ExitQueueLib, InterfoldPricing,
 BondingRegistry, CiphernodeRegistryOwnable. No Rust or CRISP was reviewed. Lifecycle/payer
-libraries, compute-provider, zk-helpers, guest, and receipt-verifier remediation code were outside
-those lists. Security Note §2.5 recommends follow-up audit before significant capital deployment.
+libraries, compute-provider, ZK configuration/witness code, guest, and receipt-verifier remediation
+code were outside those lists. Security Note §2.5 recommends follow-up audit before significant
+capital deployment.
 
 The 2026-09-08 scoped review (`ZEN2-`) covered 14 Solidity files on
 `feat/avail-vectorx-release-candidate` at `723bed2e`; upstream references use

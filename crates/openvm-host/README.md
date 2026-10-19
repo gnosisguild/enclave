@@ -37,7 +37,7 @@ configured CUDA and may fall back to CPU; explicit `cuda` fails if unavailable.
 `prove(inputs, published, domain, processor, policy).await` returns `(proof_envelope, ciphertext)`
 bytes. Use the same processor/policy in native and guest execution. `ComputeDomain` binds chain,
 verifying contract, E3, encryption scheme, and committee key; it is not optional metadata. The
-[project service](../support-scripts/openvm/service/src/main.rs) is a complete caller.
+[project service](../program-runner/src/openvm.rs) is a complete caller.
 
 The worker must verify against the expected `ComputeJournal`; exit success alone is not a receipt
 contract. `encode_compute_proof` constructs the Solidity envelope and checks seal length.

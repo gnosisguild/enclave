@@ -2,32 +2,32 @@
 
 ## Purpose
 
-Root [`package.json`](../package.json) supplies supported commands; implementations and tests live
+Root [package scripts](../package.json) supply supported commands. Implementations and tests live
 with the capability they maintain.
 
 ## Map
 
-| Owner                             | Commands and usage                                                                                                            |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| [checks/](checks/README.md)       | `pnpm check:repository`, `check:committee`, `check:addresses`, `check:bindings`, `check:license`, `check:pnpm`, `check:shell` |
-| [circuits/](circuits/README.md)   | `pnpm build:circuits`, `store:circuits`, `generate:verifiers`, `check:verifiers`, `noir:lint`, `noir:test`                    |
-| [release/](release/README.md)     | `pnpm bump:versions` prepares files by default; commit/push are explicit. `pnpm release:tag` creates and pushes a tag.        |
-| [dev/](dev/README.md)             | `pnpm clean` removes rebuildable output, never operator state or indexed files.                                               |
-| [openvm/](openvm/README.md)       | `pnpm openvm <task>`, `pnpm provenance:manifest`                                                                              |
-| [hooks/](hooks/README.md)         | Shared Git hook helpers; `.husky/` owns hook entry points.                                                                    |
-| [blueprint/](blueprint/README.md) | Architecture map, navigation checks and PR previews.                                                                          |
+| Owner                                                | Commands and usage                                                                                |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| [checks/](checks/README.md)                          | Repository, committee, address, binding, license, package-manager, and shell checks.              |
+| [circuits/](circuits/README.md)                      | Artifact transport, verifier generation, Noir wrappers, and CRISP gas preparation.                |
+| [Rust circuit builder](../crates/zk/build/README.md) | `pnpm build:circuits`, `pnpm test:circuit-build`.                                                 |
+| [Rust benchmarks](../crates/zk/benchmarks/README.md) | `pnpm bench:circuits`, `pnpm test:circuit-bench`.                                                 |
+| [release/](release/README.md)                        | Version preparation and explicit publication; [RELEASING.md](../RELEASING.md) owns the procedure. |
+| [dev/](dev/README.md)                                | `pnpm clean` removes rebuildable output, not operator state or indexed files.                     |
+| [openvm/](openvm/README.md)                          | `pnpm openvm <task>`, `pnpm provenance:manifest`.                                                 |
+| [hooks/](hooks/README.md)                            | Shared helpers for `.husky/` entry points.                                                        |
+| [blueprint/](blueprint/README.md)                    | Architecture navigation, documentation checks, and PR previews.                                   |
 
-Application scenarios remain with their application: CRISP's
-[`test-isolated.sh`](../examples/CRISP/scripts/test-isolated.sh) tests committed `HEAD` in a
+CRISP's [isolated runner](../examples/CRISP/scripts/test-isolated.sh) tests committed `HEAD` in a
 temporary worktree and rejects pending changes. Failed runs retain their worktree for diagnosis.
-Network runner regressions live beside [`crates/net/tests/run.sh`](../crates/net/tests/run.sh).
+Network runner regressions live beside [their owner](../crates/net/tests/run.sh).
 
 ## Tests
 
-Focused verification: `pnpm test:scripts`, `pnpm test:release`, `pnpm test:circuit-tooling`, and
-`pnpm test:harnesses`. These tooling tests do not prove cryptographic soundness or qualify a
-release.
+Use `pnpm test:scripts`, `pnpm test:release`, `pnpm test:circuit-tooling`, and `pnpm test:harnesses`
+for script boundaries. Use `pnpm test:circuit-build` and `pnpm test:circuit-bench` for Rust tooling.
+These tests do not qualify cryptographic proofs or a release. Contract size checks and sale
+rehearsals belong to the [contract package](../packages/interfold-contracts/README.md).
 
-Contract-size checks and sale rehearsals belong to the
-[contract package](../packages/interfold-contracts/README.md). [AGENTS.md](AGENTS.md) describes
-conventions for changing repository tooling.
+[AGENTS.md](AGENTS.md) describes how to change repository tooling.

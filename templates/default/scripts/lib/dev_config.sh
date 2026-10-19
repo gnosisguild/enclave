@@ -35,7 +35,7 @@ load_template_dev_config() {
 }
 
 template_monorepo_build_available() {
-  [[ -f "${INTERFOLD_REPO_ROOT}/scripts/circuits/build.ts" ]]
+  [[ -f "${INTERFOLD_REPO_ROOT}/crates/zk/build/Cargo.toml" ]]
 }
 
 # Whether the installed `interfold` carries an optional Cargo feature.

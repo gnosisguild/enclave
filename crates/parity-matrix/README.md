@@ -148,7 +148,7 @@ cargo test --locked -p e3-parity-matrix -- --nocapture
 Inline `matrix.rs` cases check dimensions, independent parity identities, and rejection of
 higher-degree evaluations over small/large fields. `math.rs` covers invertible/noninvertible and
 boundary moduli. No FHE runtime or prover is required. Generated-output integration is in the
-[artifact CLI](../zk/cli/README.md); change guidance is in [AGENTS.md](AGENTS.md).
+[circuit builder](../zk/build/README.md); change guidance is in [AGENTS.md](AGENTS.md).
 
 ## API Reference
 

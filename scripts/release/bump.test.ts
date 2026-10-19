@@ -21,7 +21,7 @@ function fixture(t: { after: (fn: () => void) => void }) {
     'Cargo.toml',
     '[workspace.package]\nversion = "1.2.3"\n\n[workspace.dependencies]\na = { version = "1.2.3", path = "crates/a" }\nexternal = { version = "=7.8.9", features = ["x"] }\n\nb = { path = "crates/b", version = "1.2.3" }\n\n[other]\nversion = "do-not-change"\n',
   )
-  write('crates/zk-prover/versions.json', '{"required_circuits_version":"1.2.3","bb":"keep"}\n')
+  write('crates/zk/prover/versions.json', '{"required_circuits_version":"1.2.3","bb":"keep"}\n')
   write('dappnode/dappnode_package.json', '{"version":"0.4.5","upstreamVersion":"1.2.3"}\n')
   write('dappnode/package.json', '{"version":"0.4.5"}\n')
   write('dappnode/package-lock.json', '{"version":"0.4.5","packages":{"":{"version":"0.4.5"}}}\n')
@@ -89,7 +89,7 @@ test('dry run invokes no commands and does not write release files, even with co
     'pnpm-lock.yaml',
     'Cargo.lock',
     'CHANGELOG.md',
-    'crates/zk-prover/versions.json',
+    'crates/zk/prover/versions.json',
     'dappnode/dappnode_package.json',
   ]
   const before = files.map(f.read)

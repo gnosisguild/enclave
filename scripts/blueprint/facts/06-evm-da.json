@@ -284,8 +284,7 @@
         "e3-fhe-params",
         "e3-sortition",
         "e3-trbfv",
-        "e3-utils",
-        "e3-zk-helpers"
+        "e3-utils"
       ],
       "tests": "cargo test -p e3-evm. Unit tests sit in src/ and in the *tests.rs modules. crates/evm/tests/live_sepolia_window.rs is #[ignore] and needs network access and the live Sepolia deployment.",
       "unverified": [

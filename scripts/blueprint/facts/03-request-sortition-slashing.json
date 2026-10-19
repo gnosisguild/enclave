@@ -650,7 +650,7 @@
           "ref": "crates/slashing/src/accusation_voting/transitions/reverify_proofs.rs@44@let Some(reverif) = self.pending_reverifications.remove(&correlation_id) else {"
         }
       ],
-      "depends_on": ["e3-committee", "e3-data", "e3-events", "e3-fhe-params", "e3-request", "e3-utils", "e3-zk-helpers"],
+      "depends_on": ["e3-committee", "e3-data", "e3-events", "e3-fhe-params", "e3-request", "e3-utils"],
       "tests": "accusation_voting/workflow_tests/ (admission, voting, outcomes), accusation_voting/actor_tests.rs and commitment_consistency/workflow_tests.rs under crates/slashing/src; fixture crates/slashing/tests/fixtures/layout_lock.txt; cargo test -p e3-slashing",
       "unverified": [
         "Buffered votes, window-move limits, and in-flight re-verifications are not saved. Restart also does not reapply expulsions before the router checkpoint; see the slashing domain's recovery limits."

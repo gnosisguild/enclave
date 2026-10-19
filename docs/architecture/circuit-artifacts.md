@@ -1,10 +1,9 @@
 # Circuit artifacts and deployment provenance
 
-Owners: [TypeScript circuit builder](../../scripts/circuits/build.ts),
+Owners: [Rust circuit builder](../../crates/zk/build/),
 [artifact store](../../scripts/circuits/artifacts.ts),
-[Rust artifact installer](../../crates/zk-prover/src/backend/download.rs), and
-[deployment tooling](../../packages/interfold-contracts/scripts/). This checkout uses the existing
-builder, not a proposed replacement crate stack.
+[Rust artifact installer](../../crates/zk/prover/src/backend/download.rs), and
+[deployment tooling](../../packages/interfold-contracts/scripts/).
 [Circuit Builder usage](../../scripts/circuits/README.md#circuit-builder) owns commands;
 [proof contracts](proof-statements.md) owns what the artifacts must prove.
 
@@ -21,9 +20,10 @@ threshold BFV tuples across deployment constants/Rust/preset Noir, and configura
 contracts, tasks, SDK, and EVM helpers. Drift can register a tuple nodes/circuits do not implement.
 The committed default is insecure-64/minimum; CI rebuilds that selection and rejects diffs. Local
 active-preset cache mismatch is only a note. **Limits:** the gate does not compare
-`scripts/circuits/constants.ts` committee values; manually review those. Parity regeneration/diff
-runs only with `target/release/zk-artifacts` and nargo; Repository Checks can skip it, while
-circuits CI catches committed-selection drift by rebuilding.
+`scripts/circuits/constants.ts` committee values; manually review those. With Nargo available, the
+gate runs `pnpm build:circuits check --committee all`. The Rust owner renders/formats an isolated
+library copy and compares generated files without swapping live files. Circuit CI also rejects
+committed-selection drift after rebuilding.
 
 C1/C2 `PK_GENERATION_*`/`SHARE_COMPUTATION_*` bounds are derived from preset+committee. Generator
 replaces whole declarations including array dimensions and rejects unknown prefixed globals, because
@@ -45,13 +45,23 @@ pin across CI, release, `versions.json`, Cargo, and SDK. Rust witness stacks use
 make older ACIR/serialization compatible. Rebuild/publish matching archives and regenerate
 keys/verifiers before changing required circuit version.
 
-The builder refuses nargo/bb versions other than pinned values. Pair SOURCE_HASH covers compiling
-Noir sources, library entry/dependency manifest/shared constants, pinned Noir tag/bb version, and
-Rust bound generation sources (`zk/cli`, fhe-params, committee, polynomial and its FHE adapter),
-excluding cfg(test) modules. Normalize active-preset selector and generated bound declarations:
-switching pair or editing a test must not stale another pair. Cargo.lock contributes only external
-name/version/source/checksum, not workspace version churn. Library-only changes invalidate every
-affected pair.
+Build and benchmark share exact-version parsing in `crates/zk/build/src/toolchain.rs`. Pair
+SOURCE_HASH covers compiling Noir, library entry/dependency manifests, shared constants, pinned
+tools, and Rust configuration/witness/build sources and templates. The build manifest contributes
+edition/features, not workspace dependency edges or release versions. Cargo.lock contributes only
+external name/version/source/checksum. The shared build policy is an input; the release matrix is
+not.
+
+`identity.rs` uses the versioned `interfold:zk-source:v2` hash stream. Records carry a type tag,
+repository-relative UTF-8 name, content, and explicit name/content lengths. Moving a source between
+roots changes its identity. Required files, directories, and tool pins must exist unless the build
+supplies that generated file's staged contents. A missing relocated owner fails instead of silently
+reducing provenance. Circuit-group order cannot change the same source set's hash.
+
+Normalize active-preset selection and generated bound values; exclude cfg(test) modules and the
+build crate's separate tests. Switching pair or editing a test must not stale another pair.
+Library-only changes invalidate affected pairs. Cache/release reuse rejects another hash scheme;
+development hydration retains the artifact's original identity rather than relabeling it.
 
 Restamp published artifacts only when the branch records the hash produced by the **same source
 tree** under the old hash scheme. Another tree needs a rebuild, not a new label.
@@ -68,29 +78,31 @@ tree** under the old hash scheme. Another tree needs a rebuild, not a new label.
 
 `required_circuits_version` equals Interfold release version without v; binary resolves GitHub tag
 `v{version}` / `circuits-{version}.tar.gz`. Release workflow rejects mismatch. All six pairs in
-[supported-configurations](../../crates/zk-prover/supported-configurations.json) must ship:
-insecure-64 and secure-8192 × minimum/micro/small. That matrix is canonical for
-release/installation, must match builder pairs (tooling test), and is not itself a SOURCE_HASH
-input.
+[supported-configurations](../../crates/zk/prover/supported-configurations.json) must ship:
+insecure-64 and secure-8192 × minimum/micro/small. That matrix is canonical for release/installation
+and must be a subset of `scripts/circuits/build-pairs.json` (tooling test). Both Rust and TypeScript
+read that build policy. Wildcards preserve its order, not a Cartesian product; an unsupported
+explicit pair fails before tools or writes.
 
 Default `store:circuits pull` selects newest first-parent artifact commit with matching source hash,
 not necessarily branch tip. Release uses it and `verify-release` checks every pair, stamps,
-manifests, and required artifacts before publication. **Known gap (#2249):** non-release
-CI/integration use `pull --latest` without source match; `--hydrate-bin-only` does not check stamp
-source hash. Those paths do not supply release-level source provenance. Do not remove strict release
-checking to match them.
+manifests, and required artifacts before publication. Non-release CI/full-proof integration can use
+`pull --latest` without a source match. `--hydrate-bin-only` requires a stamp and markers, reports a
+source mismatch, and records the original artifact hash in the active stamp. It never rewrites the
+archived stamp. `--skip-if-built` still requires a source match. These development reuse paths do
+not supply release-level source provenance; retain strict release qualification.
 
 The expected archive digest ships **with the binary**, never fetched from the archive or endpoint.
 0.18.0's pin is the published GitHub asset digest; other version pins live in versions.json. Release
 packaging hashes and retains exact bytes, passes `E3_CIRCUITS_ARCHIVE_SHA256` to binary/image
 compilation, and build.rs validates it. ZkConfig binds it to crate version. `noir status` checks
-binary and ciphernode image against that digest before candidate publication. Support image builds
-no CLI/node; DAppNode copies the checked image. Unpinned builds compile, but downloads fail before
-network access.
+binary and ciphernode image against that digest before candidate publication. Program-runner image
+builds no CLI/node; DAppNode copies the checked image. Unpinned builds compile, but downloads fail
+before network access.
 
 Both download and local install require nonempty SHA-256 checksums.json, verify every entry, reject
 uncovered artifacts, and require every path in
-[required-artifacts](../../crates/zk-prover/required-artifacts.json) for required/included pairs.
+[required-artifacts](../../crates/zk/prover/required-artifacts.json) for required/included pairs.
 SOURCE_HASH/root manifests/stamps are metadata, not prover artifacts. Required pairs cannot be
 chosen by archive contents. Explicit nonempty subsets are available through installer APIs and
 repeated `--circuits-configuration` only with `--circuits-archive`. Local archives need the same
@@ -115,8 +127,9 @@ replacement; missing routes or changed VKs require matching wrappers and replace
 mapping updates. Constructor code checks/nonzero VK anchors are mandatory. Deployment compares
 immutables with built artifacts. Generated verifiers must match built VKs: pre-push reads circuit
 filter paths and checked-out insecure pair (local committee/default minimum), refusing dirty
-relevant files; CI hydrates/compares all supported pairs using the same filter. A wrapper name alone
-does not identify its accepted statement.
+relevant files; CI source builds compile/check the selected default pair using the same filter.
+Releases require the complete supported matrix. A wrapper name alone does not identify its accepted
+statement.
 
 Storage baselines are committed read-only CI inputs; missing baseline, compiler drift, incompatible
 nested layout, and bad gap consumption fail. Creating a baseline is explicit maintainer work, never
@@ -146,6 +159,20 @@ executable/key/proof/input/worker-config/benchmark artifacts; put them under tar
 source.
 
 ## Provenance and checks
+
+The [Rust benchmark owner](../../crates/zk/benchmarks/README.md) validates selected artifact
+digests, compiler version, pair, and proof variant while retaining published source stamps. A local
+config cache separately binds compiled/VK digests and tool/pair identity. Fresh compilation records
+local source identity, not a hydrated archive hash. Protocol children receive the validated BB path
+through `E3_CUSTOM_BB`. Replay uses saved folded proofs; missing verifier measurements remain
+incomplete.
+
+CRISP's partial threshold build writes to `examples/CRISP/circuits/dist/threshold-build`, never the
+complete node archive. `pnpm bench:crisp:prepare` builds WASM/SDK dependencies, restores the
+selected node pair even after failure or SIGINT/SIGTERM, then compiles contracts/tasks unless
+interrupted. Gas collection runs this setup before protocol proving and records setup time
+separately from gas. Run setup and benchmark selection serially because both change shared Noir
+selectors.
 
 `pnpm provenance:manifest` ties source/lockfiles/artifact digests/OpenVM commitments/worker identity
 and deployed protocol/receipt/Halo2 verifiers. Missing fields mean `complete: false`, not partial

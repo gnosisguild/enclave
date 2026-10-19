@@ -10,12 +10,12 @@ state.
 
 ## Map
 
-| Location                                                          | Responsibility                                                                                      |
-| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| [`lib.rs`](src/lib.rs)                                            | Builder, HTTP admission/body handling, domain validation, runner invocation, and callback delivery. |
-| [`types.rs`](src/types.rs)                                        | Hex-encoded request and completion/failure webhook formats.                                         |
-| [`development runner`](../support-scripts/dev/src/main.rs)        | Concrete native/mock-proof consumer of the server builder.                                          |
-| [`OpenVM service`](../support-scripts/openvm/service/src/main.rs) | Worker-verified project runner with explicit limits.                                                |
+| Location                                             | Responsibility                                                                                      |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| [`lib.rs`](src/lib.rs)                               | Builder, HTTP admission/body handling, domain validation, runner invocation, and callback delivery. |
+| [`types.rs`](src/types.rs)                           | Hex-encoded request and completion/failure webhook formats.                                         |
+| [`development runner`](../program-runner/src/dev.rs) | Concrete native/mock-proof consumer of the server builder.                                          |
+| [`OpenVM service`](../program-runner/src/openvm.rs)  | Worker-verified project runner with explicit limits.                                                |
 
 ## Usage and job lifecycle
 

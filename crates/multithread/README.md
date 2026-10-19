@@ -52,7 +52,7 @@ for admission/retry limits.
 ## Tests
 
 `cargo test --locked -p e3-multithread` transitively builds the prover; read its
-[build prerequisites and side effects](../zk-prover/README.md) first.
+[build prerequisites and side effects](../zk/prover/README.md) first.
 
 Inline suites distinguish pool cancellation/panic handling, deterministic capacity calculations,
 effect-gate replay/redelivery, and bus dispatch/retry/teardown. Fake outcomes test scheduling and

@@ -43,7 +43,7 @@ real-proof suites.
 ## Prerequisites and assurance
 
 Prepare root `pnpm evm:build` and `pnpm fixtures:build`, with bash, solc, jq, and Anvil for chain
-scenarios. [Prover setup](../zk-prover/README.md) explains matching nargo/bb/artifacts and
+scenarios. [Prover setup](../zk/prover/README.md) explains matching nargo/bb/artifacts and
 build-time fixture side effects. Even the layout target compiles the runtime dependency graph. Tests
 may skip when tools are absent, and ignored scenarios need explicit selection.
 

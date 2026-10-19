@@ -18,6 +18,11 @@
           "name": "installed binary at the resolved current-executable path; update replaces it, uninstall leaves configuration and node data intact",
           "where": "disk",
           "ref": "crates/cli/src/update.rs@108@fn installed_binary() -> Result<PathBuf> {"
+        },
+        {
+          "name": ".interfold/caches folder in the project directory, deleted by `program cache purge`",
+          "where": "disk",
+          "ref": "crates/cli/src/program_support.rs@121@let caches = env::current_dir()?"
         }
       ],
       "key_types": [
@@ -55,7 +60,7 @@
       "read_first": [
         {
           "why": "the entry point: parse, then forward to a running node or run locally",
-          "ref": "crates/cli/src/main.rs@71@pub async fn main() -> Result<()> {"
+          "ref": "crates/cli/src/main.rs@72@pub async fn main() -> Result<()> {"
         },
         {
           "why": "dispatch, including commands that run without config and start's setup path",
@@ -72,6 +77,10 @@
         {
           "why": "update: resolves latest, dev or an explicit release tag, downloads the platform archive and replaces the installed binary",
           "ref": "crates/cli/src/update.rs@41@pub async fn execute(out: Console, version: Option<String>, node_running: bool) -> Result<()> {"
+        },
+        {
+          "why": "program compile and start: pick dev or OpenVM mode, then run cargo for the project runner",
+          "ref": "crates/cli/src/program_support.rs@65@pub async fn compile(config: &ProgramConfig, dev: Option<bool>)"
         }
       ],
       "rust_patterns": [
@@ -98,12 +107,22 @@
         {
           "pattern": "closure",
           "note": "clap error handler that rejects secret command-line arguments",
-          "ref": "crates/cli/src/main.rs@75@unwrap_or_else(|mut error| {"
+          "ref": "crates/cli/src/main.rs@76@unwrap_or_else(|mut error| {"
         },
         {
           "pattern": "tokio-select",
           "note": "startup races the node build against the shutdown signal",
           "ref": "crates/cli/src/start.rs@47@let node = tokio::select! {"
+        },
+        {
+          "pattern": "tokio-select",
+          "note": "the child process races against Ctrl-C, which kills it",
+          "ref": "crates/cli/src/program_support.rs@164@tokio::select! {"
+        },
+        {
+          "pattern": "unit-test",
+          "note": "checks that --dev overrides program.dev and that OpenVM is the default",
+          "ref": "crates/cli/src/program_support.rs@182@fn the_dev_flag_overrides_the_configuration_and_openvm_is_the_default() {"
         }
       ],
       "depends_on": [
@@ -120,13 +139,15 @@
         "e3-trbfv",
         "e3-fhe-params",
         "e3-init",
-        "e3-support-scripts",
         "e3-daemon-server",
         "e3-utils",
         "e3-zk-prover"
       ],
-      "tests": "Unit tests in src/ (cli.rs, start.rs, update.rs, rev.rs, helpers/, manifest.rs and others) and tests/cli_secrets.rs; run: cargo test -p e3-cli",
-      "unverified": ["Default control port and log file locations come from e3-config, which was not read."]
+      "tests": "Unit tests in src/ (cli.rs, start.rs, update.rs, rev.rs, program_support.rs, helpers/, manifest.rs and others) and tests/cli_secrets.rs; run: cargo test -p e3-cli",
+      "unverified": [
+        "Default control port and log file locations come from e3-config, which was not read.",
+        "crates/cli/scripts/openvm-compile.sh was not read."
+      ]
     },
     {
       "id": "e3-entrypoint",
@@ -694,11 +715,6 @@
           "name": "template clone in the fixed temporary folder /tmp/__interfold-tmp-folder.1",
           "where": "disk",
           "ref": "crates/init/src/lib.rs@28@const TEMP_DIR: &str"
-        },
-        {
-          "name": "dev runner and OpenVM scripts copied into the project's .interfold/support folder",
-          "where": "disk",
-          "ref": "crates/init/src/lib.rs@170@&cwd.join(\".interfold/support/dev\"),"
         }
       ],
       "key_types": [
@@ -721,7 +737,7 @@
       "read_first": [
         {
           "why": "the entry point that the CLI calls",
-          "ref": "crates/init/src/lib.rs@287@pub async fn execute("
+          "ref": "crates/init/src/lib.rs@262@pub async fn execute("
         },
         {
           "why": "the steps in order: clone, read versions, copy, install",
@@ -729,7 +745,7 @@
         },
         {
           "why": "the Cargo path rewrite that points template crates at the template's commit",
-          "ref": "crates/init/src/lib.rs@279@fn interfold_path_filter(commit_hash: &str) -> Filter {"
+          "ref": "crates/init/src/lib.rs@254@fn interfold_path_filter(commit_hash: &str) -> Filter {"
         },
         {
           "why": "the copy routine that applies the filters",
@@ -838,82 +854,6 @@
       "depends_on": [],
       "tests": "Unit tests in src/fs.rs (test_cp_recursive_copy, test_find_files_with_glob_pattern, test_replace_in_place_table); run: cargo test -p e3-fs",
       "unverified": []
-    },
-    {
-      "id": "e3-support-scripts",
-      "documentation": [{ "title": "Program runners", "path": "docs/pages/build/e3-program/compute-provider.mdx" }],
-      "kind": "crate",
-      "path": "crates/support-scripts",
-      "one_line": "Runs a project's program scripts: compile and start go to the dev runner or the OpenVM prover, and the cache purge deletes build caches.",
-      "actors": [],
-      "consumes": [],
-      "emits": [],
-      "state": [
-        {
-          "name": ".interfold/caches folder in the working directory, deleted by the cache purge",
-          "where": "disk",
-          "ref": "crates/support-scripts/src/lib.rs@33@let caches = cwd.join("
-        }
-      ],
-      "key_types": [
-        {
-          "name": "ProgramSupport",
-          "what": "enum that picks the Dev or OpenVm backend from the flag and the config",
-          "ref": "crates/support-scripts/src/program.rs@22@pub enum ProgramSupport {"
-        },
-        {
-          "name": "ProgramSupportApi",
-          "what": "trait with compile and start, implemented by ProgramSupport",
-          "ref": "crates/support-scripts/src/traits.rs@11@pub trait ProgramSupportApi {"
-        }
-      ],
-      "read_first": [
-        {
-          "why": "the entry point: validate the config, then compile through the chosen backend",
-          "ref": "crates/support-scripts/src/lib.rs@20@pub async fn program_compile(program_config: ProgramConfig, is_dev: Option<bool>) -> Result<()> {"
-        },
-        {
-          "why": "the backend choice",
-          "ref": "crates/support-scripts/src/program.rs@28@pub fn new(config: ProgramConfig, mode: Option<bool>) -> ProgramSupport {"
-        },
-        {
-          "why": "the OpenVM script runner, with its checks on the prover paths",
-          "ref": "crates/support-scripts/src/program_openvm.rs@21@async fn run(&self, script: &str) -> Result<()> {"
-        }
-      ],
-      "rust_patterns": [
-        {
-          "pattern": "trait-def",
-          "note": "ProgramSupportApi is the contract that both backends implement",
-          "ref": "crates/support-scripts/src/traits.rs@11@pub trait ProgramSupportApi {"
-        },
-        {
-          "pattern": "trait-impl",
-          "note": "the enum forwards compile and start to the backend it holds",
-          "ref": "crates/support-scripts/src/program.rs@38@impl ProgramSupportApi for ProgramSupport {"
-        },
-        {
-          "pattern": "enum-match",
-          "note": "dispatch on the backend variant",
-          "ref": "crates/support-scripts/src/program.rs@40@match self {"
-        },
-        {
-          "pattern": "result-question-mark",
-          "note": "an unsupported config is rejected before any script runs",
-          "ref": "crates/support-scripts/src/lib.rs@21@program_config.ensure_supported()?;"
-        },
-        {
-          "pattern": "unit-test",
-          "note": "tests that the default backend is OpenVm and that the flag overrides it",
-          "ref": "crates/support-scripts/src/program.rs@58@fn default_backend_is_openvm() {"
-        }
-      ],
-      "depends_on": ["e3-config"],
-      "tests": "Unit tests in src/program.rs and src/utils.rs (tokio tests for the script runner); the nested dev/ crate has its own tests. Run: cargo test -p e3-support-scripts",
-      "unverified": [
-        "dev/ and openvm/service/ are separate Cargo projects with their own lock file; their proving code was not traced.",
-        "The openvm/compile and openvm/start scripts were not read."
-      ]
     }
   ]
 }

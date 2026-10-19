@@ -100,7 +100,7 @@ export class VersionBumper {
     const outputs = [
       'Cargo.toml',
       ...PACKAGE_FILES,
-      'crates/zk-prover/versions.json',
+      'crates/zk/prover/versions.json',
       ...CARGO_WORKSPACES.map((workspace: string) => join(workspace, 'Cargo.lock')),
       'pnpm-lock.yaml',
       'CHANGELOG.md',
@@ -134,8 +134,8 @@ export class VersionBumper {
     const before = new Map(outputs.map((path) => [path, existsSync(join(this.rootDir, path)) ? this.read(path) : null]))
     this.write('Cargo.toml', cargo)
     for (const path of PACKAGE_FILES) this.writeJson(path, { ...this.json(path), version: this.newVersion })
-    const versions = this.json('crates/zk-prover/versions.json')
-    this.writeJson('crates/zk-prover/versions.json', { ...versions, required_circuits_version: this.newVersion })
+    const versions = this.json('crates/zk/prover/versions.json')
+    this.writeJson('crates/zk/prover/versions.json', { ...versions, required_circuits_version: this.newVersion })
     if (stable) this.bumpDappnode(dappnode, wrapperVersion!)
 
     // Each required command must succeed before any stage/commit/push. Failures leave reviewable

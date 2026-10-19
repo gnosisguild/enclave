@@ -420,7 +420,7 @@
       "tests": "Noir #[test] functions in examples/CRISP/circuits/lib/src (for example merkle_tree.nr and ciphertext_addition.nr); from examples/CRISP run pnpm test:circuits with the pinned Noir toolchain.",
       "unverified": [
         "The interfold_lib constants (N, L, QIS, and the bit widths) come from circuits/lib at the snapshot root, which this unit did not read.",
-        "The pnpm compute:vk-hash regeneration flow was not traced in this unit."
+        "The pnpm build:circuits sync-crisp regeneration flow was not traced in this unit."
       ]
     },
     {
@@ -595,7 +595,7 @@
         {
           "name": "ZKInputsGenerator",
           "what": "holds the BFV parameters and builds keys, encrypted votes, commitments, and circuit inputs",
-          "ref": "examples/CRISP/crates/zk-inputs/src/lib.rs@32@pub struct ZKInputsGenerator {"
+          "ref": "examples/CRISP/crates/zk-inputs/src/lib.rs@31@pub struct ZKInputsGenerator {"
         },
         {
           "name": "SimulateError",
@@ -617,7 +617,7 @@
           "why": "contract client: publish_input and finalize_input",
           "ref": "examples/CRISP/crates/evm_helpers/src/lib.rs@232@pub struct CRISPContract<P = CRISPWriteProvider> {"
         },
-        { "why": "ZK input generation for ballots", "ref": "examples/CRISP/crates/zk-inputs/src/lib.rs@173@pub fn generate_inputs(" },
+        { "why": "ZK input generation for ballots", "ref": "examples/CRISP/crates/zk-inputs/src/lib.rs@172@pub fn generate_inputs(" },
         {
           "why": "the JavaScript binding over the same generator",
           "ref": "examples/CRISP/crates/zk-inputs-wasm/src/lib.rs@16@pub struct ZKInputsGenerator {"
@@ -650,7 +650,7 @@
           "ref": "examples/CRISP/crates/crisp-utils/src/lib.rs@77@#[test]"
         }
       ],
-      "depends_on": ["e3-sdk", "e3-bfv-client", "e3-evm-helpers", "e3-fhe-params", "e3-zk-helpers", "e3-polynomial"],
+      "depends_on": ["e3-sdk", "e3-bfv-client", "e3-evm-helpers", "e3-fhe-params", "e3-zk-config", "e3-zk-witness", "e3-polynomial"],
       "tests": "crisp-utils and zk-inputs have inline #[test] modules, and evm_helpers has inline tests plus tests/integration.rs. Run cargo test inside each crate directory; these crates are not members of the root workspace.",
       "unverified": [
         "Callers of zk-inputs beyond zk-inputs-wasm, including its JavaScript wrapper, were not traced.",

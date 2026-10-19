@@ -70,14 +70,25 @@ preserves commitment/root but fails ShareManager decryption, wrongly imposing ci
 DecryptionTimeout. Receipt-verifier addresses must have code; a void call to an EOA returning empty
 bytes is not success.
 
-Each project guest/service links its own program. Changing processor/policy, allocator, sources,
-fhe.rs pin, or VM configuration requires rebuilt executable/keys/application commitments and
-matching deployed receipt identity. Never reuse a legacy RISC Zero image ID or another VM
-configuration's aggregation key. `interfold program compile` prepares artifacts/config;
-`program start` checks the selected CPU/CUDA worker (CUDA only after a successful GPU probe) before
-accepting work. Worker runs have deadlines; machine-local paths, keys, proofs, and benchmarks stay
-outside Git. See [OpenVM operations](../../crates/openvm-prover/README.md) and
+Each project's guest and separate `runner/` crate link its own program. The runner calls
+`e3_program_runner::run(fhe_processor, policy())`; keeping it separate prevents server dependencies
+from entering the guest. `program-runner dev` serves mock proofs; `program-runner openvm` serves the
+worker-verified service. Neither creates durable job admission.
+
+Changing processor/policy, allocator, sources, fhe.rs pin, or VM configuration requires rebuilt
+executable/keys/application commitments and matching deployed receipt identity. Never reuse a legacy
+RISC Zero image ID or another VM configuration's aggregation key. `interfold program compile`
+prepares artifacts/config; `program start` checks the selected CPU/CUDA worker (CUDA only after a
+successful GPU probe) before accepting work. Worker runs have deadlines; machine-local paths, keys,
+proofs, and benchmarks stay outside Git. See
+[OpenVM operations](../../crates/openvm-prover/README.md) and
 [provenance](../pages/build/e3-program/verify-compute-provider.mdx).
+
+The CLI's `program_support.rs` owns project-root compile/start and cache purge. Development compile
+uses `cargo build --bin program-runner`; OpenVM compile runs the embedded
+`crates/cli/scripts/openvm-compile.sh` to build guest, keys, receipt identity, worker configuration,
+and runner. Start uses the matching mode and forwards absolute `program.openvm` paths as `OPENVM_*`.
+Legacy `.interfold/support` projects are refused until they adopt the template runner.
 
 ## Ballot proof and selection
 
@@ -114,8 +125,8 @@ coefficient, hinted weight v, and quotient r to `[0,t)`, then verifies `k1 + t*r
 integers. Use the non-centered scale, not `Q_MOD_T_CENTERED`. Weights sum at most the slot bound;
 with two options at most one is nonzero. Bounds give `k1_commitment` one opening, so the fold binds
 the same plaintext the encryption circuit proves. Regenerate both presets' fold VK constants
-(`pnpm compute:vk-hash` in the CRISP workspace) and verifiers after ballot-circuit changes; a
-deployed program retains its old immutable verifier until replacement.
+(`pnpm build:circuits sync-crisp` from the repository root, for both presets) and verifiers after
+ballot-circuit changes; a deployed program retains its old immutable verifier until replacement.
 
 The tree appends rather than updates because anyone may mask an eligible slot without its owner's
 signature. Update-in-place would let a third party erase a counted vote. Each entry names its

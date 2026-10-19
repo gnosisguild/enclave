@@ -837,7 +837,8 @@
         "e3-fhe-params",
         "e3-utils",
         "e3-zk-prover",
-        "e3-zk-helpers"
+        "e3-zk-config",
+        "e3-polynomial"
       ],
       "tests": "cargo test -p e3-tests --test integration (5 tests), --test large_work_plan_recovery (1) and --test layout_lock (1). Regenerate the layout fixture locally with LAYOUT_LOCK_UPDATE=1 cargo test -p e3-tests --test layout_lock. tests/docker holds a shell test of the ciphernode entrypoint's state paths.",
       "unverified": []

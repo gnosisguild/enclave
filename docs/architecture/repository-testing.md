@@ -2,7 +2,7 @@
 
 Owners: [shared helpers](../../crates/test-helpers/),
 [integration scenarios](../../crates/tests/tests/), and
-[real recursive-proof tests](../../crates/zk-prover/tests/). Root
+[real recursive-proof tests](../../crates/zk/prover/tests/). Root
 [package scripts](../../package.json) own setup and commands. This page describes what the test
 boundaries establish, not a replacement inventory of tests.
 
@@ -21,6 +21,17 @@ recovery. [Network delivery](network-delivery.md) and [persistence](persistence-
 retain the production gaps those scenarios do not close.
 
 ## Proofs and compatibility
+
+ZK configuration, production preparation, artificial samples, build operations, and benchmark
+orchestration have [separate owners](../../crates/zk/README.md). Samples use dev-dependencies except
+for the unpublished benchmark tool; no package may depend on that benchmark owner. The repository
+containment check handles aliases and target-specific dependency tables.
+
+`pnpm test:circuit-build` and `pnpm test:circuit-bench` cover tooling contracts without launching a
+full proof campaign. Benchmark schema 2 keeps production Rust phases separate from historical
+`isolated_nargo`, integration wall time, and overlapping job time. Missing measurements stay null;
+failed stages fail the run. Replay re-verifies saved proofs without recreating them; report runs no
+compiler, prover, integration, or EVM command and does not overwrite saved data.
 
 Integration setup can locate `bb` or install the required backend/artifacts. The test crate also
 enables test-only proof-aggregation support: inspect the selected scenario's settings before calling

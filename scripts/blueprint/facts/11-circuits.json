@@ -1074,7 +1074,7 @@
       "depends_on": [],
       "tests": "Unit tests sit beside the code: safe.nr 13, helpers.nr 9, polynomial.nr 12, recursive_vk.nr 4, plus the modulo files and the core modules. Run nargo test in circuits/lib (circuits/README.md).",
       "unverified": [
-        "The builder now lives at scripts/circuits/build.ts, outside this circuit snapshot; generated headers may still name its historical scripts/build-circuits.ts path.",
+        "The Rust builder lives at crates/zk/build, outside this circuit snapshot; generated provenance retains its committed byte format.",
         "The Poseidon2 permutation body in safe.nr was not read; the Poseidon2 and Keccak256 description comes from the module comments."
       ]
     }

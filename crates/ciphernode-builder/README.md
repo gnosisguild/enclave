@@ -67,7 +67,7 @@ load the password-backed `Cipher`, choose a profile, then configure:
 readiness before returning. Run it inside an Actix runtime; its actor setup uses local tasks, so do
 not move the startup future to an arbitrary `tokio::spawn` worker. Enabled chains need reachable RPC
 endpoints and deployed contracts. Full nodes also need matching
-[Noir/Barretenberg artifacts](../zk-prover/README.md); preparation may install artifacts. The
+[Noir/Barretenberg artifacts](../zk/prover/README.md); preparation may install artifacts. The
 entrypoint applies a configured startup deadline around `build()`.
 
 ## Handle and shutdown
