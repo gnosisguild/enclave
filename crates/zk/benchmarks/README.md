@@ -37,7 +37,8 @@ mode-restricted selections fail. Historical result directories and that config s
 - Sample generation, configuration construction, and artifact loading sit outside the phase timers.
   BB adapter measurements include process startup and file I/O.
 - Missing measurements are JSON `null`, never zero. A failed stage fails the run; it does not become
-  a successful N/A result.
+  a successful N/A result. Raw records retain failed-stage durations for diagnostics. Reports show
+  failed leaf-phase durations as `N/A` and exclude them from leaf totals; the run remains failed.
 - Both UDE legs share one encryption and one prepared witness. The runner measures this shared work
   once, and each leg projects the compiled ABI, including ct1's separate `r_ct1` quotient.
 

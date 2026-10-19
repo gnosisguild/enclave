@@ -152,6 +152,50 @@ fn report_reads_both_schemas_without_relabeling_metrics_or_confusing_ude_wrapper
 }
 
 #[test]
+fn report_excludes_failed_schema_two_phase_durations() {
+    let mut failed = Record::new(
+        Case::Ct0,
+        "insecure",
+        e3_zk_prover::CircuitVariant::Recursive,
+    );
+    let failure: anyhow::Result<()> = Err(anyhow::anyhow!("phase failed"));
+    for stage in [
+        &mut failed.preparation,
+        &mut failed.compilation,
+        &mut failed.execution,
+        &mut failed.vk_generation,
+        &mut failed.proof_generation,
+        &mut failed.verification,
+    ] {
+        stage.finish(std::time::Duration::from_secs(3), &failure);
+    }
+    failed.error = Some("phase failed".into());
+    let mut successful = Record::new(
+        Case::Ct1,
+        "insecure",
+        e3_zk_prover::CircuitVariant::Recursive,
+    );
+    successful.proof_generation.success = Some(true);
+    successful.proof_generation.time_seconds = Some(0.0);
+    successful.verification.success = Some(true);
+    successful.verification.time_seconds = Some(1.0);
+    let data = report::Data {
+        leaves: [failed, successful]
+            .into_iter()
+            .map(|record| report::parse_leaf(serde_json::to_value(record).unwrap()).unwrap())
+            .collect(),
+        metadata: serde_json::Value::Null,
+        integration: serde_json::Value::Null,
+        gas: serde_json::Value::Null,
+        files: vec![],
+    };
+    let rendered = report::render(&data).unwrap();
+    assert!(rendered.contains("| threshold/user_data_encryption_ct0 | external_bb_prove_wall | N/A | N/A | N/A | N/A | N/A | N/A | failed |"));
+    assert!(rendered.contains("prove time: N/A s; verify time: N/A s."));
+    assert!(rendered.contains("| threshold/user_data_encryption_ct1 | external_bb_prove_wall | N/A | N/A | N/A | N/A | 0.000000 | 1.000000 | verified |"));
+}
+
+#[test]
 fn report_only_uses_saved_data_and_does_not_overwrite_its_input() {
     let temp = tempfile::tempdir().unwrap();
     let saved = temp.path().join("saved");

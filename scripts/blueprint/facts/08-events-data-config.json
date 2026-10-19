@@ -232,7 +232,7 @@
           "ref": "crates/events/src/event_context.rs@24@pub struct AggregateId(usize);"
         }
       ],
-      "depends_on": ["e3-crypto", "e3-committee-hash", "e3-trbfv", "e3-utils", "e3-fhe-params", "e3-zk-helpers"],
+      "depends_on": ["e3-crypto", "e3-committee-hash", "e3-trbfv", "e3-utils", "e3-fhe-params", "e3-zk-config"],
       "tests": "Unit tests sit in #[cfg(test)] modules in eventbus.rs, eventstore.rs and sequencer.rs. Run: cargo test -p e3-events",
       "unverified": [
         "The replay path that feeds stored events back into the EventBus after a restart lives outside these four crates and was not traced here."

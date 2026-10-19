@@ -66,11 +66,11 @@ pub(crate) struct Leaf {
     system: Value,
 }
 
-fn measured(stage: &HistoricalStage) -> Option<f64> {
-    if stage.success == Some(false) {
+fn measured(success: Option<bool>, time_seconds: Option<f64>) -> Option<f64> {
+    if success == Some(false) {
         None
     } else {
-        stage.time_seconds
+        time_seconds
     }
 }
 pub(crate) fn parse_leaf(document: Value) -> Result<Leaf> {
@@ -101,12 +101,15 @@ pub(crate) fn parse_leaf(document: Value) -> Result<Leaf> {
                 path: row.circuit_path,
                 name: row.circuit_name,
                 origin: row.metric_kind,
-                preparation: row.preparation.time_seconds,
-                compilation: row.compilation.time_seconds,
-                execution: row.execution.time_seconds,
-                vk: row.vk_generation.time_seconds,
-                prove: row.proof_generation.time_seconds,
-                verify: row.verification.time_seconds,
+                preparation: measured(row.preparation.success, row.preparation.time_seconds),
+                compilation: measured(row.compilation.success, row.compilation.time_seconds),
+                execution: measured(row.execution.success, row.execution.time_seconds),
+                vk: measured(row.vk_generation.success, row.vk_generation.time_seconds),
+                prove: measured(
+                    row.proof_generation.success,
+                    row.proof_generation.time_seconds,
+                ),
+                verify: measured(row.verification.success, row.verification.time_seconds),
                 gates: row.gates.total_gates,
                 circuit_bytes: row.circuit_size_bytes,
                 witness_bytes: row.witness_size_bytes,
@@ -141,11 +144,14 @@ pub(crate) fn parse_leaf(document: Value) -> Result<Leaf> {
                 name: row.circuit_name,
                 origin: "isolated_nargo".into(),
                 preparation: None,
-                compilation: measured(&row.compilation),
-                execution: measured(&row.execution),
-                vk: measured(&row.vk_generation),
-                prove: measured(&row.proof_generation),
-                verify: measured(&row.verification),
+                compilation: measured(row.compilation.success, row.compilation.time_seconds),
+                execution: measured(row.execution.success, row.execution.time_seconds),
+                vk: measured(row.vk_generation.success, row.vk_generation.time_seconds),
+                prove: measured(
+                    row.proof_generation.success,
+                    row.proof_generation.time_seconds,
+                ),
+                verify: measured(row.verification.success, row.verification.time_seconds),
                 gates: row.gates["total_gates"]
                     .as_u64()
                     .filter(|value| *value != 0),
