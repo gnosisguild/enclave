@@ -313,13 +313,23 @@ the reduction.
 `ZKPassportIdentityVerifier` is an `IIdentityVerifier` for ZKPassport proofs of chip documents. It
 replaces the caller's service configuration with a fixed domain, scope, proof-age window and
 `devMode = false` before it calls ZKPassport's root verifier, because ZKPassport checks the values
-that its caller passes. It accepts one ZKPassport version and one identifier type (non-salted or
-salted). It requires a non-zero identifier, a proof bound to the registering owner and to
-`block.chainid`, a proven expiry date at or after the evidence's `validUntil`, and strict FaceMatch
-when configured. The identifier hashes the scoped nullifier with the domain and scope, so it belongs
-to one document: two documents give two identifiers, and a renewed document gives a new one. The
-credential ends at `validUntil`, or `maxValidity` after the proof date if that is earlier.
-ZKPassport's admin keys control its verifier, helper and certificate registry.
+that its caller passes. It accepts one ZKPassport version, one identifier type (non-salted or
+salted) and one OPRF key hash (ZKPassport's key for salted proofs, zero for non-salted proofs). It
+requires a non-zero identifier, a proof bound to the registering owner and to `block.chainid`, a
+proven expiry date at or after the evidence's `validUntil`, and strict FaceMatch when configured.
+The identifier hashes the scoped nullifier with the domain and scope. While the domain, scope,
+identifier type, OPRF key and ZKPassport's nullifier derivation stay the same, it belongs to one
+document: two documents give two identifiers, and a renewed document gives a new one. The credential
+ends at `validUntil`, or `maxValidity` after the proof date if that is earlier. ZKPassport's admin
+keys control its verifier, helper, certificate registry and OPRF key.
+
+`OwnerIdentityRegistry.setVerifier` accepts any verifier. A replacement keeps the existing
+reservations useful only if it yields the same identifiers: the same domain, scope, identifier type
+and OPRF key, and the same ZKPassport derivation. Any other replacement gives every registered
+document a new identifier that can register a second owner, so it needs a new registry. When
+ZKPassport retires the pinned version, registration and renewal revert until governance sets a
+verifier for the new version. Credentials then lapse at their `expiresAt`, and under a required
+policy the owner capacity fails closed.
 
 Before pausing admissions after an eligibility configuration change, refresh every operator that
 must remain eligible. Wait for a later block timestamp. Check that
