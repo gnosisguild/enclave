@@ -320,7 +320,7 @@ proven expiry date at or after the evidence's `validUntil`, and strict FaceMatch
 The identifier hashes the scoped nullifier with the domain and scope. While the domain, scope,
 identifier type, OPRF key and ZKPassport's nullifier derivation stay the same, it belongs to one
 document: two documents give two identifiers, and a renewed document gives a new one. The credential
-ends at `validUntil`, or `maxValidity` after the proof date if that is earlier. ZKPassport's admin
+ends at `validUntil`, or `MAX_VALIDITY` after the proof date if that is earlier. ZKPassport's admin
 keys control its verifier, helper, certificate registry and OPRF key.
 
 `OwnerIdentityRegistry.setVerifier` accepts any verifier. A replacement keeps the existing
