@@ -35,11 +35,17 @@ CiphernodeSelected event arrives at ThresholdKeyshare
 │   ├─ 1. Create child actors:
 │   │     ├─ EncryptionKeyCollector (accepts all N keys or at least H at cutoff)
 │   │     └─ ThresholdShareCollector (accepts all N−1 external shares or at least H−1 at cutoff)
-│   │     → These collectors start immediately so early peer keys/shares can
-│   │       be buffered while this node is still finishing earlier DKG phases
+│   │     → Once effects run, these collectors start immediately so early peer
+│   │       keys/shares can be buffered while this node is still finishing earlier
+│   │       DKG phases
 │   │     → A peer key that arrives in `Init` is only recorded.
 │   │       `replay_encryption_keys` sends every recorded key to the new
 │   │       EncryptionKeyCollector, as restart recovery does
+│   │     → While startup replays the event log (effects off), no collector
+│   │       starts, here or for a key, share or C4 share that arrives: the input
+│   │       is only recorded, and `resume_in_flight_work` builds the collectors
+│   │       at EffectsEnabled. A keyshare that replay starts gets effects off from
+│   │       `E3Context::effects_enabled`, like a restored one
 │   │
 │   ├─ 2. Reuse the recorded BFV keypair, or generate a fresh one:
 │   │     (secret_key, public_key) = BFV::keygen(share_encryption_preset)
@@ -1995,27 +2001,28 @@ answers differently from a program where every input counts.
 `InputPolicy::default()` is the behaviour that predates policies — the leaf is the ciphertext's own
 commitment and every input is computed over — and matches the starter template, whose
 `MyProgram.publishInput` inserts the commitment directly. Every E3 program exports `policy()` beside
-`fhe_processor`, so the guest and the dev runner need not know which program they are running.
+`fhe_processor`, so the guest and `e3-program-runner` need not know which program they are running.
 `select` sees an `InputRecord`: the published input without its ciphertext bytes, which the Secure
 Process no longer holds at selection time. The processor receives the selected ciphertexts as an
 iterator.
 
-Each project's guest (`guest/`) and proving service (`.interfold/support/openvm`) link the project's
-own `program/`. A policy or processor change requires a new OpenVM executable, derived application
-commitments, and matching receipt-verifier deployment. Do not reuse a legacy RISC Zero image ID or
-an aggregation key for another VM configuration.
+Each project's guest (`guest/`) and runner (`runner/`, which serves the proving service in `openvm`
+mode) link the project's own `program/`. A policy or processor change requires a new OpenVM
+executable, derived application commitments, and matching receipt-verifier deployment. Do not reuse
+a legacy RISC Zero image ID or an aggregation key for another VM configuration.
 
 The OpenVM guest enables `heap-embedded-alloc`. A bump allocator never frees, so each input's
 temporary Greco form would stay allocated and a secure-preset round would run out of memory as the
 round grows. The allocator is part of the guest executable, so changing it changes the application
 commitments that the receipt verifiers bind.
 
-`interfold program compile` builds the project's guest, its keys, the receipt identity and the
-worker configuration, and `interfold program start` runs the project's service with the
-`program.openvm` workers. The service picks the CUDA worker when it is configured and its probe
-opens a GPU, and the CPU worker otherwise, and runs the worker's `check` before it accepts work.
-Every worker run has a deadline. Proving artifacts and machine-specific paths stay outside Git.
-Explicit development mode remains separate from the real-proof service.
+`interfold program compile` builds the project's guest, its keys, the receipt identity, the worker
+configuration and the project's `program-runner` binary, and `interfold program start` runs
+`program-runner openvm` with the `program.openvm` workers. The service picks the CUDA worker when it
+is configured and its probe opens a GPU, and the CPU worker otherwise, and runs the worker's `check`
+before it accepts work. Every worker run has a deadline. Proving artifacts and machine-specific
+paths stay outside Git. Development mode (`program-runner dev`) remains separate from the real-proof
+service.
 
 File: `examples/CRISP/packages/crisp-contracts/tests/openvm-service.test.ts`
 

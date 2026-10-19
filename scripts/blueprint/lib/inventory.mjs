@@ -43,20 +43,19 @@ const lines = (p) => readFileSync(p, 'utf8').split('\n')
 
 // The layer of each workspace crate, from agent/CRATES_ARCHITECTURE.md "Dependency layers".
 export const LAYERS = {
-  entry: [
-    'cli',
-    'entrypoint',
-    'ciphernode-builder',
-    'dashboard',
-    'daemon-server',
-    'console',
-    'init',
-    'fs',
-    'support-scripts',
-    'interfoldup',
-    'zk/cli',
+  entry: ['cli', 'entrypoint', 'ciphernode-builder', 'dashboard', 'daemon-server', 'console', 'init', 'fs', 'interfoldup', 'zk/cli'],
+  clients: [
+    'program-server',
+    'program-runner',
+    'compute-provider',
+    'sdk',
+    'indexer',
+    'evm-helpers',
+    'wasm',
+    'openvm-host',
+    'openvm-types',
+    'openvm-prover',
   ],
-  clients: ['program-server', 'compute-provider', 'sdk', 'indexer', 'evm-helpers', 'wasm', 'openvm-host', 'openvm-types', 'openvm-prover'],
   workflows: ['request', 'sortition', 'keyshare', 'aggregator', 'slashing', 'zk-prover', 'fhe', 'multithread', 'trbfv', 'bfv-client'],
   adapters: ['evm', 'net', 'sync', 'data', 'data-availability', 'logger'],
   vocabulary: ['events', 'config', 'fhe-params', 'zk-helpers', 'committee', 'committee-hash'],

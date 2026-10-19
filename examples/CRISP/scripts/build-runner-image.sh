@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: LGPL-3.0-only
+#
+# Builds the e3-support image, CRISP's program runner (examples/CRISP/runner/Dockerfile), from the
+# repository root. `--push` also pushes it. Other arguments go to `docker build`.
 PKG="${E3_SUPPORT_IMAGE_REPOSITORY:-ghcr.io/theinterfold/e3-support}"
 GIT_SHA=$(git rev-parse --short=9 HEAD)
 
@@ -16,7 +20,7 @@ done
 
 # Build with any additional arguments
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-docker build -t "$PKG:$GIT_SHA" -f "$ROOT/crates/support/Dockerfile" "${BUILD_ARGS[@]}" "$ROOT"
+docker build -t "$PKG:$GIT_SHA" -f "$ROOT/examples/CRISP/runner/Dockerfile" "${BUILD_ARGS[@]}" "$ROOT"
 
 # Push if --push was specified
 if [ "$PUSH" = true ]; then

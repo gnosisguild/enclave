@@ -17,7 +17,7 @@ on:
 
 env:
   CIPHERNODE_DOCKERFILE_PATH: crates/Dockerfile
-  SUPPORT_DOCKERFILE_PATH: crates/support/Dockerfile
+  SUPPORT_DOCKERFILE_PATH: examples/CRISP/runner/Dockerfile
   CIPHERNODE_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/ciphernode
   SUPPORT_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/e3-support
   NPM_VERSION: '11.19.1'

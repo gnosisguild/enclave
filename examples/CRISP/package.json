@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "dev:setup": "bash ./scripts/setup.sh",
     "dev:up": "bash ./scripts/dev.sh",
+    "build:runner-image": "bash ./scripts/build-runner-image.sh",
     "test:e2e": "bash ./scripts/test_e2e.sh",
     "compile:contracts": "pnpm -C packages/crisp-contracts compile",
     "test:contracts": "pnpm -C packages/crisp-contracts test",

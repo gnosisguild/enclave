@@ -25,11 +25,11 @@ flowchart TD
         Console[e3-console]
         Init[e3-init]
         Fs[e3-fs]
-        Support[e3-support-scripts]
     end
 
     subgraph Clients[Client and compute surfaces]
         ProgramServer[e3-program-server]
+        ProgramRunner[e3-program-runner]
         ComputeProvider[e3-compute-provider]
         SDK[e3-sdk]
         Indexer[e3-indexer]
@@ -97,15 +97,16 @@ flowchart TD
     CLI --> Dash
     CLI --> Daemon
     CLI --> Init
-    CLI --> Support
+    CLI --> Config
     EP --> Builder
     EP --> EventSystem
     Daemon --> Config
     Daemon --> Console
     Init --> Fs
-    Support --> Config
 
     ProgramServer --> ComputeProvider
+    ProgramRunner --> ProgramServer
+    ProgramRunner --> ComputeProvider
     ComputeProvider --> BfvClient
     SDK --> BfvClient
     SDK --> Indexer
@@ -282,22 +283,21 @@ sequenceDiagram
 
 `interfold start --bootstrap` builds a bootstrap node with `CiphernodeBuilder::bootstrap`. It
 enables persistence, the Interfold contract reader, and the libp2p interface. It has no compute
-scheduler (so no prover-memory check), TrBFV keyshare, ZK prover,
-aggregators, registry or bonding readers, or contract writers, and `setup_extensions` installs no
-`AccusationManager` or `CommitmentConsistencyChecker`, so it signs no votes. The parts that the
-builder runs for every node still run: sortition, the request router with the aggregator-role
-extension, the E3 lifecycle coordinator, and per-chain data-availability coordination. Installed
-extensions declare the expected router recipients. Bootstrap extensions declare none, so their E3
-contexts keep no deferred protocol backlog. Full-node deferred delivery uses per-E3 and global item
-and byte limits, with isolated queue failure on overflow (`flow-trace/03`). It still needs a wallet
-key. The builder derives the node address and the HLC node id from it, and `wallet set` derives the
-libp2p keypair from the same key. It fetches peer history at startup like a full node, but
-`NetSyncManager` continues without that history when no peer serves it (`peer_history_optional`), so
-a seed without a reachable peer still starts while an E3 is open. A full node needs that history:
-`NetSyncManager` returns the fetch failure through the failure recipient of
-`HistoricalNetSyncStart`, and startup stops with that error before its deadline. A bootstrap node
-serves discovery, gossip, DHT documents, and history like a full node
-(`crates/entrypoint/src/start/start.rs`).
+scheduler (so no prover-memory check), TrBFV keyshare, ZK prover, aggregators, registry or bonding
+readers, or contract writers, and `setup_extensions` installs no `AccusationManager` or
+`CommitmentConsistencyChecker`, so it signs no votes. The parts that the builder runs for every node
+still run: sortition, the request router with the aggregator-role extension, the E3 lifecycle
+coordinator, and per-chain data-availability coordination. Installed extensions declare the expected
+router recipients. Bootstrap extensions declare none, so their E3 contexts keep no deferred protocol
+backlog. Full-node deferred delivery uses per-E3 and global item and byte limits, with isolated
+queue failure on overflow (`flow-trace/03`). It still needs a wallet key. The builder derives the
+node address and the HLC node id from it, and `wallet set` derives the libp2p keypair from the same
+key. It fetches peer history at startup like a full node, but `NetSyncManager` continues without
+that history when no peer serves it (`peer_history_optional`), so a seed without a reachable peer
+still starts while an E3 is open. A full node needs that history: `NetSyncManager` returns the fetch
+failure through the failure recipient of `HistoricalNetSyncStart`, and startup stops with that error
+before its deadline. A bootstrap node serves discovery, gossip, DHT documents, and history like a
+full node (`crates/entrypoint/src/start/start.rs`).
 
 After schema admission, `preflight_node_role` stamps `//node_role` on a new data directory, which is
 one whose schema marker this startup wrote. A directory that existed before this startup and has no
@@ -309,11 +309,11 @@ has only two profiles, `CiphernodeBuilder::full` and `CiphernodeBuilder::bootstr
 node cannot enable keyshare, aggregation, registry, or contract-writer components. A bootstrap node
 advances the per-chain block cursor with only the Interfold reader. A full node started on its
 directory would therefore skip earlier registry events. A bootstrap node started on a full node's
-directory would restore that node's
-committees. The marker is read with `read_checked`, so a storage error cannot pass as an unmarked
-directory. A release without the marker check uses schema 7 or earlier, so it halts on a schema-8
-directory (`crates/sync/src/sync/preflight.rs`). A schema-7 directory that a development build wrote
-with the marker is the exception: v0.18.0 opens it without the check.
+directory would restore that node's committees. The marker is read with `read_checked`, so a storage
+error cannot pass as an unmarked directory. A release without the marker check uses schema 7 or
+earlier, so it halts on a schema-8 directory (`crates/sync/src/sync/preflight.rs`). A schema-7
+directory that a development build wrote with the marker is the exception: v0.18.0 opens it without
+the check.
 
 Startup has a configured outer deadline. The EVM and network startup buffers expose readiness
 failures; a bound overflow fails startup instead of silently discarding protocol observations.
@@ -1107,8 +1107,8 @@ attributable to a canonical party before they become slashing evidence. Replayed
 `AccusationQuorumReached` events are written to a versioned per-chain recovery outbox and held until
 `EffectsEnabled`, then coalesced by the contract's semantic replay domain across deferred,
 in-flight, and completed submissions. Retryable submission failures release the process-local
-in-flight key but retain the outbox intent. Confirmed or known-benign terminal results resolve it.
-A failure is terminal when its decoded revert names an error in `TERMINAL_SLASH_SUBMISSION_ERRORS`,
+in-flight key but retain the outbox intent. Confirmed or known-benign terminal results resolve it. A
+failure is terminal when its decoded revert names an error in `TERMINAL_SLASH_SUBMISSION_ERRORS`,
 for example `SlashSubmissionDeadlinePassed`. Each listed error must be in the Rust
 `ISlashingManager` ABI: a revert that does not decode is retried every 30 seconds.
 
@@ -1120,10 +1120,10 @@ canonical N-member roster remains unchanged for proof binding, rewards, and regi
 The slash writer has three state layers. Its deferred, in-flight, and completed admission sets are
 process-local. Its semantic intent outbox is durable and is written before policy reads or
 submission. A separate durable record keeps when it first recorded each intent, so a fallback
-submitter waits only for the rest of its rank delay after a restart. A matching canonical exclusion or slash execution acknowledges the outbox, and startup
-backfills a missing outbox from EventStore history. A crash after transaction broadcast can still
-require on-chain reconciliation to distinguish landed from missing work; contract replay protection
-makes a repeated proposal safe.
+submitter waits only for the rest of its rank delay after a restart. A matching canonical exclusion
+or slash execution acknowledges the outbox, and startup backfills a missing outbox from EventStore
+history. A crash after transaction broadcast can still require on-chain reconciliation to
+distinguish landed from missing work; contract replay protection makes a repeated proposal safe.
 
 At startup, a full node's `CiphernodeBuilder` reads `Interfold.slashingManager()` on each enabled
 chain. That chain's `SlashExecuted` reader and proposal writer use the resolved address, and the
@@ -1140,8 +1140,8 @@ backfill start block comes from the configured `deploy_block` values.
 The node reads the SlashingManager only at startup. After its startup sync, a `SlashingManagerSet`
 log of the `Interfold` contract that names another address fails that chain's `EvmChainGateway`
 closed, so the node exits with an error and a restart reads the new manager. **Gap:** a replacement
-that lands between the startup read and the end of the startup sync is a historical log, so the
-node keeps the old manager until its next restart.
+that lands between the startup read and the end of the startup sync is a historical log, so the node
+keeps the old manager until its next restart.
 
 ## Program-server trust boundary
 
@@ -1401,10 +1401,9 @@ and the CLI exits with an error. A panic ends only the actor whose handler panic
 command installs a panic hook (`e3_entrypoint::actor_panics`): after a panic on the thread that runs
 the actors, the CLI runs the shutdown barrier and exits with an error, and the node recovers from
 its event log at the next start. Panics on other threads stay with their owners; the compute pool
-returns them as job errors. Shutdown closes event admission, waits for admitted
-publishers, persists and fans out `Shutdown`, flushes the durable pipeline, then drains snapshot
-batches and the backing store under one deadline. Any failed shutdown stage reaches the CLI and
-causes an unsuccessful exit.
+returns them as job errors. Shutdown closes event admission, waits for admitted publishers, persists
+and fans out `Shutdown`, flushes the durable pipeline, then drains snapshot batches and the backing
+store under one deadline. Any failed shutdown stage reaches the CLI and causes an unsuccessful exit.
 
 Cancellation ownership is not uniform across the workspace. EVM reader loops have an explicit
 oneshot shutdown signal, the EventBus shutdown event stops many actors, and the outer deadline
@@ -1468,8 +1467,9 @@ New E3s start from zero; terminal or finalized E3 checkpoints are removed.
 | `e3-keyshare`                      | Coordinate request-local DKG, shares, and decryption work.                                           | Threshold keyshare actor state and repositories; depends on FHE/ZK services and the event bus.                                                                     | Party IDs index the canonical committee; each recipient gets C2a/C2b singletons and C3a/C3b per threshold Shamir row. Resumable determined outputs redrive only after `EffectsEnabled`. Fatal collector timeouts commit `Failed` before `E3Failed`, freeze its payload, and redrive that failure after hydration.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Cryptographic backend/task pool; must not own transport frames or ABI decoding.                                           |
 | `e3-zk-prover`                     | Build and verify typed proof jobs/statements.                                                        | Backend job state, circuit registry, verification outcomes, durable node-fold inputs and outputs, and seeded committee/preset caches.                              | Statement shapes, canonical committee dimensions, signer/slot binding, and proof multiplicity are checked before acceptance; DKG presets normalize to their threshold counterpart when deriving C3 row counts. Finalized slots and C0 context load before replay. The node-fold collector persists each inner proof and fold metadata, then resumes incomplete work after restart. A `bb` run is capped by the node's `bb_timeout_secs` (12 hours by default); the timeout error carries the elapsed time and the end of bb's stderr.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | ZK backend and registry; must not add committee policy absent from the proof statement.                                   |
 | `e3-aggregator`                    | Aggregate canonical verified public-key/plaintext shares and schedule committee finalization.        | Explicit per-E3 aggregation states plus a versioned finalizer request/ticket repository shared across chains.                                                      | One signer-bound share/proof occupies each canonical party slot and output multiplicity is exact. Every standby persists valid inputs; only the active party launches aggregation effects. Promotion resumes the persisted phase. Finalization timers re-arm after effects with the E3's chain provider and retry temporary timestamp failures. Invalid or duplicate contributions are rejected.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Pure aggregation states and proof backend; must not own EVM transaction policy.                                           |
-| `e3-slashing`                      | Attribute proof failures, collect authenticated votes, and emit quorum outcomes.                     | Recreated per-E3 accusation/checker actors and per-E3 saved vote and evidence state; depends on durable committee data, verification, and events.                  | Honest threshold decides quorum and only structurally attributable failures become evidence. Active actors recover from committee snapshots, and pending accusations keep their votes and vote timeouts across a restart.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Voting/evidence domain modules; must not generate proofs or assign ambiguous blame.                                       |
+| `e3-slashing`                      | Attribute proof failures, collect authenticated votes, and emit quorum outcomes.                     | Recreated per-E3 accusation/checker actors and per-E3 saved vote and evidence state; depends on durable committee data, verification, and events.                  | Honest threshold decides quorum and only structurally attributable failures become evidence. Active actors recover from committee snapshots, and pending accusations keep their votes and vote timeouts across a restart.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Voting/evidence domain modules; must not generate proofs or assign ambiguous blame.                                       |
 | `e3-program-server`                | Serve bounded development compute requests and deliver results to caller-supplied HTTP(S) callbacks. | Runner closure, callback client, and job semaphore.                                                                                                                | Zero job capacity fails build; overload returns 429; callbacks reject unsafe URL forms and use bounded delivery timeouts. The test endpoint does not authenticate callers, does not allowlist callback targets, and must not be exposed as a production service. Detached tasks are not recoverable.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Runner callback; must not become durable protocol state or be treated as a production trust boundary.                     |
+| `e3-program-runner`                | Run a project's E3 program as the unproved development runner or the OpenVM proving service.         | The project's processor and policy, and one `E3ProgramServer` per process.                                                                                         | The first argument selects `dev` or `openvm`; any other value fails with a usage error. Both modes pass the caller's policy to the run, so the published ciphertext and the proof use one rule. Both modes serve the unauthenticated test endpoint, so an `openvm` deployment must add its own access control.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Project-supplied processor and policy; must not own program logic or be linked into the OpenVM guest.                     |
 | `e3-ciphernode-builder`            | Construct stores, adapters, actor extensions, migration projections, and startup barriers.           | Composition handles, reconciled startup snapshots, and validated configuration; durable state remains in repositories and logs.                                    | Schema and recovery preflight run before state-writing actors. Contradictory committee snapshots, missing active metadata, or an unsupported recovery version fail startup. Required components and startup readiness must succeed before returning a handle. A chain configured without a contract route fails at build, because its reader filter would have no address and fetch every log on the chain.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Concrete factories/extensions; must not accumulate live protocol policy or durable business state.                        |
 | `e3-entrypoint` / SWARM supervisor | Load/decrypt node configuration and manage child processes.                                          | Process map, kill-on-drop child handles, and output-forwarding tasks.                                                                                              | Partial startup is cleaned up; status distinguishes exited children; stop is SIGTERM-first and time-bounded; a dropped final handle cannot orphan its child.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Command composition; must not silently restart failed protocol work or own node domain state.                             |
 
@@ -1480,20 +1480,25 @@ are not introduced solely to create layers.
 ### OpenVM compute support
 
 Each project proves its own E3 program. Its `guest/` crate (its own workspace, built with
-`cargo openvm`) and the `.interfold/support/openvm` service both link the project's `program/`, so
-the guest, the native host, and the contract share one policy source. The service is an
-`e3-program-server` whose runner is `e3-openvm-host`: it runs the shared `SecureProcess` natively,
-writes the guest's input stream (a header, every ciphertext, then the selected ones), and runs the
-separate `interfold-openvm-prover` worker (`crates/openvm-prover`, its own workspace). It accepts
-only a verified OpenVM EVM receipt. The guest reads one ciphertext at a time, so a round is not
-bounded by guest memory. The worker validates the executable, VM identity, aggregation key, Halo2
-key and parameters, verifier artifact, and journal. At startup the host picks the CUDA worker when
-it is configured and can open a GPU, and otherwise the CPU worker; every worker run has a deadline.
-Jobs remain in memory; this service does not provide durable admission or restart recovery.
-`interfold program compile` builds the guest, keys, receipt identity, worker configuration, and
-service; `e3-init` copies the service folder and pins the guest's Interfold crates to the template
-commit. The normal `e3-support-scripts` backend uses `program.openvm`; it no longer selects RISC
-Zero or Boundless. `program.dev` is an explicit, unproved runner.
+`cargo openvm`) and its `runner/` crate both link the project's `program/`, so the guest, the native
+host, and the contract share one policy source. The `runner/` binary calls
+`e3_program_runner::run(fhe_processor, policy())` and is a separate crate so the server dependencies
+stay out of the guest. With the argument `openvm`, `e3-program-runner` starts an `e3-program-server`
+whose runner is `e3-openvm-host`: it runs the shared `SecureProcess` natively, writes the guest's
+input stream (a header, every ciphertext, then the selected ones), and runs the separate
+`interfold-openvm-prover` worker (`crates/openvm-prover`, its own workspace). It accepts only a
+verified OpenVM EVM receipt. The guest reads one ciphertext at a time, so a round is not bounded by
+guest memory. The worker validates the executable, VM identity, aggregation key, Halo2 key and
+parameters, verifier artifact, and journal. At startup the host picks the CUDA worker when it is
+configured and can open a GPU, and otherwise the CPU worker; every worker run has a deadline. Jobs
+remain in memory; this service does not provide durable admission or restart recovery.
+`interfold program compile` (`crates/cli/src/program_support.rs`) runs
+`cargo build --bin program-runner` in dev mode. Otherwise it runs
+`crates/cli/scripts/openvm-compile.sh`, which builds the guest, keys, receipt identity, worker
+configuration, and the project's `program-runner` binary. `interfold program start` runs
+`program-runner dev` or `program-runner openvm` with `cargo run`. `e3-init` pins the guest's
+Interfold crates to the template commit. The OpenVM mode uses `program.openvm`. `program.dev` runs
+the same binary with the argument `dev`, an explicit, unproved runner with a mock proof.
 
 CRISP's encrypted-input and result-callback routes accept at most 4 MiB of JSON, to contain the
 largest supported DA object after hexadecimal encoding. This limit is scoped to those routes; read

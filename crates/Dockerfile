@@ -79,6 +79,7 @@ COPY crates/parity-matrix/Cargo.toml ./parity-matrix/Cargo.toml
 COPY crates/zk-prover/Cargo.toml ./zk-prover/Cargo.toml
 COPY crates/polynomial/Cargo.toml ./polynomial/Cargo.toml
 COPY crates/polynomial/fhe-adapter/Cargo.toml ./polynomial/fhe-adapter/Cargo.toml
+COPY crates/program-runner/Cargo.toml ./program-runner/Cargo.toml
 COPY crates/program-server/Cargo.toml ./program-server/Cargo.toml
 COPY crates/request/Cargo.toml ./request/Cargo.toml
 COPY crates/safe/Cargo.toml ./safe/Cargo.toml
@@ -87,7 +88,6 @@ COPY crates/slashing/Cargo.toml ./slashing/Cargo.toml
 COPY crates/sortition/Cargo.toml ./sortition/Cargo.toml
 COPY crates/dashboard/Cargo.toml ./dashboard/Cargo.toml
 COPY crates/daemon-server/Cargo.toml ./daemon-server/Cargo.toml
-COPY crates/support-scripts/Cargo.toml ./support-scripts/Cargo.toml
 COPY crates/sync/Cargo.toml ./sync/Cargo.toml
 COPY crates/test-helpers/Cargo.toml ./test-helpers/Cargo.toml
 COPY crates/tests/Cargo.toml ./tests/Cargo.toml

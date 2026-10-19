@@ -84,10 +84,10 @@
     "supported": true,
     "refs": [
       "crates/program-server/src/lib.rs@111@pub fn new<F, Fut>(callback: F)",
-      "crates/support-scripts/dev/src/main.rs@61@ComputeManager::with_published("
+      "crates/program-runner/src/dev.rs@63@ComputeManager::with_published("
     ],
     "line_text": ["pub fn new<F, Fut>(callback: F) -> Self", "let mut manager = ComputeManager::with_published("],
-    "note": "program-server hosts /run_compute and hands each job to the callback it is built with; the shipped runners call compute-provider (dev runner ComputeManager, OpenVM service via openvm-host)."
+    "note": "program-server hosts /run_compute and hands each job to the callback it is built with; program-runner supplies that callback and calls compute-provider (dev runner ComputeManager, OpenVM service via openvm-host)."
   },
   {
     "id": "A10",

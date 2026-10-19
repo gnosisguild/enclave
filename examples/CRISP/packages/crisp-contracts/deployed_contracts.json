@@ -17,37 +17,59 @@
       "blockNumber": 25998860
     },
     "HonkVerifier": {
-      "address": "0xe359cE6DA6aD159600F65dF7bdd7a4e035Ef344E",
-      "blockNumber": 25998863
+      "address": "0x6E1eC1e74162D9c141e12B593Cad390aEfFb6bD0",
+      "blockNumber": 26156229
     },
     "OnchainHonkVerifier": {
-      "address": "0xccEC1b15De4d07ac8b5Df7E0d5d626954111955C",
-      "blockNumber": 25998866
+      "address": "0xC496A7ee730590D5A7669E251cbE54F5Fc339Ea8",
+      "blockNumber": 26156234
     },
     "CRISPProgram": {
-      "address": "0x53FCdb21E73A461CfE6c64B19855204384B91BA3",
-      "blockNumber": 25998868,
+      "address": "0x1EA4dBdec0F2F1E9235915847fc59EF4045EEe28",
+      "blockNumber": 26156236,
       "constructorArgs": {
         "initialOwner": "0x652a31c669f9AB37f6040f279139a75D04F2679e",
-        "verifierAddress": "0xB6AC0ef383dafd09b79Eadc96491CAE2AD61D331",
-        "honkVerifierAddress": "0xe359cE6DA6aD159600F65dF7bdd7a4e035Ef344E",
-        "onchainHonkVerifierAddress": "0xccEC1b15De4d07ac8b5Df7E0d5d626954111955C",
-        "dataAvailabilityVerifierAddress": "0xC038C7ba5717bDa886115e5d954085bce069069E",
+        "verifierAddress": "0x0dd5E45414629F0f7D757cbb0310A9cfdc5B400b",
+        "honkVerifierAddress": "0x6E1eC1e74162D9c141e12B593Cad390aEfFb6bD0",
+        "onchainHonkVerifierAddress": "0xC496A7ee730590D5A7669E251cbE54F5Fc339Ea8",
+        "dataAvailabilityVerifierAddress": "0x9B5088112Ae1D682782236486290120E27Eb32e3",
         "availabilityFinalizationWindow": 10800,
         "inputAvailabilitySigner": "0x34655732dB9BBfA627021D18d786EfF7Bde211F7",
-        "imageId": "0x9d3e21fd7cc08e629cb467e5ca6bfc8e1a645b483bfd91b6b1648ced259110fc"
+        "imageId": "0x126eb3ea8c2d24cbf8e89f7e41dd2f0be5050be7a28276f0bcd4cb0546acdf52"
       }
     },
     "SelfRegistry": {
-      "address": "0xAE78040338c7Ed90D53bDdB5bBF3735e4bD29B03",
-      "blockNumber": 25998869
+      "address": "0x15a25F923b5a986a1741fa6A6EFD2688fF19ab0D",
+      "blockNumber": 26156237
     },
     "AvailVectorXDataAvailabilityVerifier": {
-      "address": "0xC038C7ba5717bDa886115e5d954085bce069069E",
-      "blockNumber": 25998867,
+      "address": "0x9B5088112Ae1D682782236486290120E27Eb32e3",
+      "blockNumber": 26156235,
       "constructorArgs": {
         "bridge": "0x054fd961708d8e2b9c10a63f6157c74458889f0a",
         "vectorx": "0x02993cdC11213985b9B13224f3aF289F03bf298d"
+      }
+    },
+    "OpenVmHalo2Verifier": {
+      "address": "0x75cECF62f1ADe2C7b95d5a93460f450c6885F904",
+      "blockNumber": 26156225,
+      "bytecodeHash": "0xc164e9a2f1317f2babaccd3b14efe13a172225dbee3ffff0f95d5afda7b6b99c"
+    },
+    "OpenVmReceiptVerifier": {
+      "address": "0x0dd5E45414629F0f7D757cbb0310A9cfdc5B400b",
+      "blockNumber": 26156225,
+      "constructorArgs": {
+        "verifier": "0x75cECF62f1ADe2C7b95d5a93460f450c6885F904",
+        "appExeCommit": "0x00751c5c3a779981db2eaad979669a55443106464b13546a19fea4d92e5bfd45",
+        "appVmCommit": "0x009034802c4d22df352e22772fc613453a77e387b95479ef296bbef78edc588a"
+      }
+    },
+    "OpenVmBfvCiphertextVerifier": {
+      "address": "0x6cD258E0a893612Aea41c42dC47450ac1A6E2dD1",
+      "blockNumber": 26156226,
+      "constructorArgs": {
+        "verifier": "0x0dd5E45414629F0f7D757cbb0310A9cfdc5B400b",
+        "imageId": "0x126eb3ea8c2d24cbf8e89f7e41dd2f0be5050be7a28276f0bcd4cb0546acdf52"
       }
     }
   },
