@@ -197,6 +197,12 @@ test('publication gate handles stable and pre-release jobs', () => {
   assert.throws(() => verifyPublications({ ...common, DAPPNODE_RESULT: 'failure', IS_PRERELEASE: 'false' }), /DAppNode result/)
 })
 
+const RELEASE_BINARIES = [
+  'interfold-linux-x86_64.tar.gz',
+  'interfold-macos-aarch64.tar.gz',
+  'interfold-test-only-skip-proof-aggregation-linux-x86_64.tar.gz',
+]
+
 test('release assets require the complete binary and circuit set', () => {
   const rootDir = temporaryDirectory('interfold-release-assets')
   const distDir = join(rootDir, 'dist', 'downloads')
@@ -204,34 +210,39 @@ test('release assets require the complete binary and circuit set', () => {
   mkdirSync(distDir, { recursive: true })
   mkdirSync(deploymentsDir)
 
-  for (const archive of ['interfold-linux-x86_64.tar.gz', 'interfold-macos-aarch64.tar.gz', 'circuits-1.2.3.tar.gz']) {
+  for (const archive of [...RELEASE_BINARIES, 'circuits-1.2.3.tar.gz']) {
     writeFileSync(join(distDir, archive), archive)
   }
   writeFileSync(join(deploymentsDir, 'manifest.json'), '{}\n')
   writeFileSync(join(rootDir, 'CHANGELOG.md'), '#### [v1.2.3](compare)\n\nCurrent changes.\n\n#### [v1.2.2](compare)\n\nOld changes.\n')
 
-  prepareReleaseAssets(
-    {
-      candidateSha: 'abc123',
-      circuitSourceHash: 'circuit-source',
-      isPrerelease: false,
-      tagName: 'v1.2.3',
-      version: '1.2.3',
-      workflowRunId: '456',
-    },
-    rootDir,
-  )
+  const options = {
+    candidateSha: 'abc123',
+    circuitSourceHash: 'circuit-source',
+    isPrerelease: false,
+    tagName: 'v1.2.3',
+    version: '1.2.3',
+    workflowRunId: '456',
+  }
+  prepareReleaseAssets(options, rootDir)
 
   const notes = readFileSync(join(rootDir, 'release_notes.md'), 'utf8')
   assert.match(notes, /Current changes\./)
   assert.doesNotMatch(notes, /Old changes\./)
   assert.match(notes, /@interfold\/sdk@latest/)
+  assert.match(notes, /[0-9a-f]{64} {2}interfold-test-only-skip-proof-aggregation-linux-x86_64\.tar\.gz/)
   assert.deepEqual(JSON.parse(readFileSync(join(rootDir, 'release-assets/release-provenance.json'), 'utf8')), {
     candidateSha: 'abc123',
     circuitSourceHash: 'circuit-source',
     tag: 'v1.2.3',
     workflowRunId: '456',
   })
+
+  rmSync(join(distDir, 'interfold-test-only-skip-proof-aggregation-linux-x86_64.tar.gz'))
+  assert.throws(
+    () => prepareReleaseAssets(options, rootDir),
+    /required release asset is missing: interfold-test-only-skip-proof-aggregation-linux-x86_64\.tar\.gz/,
+  )
 })
 
 test('stable release notes list the pre-release changes and the upgrade note', () => {
@@ -243,7 +254,7 @@ test('stable release notes list the pre-release changes and the upgrade note', (
   mkdirSync(deploymentsDir)
   mkdirSync(notesDir, { recursive: true })
 
-  for (const archive of ['interfold-linux-x86_64.tar.gz', 'interfold-macos-aarch64.tar.gz', 'circuits-1.3.0.tar.gz']) {
+  for (const archive of [...RELEASE_BINARIES, 'circuits-1.3.0.tar.gz']) {
     writeFileSync(join(distDir, archive), archive)
   }
   writeFileSync(join(deploymentsDir, 'manifest.json'), '{}\n')
