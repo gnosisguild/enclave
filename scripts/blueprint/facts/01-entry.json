@@ -732,7 +732,7 @@
       "read_first": [
         {
           "why": "the entry point that the CLI calls",
-          "ref": "crates/init/src/lib.rs@255@pub async fn execute("
+          "ref": "crates/init/src/lib.rs@262@pub async fn execute("
         },
         {
           "why": "the steps in order: clone, read versions, copy, install",
@@ -740,7 +740,7 @@
         },
         {
           "why": "the Cargo path rewrite that points template crates at the template's commit",
-          "ref": "crates/init/src/lib.rs@247@fn interfold_path_filter(commit_hash: &str) -> Filter {"
+          "ref": "crates/init/src/lib.rs@254@fn interfold_path_filter(commit_hash: &str) -> Filter {"
         },
         {
           "why": "the copy routine that applies the filters",

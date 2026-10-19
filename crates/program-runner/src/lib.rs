@@ -30,11 +30,11 @@ pub fn run(processor: FHEProcessor, policy: InputPolicy) -> Result<()> {
             .enable_all()
             .build()
     };
-    let mut args = std::env::args();
+    let mut args = std::env::args_os();
     let binary = args.next().unwrap_or_default();
-    match args.next().as_deref() {
+    match args.next().as_deref().and_then(|mode| mode.to_str()) {
         Some("dev") => runtime()?.block_on(dev::serve(processor, policy)),
         Some("openvm") => runtime()?.block_on(openvm::serve(processor, policy)),
-        _ => bail!("Usage: {binary} dev|openvm"),
+        _ => bail!("Usage: {} dev|openvm", binary.to_string_lossy()),
     }
 }

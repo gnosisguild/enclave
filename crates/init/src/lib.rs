@@ -11,7 +11,7 @@ mod logging;
 mod package_json;
 mod pkgman;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use copy::Filter;
 use file_utils::{delete_path, move_file, remove_all_files_in_dir};
 use git::parse_git_url;
@@ -102,6 +102,13 @@ async fn install_interfold(
         .await?;
 
     let src = PathBuf::from(TEMP_DIR).join(template_path);
+    if fs::try_exists(src.join(".interfold/support")).await? {
+        bail!(
+            "The template at commit {commit_hash} keeps its program server in .interfold/support, \
+             which this interfold CLI does not run. Pass --template with a template that has a \
+             runner/ crate."
+        );
+    }
 
     spinner
         .run("Copy with filters...", || async {
@@ -181,7 +188,7 @@ async fn install_interfold(
         })
         .await?;
 
-    spinner.complete_task("Support folders set up\n");
+    spinner.complete_task("Project files set up\n");
 
     spinner.update("Setting up the project repository...").await;
 

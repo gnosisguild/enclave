@@ -169,8 +169,10 @@ in a parent folder, or in the default configuration folder. In that case, it sto
 <Callout type='info'>
   A project that has an `.interfold/support` folder cannot run `interfold program`. To migrate it,
   delete `.interfold/support` and its two workspace members from `Cargo.toml`. Then copy `runner/`
-  from the template, add `runner` to the workspace members, and replace the `e3-program-server`
-  workspace dependency with the `e3-program-runner` entry from the template's `Cargo.toml`.
+  from the template and add `runner` to the workspace members. In `[workspace.dependencies]`,
+  replace `e3-program-server` with `e3-program-runner ={' '}
+  {((git = 'https://github.com/theinterfold/interfold'), (rev = '<rev>'))}`. Use the same `rev` as
+  the other `e3-*` dependencies of the project.
 </Callout>
 
 The scripts make more folders when they run:
