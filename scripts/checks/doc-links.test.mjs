@@ -96,6 +96,20 @@ test('documentation discovery includes pending Markdown and excludes Git-ignored
   assert.equal(passed.status, 0, passed.stdout + passed.stderr)
 })
 
+test('documentation anchor checks do not accept IDs from prose or inline code examples', (t) => {
+  const { write, run } = fixture(t)
+  write('docs/guide.md', '# Guide\n\nText id="prose-only".\n\n`<a id="example-only"></a>`\n\n<a id="real-anchor"></a>\n')
+  for (const anchor of ['prose-only', 'example-only']) {
+    write('README.md', `[Not an anchor](docs/guide.md#${anchor})\n`)
+    const result = run('README.md')
+    assert.equal(result.status, 1, anchor)
+    assert.match(result.stdout + result.stderr, /missing anchor/)
+  }
+  write('README.md', '[Real](docs/guide.md#real-anchor)\n')
+  const result = run('README.md')
+  assert.equal(result.status, 0, result.stdout + result.stderr)
+})
+
 test('documentation links never read a symlink target outside the repository', (t) => {
   const { root, write, run } = fixture(t)
   const outside = mkdtempSync(join(tmpdir(), 'interfold-doc-links-outside-'))

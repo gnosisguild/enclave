@@ -48,7 +48,8 @@ function readDocument(file) {
   if (documents.has(file)) return documents.get(file)
   if (!inside(file) || !inside(realpathSync(file))) throw new Error('path is outside the repository')
   const text = prose(readFileSync(file, 'utf8'))
-  const anchors = new Set([...text.matchAll(/\b(?:id|name)\s*=\s*["']([^"']+)["']/g)].map((match) => match[1]))
+  const html = text.replace(/(`+)([^`\n]*?)\1/g, mask)
+  const anchors = new Set([...html.matchAll(/<[A-Za-z][^<>]*?\s(?:id|name)\s*=\s*["']([^"']+)["']/g)].map((match) => match[1]))
   const headings = new Set()
   for (const match of text.matchAll(/^ {0,3}#{1,6}\s+(.+)$/gm)) {
     const label = entities(
