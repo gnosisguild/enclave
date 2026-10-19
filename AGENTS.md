@@ -49,3 +49,5 @@ own cross-component rules, rationale, and limits.
   wording.
 - Review the actual diff, correct documentation made false, and report commands, results, and
   verification limits. A successful compile is not proof verification or a successful CI run.
+- Record protocol-review references and outcomes as
+  [CONTRIBUTING.md](CONTRIBUTING.md#protocol-compatibility) requires.

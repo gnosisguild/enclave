@@ -8,7 +8,11 @@
 # The Noir circuits and the scripts that build, lint, and test them.
 circuits:
   - 'circuits/**'
-  - 'scripts/circuits/**'
+  - 'scripts/circuits/lint.sh'
+  - 'scripts/circuits/test.sh'
+  - 'scripts/circuits/verifiers*.ts'
+  - 'scripts/circuits/constants.ts'
+  - 'scripts/circuits/build-pairs.json'
   - 'crates/zk/build/**'
   - 'crates/zk/prover/supported-configurations.json'
   - '!**/*.md'

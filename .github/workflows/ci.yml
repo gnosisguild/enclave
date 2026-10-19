@@ -369,7 +369,7 @@ jobs:
           echo "build_interfold_cli=$(any $FORCE $RUST $CONTRACTS $CIRCUITS $INTEGRATION $TEMPLATES $CRISP_E2E $SDK $CI $TOOLING)" >> $GITHUB_OUTPUT
 
       - name: Check test runner dispatch and results
-        run: node --test crates/net/tests/runner.test.mjs scripts/hooks/*.test.mjs
+        run: node --test crates/net/tests/runner.test.mjs scripts/hooks/*.test.mjs scripts/circuits/*.test.mjs
 
   script_tooling:
     runs-on: ubuntu-latest

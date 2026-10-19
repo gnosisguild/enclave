@@ -50,10 +50,9 @@ Accusers converge on the latest valid signed window. The accused cannot move it,
 shorten it, and each accuser moves it at most once. Governance can keep/increase vote validity
 immediately; every reduction, including zero, requires a two-day propose/commit delay and expires
 two days after becoming ready. Direct keep/increase clears pending changes. Live zero disables new
-Lane A reports. Each E3 freezes its nonzero maximum vote window and objective reporting deadline
-(worst-case lifecycle
-
-- one day); assignment closure and manager retirement must wait past it.
+Lane A reports. Each E3 freezes its nonzero maximum vote window and objective reporting deadline:
+the latest possible lifecycle deadline plus one day. Assignment closure and manager retirement must
+wait past it.
 
 The manager saves pending accusations holding this node's vote, their admitted votes, absolute
 timeouts, failed-proof evidence, and accused-proof identities in a versioned per-E3 record.

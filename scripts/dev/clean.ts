@@ -52,18 +52,22 @@ export function planClean(rootDir: string, options: CleanOptions = {}): string[]
     return true
   }
 
-  function select(path: string): { removable: boolean; paths: string[] } {
+  function select(path: string, nested = false): { removable: boolean; paths: string[] } {
     const full = join(rootDir, path)
     const stat = lstatSync(full, { throwIfNoEntry: false })
     if (!stat) return { removable: !protectedPaths.has(path), paths: [] }
-    if (stat.isSymbolicLink() || STATE_DIRECTORIES.has(path.split('/').pop()!) || trackedFiles.has(path))
-      return { removable: false, paths: [] }
+    if (STATE_DIRECTORIES.has(path.split('/').pop()!) || trackedFiles.has(path)) return { removable: false, paths: [] }
+    // Unlink children of a physical output tree, never follow them or remove a linked output root.
+    if (stat.isSymbolicLink()) {
+      const removable = nested && !protectedPaths.has(path)
+      return { removable, paths: removable ? [path] : [] }
+    }
     if (stat.isFile()) return { removable: true, paths: [path] }
     if (!stat.isDirectory()) return { removable: false, paths: [] }
     if (existsSync(join(full, '.git'))) return { removable: false, paths: [] }
     const children = readdirSync(full)
       .sort()
-      .map((name) => select(join(path, name)))
+      .map((name) => select(join(path, name), true))
     if (!protectedPaths.has(path) && children.every((child) => child.removable)) return { removable: true, paths: [path] }
     return { removable: false, paths: children.flatMap((child) => child.paths) }
   }
@@ -111,7 +115,8 @@ function main(): void {
     if (arg === '--help' || arg === '-h') {
       console.log(`Usage: pnpm clean [--skip-node] [--skip-crates] [--skip-contracts] [--interactive|-i] [--dry-run|-n]
 Removes rebuildable outputs beside tracked package/Cargo/Hardhat manifests.
-Never removes tracked files, operator state, nested repositories, or symlinks.
+Never removes tracked files, operator state, nested repositories, or linked output roots.
+Internal output symlinks are unlinked without following their targets.
 --skip-node       Keep node_modules, dist, .pnpm-store
 --skip-crates     Keep target directories (fixtures are always preserved)
 --skip-contracts  Keep artifacts, cache, out, types (deployments are always preserved)`)

@@ -80,6 +80,18 @@ export function checkReleaseSafeguards(rootDir = ROOT_DIR) {
     if (!uploads.length || uploads.some((step) => step.with?.['if-no-files-found'] !== 'error'))
       fail(`${name} must fail on missing release archives`)
   }
+  const binaries = job('build-binaries').strategy?.matrix?.include ?? []
+  for (const [asset, features] of Object.entries({
+    'interfold-linux-x86_64': '',
+    'interfold-macos-aarch64': '',
+    'interfold-test-only-skip-proof-aggregation-linux-x86_64': 'test-only-skip-proof-aggregation',
+  })) {
+    const entries = binaries.filter((entry) => entry.asset === asset)
+    if (entries.length !== 1 || entries[0].features !== features)
+      fail(`the ${asset} release archive must be built with features: ${features}`)
+  }
+  command('build-binaries', 'test "$compiled" = "$FEATURES"')
+  command('build-binaries', 'case "$ASSET" in interfold-test-only-*) ;; *) exit 1 ;; esac')
   command('publish-npm-packages', 'node scripts/release/index.mjs publish-npm')
   command('publish-npm-packages', 'npm install -g "npm@${NPM_VERSION}"')
   requires('create-github-release', ['publication-gate'])

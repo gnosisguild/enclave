@@ -21,9 +21,12 @@ removes rebuildable outputs beside **indexed** package, Cargo, and Hardhat manif
 - Contracts: `artifacts`, `cache`, `out`, `types`.
 
 The Git index protects tracked files (including newly staged ones) and their parent directories.
-Safe untracked outputs alongside them can still be removed. Symlinks, nested Git repositories,
-`.interfold`, `database`, `broadcast`, `ignition`, and `deployments` are preserved. This is not a
-node reset or deployment purge; use the product's explicit reset/purge commands for operator state.
+Safe untracked outputs alongside them can still be removed. A symlink used as an output root is
+preserved. Inside a physical output tree, untracked symlinks are unlinked without following their
+targets; pnpm dependency links therefore do not leave a partially deleted `node_modules` tree.
+Indexed links and their ancestors, nested Git repositories, `.interfold`, `database`, `broadcast`,
+`ignition`, and `deployments` are preserved. This is not a node reset or deployment purge; use the
+product's explicit reset/purge commands for operator state.
 
 Run from the root with workspace dependencies installed. Preview with `pnpm clean --dry-run` before
 deleting. Stop builds and other writers first; the plan is not a filesystem lock against concurrent

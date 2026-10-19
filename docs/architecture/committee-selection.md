@@ -70,8 +70,9 @@ spend the same reserve.
 Reject same-Ethereum-request-block, future-dated, or late responses. A timely accepted seed remains
 readable after terminal cleanup for replay. Expiry sets advisory
 `degraded`/`RandomnessCircuitBreakerTripped`, not a permissionless registry-global provider reset.
-Governance repointing clears degradation, only while requests are paused and all committee
-obligations released.
+Governance repointing clears degradation. Both provider replacement and response-timeout changes
+require paused requests and release of every committee obligation. See
+[randomness timeout controls](../pages/internals/sortition.mdx#timeouts-and-the-degraded-flag).
 
 ```text
 seed  = keccak256(abi.encode(randomWord, chainid, registry, e3Id, requestId))

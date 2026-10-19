@@ -25,6 +25,7 @@ YAML/Compose validator (aliases and other valid duration notations are not suppo
 | [`pnpm.sh`](pnpm.sh)                                           | Checks the package-manager version against the root pin.                                                       |
 | [`shell-syntax.mjs`](shell-syntax.mjs)                         | Parses shell sources individually.                                                                             |
 | [`changed-format.mjs`](changed-format.mjs)                     | Checks supported files changed between two Git revisions.                                                      |
+| [`doc-links.mjs`](doc-links.mjs)                               | Checks relative Markdown/MDX file targets, exact case, and heading/explicit-ID anchors without network access. |
 
 ## Usage
 
@@ -43,6 +44,14 @@ proof-skip rejection.
 
 `pnpm check:shell` parses each tracked shell source and Husky hook separately, choosing `sh` for
 POSIX shebangs and Bash otherwise. Local untracked, nonignored scripts are included too.
+
+`pnpm check:links [files...]` checks inline/reference Markdown links and images in indexed and
+untracked, nonignored Markdown/MDX. It validates relative targets, ATX heading anchors, repeated
+heading suffixes, and explicit literal HTML IDs. Fenced/inline code and footnote labels are not file
+targets. It skips external URLs and absolute site routes, does not parse HTML/JSX attributes, and
+does not validate rendered MDX semantics. CI and pre-push run it without changing files. The
+[protocol review requirement](../../CONTRIBUTING.md#protocol-compatibility) remains a separate
+semantic check by the reviewer.
 
 `pnpm check:license [--check-only|--fix]` checks tracked JS/JSX, Noir, Rust, Solidity, and TS/TSX.
 Other SPDX licenses are retained and reported, never replaced. `--fix` adds missing headers after an

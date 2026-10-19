@@ -218,8 +218,9 @@ expect(BigInt(result)).toBe(2n * (num1 + num2))
 ```
 
 Run the test with `pnpm test:integration`. This test needs a CLI that is built with the
-`test-only-skip-proof-aggregation` Cargo feature. Release binaries do not include it. See
-[Installation](/build/installation#install-the-cli) for a source build.
+`test-only-skip-proof-aggregation` Cargo feature. Of the release archives, only the test-only
+archive for Linux x86_64 has it. See [Installation](/build/installation#supported-platforms) for
+this archive and for a source build.
 
 ## Operations on ciphertexts
 

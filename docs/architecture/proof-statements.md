@@ -26,6 +26,11 @@ final verifiers are mandatory. The runtime `skip_proof_aggregation` setting work
 `test-only-skip-proof-aggregation`; production rejects it. Test placeholders retain roster/domain
 fields but production verifiers reject their proof bytes. There is no request-level bypass.
 
+The release workflow puts the proof-skip feature only in
+`interfold-test-only-skip-proof-aggregation-linux-x86_64`. Every release archive checks its compiled
+`rev --features` against its declared build features. The install script and `interfold update`
+select normal platform archives, never the test-only archive. It is for tests/CI, not production.
+
 ## Integer constraints inside a field
 
 A relation `lifted = residue + quotient * q` alone binds nothing: q is invertible in the proof
@@ -101,8 +106,10 @@ witness binding: deriving it caused an unexplained Noir
 `bug: Brillig function call isn't properly covered by a manual constraint` diagnostic. A solved
 witness, including under `--silence-warnings`, does not make that diagnostic acceptable. C3's scaled
 rounding carry z is a prover witness with `BIT_Z` and `[0,t)` checks, not an in-circuit unchecked
-hint; retain negative tests for inflated/deflated carries. The scaled quotient branch is generated
-false for insecure-64, so default insecure E2E tests miss it.
+hint; retain negative tests for inflated/deflated carries. The committed insecure-64 and secure-8192
+configurations both enable the scaled-quotient branch. Tests using the current insecure artifacts
+can enter it; a reused archive must be checked independently. Secure bounds and witness sizes still
+need secure-parameter coverage.
 
 The CRISP ballot relation is a narrow exception: plain packing can preserve a coefficient-aligned
 linear relation across equal-width carriers when all commitments have bounded openings fixed

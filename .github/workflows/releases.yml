@@ -143,7 +143,7 @@ jobs:
         run: npx --no-install dappnodesdk build --skip_upload --skip_save --arch linux/amd64
 
   build-binaries:
-    name: Build Binaries (${{ matrix.os_name }}-${{ matrix.arch }})
+    name: Build Binaries (${{ matrix.asset }})
     runs-on: ${{ matrix.os }}
     needs: [validate-and-prepare, download-circuits]
     env:
@@ -153,12 +153,19 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            os_name: linux
-            arch: x86_64
+            asset: interfold-linux-x86_64
+            features: ''
           - os: macos-latest
             target: aarch64-apple-darwin
-            os_name: macos
-            arch: aarch64
+            asset: interfold-macos-aarch64
+            features: ''
+          # Test and CI only: projects such as CRISP run their end-to-end tests with this binary and
+          # `skip_proof_aggregation: true`. The install script and `interfold update` select
+          # `interfold-<platform>.tar.gz`, so they never install it.
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            asset: interfold-test-only-skip-proof-aggregation-linux-x86_64
+            features: test-only-skip-proof-aggregation
 
     steps:
       - name: Checkout
@@ -172,7 +179,7 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
-          key: ${{ matrix.target }}
+          key: ${{ matrix.asset }}
 
       - name: Install solc (Linux)
         if: matrix.os == 'ubuntu-latest'
@@ -183,24 +190,39 @@ jobs:
         run: brew install solidity
 
       - name: Build interfold binary
+        env:
+          FEATURES: ${{ matrix.features }}
         run: |
           test -n "$E3_CIRCUITS_ARCHIVE_SHA256"
-          cargo build --locked --release --target ${{ matrix.target }} --bin interfold
+          cargo build --locked --release --target ${{ matrix.target }} --bin interfold ${FEATURES:+--features "$FEATURES"}
 
       - name: Check compiled circuit archive pin
         run: |
           target/${{ matrix.target }}/release/interfold noir status > "$RUNNER_TEMP/noir-status.txt"
           grep -Fx "  Archive SHA-256: $E3_CIRCUITS_ARCHIVE_SHA256" "$RUNNER_TEMP/noir-status.txt"
 
+      # A production archive must report no features. The test-only archive must report exactly its
+      # feature, and its name must say that it is test-only.
+      - name: Check compiled features
+        env:
+          ASSET: ${{ matrix.asset }}
+          FEATURES: ${{ matrix.features }}
+        run: |
+          compiled="$(target/${{ matrix.target }}/release/interfold rev --features)"
+          test "$compiled" = "$FEATURES"
+          if [ -n "$FEATURES" ]; then
+            case "$ASSET" in interfold-test-only-*) ;; *) exit 1 ;; esac
+          fi
+
       - name: Create release archives
         run: |
           mkdir -p dist
-          tar -C "target/${{ matrix.target }}/release" -czf "dist/interfold-${{ matrix.os_name }}-${{ matrix.arch }}.tar.gz" interfold
+          tar -C "target/${{ matrix.target }}/release" -czf "dist/${{ matrix.asset }}.tar.gz" interfold
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: interfold-binaries-${{ matrix.os_name }}-${{ matrix.arch }}
+          name: interfold-binaries-${{ matrix.asset }}
           if-no-files-found: error
           path: dist/
 

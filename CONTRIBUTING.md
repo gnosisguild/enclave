@@ -105,6 +105,10 @@ Fix a rejected title by editing the PR title; do not rewrite commit history just
 check. Local checks use Husky (`pnpm prepare`); selecting a different `core.hooksPath` replaces
 those hooks rather than adding to them.
 
+Husky checks formatting before commit and repository checks before push. It does not validate
+individual commit messages; the optional `.githooks/commit-msg` validator has no replacement. Use
+Conventional Commits for authored messages and the validated squash-commit title.
+
 ## Pull Requests
 
 Before you create a pull request, search for any issues related to the change you are making. If
@@ -157,6 +161,12 @@ artifact combinations that remain supported. The detailed requirements and known
 [domain references](docs/architecture/AGENTS.md); verify relevant claims against their sources.
 Human review decides the rollout; no documentation edit or optional agent review grants deployment
 or publication permission.
+
+Before merging a protocol-bearing change, the required reviewer must check the affected domain
+contracts against the actual diff, including persistence/replay and cross-layer compatibility where
+applicable. Record the domain references, review outcome, and unresolved limits in the PR.
+`pnpm check:links` checks documentation targets and anchors, not semantic doc/code agreement or
+protocol correctness; it does not replace this review.
 
 ## Merging
 

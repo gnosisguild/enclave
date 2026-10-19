@@ -164,7 +164,9 @@ fresh ciphertext. Both presets set `SEARCH_Z` to 100,000, covering that maximum.
 voter signature, so anyone with valid proofs/attestations/transactions can fill the limit; no
 implemented rate policy makes this impossible.
 
-Every option total must remain below the round's plaintext modulus t (17,000,000 for both presets):
+Every option total must remain below the round's plaintext modulus t (17,000,000 for both presets).
+`CRISPProgram.validate` reads that modulus from the request's ABI-encoded `e3ProgramParams`, not a
+local preset constant, before initializing the round's limits.
 
 - CONSTANT: reject `credits >= t`; input limit is `min((t-1)/credits,100000)`. Zero credits use
   100,000.

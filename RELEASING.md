@@ -100,6 +100,11 @@ Rust workspace crates are not published to crates.io by this workflow. The suppo
 CLI/ciphernode build; DAppNode copies the checked ciphernode image. Asset inventory and npm retry
 semantics are owned by the release scripts, not a second checklist of package versions here.
 
+The separately named `interfold-test-only-skip-proof-aggregation-linux-x86_64` CLI archive enables
+proof skipping for tests/CI only. Normal platform archives have no proof-skip feature; the workflow
+checks each binary's `rev --features` before packaging. Install/update commands select normal
+platform archives, not this test-only archive. Never use it as a production fallback.
+
 Do not confuse SOURCE_HASH (compiling source/tool identity), archive SHA-256 (bytes), recursive VK
 anchors, and OpenVM application/receipt commitments.
 [Circuit artifacts](docs/architecture/circuit-artifacts.md) owns their checks and limitations. The

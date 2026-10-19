@@ -146,6 +146,10 @@ the frozen verifier as verifying contract. Rotation cannot silently change the a
 The callback must meet both the inclusive DKG deadline and input-window end; late key publication
 cannot turn a committee timeout into requester-paid compute failure.
 
+The on-chain fold verifier requires strictly increasing proof party IDs, binding party IDs, and
+attestation party IDs. Each attestation must match its binding and the finalized address-sorted
+committee slot. Runtime sorting alone does not replace these contract checks.
+
 Committee hash is Keccak over ordered raw **20-byte** addresses, not padded
 `abi.encodePacked(address[])`. Solidity's `CommitteeHashLib`, Rust's `committee-hash`, and Noir must
 agree. The wrapper checks its 128-bit limbs; other contextual PK-verifier arguments are not
@@ -202,19 +206,22 @@ fetch. Dispatch only after EffectsEnabled. Local verification errors retry from 
 60-second cap; request completion cancels them. This recovery is not a durable-general-outbox claim.
 
 Restore C4 collectors from the saved roster and first authenticated peer messages before resuming
-proof jobs; completed collection ignores duplicates. Node-fold recovery persists ordered inner
-proofs, metadata, and completed output; C4 waits for the sequence layout from
-`ThresholdSharePending`. `KeyPublished` and terminal events retire that data. Large immutable
-recovery payloads have separate keys with length/Keccak references; verify before hydration, retire
-references before payloads. Inactive node-fold entries are tombstoned before removing their index
-entry.
+proof jobs; completed collection ignores duplicates. Node-fold aggregation records each ordered
+inner proof before admitting it to its buffers and records the completed fold before publishing it.
+An enqueue failure cannot authorize admission or publication. Metadata and completed output recover
+with those inputs; C4 waits for the sequence layout from `ThresholdSharePending`. `KeyPublished` and
+terminal events retire that data. Large immutable recovery payloads have separate keys with
+length/Keccak references; verify before hydration, retire references before payloads. Inactive
+node-fold entries are tombstoned before removing their index entry.
 
 The commitment checker restores its complete verified-proof cache and H-roster before proof
 recovery. It checks C1→C2, C2→C3, selected-roster C2→C4, and C1→C5; C0→C3 local-cache absence is not
 fault evidence, so each recipient checks its own key. C2→C4 waits for all selected targets and maps
-full party IDs to H-row positions. C4→C6 and C6→C7 continue this chain. **Gap:** failed checker
-snapshot writes are logged and retried on the next mutation while processing and publication
-continue. See [persistence](persistence-and-replay.md) for the wider snapshot limit.
+full party IDs to H-row positions. C4→C6 and C6→C7 continue this chain. Save changed checker state
+with the triggering event's context, in the same snapshot batch as that event. These ordering rules
+do not make snapshot enqueue a durable-flush acknowledgment. **Gap:** failed checker snapshot writes
+are logged and retried on the next mutation while processing and publication continue. See
+[persistence](persistence-and-replay.md) for the wider snapshot limit.
 
 Representative guards (not a complete protocol proof):
 

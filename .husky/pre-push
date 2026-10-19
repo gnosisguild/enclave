@@ -10,6 +10,7 @@ pnpm check:license
 pnpm check:committee
 pnpm check:addresses
 pnpm check:repository
+pnpm check:links
 
 # check:verifiers deletes the aggregation circuits' nargo target directories and recompiles both
 # aggregator circuits. Run it only when a pushed branch changes a path in

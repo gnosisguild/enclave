@@ -72,8 +72,8 @@ native bounds scaled worse with H (branch break-even ~4.4). Measured C4 minimum/
 1,098,865 / 2,092,666 / 5,074,069. C5 remains above old main because its repaired openings/aggregate
 bound cost cannot disappear algebraically. C6 saved another 415,111 by absorbing the checked
 ciphertext commitment instead of coefficients. C3's generated scaled quotient saved 619,294 at the
-recorded secure pair (current derived widths 26/18/14 versus older 27/19/14); insecure keeps direct
-path.
+recorded secure pair (derived widths 26/18/14 versus older 27/19/14). The recorded degree-512
+insecure preset used the direct path; this does not describe the current degree-64 configuration.
 
 Keep C1's integer smudging lift despite an older branch deleting it; retain C6 native-tail witness
 after an unexplained Brillig diagnostic (derivation saved only 1,950 gates). Quotients such as C3 z

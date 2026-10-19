@@ -9,5 +9,6 @@
 ## Compatibility (if applicable)
 
 <!-- Describe effects on deployed contracts/verifiers, stored data, peers, and replay.
+Record the affected domain references, protocol-review outcome, and unresolved limits.
 For protocol migrations, record the upgrade class, release-counter decision, and rollback plan.
 See CONTRIBUTING.md#protocol-compatibility. Omit this section when not applicable. -->

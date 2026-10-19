@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
@@ -83,6 +83,9 @@ test('clean does not follow output symlinks or manifest ancestors into another d
   writeFileSync(join(outside, 'valuable'), 'keep')
   symlinkSync(outside, join(root, 'dist/link'))
   symlinkSync(join(outside, 'does-not-exist'), join(root, 'dist/broken-link'))
+  symlinkSync(outside, join(root, 'node_modules'))
+  symlinkSync('../../../Cargo.toml', join(root, 'packages/contracts/artifacts/staged-link'))
+  execFileSync('git', ['add', 'packages/contracts/artifacts/staged-link'], { cwd: root })
   write('nested/package.json')
   execFileSync('git', ['add', 'nested/package.json'], { cwd: root })
   rmSync(join(root, 'nested'), { recursive: true })
@@ -92,7 +95,35 @@ test('clean does not follow output symlinks or manifest ancestors into another d
   await clean(root)
   assert.equal(readFileSync(join(outside, 'valuable'), 'utf8'), 'keep')
   assert.equal(readFileSync(join(outside, 'dist/build'), 'utf8'), 'keep')
+  assert.ok(lstatSync(join(root, 'node_modules')).isSymbolicLink(), 'a linked output root must be preserved')
+  assert.ok(lstatSync(join(root, 'packages/contracts/artifacts/staged-link')).isSymbolicLink(), 'an indexed link must be preserved')
+  assert.equal(lstatSync(join(root, 'dist/link'), { throwIfNoEntry: false }), undefined)
+  assert.equal(lstatSync(join(root, 'dist/broken-link'), { throwIfNoEntry: false }), undefined)
   assert.ok(existsSync(join(root, 'dist')))
+})
+
+test('clean removes a physical pnpm tree and unlinks its internal links without following targets', async (t) => {
+  const { root, write } = fixture(t)
+  const outside = mkdtempSync(join(tmpdir(), 'interfold-clean-pnpm-outside-'))
+  t.after(() => rmSync(outside, { recursive: true, force: true }))
+  writeFileSync(join(outside, 'valuable'), 'keep')
+  write('node_modules/.pnpm/pkg@1/node_modules/pkg/index.js', 'module.exports = 1')
+  symlinkSync('.pnpm/pkg@1/node_modules/pkg', join(root, 'node_modules/pkg'))
+  symlinkSync(outside, join(root, 'node_modules/external'))
+  symlinkSync('missing', join(root, 'node_modules/broken'))
+  await clean(root)
+  assert.equal(lstatSync(join(root, 'node_modules'), { throwIfNoEntry: false }), undefined)
+  assert.equal(readFileSync(join(outside, 'valuable'), 'utf8'), 'keep')
+})
+
+test('clean preserves a symlink replacing an indexed directory inside an output tree', async (t) => {
+  const { root } = fixture(t)
+  const path = 'packages/contracts/artifacts/contracts'
+  renameSync(join(root, path), join(root, 'saved-contracts'))
+  symlinkSync('../../../saved-contracts', join(root, path))
+  await clean(root)
+  assert.ok(lstatSync(join(root, path)).isSymbolicLink())
+  assert.ok(existsSync(join(root, path, 'Tracked.json')))
 })
 
 for (const [flag, kept, removed] of [
