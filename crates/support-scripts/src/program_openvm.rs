@@ -13,7 +13,7 @@ use async_trait::async_trait;
 use e3_config::ProgramConfig;
 use std::env;
 
-/// Proves the project's E3 program with OpenVM, through the project's runner in `openvm` mode.
+/// Proves the project's E3 program with OpenVM, through the program runner in `openvm` mode.
 pub struct ProgramSupportOpenVm(pub ProgramConfig);
 
 impl ProgramSupportOpenVm {

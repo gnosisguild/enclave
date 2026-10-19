@@ -14,7 +14,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use e3_config::ProgramConfig;
 
-/// Runs the project's E3 program unproved, through the project's runner in `dev` mode.
+/// Runs the project's E3 program unproved, through the program runner in `dev` mode.
 #[allow(dead_code)]
 pub struct ProgramSupportDev(pub ProgramConfig);
 

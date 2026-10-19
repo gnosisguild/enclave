@@ -53,16 +53,6 @@ in a parent folder, or in the default configuration folder. In that case, it sto
 
 <FileTree>
   <FileTree.Folder name='my-first-e3' defaultOpen>
-    <FileTree.Folder name='.interfold'>
-      <FileTree.Folder name='support'>
-        <FileTree.Folder name='dev' />
-        <FileTree.Folder name='openvm'>
-          <FileTree.Folder name='service' />
-          <FileTree.File name='compile' />
-          <FileTree.File name='start' />
-        </FileTree.Folder>
-      </FileTree.Folder>
-    </FileTree.Folder>
     <FileTree.Folder name='client'>
       <FileTree.Folder name='src'>
         <FileTree.Folder name='context'>
@@ -109,6 +99,12 @@ in a parent folder, or in the default configuration folder. In that case, it sto
     <FileTree.Folder name='program'>
       <FileTree.Folder name='src'>
         <FileTree.File name='lib.rs' />
+      </FileTree.Folder>
+      <FileTree.File name='Cargo.toml' />
+    </FileTree.Folder>
+    <FileTree.Folder name='runner'>
+      <FileTree.Folder name='src'>
+        <FileTree.File name='main.rs' />
       </FileTree.Folder>
       <FileTree.File name='Cargo.toml' />
     </FileTree.Folder>
@@ -172,8 +168,9 @@ in a parent folder, or in the default configuration folder. In that case, it sto
 
 <Callout type='info'>
   A project that has an `.interfold/support` folder cannot run `interfold program`. To migrate it,
-  delete `.interfold/support` and its two workspace members from `Cargo.toml`, then copy `runner/`
-  from the template and add `runner` to the workspace members.
+  delete `.interfold/support` and its two workspace members from `Cargo.toml`. Then copy `runner/`
+  from the template, add `runner` to the workspace members, and replace the `e3-program-server`
+  workspace dependency with the `e3-program-runner` entry from the template's `Cargo.toml`.
 </Callout>
 
 The scripts make more folders when they run:

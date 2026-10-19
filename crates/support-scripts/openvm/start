@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: LGPL-3.0-only
 #
-# Starts the OpenVM proving service: the project's runner in `openvm` mode. Runs in the project
+# Starts the OpenVM proving service: the program runner in `openvm` mode. Runs in the project
 # directory. `interfold program start` sets the worker paths and the backend from `program.openvm`.
 # The worker configuration is OPENVM_PROVER_CONFIG, or the one `compile` wrote.
 set -euo pipefail

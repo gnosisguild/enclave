@@ -11,7 +11,7 @@ use tokio::fs;
 use tokio::signal;
 
 /// A support script that the CLI carries. It runs in the project directory and builds or starts
-/// the project's runner, the binary that serves the project's program through `e3-program-runner`.
+/// the program runner, the binary that serves the project's program through `e3-program-runner`.
 pub struct Script {
     pub name: &'static str,
     pub source: &'static str,

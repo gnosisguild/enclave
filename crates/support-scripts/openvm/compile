@@ -7,7 +7,7 @@
 #   1. the guest in ./guest, transpiled to an OpenVM executable;
 #   2. its application proving key, then the aggregation key and receipt identity (`prepare`);
 #   3. the worker configuration: OPENVM_PROVER_CONFIG, or .interfold/caches/openvm/prover.json;
-#   4. the project's runner, which serves the proving service.
+#   4. the program runner, which serves the proving service.
 #
 # Step 2 runs only when the executable or ./guest/openvm.toml changed since the last run.
 #
@@ -85,5 +85,5 @@ echo "Receipt identity: $PREPARED/identity.json"
 
 # Not --locked: after `interfold init`, the project's lockfile still names the template's path
 # sources until a build updates it.
-echo "Building the project runner"
+echo "Building the program runner"
 cargo build --release --bin program-runner
