@@ -310,6 +310,17 @@ Credential expiry and revocation preserve earlier eligibility snapshots. Registr
 an existing credential's expiry. Governance must revoke it first so that the capacity guard detects
 the reduction.
 
+`ZKPassportIdentityVerifier` is an `IIdentityVerifier` for ZKPassport proofs of chip documents. It
+replaces the caller's service configuration with a fixed domain, scope, proof-age window and
+`devMode = false` before it calls ZKPassport's root verifier, because ZKPassport checks the values
+that its caller passes. It accepts one ZKPassport version and one identifier type (non-salted or
+salted). It requires a non-zero identifier, a proof bound to the registering owner and to
+`block.chainid`, a proven expiry date at or after the evidence's `validUntil`, and strict FaceMatch
+when configured. The identifier hashes the scoped nullifier with the domain and scope, so it belongs
+to one document: two documents give two identifiers, and a renewed document gives a new one. The
+credential ends at `validUntil`, or `maxValidity` after the proof date if that is earlier.
+ZKPassport's admin keys control its verifier, helper and certificate registry.
+
 Before pausing admissions after an eligibility configuration change, refresh every operator that
 must remain eligible. Wait for a later block timestamp. Check that
 `committeeOwnerCapacity(latest.timestamp - 1)` covers the required committee size. An unrefreshed
