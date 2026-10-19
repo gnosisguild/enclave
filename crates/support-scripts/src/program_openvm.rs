@@ -6,19 +6,18 @@
 
 use crate::{
     traits::ProgramSupportApi,
-    utils::{ensure_script_exists, run_bash_script_with_env},
+    utils::{ensure_project, run_script, Script, OPENVM_COMPILE, OPENVM_START},
 };
 use anyhow::{ensure, Context, Result};
 use async_trait::async_trait;
 use e3_config::ProgramConfig;
 use std::env;
 
-/// Proves the project's E3 program with OpenVM, through the project's
-/// `.interfold/support/openvm` scripts.
+/// Proves the project's E3 program with OpenVM, through the project's runner in `openvm` mode.
 pub struct ProgramSupportOpenVm(pub ProgramConfig);
 
 impl ProgramSupportOpenVm {
-    async fn run(&self, script: &str) -> Result<()> {
+    async fn run(&self, script: &Script) -> Result<()> {
         let config = self.0.openvm().context(
             "Set program.openvm.prover_bin to the CPU worker, program.openvm.prover_bin_cuda to \
              the CUDA worker, or both",
@@ -49,18 +48,17 @@ impl ProgramSupportOpenVm {
         }
 
         let cwd = env::current_dir()?;
-        let script = cwd.join(".interfold/support/openvm").join(script);
-        ensure_script_exists(&script).await?;
-        run_bash_script_with_env(&cwd, &script, &[], &environment).await
+        ensure_project(&cwd).await?;
+        run_script(&cwd, script, &environment).await
     }
 }
 
 #[async_trait]
 impl ProgramSupportApi for ProgramSupportOpenVm {
     async fn compile(&self) -> Result<()> {
-        self.run("compile").await
+        self.run(&OPENVM_COMPILE).await
     }
     async fn start(&self) -> Result<()> {
-        self.run("start").await
+        self.run(&OPENVM_START).await
     }
 }

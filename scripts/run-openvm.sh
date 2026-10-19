@@ -20,22 +20,22 @@ case "$command" in
     export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target/openvm/crisp-server}"
     exec cargo "${command#crisp-server-}" --locked --manifest-path "$CRISP/Cargo.toml" -p crisp "$@"
     ;;
-  # CRISP's proving service: examples/CRISP/.interfold/support/openvm/service.
+  # CRISP's program runner: examples/CRISP/runner, which serves the proving service.
   service-build|service-check)
-    exec cargo "${command#service-}" --locked --manifest-path "$CRISP/Cargo.toml" -p e3-support-scripts-openvm "$@"
+    exec cargo "${command#service-}" --locked --manifest-path "$CRISP/Cargo.toml" -p e3-user-program-runner "$@"
     ;;
   service-test)
-    exec cargo test --locked --manifest-path "$ROOT/Cargo.toml" -p e3-openvm-types -p e3-openvm-host -p e3-compute-provider -p e3-program-server "$@"
+    exec cargo test --locked --manifest-path "$ROOT/Cargo.toml" -p e3-openvm-types -p e3-openvm-host -p e3-compute-provider -p e3-program-server -p e3-program-runner "$@"
     ;;
   # Builds CRISP's guest, keys, receipt identity, worker configuration and service. Takes the same
   # OPENVM_* environment as `interfold program compile`.
   compile)
     cd "$CRISP"
-    exec bash .interfold/support/openvm/compile "$@"
+    exec bash "$ROOT/crates/support-scripts/openvm/compile" "$@"
     ;;
   service-start)
     cd "$CRISP"
-    exec bash .interfold/support/openvm/start "$@"
+    exec bash "$ROOT/crates/support-scripts/openvm/start" "$@"
     ;;
   prover-build|prover-test|prover-check)
     export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target/openvm/prover}"

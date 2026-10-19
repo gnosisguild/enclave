@@ -25,7 +25,6 @@ RUN cargo install --locked cargo-chef
 FROM base-dev AS chef
 WORKDIR /app
 
-# COPY examples/CRISP/.interfold/support/dev/Cargo.toml examples/CRISP/.interfold/support/dev/
 COPY examples/CRISP/server/Cargo.toml examples/CRISP/server/
 COPY examples/CRISP/program/Cargo.toml examples/CRISP/program/
 COPY examples/CRISP/program/client/Cargo.toml examples/CRISP/program/client/
@@ -81,6 +80,7 @@ COPY crates/keyshare/Cargo.toml crates/keyshare/Cargo.toml
 COPY crates/logger/Cargo.toml crates/logger/Cargo.toml
 COPY crates/multithread/Cargo.toml crates/multithread/Cargo.toml
 COPY crates/net/Cargo.toml crates/net/Cargo.toml
+COPY crates/program-runner/Cargo.toml crates/program-runner/Cargo.toml
 COPY crates/program-server/Cargo.toml crates/program-server/Cargo.toml
 COPY crates/request/Cargo.toml crates/request/Cargo.toml
 COPY crates/sdk/Cargo.toml crates/sdk/Cargo.toml
@@ -127,7 +127,7 @@ ENV SKIP_SOLIDITY=${SKIP_SOLIDITY}
 
 WORKDIR /app
 
-COPY examples/CRISP/.interfold/   examples/CRISP/.interfold/
+COPY examples/CRISP/runner/    examples/CRISP/runner/
 COPY examples/CRISP/server/    examples/CRISP/server/
 COPY examples/CRISP/program/   examples/CRISP/program/
 COPY examples/CRISP/crates/   examples/CRISP/crates/

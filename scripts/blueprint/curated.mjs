@@ -1334,8 +1334,8 @@ function apps() {
         label: 'OpenVM runner',
         tip: 'The OpenVM service builds the program server with a callback that calls prover.prove(...)',
         refs: [
-          H('crates/support-scripts/openvm/service/src/main.rs', 40, 'E3ProgramServer::builder(move |job| {'),
-          H('crates/support-scripts/openvm/service/src/main.rs', 51, '.prove('),
+          H('crates/program-runner/src/openvm.rs', 38, 'E3ProgramServer::builder(move |job| {'),
+          H('crates/program-runner/src/openvm.rs', 49, '.prove('),
         ],
       },
       {
@@ -1350,7 +1350,7 @@ function apps() {
         label: 'dev',
         lp: 'left',
         tip: 'The dev runner calls compute-provider directly, with no proof',
-        refs: [H('crates/support-scripts/dev/src/main.rs', 61, 'ComputeManager::with_published(')],
+        refs: [H('crates/program-runner/src/dev.rs', 63, 'ComputeManager::with_published(')],
       },
       {
         from: 'ovm',

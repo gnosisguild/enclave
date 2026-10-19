@@ -4,27 +4,30 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+//! The unproved development runner: runs the program natively and answers with a mock proof.
+
 use anyhow::Result;
 use e3_compute_provider::{
-    ComputeInput, ComputeManager, ComputeProvider, ComputeResult, InputPolicy,
+    ComputeInput, ComputeManager, ComputeProvider, ComputeResult, FHEProcessor, InputPolicy,
 };
 use e3_program_server::E3ProgramServer;
-use e3_user_program::fhe_processor;
 
-struct MockProofProvider;
+struct MockProofProvider {
+    processor: FHEProcessor,
+}
 
 impl ComputeProvider for MockProofProvider {
     type Output = ComputeResult;
 
     fn prove(&self, input: &ComputeInput, policy: InputPolicy) -> Self::Output {
-        // The policy comes from the caller rather than from `e3_user_program::policy()` here.
-        // Reading it twice would let the ciphertext this run publishes and the one it proves be
-        // selected by different rules, which is the divergence the argument exists to remove.
+        // The policy comes from the caller rather than from the program here. Reading it twice
+        // would let the ciphertext this run publishes and the one it proves be selected by
+        // different rules, which is the divergence the argument exists to remove.
         //
         // This dev provider stands in for the zkVM, where a failure aborts the guest. Panicking
         // with the reason keeps that behaviour while naming the input that could not be used.
         input
-            .process(fhe_processor, policy)
+            .process(self.processor, policy)
             .expect("the Secure Process rejected its inputs")
     }
 }
@@ -53,26 +56,24 @@ fn encode_mock_compute_proof(seal: &[u8], result: &ComputeResult) -> Result<Vec<
     Ok(encoded)
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    let server = E3ProgramServer::builder(|job| async move {
+pub(crate) async fn serve(processor: FHEProcessor, policy: InputPolicy) -> Result<()> {
+    let server = E3ProgramServer::builder(move |job| async move {
         // `with_published`, not `new`: a program whose policy reads the commitment or the slot
         // needs what the E3 program published, and `new` supplies none of it.
         let mut manager = ComputeManager::with_published(
-            MockProofProvider,
+            MockProofProvider { processor },
             job.inputs,
             job.published,
-            fhe_processor,
+            processor,
         );
-        let (result, ciphertext) = manager.start(e3_user_program::policy())?;
+        let (result, ciphertext) = manager.start(policy)?;
         let proof = encode_mock_compute_proof(&[3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5], &result)?;
 
         Ok((proof, ciphertext))
     })
     .build()?;
 
-    server.run().await?;
-    Ok(())
+    server.run().await
 }
 
 #[cfg(test)]

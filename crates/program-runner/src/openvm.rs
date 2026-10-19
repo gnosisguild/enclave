@@ -4,13 +4,12 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! The OpenVM proving service for this project's E3 program.
-//!
-//! Serves the same `POST /run_compute` as the development runner, and answers with a real OpenVM
-//! receipt. The worker, its configuration and the deadlines come from the environment that
-//! `interfold program start` sets; see `e3_openvm_host::WorkerConfig`.
+//! The OpenVM proving service. Serves the same `POST /run_compute` as the development runner, and
+//! answers with a real OpenVM receipt. The worker, its configuration and the deadlines come from
+//! the environment that `interfold program start` sets; see `e3_openvm_host::WorkerConfig`.
 
 use anyhow::{Context, Result};
+use e3_compute_provider::{FHEProcessor, InputPolicy};
 use e3_openvm_host::{ComputeDomain, Prover, WorkerConfig};
 use e3_program_server::E3ProgramServer;
 use std::sync::Arc;
@@ -25,8 +24,7 @@ fn env_or<T: std::str::FromStr>(name: &str, default: T) -> Result<T> {
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+pub(crate) async fn serve(processor: FHEProcessor, policy: InputPolicy) -> Result<()> {
     let prover = Arc::new(Prover::start(WorkerConfig::from_env()?).await?);
 
     let bind = env_or("OPENVM_BIND_ADDR", "127.0.0.1:13151".to_string())?;
@@ -48,13 +46,7 @@ async fn main() -> Result<()> {
                 committee_public_key_hash: job.domain.committee_public_key_hash,
             };
             prover
-                .prove(
-                    job.inputs,
-                    job.published,
-                    domain,
-                    e3_user_program::fhe_processor,
-                    e3_user_program::policy(),
-                )
+                .prove(job.inputs, job.published, domain, processor, policy)
                 .await
         }
     })

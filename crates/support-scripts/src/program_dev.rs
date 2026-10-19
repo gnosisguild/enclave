@@ -8,29 +8,30 @@ use std::env;
 
 use crate::{
     traits::ProgramSupportApi,
-    utils::{ensure_script_exists, run_bash_script},
+    utils::{ensure_project, run_script, Script, DEV_COMPILE, DEV_START},
 };
 use anyhow::Result;
 use async_trait::async_trait;
 use e3_config::ProgramConfig;
 
+/// Runs the project's E3 program unproved, through the project's runner in `dev` mode.
 #[allow(dead_code)]
 pub struct ProgramSupportDev(pub ProgramConfig);
+
+impl ProgramSupportDev {
+    async fn run(&self, script: &Script) -> Result<()> {
+        let cwd = env::current_dir()?;
+        ensure_project(&cwd).await?;
+        run_script(&cwd, script, &[]).await
+    }
+}
 
 #[async_trait]
 impl ProgramSupportApi for ProgramSupportDev {
     async fn compile(&self) -> Result<()> {
-        let cwd = env::current_dir()?;
-        let script = cwd.join(".interfold/support/dev/compile");
-        ensure_script_exists(&script).await?;
-        run_bash_script(&cwd, &script, &[]).await?;
-        Ok(())
+        self.run(&DEV_COMPILE).await
     }
     async fn start(&self) -> Result<()> {
-        let cwd = env::current_dir()?;
-        let script = cwd.join(".interfold/support/dev/start");
-        ensure_script_exists(&script).await?;
-        run_bash_script(&cwd, &script, &[]).await?;
-        Ok(())
+        self.run(&DEV_START).await
     }
 }

@@ -678,7 +678,7 @@
       "kind": "crate",
       "path": "crates/init",
       "one_line": "Implements `interfold init`: fetches the project template at the release tag, pins package versions, copies it in, and installs packages.",
-      "explain": "`execute` clones the template repository, by default at this CLI's own release tag, into a temporary folder, then copies it into the project through filters. The filters pin `@interfold/contracts`, `@interfold/react` and `@interfold/sdk` to the versions in that clone and rewrite Interfold crate path dependencies to the template's git commit; separate copy steps add the dev runner and OpenVM scripts to `.interfold/support`. It then runs `pnpm install` unless `--skip-install` is set, so a new project matches the release's contracts, SDK and prover scripts.",
+      "explain": "`execute` clones the template repository, by default at this CLI's own release tag, into a temporary folder, then copies it into the project through filters. The filters pin `@interfold/contracts`, `@interfold/react` and `@interfold/sdk` to the versions in that clone and rewrite Interfold crate path dependencies, such as `e3-program-runner`, to the template's git commit. It then runs `pnpm install` unless `--skip-install` is set, so a new project matches the release's contracts, SDK and program runner.",
       "analogy": "A flat-pack kit for this release: it fetches the parts for this version, adjusts the labels to fit, lays them out in the new room, and then runs the assembly step.",
       "actors": [],
       "consumes": [],
@@ -688,11 +688,6 @@
           "name": "template clone in the fixed temporary folder /tmp/__interfold-tmp-folder.1",
           "where": "disk",
           "ref": "crates/init/src/lib.rs@28@const TEMP_DIR: &str"
-        },
-        {
-          "name": "dev runner and OpenVM scripts copied into the project's .interfold/support folder",
-          "where": "disk",
-          "ref": "crates/init/src/lib.rs@170@&cwd.join(\".interfold/support/dev\"),"
         }
       ],
       "key_types": [
@@ -715,7 +710,7 @@
       "read_first": [
         {
           "why": "the entry point that the CLI calls",
-          "ref": "crates/init/src/lib.rs@287@pub async fn execute("
+          "ref": "crates/init/src/lib.rs@255@pub async fn execute("
         },
         {
           "why": "the steps in order: clone, read versions, copy, install",
@@ -723,7 +718,7 @@
         },
         {
           "why": "the Cargo path rewrite that points template crates at the template's commit",
-          "ref": "crates/init/src/lib.rs@279@fn interfold_path_filter(commit_hash: &str) -> Filter {"
+          "ref": "crates/init/src/lib.rs@247@fn interfold_path_filter(commit_hash: &str) -> Filter {"
         },
         {
           "why": "the copy routine that applies the filters",
@@ -839,7 +834,7 @@
       "kind": "crate",
       "path": "crates/support-scripts",
       "one_line": "Runs a project's program scripts: compile and start go to the dev runner or the OpenVM prover, and the cache purge deletes build caches.",
-      "explain": "`program_compile` and `program_start` check the program config, pick a backend, and run its bash script: `dev`, a runner with a mock proof provider from `.interfold/support/dev`, or `openvm`, the OpenVM proving service from `.interfold/support/openvm`. `ProgramSupport` picks the dev backend when the flag or the config says so, and OpenVm otherwise; `program_cache_purge` removes `.interfold/caches`. Without it, `interfold compile`, `interfold program start` and `purge-all` could not run a project's program.",
+      "explain": "`program_compile` and `program_start` check the program config, pick a backend, and run its bash script: `dev` or `openvm`. The `interfold` binary embeds the scripts and runs them in the project directory; they build and run the project's `program-runner` binary (`e3-program-runner`) in dev mode or OpenVM mode. A project that still has `.interfold/support` is refused. `ProgramSupport` picks the dev backend when the flag or the config says so, and OpenVm otherwise; `program_cache_purge` removes `.interfold/caches`. Without it, `interfold compile`, `interfold program start` and `purge-all` could not run a project's program.",
       "analogy": "A stage manager who reads the cue sheet, calls the right crew to run their script, and clears the props room when asked.",
       "actors": [],
       "consumes": [],
@@ -905,11 +900,8 @@
         }
       ],
       "depends_on": ["e3-config"],
-      "tests": "Unit tests in src/program.rs and src/utils.rs (tokio tests for the script runner); the nested dev/ crate has its own tests. Run: cargo test -p e3-support-scripts",
-      "unverified": [
-        "dev/ and openvm/service/ are separate Cargo projects with their own lock file; their proving code was not traced.",
-        "The openvm/compile and openvm/start scripts were not read."
-      ]
+      "tests": "Unit tests in src/program.rs and src/utils.rs (tokio tests for the script runner). Run: cargo test -p e3-support-scripts",
+      "unverified": ["The openvm/compile and openvm/start scripts were not read."]
     },
     {
       "id": "interfoldup",

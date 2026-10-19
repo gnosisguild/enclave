@@ -168,9 +168,7 @@ jobs:
               - 'examples/CRISP/Cargo.toml'
               - 'examples/CRISP/Cargo.lock'
               - 'examples/CRISP/rust-toolchain.toml'
-              # Symlinks to members of the CRISP cargo workspace.
-              - 'examples/CRISP/.interfold/support/dev'
-              - 'examples/CRISP/.interfold/support/openvm'
+              - 'examples/CRISP/runner/**'
               - 'examples/CRISP/crates/**'
               - 'examples/CRISP/program/**'
               - 'examples/CRISP/server/**'
@@ -1716,24 +1714,23 @@ jobs:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Install protoc
         uses: ./.github/actions/install-protoc
-      # The e3-support-scripts tests run in rust_unit_tests: every input of that crate selects it.
-      - name: Build support scripts
-        run: cd templates/default && cargo build --locked --bin e3-support-scripts-dev
-      # The OpenVM proving service links the template program. Its guest needs cargo-openvm and a GPU
-      # host for proofs, so CI builds only the service.
-      - name: Build the OpenVM proving service
-        run: cd templates/default && cargo build --locked --bin e3-support-scripts-openvm
+      # The e3-support-scripts and e3-program-runner tests run in rust_unit_tests: every input of
+      # those crates selects it. One binary serves both the development runner and the OpenVM
+      # proving service; the OpenVM guest needs cargo-openvm and a GPU host for proofs, so CI builds
+      # only the runner.
+      - name: Build the program runner
+        run: cd templates/default && cargo build --locked --bin program-runner
       - name: Verify build artifacts
         run: |
-          echo "Checking for support scripts binary:"
-          find templates/default/target/ -name "e3-support-scripts-dev" -type f -ls || echo "Binary not found"
+          echo "Checking for the program runner binary:"
+          find templates/default/target/ -name "program-runner" -type f -ls || echo "Binary not found"
       - name: Upload support scripts artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: support-scripts-artifacts
           # Only the binary. template_integration is the one consumer and needs nothing else from
           # the cargo target directory.
-          path: templates/default/target/debug/e3-support-scripts-dev
+          path: templates/default/target/debug/program-runner
           retention-days: 1
           if-no-files-found: error
 
@@ -2052,7 +2049,7 @@ jobs:
       - name: Make binaries executable
         run: |
           chmod +x ~/.cargo/bin/interfold
-          chmod +x templates/default/target/debug/e3-support-scripts-dev
+          chmod +x templates/default/target/debug/program-runner
 
       - name: Install Nargo
         uses: noir-lang/noirup@7dbe69ccc78877f0200ffa5a40836c953d2cfd8f # v0.1.4
@@ -2091,12 +2088,12 @@ jobs:
         run: |
           echo "Checking downloaded artifacts:"
           ls -la ~/.cargo/bin/interfold || echo "interfold binary not found"
-          ls -la templates/default/target/debug/e3-support-scripts-dev || echo "support scripts not found"
+          ls -la templates/default/target/debug/program-runner || echo "program runner not found"
           ls -la packages/interfold-contracts/dist || echo "SDK dist not found"
           ls -la crates/wasm/dist || echo "WASM dist not found"
           test -f circuits/bin/.active-preset.json || (echo "ERROR: circuit preset stamp not found" && exit 1)
-          echo "Support scripts permissions:"
-          ls -la templates/default/target/debug/e3-support-scripts-dev
+          echo "Program runner permissions:"
+          ls -la templates/default/target/debug/program-runner
 
       - name: Test Template
         run: |

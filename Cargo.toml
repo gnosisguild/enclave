@@ -34,6 +34,7 @@ members = [
   "crates/parity-matrix",
   "crates/polynomial",
   "crates/polynomial/fhe-adapter",
+  "crates/program-runner",
   "crates/program-server",
   "crates/request",
   "crates/safe",
@@ -59,8 +60,6 @@ exclude = [
   "examples/CRISP/program",
   # Built with the OpenVM SDK as a workspace of its own.
   "crates/openvm-prover",
-  "crates/support-scripts/dev",
-  "crates/support-scripts/openvm",
   "templates/default"
 ]
 resolver = "3"
@@ -119,6 +118,7 @@ e3-openvm-host = { version = "0.19.0", path = "./crates/openvm-host" }
 e3-openvm-types = { version = "0.19.0", path = "./crates/openvm-types" }
 e3-sortition = { version = "0.19.0", path = "./crates/sortition" }
 e3-daemon-server = { version = "0.19.0", path = "./crates/daemon-server" }
+e3-program-runner = { version = "0.19.0", path = "./crates/program-runner" }
 e3-program-server = { version = "0.19.0", path = "./crates/program-server" }
 e3-polynomial = { version = "0.19.0", path = "./crates/polynomial" }
 e3-polynomial-fhe = { version = "0.19.0", path = "./crates/polynomial/fhe-adapter" }

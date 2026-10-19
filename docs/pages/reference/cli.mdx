@@ -162,8 +162,7 @@ These commands make and run an E3 project from the template. For a walkthrough, 
 ### `interfold init`
 
 Makes a new Interfold project from a template. The command clones the template, pins its Interfold
-crates to the cloned commit, copies the development runner and the OpenVM proving service to
-`.interfold/support`, runs `pnpm install`, and makes the first Git commit. It needs `git` and
+crates to the cloned commit, runs `pnpm install`, and makes the first Git commit. It needs `git` and
 `pnpm`.
 
 ```bash
@@ -193,8 +192,9 @@ interfold compile [--dev <true|false>]
 
 ### `interfold program`
 
-Manages the E3 program of the project. Each subcommand runs a script in `.interfold/support` in the
-current directory. `interfold init` puts these scripts in the project.
+Manages the E3 program of the project. Each subcommand runs a script in the current directory. The
+CLI embeds the scripts, so the project does not hold them. They build and run the `program-runner`
+binary of the project's `runner/` crate.
 
 The `--dev` flag selects the script set. When the flag is absent, the CLI uses `program.dev` from
 the configuration, which defaults to `false`.
