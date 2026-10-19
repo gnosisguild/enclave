@@ -145,7 +145,9 @@ matrix:
 `ActiveCryptoConfig.sol` selects the parameter sets and committee shapes supported by
 `block.chainid`. Deployment tooling mirrors that matrix with `bfvConfigsForChain(chainId)` and reads
 VK hashes from `dist/circuits/<preset>/<committee>/...`. A verifier router can sit behind the BFV
-scheme mapping and dispatch proofs to the concrete verifier for each generated pair.
+scheme mapping and dispatch proofs to the concrete verifier for each generated pair. An installed
+`@interfold/contracts` outside the monorepo reads VK hashes from `INTERFOLD_CIRCUITS_DIR` and the
+node release from `dist/node-release.json`, which `compile:ts` writes.
 
 `circuits/bin/.active-preset.json` only records the local hydrated circuit cache. It can point at a
 different pair than the target chain uses, provided `dist/circuits/` contains every required pair

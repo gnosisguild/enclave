@@ -434,8 +434,11 @@ importers:
       '@chainlink/contracts':
         specifier: 1.5.0
         version: 1.5.0(@types/node@22.7.5)(bufferutil@4.1.0)(ethers@6.17.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(utf-8-validate@5.0.10)
+      '@openzeppelin/contracts':
+        specifier: 5.3.0
+        version: 5.3.0
       '@openzeppelin/contracts-upgradeable':
-        specifier: ^5.0.2
+        specifier: 5.0.2
         version: 5.0.2(@openzeppelin/contracts@5.3.0)
       '@predicate/contracts':
         specifier: 2.2.3
@@ -489,9 +492,6 @@ importers:
       '@nomicfoundation/hardhat-verify':
         specifier: ^3.0.1
         version: 3.0.5(hardhat@3.0.11(bufferutil@4.1.0)(utf-8-validate@5.0.10))
-      '@openzeppelin/contracts':
-        specifier: ^5.0.2
-        version: 5.3.0
       '@trivago/prettier-plugin-sort-imports':
         specifier: ^4.3.0
         version: 4.3.0(prettier@3.6.2)
