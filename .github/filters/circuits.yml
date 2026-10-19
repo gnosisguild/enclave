@@ -6,6 +6,7 @@
 # Give every filter the same `!` patterns, because the hook applies each one to the whole list.
 
 # The Noir circuits and the scripts that build, lint, and test them.
+# Add new generator/check inputs explicitly; scripts/circuits/ is not matched wholesale.
 circuits:
   - 'circuits/**'
   - 'scripts/circuits/lint.sh'

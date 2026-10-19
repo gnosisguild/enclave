@@ -4,6 +4,19 @@ Interfold implements encrypted execution across contracts, circuits, and asynchr
 own usage and public contracts; the nearest `AGENTS.md` owns change guidance, and domain documents
 own cross-component rules, rationale, and limits.
 
+## Sources of authority
+
+When sources disagree, use this descending order:
+
+1. Deployed contract behavior and protocol/circuit invariants.
+2. Compatibility and end-to-end tests.
+3. Durable event/snapshot schemas.
+4. Domain descriptions of current behavior and crate/module maps.
+5. Target designs in [design principles](docs/architecture/design-principles.md).
+
+Correct documentation against higher-authority sources. A target design is not evidence of current
+behavior; record unmet requirements as gaps rather than weakening them to match code.
+
 ## Working agreement
 
 - Preserve unrelated work. Confirm the checkout and branch before editing; coordinate concurrent
@@ -27,9 +40,11 @@ own cross-component rules, rationale, and limits.
 
 ## Protocol and artifact changes
 
-- Cleanup does not authorize changes to cryptographic statements, deployed verifiers, durable
-  encodings, replay, or actor ordering. Consult the affected
-  [domain document](docs/architecture/AGENTS.md) and verify its claims against code and tests.
+- Cleanup must never silently change committee ordering, threshold meaning, proof multiplicity,
+  hashing, signatures, circuit witness shape, event identity, or replay semantics. It does not
+  authorize changes to cryptographic statements, deployed verifiers, durable encodings, or actor
+  ordering. Consult the affected [domain document](docs/architecture/AGENTS.md) and verify its
+  claims against code and tests.
 - Migrations need explicit compatibility, release-counter, rollout, and rollback decisions for human
   review. Follow [Protocol compatibility](CONTRIBUTING.md#protocol-compatibility).
 - Use canonical generators for committee/preset outputs, parity matrices, verifiers, constants, and

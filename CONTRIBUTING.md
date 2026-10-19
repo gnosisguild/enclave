@@ -109,6 +109,11 @@ Husky checks formatting before commit and repository checks before push. It does
 individual commit messages; the optional `.githooks/commit-msg` validator has no replacement. Use
 Conventional Commits for authored messages and the validated squash-commit title.
 
+Formatting is check-only, not automatic repair after each edit. The shared pre-commit hook checks
+staged Prettier-supported files; CI checks changed supported files. Rust and Noir formatting are
+checked by `pnpm lint` at pre-push, not by that Prettier pre-commit hook. Format changed files
+explicitly with the repository configuration before committing.
+
 ## Pull Requests
 
 Before you create a pull request, search for any issues related to the change you are making. If
@@ -165,8 +170,28 @@ or publication permission.
 Before merging a protocol-bearing change, the required reviewer must check the affected domain
 contracts against the actual diff, including persistence/replay and cross-layer compatibility where
 applicable. Record the domain references, review outcome, and unresolved limits in the PR.
-`pnpm check:links` checks documentation targets and anchors, not semantic doc/code agreement or
-protocol correctness; it does not replace this review.
+
+Perform one read-only review pass as a separate step, starting from the diff and post-change code,
+not from memory of the edits:
+
+- Route the changed paths/symbols through the [domain references](docs/architecture/AGENTS.md) and
+  check the relevant requirements, current owners, and known issues in
+  [protocol history](docs/architecture/protocol-history.md).
+- Flag a diff that widens a documented gap, relies on a missing property, or weakens requirement
+  text to match code. Close a gap only in a scoped change with supporting evidence.
+- For schema, wire-format, circuit, verification-key, source-hash, ABI/storage, upgrade, or
+  release-counter changes, report separately on old-data replay, old-version peers, and
+  already-deployed verifiers. Explain when a compatibility category does not apply.
+- Check formulas, thresholds, hashes, and schema facts at their existing owner; flag new copies or
+  disagreements. Update the owning documentation in the same change when documented behavior
+  changes, and check that resolved findings are not reintroduced.
+- Report actionable findings by severity, with the domain requirement, code location, concrete
+  failure scenario, and verification limits. Identify touched requirements verified unaffected.
+
+No automated gate requires a matching documentation diff when protocol-bearing code changes.
+Documentation/code synchronization is review-enforced. `pnpm check:links` checks documentation
+targets and anchors, not semantic doc/code agreement or protocol correctness; it does not replace
+this review.
 
 ## Merging
 
