@@ -636,7 +636,7 @@
           "ref": "examples/CRISP/crates/crisp-utils/src/lib.rs@77@#[test]"
         }
       ],
-      "depends_on": ["e3-sdk", "e3-bfv-client", "e3-evm-helpers", "e3-fhe-params", "e3-zk-helpers", "e3-polynomial"],
+      "depends_on": ["e3-sdk", "e3-bfv-client", "e3-evm-helpers", "e3-fhe-params", "e3-zk-config", "e3-zk-witness", "e3-polynomial"],
       "tests": "crisp-utils and zk-inputs have inline #[test] modules, and evm_helpers has inline tests plus tests/integration.rs. Run cargo test inside each crate directory; these crates are not members of the root workspace.",
       "unverified": [
         "No Rust crate in this snapshot imports zk-inputs except zk-inputs-wasm, and the JavaScript package that wraps zk-inputs-wasm is not here.",

@@ -7,8 +7,8 @@ treat it as a protocol migration (versioning + compatibility tests), never a sil
 
 Some entries are mechanically enforced and will fail pre-push: committee sync
 (`pnpm check:committee`), harness-doc drift (`pnpm check:docs`), and `pnpm check:invariants` (the
-`do_send` ratchet with its baseline in `scripts/invariant-baselines.env`, skip-proof feature
-containment, the runtime proof-skip guard, ciphernode Docker workspace coverage, and Compose
+`do_send` ratchet with its baseline in `scripts/invariant-baselines.env`, skip-proof feature and ZK
+sample dependency containment, the runtime proof-skip guard, ciphernode Docker workspace coverage, and Compose
 `stop_grace_period` > 60 s). The rest are review-enforced: run the procedure in
 `agent/prompts/invariant-reviewer.md` (Claude `/invariant-review`; the `invariant-review` skill in
 other tools).
@@ -39,7 +39,7 @@ your diff changes, search that section too (`rg -l '<file or symbol>' agent/inva
 | `packages/interfold-contracts/{scripts,tasks,deploy,ignition}/`                                                                                                                | `01_PROTOCOL_ONCHAIN.md` + `04_BUILD_CONFIG.md`                                                        |
 | `circuits/`                                                                                                                                                                    | `02_CRYPTO_CIRCUITS.md`                                                                                |
 | `crates/` (any crate)                                                                                                                                                          | `03_ACTOR_RUNTIME.md`                                                                                  |
-| `crates/{zk-prover,zk-helpers,zk/cli,trbfv,fhe-params,committee,polynomial,compute-provider,wasm,support,committee-hash}/`                                                     | also `02_CRYPTO_CIRCUITS.md`                                                                           |
+| `crates/{zk-prover,zk/{cli,config,witness},trbfv,fhe-params,committee,polynomial,compute-provider,wasm,support,committee-hash}/`                                               | also `02_CRYPTO_CIRCUITS.md`                                                                           |
 | `crates/{sortition,evm}/`                                                                                                                                                      | also `01_PROTOCOL_ONCHAIN.md`                                                                          |
 | `crates/data-availability/`                                                                                                                                                    | also `01_PROTOCOL_ONCHAIN.md`, `02_CRYPTO_CIRCUITS.md`, and `agent/flow-trace/08_DATA_AVAILABILITY.md` |
 | `crates/cli/`                                                                                                                                                                  | also `04_BUILD_CONFIG.md` (CLI secrets)                                                                |

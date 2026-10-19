@@ -43,7 +43,19 @@ const lines = (p) => readFileSync(p, 'utf8').split('\n')
 
 // The layer of each workspace crate, from agent/CRATES_ARCHITECTURE.md "Dependency layers".
 export const LAYERS = {
-  entry: ['cli', 'entrypoint', 'ciphernode-builder', 'dashboard', 'daemon-server', 'console', 'init', 'fs', 'interfoldup', 'zk/cli'],
+  entry: [
+    'cli',
+    'entrypoint',
+    'ciphernode-builder',
+    'dashboard',
+    'daemon-server',
+    'console',
+    'init',
+    'fs',
+    'interfoldup',
+    'zk/build',
+    'zk/benchmarks',
+  ],
   clients: [
     'program-server',
     'program-runner',
@@ -56,11 +68,11 @@ export const LAYERS = {
     'openvm-types',
     'openvm-prover',
   ],
-  workflows: ['request', 'sortition', 'keyshare', 'aggregator', 'slashing', 'zk-prover', 'fhe', 'multithread', 'trbfv', 'bfv-client'],
+  workflows: ['request', 'sortition', 'keyshare', 'aggregator', 'slashing', 'zk/prover', 'fhe', 'multithread', 'trbfv', 'bfv-client'],
   adapters: ['evm', 'net', 'sync', 'data', 'data-availability', 'logger'],
-  vocabulary: ['events', 'config', 'fhe-params', 'zk-helpers', 'committee', 'committee-hash'],
+  vocabulary: ['events', 'config', 'fhe-params', 'zk/config', 'zk/witness', 'committee', 'committee-hash'],
   foundations: ['crypto', 'polynomial', 'polynomial/fhe-adapter', 'parity-matrix', 'safe', 'hamt', 'utils', 'utils-derive'],
-  validation: ['test-helpers', 'tests', 'layout-lock'],
+  validation: ['test-helpers', 'tests', 'layout-lock', 'zk/samples'],
 }
 
 function cargoName(dir) {

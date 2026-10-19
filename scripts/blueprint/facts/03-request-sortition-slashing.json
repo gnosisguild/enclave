@@ -185,16 +185,7 @@
           "ref": "crates/request/src/routing/effects/build_context.rs@51@pub fn with(mut self, listener: Box<dyn E3Extension>) -> Self {"
         }
       ],
-      "depends_on": [
-        "e3-bfv-client",
-        "e3-committee-hash",
-        "e3-zk-helpers",
-        "e3-events",
-        "e3-fhe-params",
-        "e3-data",
-        "e3-utils",
-        "e3-config"
-      ],
+      "depends_on": ["e3-bfv-client", "e3-committee-hash", "e3-events", "e3-fhe-params", "e3-data", "e3-utils", "e3-config"],
       "tests": "routing/tests.rs, routing/buffer_tests.rs, routing/capacity_tests.rs, routing/workflow_tests.rs and lifecycle/workflow_tests.rs under crates/request/src; cargo test -p e3-request",
       "unverified": [
         "The restart path (fail_on_restart, complete_on_restart, reconcile_recovered_selections) was read in routing/handlers.rs and build_context.rs; the builder's full startup order was not traced."
@@ -648,7 +639,7 @@
           "ref": "crates/slashing/src/accusation_voting/transitions/reverify_proofs.rs@43@let Some(reverif) = self.pending_reverifications.remove(&correlation_id) else {"
         }
       ],
-      "depends_on": ["e3-data", "e3-events", "e3-fhe-params", "e3-request", "e3-utils", "e3-zk-helpers"],
+      "depends_on": ["e3-data", "e3-events", "e3-fhe-params", "e3-request", "e3-utils"],
       "tests": "accusation_voting/workflow_tests/ (admission, voting, outcomes), accusation_voting/actor_tests.rs and commitment_consistency/workflow_tests.rs under crates/slashing/src; fixture crates/slashing/tests/fixtures/layout_lock.txt; cargo test -p e3-slashing",
       "unverified": ["SlashExecuted is built from chain logs in crates/evm/src/slashing/events.rs; only its construction line was read."]
     }
