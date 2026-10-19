@@ -8,17 +8,17 @@ unchanged.
 
 ## Pieces
 
-| Piece                                   | What it is                                                                                             |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `guest/` in the project                 | The OpenVM guest. Its own workspace, built with `cargo openvm`                                         |
-| `runner/` in the project                | The `program-runner` binary. `program-runner openvm` is the proving service (`crates/program-runner`)  |
-| `crates/support-scripts/openvm/compile` | Builds the guest, keys, receipt identity, worker configuration and `program-runner`; the CLI embeds it |
-| `crates/support-scripts/openvm/start`   | Starts `program-runner openvm`; the CLI embeds it                                                      |
-| `interfold-openvm-prover` (this crate)  | The worker. A separate process, in a CPU build and a CUDA build                                        |
+| Piece                                  | What it is                                                                                            |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `guest/` in the project                | The OpenVM guest. Its own workspace, built with `cargo openvm`                                        |
+| `runner/` in the project               | The `program-runner` binary. `program-runner openvm` is the proving service (`crates/program-runner`) |
+| `interfold-openvm-prover` (this crate) | The worker. A separate process, in a CPU build and a CUDA build                                       |
 
 The proving service is `e3-program-server` with `e3-openvm-host` as runner. `interfold init` pins
-the guest's Interfold crates to the template's commit. The `interfold` CLI runs the two scripts in
-the project directory. In this repository, `templates/default` and `examples/CRISP` have a `runner/`
+the guest's Interfold crates to the template's commit. `interfold program compile` runs
+`crates/cli/scripts/openvm-compile.sh`, which builds the guest, keys, receipt identity, worker
+configuration and `program-runner`. `interfold program start` runs `program-runner openvm` with
+`cargo run --release`. In this repository, `templates/default` and `examples/CRISP` have a `runner/`
 crate that calls `e3_program_runner::run`.
 
 The guest reads the round one item at a time: a header, every ciphertext in index order, then the

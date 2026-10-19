@@ -7,7 +7,7 @@
 !Cargo.lock
 !crates/**/*
 !examples/CRISP/program/**/*
-# CRISP's OpenVM proving service (crates/support/Dockerfile) builds in the CRISP workspace.
+# CRISP's program runner image (examples/CRISP/runner/Dockerfile) builds in the CRISP workspace.
 !examples/CRISP/Cargo.toml
 !examples/CRISP/Cargo.lock
 !examples/CRISP/runner/**/*

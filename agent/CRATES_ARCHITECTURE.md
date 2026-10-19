@@ -8,7 +8,7 @@ guide and [`RULES.md`](RULES.md). The actor-by-actor refactor findings are summa
 
 ## Dependency layers
 
-All 49 workspace packages are shown below. Arrows point from a dependent crate to a direct
+All 48 workspace packages are shown below. Arrows point from a dependent crate to a direct
 dependency; the diagram keeps representative production edges rather than reproducing every Cargo
 edge, while the groups record each crate's current primary responsibility. Test-only edges are kept
 in the validation group. Several protocol crates still import concrete infrastructure types; that
@@ -25,7 +25,6 @@ flowchart TD
         Console[e3-console]
         Init[e3-init]
         Fs[e3-fs]
-        Support[e3-support-scripts]
     end
 
     subgraph Clients[Client and compute surfaces]
@@ -98,13 +97,12 @@ flowchart TD
     CLI --> Dash
     CLI --> Daemon
     CLI --> Init
-    CLI --> Support
+    CLI --> Config
     EP --> Builder
     EP --> EventSystem
     Daemon --> Config
     Daemon --> Console
     Init --> Fs
-    Support --> Config
 
     ProgramServer --> ComputeProvider
     ProgramRunner --> ProgramServer
@@ -1494,11 +1492,13 @@ guest memory. The worker validates the executable, VM identity, aggregation key,
 parameters, verifier artifact, and journal. At startup the host picks the CUDA worker when it is
 configured and can open a GPU, and otherwise the CPU worker; every worker run has a deadline. Jobs
 remain in memory; this service does not provide durable admission or restart recovery.
-`interfold program compile` builds the guest, keys, receipt identity, worker configuration, and the
-project's `program-runner` binary with the `compile` script that the `interfold` CLI embeds from
-`crates/support-scripts/openvm`; `e3-init` pins the guest's Interfold crates to the template commit.
-The `e3-support-scripts` backend uses `program.openvm`. `program.dev` runs the same binary with the
-argument `dev`, an explicit, unproved runner with a mock proof.
+`interfold program compile` (`crates/cli/src/program_support.rs`) runs
+`cargo build --bin program-runner` in dev mode. Otherwise it runs
+`crates/cli/scripts/openvm-compile.sh`, which builds the guest, keys, receipt identity, worker
+configuration, and the project's `program-runner` binary. `interfold program start` runs
+`program-runner dev` or `program-runner openvm` with `cargo run`. `e3-init` pins the guest's
+Interfold crates to the template commit. The OpenVM mode uses `program.openvm`. `program.dev` runs
+the same binary with the argument `dev`, an explicit, unproved runner with a mock proof.
 
 CRISP's encrypted-input and result-callback routes accept at most 4 MiB of JSON, to contain the
 largest supported DA object after hexadecimal encoding. This limit is scoped to those routes; read

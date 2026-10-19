@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-# SPDX-License-Identifier: LGPL-3.0-only
-#
-# Starts the unproved development runner. Runs in the project directory.
-
-cargo run --bin program-runner -- dev

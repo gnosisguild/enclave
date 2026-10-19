@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-# SPDX-License-Identifier: LGPL-3.0-only
-#
-# Builds the program runner, which serves the project's program through e3_program_runner. Runs
-# in the project directory.
-
-# Not --locked: `interfold init` points the project's Interfold crates at git, so the lock file a
-# new project copies is out of date until cargo updates it.
-cargo build --bin program-runner

@@ -18,7 +18,7 @@ on:
       - main
       - dev
 env:
-  SUPPORT_DOCKERFILE_PATH: crates/support/Dockerfile
+  SUPPORT_DOCKERFILE_PATH: examples/CRISP/runner/Dockerfile
   CIPHERNODE_DOCKERFILE_PATH: crates/Dockerfile
   SUPPORT_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/e3-support
   CIPHERNODE_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/ciphernode
@@ -102,7 +102,8 @@ jobs:
               - 'Cargo.lock'
               - 'rust-toolchain.toml'
               # The OpenVM worker is a workspace of its own, and no cargo build reads the image
-              # files. The `openvm_worker` and `docker` filters select their jobs.
+              # files or the frozen CRISP image ID. The `openvm_worker` and `docker` filters select
+              # their jobs.
               - '!crates/openvm-prover/**'
               - '!crates/Dockerfile'
               - '!crates/support/**'
@@ -250,8 +251,7 @@ jobs:
             docker:
               - 'crates/Dockerfile'
               - 'crates/ciphernode-entrypoint.sh'
-              - 'crates/support/Dockerfile'
-              - 'crates/support/**'
+              - 'examples/CRISP/runner/Dockerfile'
               - '.dockerignore'
               - '!**/*.md'
               - '!**/*.mdx'
@@ -1714,7 +1714,7 @@ jobs:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Install protoc
         uses: ./.github/actions/install-protoc
-      # The e3-support-scripts and e3-program-runner tests run in rust_unit_tests: every input of
+      # The e3-cli and e3-program-runner tests run in rust_unit_tests: every input of
       # those crates selects it. One binary serves both the development runner and the OpenVM
       # proving service; the OpenVM guest needs cargo-openvm and a GPU host for proofs, so CI builds
       # only the runner.
@@ -1724,10 +1724,10 @@ jobs:
         run: |
           echo "Checking for the program runner binary:"
           find templates/default/target/ -name "program-runner" -type f -ls || echo "Binary not found"
-      - name: Upload support scripts artifacts
+      - name: Upload the program runner
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: support-scripts-artifacts
+          name: program-runner-artifacts
           # Only the binary. template_integration is the one consumer and needs nothing else from
           # the cargo target directory.
           path: templates/default/target/debug/program-runner
@@ -2034,10 +2034,10 @@ jobs:
           name: interfold-binary
           path: ~/.cargo/bin/
 
-      - name: Download support scripts artifacts
+      - name: Download the program runner
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: support-scripts-artifacts
+          name: program-runner-artifacts
           path: templates/default/target/debug/
 
       - name: Download SDK artifacts

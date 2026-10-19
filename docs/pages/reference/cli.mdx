@@ -192,18 +192,17 @@ interfold compile [--dev <true|false>]
 
 ### `interfold program`
 
-Manages the E3 program of the project. Each subcommand runs a script in the current directory. The
-CLI embeds the scripts, so the project does not hold them. They build and run the `program-runner`
-binary of the project's `runner/` crate.
+Manages the E3 program of the project. Each subcommand runs in the current directory and builds or
+runs the `program-runner` binary of the project's `runner/` crate.
 
-The `--dev` flag selects the script set. When the flag is absent, the CLI uses `program.dev` from
-the configuration, which defaults to `false`.
+The `--dev` flag selects the mode. When the flag is absent, the CLI uses `program.dev` from the
+configuration, which defaults to `false`.
 
-| Subcommand                      | Purpose                                                                                                                                                                                              | Script                            |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| `program start [--dev <DEV>]`   | Starts the program server. In Dev Mode, the program runs without a proving backend, so nothing verifies the result. Otherwise the OpenVM service checks its worker and keys, then proves each round. | `dev/start` or `openvm/start`     |
-| `program compile [--dev <DEV>]` | Compiles the program. Outside Dev Mode, it also builds the OpenVM guest, its keys, the receipt identity, and the worker configuration.                                                               | `dev/compile` or `openvm/compile` |
-| `program cache purge`           | Deletes `.interfold/caches`, including the OpenVM guest build and keys. The next compilation takes longer.                                                                                           | None                              |
+| Subcommand                      | Purpose                                                                                                                                                                                              | Command                                                                                                        |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `program start [--dev <DEV>]`   | Starts the program server. In Dev Mode, the program runs without a proving backend, so nothing verifies the result. Otherwise the OpenVM service checks its worker and keys, then proves each round. | `cargo run --bin program-runner -- dev` or `cargo run --release --bin program-runner -- openvm`                |
+| `program compile [--dev <DEV>]` | Compiles the program. Outside Dev Mode, it also builds the OpenVM guest, its keys, the receipt identity, and the worker configuration.                                                               | `cargo build --bin program-runner` or, outside Dev Mode, a build script that ends with `cargo build --release` |
+| `program cache purge`           | Deletes `.interfold/caches`, including the OpenVM guest build and keys. The next compilation takes longer.                                                                                           | None                                                                                                           |
 
 Outside Dev Mode, `program compile` and `program start` need a `program.openvm` section with at
 least one worker. The CLI refuses the removed `program.risc0` section. See

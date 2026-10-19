@@ -31,11 +31,12 @@ case "$command" in
   # OPENVM_* environment as `interfold program compile`.
   compile)
     cd "$CRISP"
-    exec bash "$ROOT/crates/support-scripts/openvm/compile" "$@"
+    exec bash "$ROOT/crates/cli/scripts/openvm-compile.sh" "$@"
     ;;
   service-start)
     cd "$CRISP"
-    exec bash "$ROOT/crates/support-scripts/openvm/start" "$@"
+    export OPENVM_PROVER_CONFIG="${OPENVM_PROVER_CONFIG:-$CRISP/.interfold/caches/openvm/prover.json}"
+    exec cargo run --release --bin program-runner -- openvm
     ;;
   prover-build|prover-test|prover-check)
     export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target/openvm/prover}"

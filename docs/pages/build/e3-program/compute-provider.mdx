@@ -51,9 +51,9 @@ that made it.
 | Program runner            | `runner/` in your project    | The `program-runner` binary. It passes your `program/` crate to `e3-program-runner` |
 | Coordination server       | `server/index.ts` (template) | Sends the job, receives the webhook, and calls `publishCiphertextOutput`            |
 
-The `compile` and `start` scripts that `interfold program` runs are in `crates/support-scripts`. The
-`interfold` CLI embeds them and runs them in your project directory. `interfold init` pins the
-guest's Interfold crates to the template's commit.
+`interfold program compile` and `interfold program start` build and run the `program-runner` binary
+in your project directory. `interfold init` pins the guest's Interfold crates to the template's
+commit.
 
 ## The secure process
 

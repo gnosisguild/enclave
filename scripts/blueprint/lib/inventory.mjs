@@ -43,19 +43,7 @@ const lines = (p) => readFileSync(p, 'utf8').split('\n')
 
 // The layer of each workspace crate, from agent/CRATES_ARCHITECTURE.md "Dependency layers".
 export const LAYERS = {
-  entry: [
-    'cli',
-    'entrypoint',
-    'ciphernode-builder',
-    'dashboard',
-    'daemon-server',
-    'console',
-    'init',
-    'fs',
-    'support-scripts',
-    'interfoldup',
-    'zk/cli',
-  ],
+  entry: ['cli', 'entrypoint', 'ciphernode-builder', 'dashboard', 'daemon-server', 'console', 'init', 'fs', 'interfoldup', 'zk/cli'],
   clients: [
     'program-server',
     'program-runner',

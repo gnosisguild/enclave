@@ -3550,18 +3550,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c3cf4824e2d5f025c7b531afcb2325364084a16806f6d47fbc1f5fbd9960590"
 
 [[package]]
-name = "duct"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6ce170a0e8454fa0f9b0e5ca38a6ba17ed76a50916839d217eb5357e05cdfde"
-dependencies = [
- "libc",
- "os_pipe",
- "shared_child",
- "shared_thread",
-]
-
-[[package]]
 name = "dunce"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3685,7 +3673,6 @@ dependencies = [
  "e3-fhe-params",
  "e3-init",
  "e3-logger",
- "e3-support-scripts",
  "e3-trbfv",
  "e3-utils",
  "e3-zk-prover",
@@ -4459,17 +4446,6 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "e3-support-scripts"
-version = "0.19.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "duct",
- "e3-config",
- "tokio",
 ]
 
 [[package]]
@@ -8327,16 +8303,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
-name = "os_pipe"
-version = "1.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d8fae84b431384b68627d0f9b3b1245fcf9f46f6c0e3dc902e9dce64edd1967"
-dependencies = [
- "libc",
- "windows-sys 0.61.2",
-]
-
-[[package]]
 name = "p256"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10470,23 +10436,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "shared_child"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e362d9935bc50f019969e2f9ecd66786612daae13e8f277be7bfb66e8bed3f7"
-dependencies = [
- "libc",
- "sigchld",
- "windows-sys 0.60.2",
-]
-
-[[package]]
-name = "shared_thread"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7a6f98357c6bb0ebace19b22220e5543801d9de90ffe77f8abb27c056bac064"
-
-[[package]]
 name = "shell-words"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10506,27 +10455,6 @@ name = "shlex"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
-
-[[package]]
-name = "sigchld"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47106eded3c154e70176fc83df9737335c94ce22f821c32d17ed1db1f83badb1"
-dependencies = [
- "libc",
- "os_pipe",
- "signal-hook",
-]
-
-[[package]]
-name = "signal-hook"
-version = "0.3.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d881a16cf4426aa584979d30bd82cb33429027e42122b169753d6ef1085ed6e2"
-dependencies = [
- "libc",
- "signal-hook-registry",
-]
 
 [[package]]
 name = "signal-hook-registry"

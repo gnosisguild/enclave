@@ -208,7 +208,7 @@ impl Cli {
                 bail!("Cannot run `interfold init` when a configuration exists.");
             }
             Commands::Compile { dev } => {
-                e3_support_scripts::program_compile(config.program().clone(), dev).await?
+                crate::program_support::compile(config.program(), dev).await?
             }
             Commands::PrintEnv { vite, chain } => {
                 print_env::execute(out, &config, &chain, vite).await?

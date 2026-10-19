@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: LGPL-3.0-only
 #
-# Runs in the project directory. Builds what `interfold program start` needs to prove this
-# project's E3 program with OpenVM:
+# `interfold program compile` runs this script in the project directory; the CLI binary carries it.
+# It builds what `interfold program start` needs to prove the project's E3 program with OpenVM:
 #
 #   1. the guest in ./guest, transpiled to an OpenVM executable;
 #   2. its application proving key, then the aggregation key and receipt identity (`prepare`);
