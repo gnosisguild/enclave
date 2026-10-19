@@ -59,7 +59,7 @@
         {
           "name": "EvmChainGateway",
           "role": "Buffers events until the sync actor starts, hands the historical batch over, then forwards live events to the bus; fails closed on error.",
-          "ref": "crates/evm/src/chain_gateway/actor.rs@57@pub struct EvmChainGateway {"
+          "ref": "crates/evm/src/chain_gateway/actor.rs@59@pub struct EvmChainGateway {"
         },
         {
           "name": "DataAvailabilityCoordinator",
@@ -74,7 +74,7 @@
         {
           "name": "InterfoldSolWriter",
           "role": "Writes to Interfold.sol: publishPlaintextOutput for a local PlaintextAggregated, plus markE3Failed and processE3Failure around failure deadlines.",
-          "ref": "crates/evm/src/interfold_writing/actor.rs@50@pub struct InterfoldSolWriter<P> {"
+          "ref": "crates/evm/src/interfold_writing/actor.rs@49@pub struct InterfoldSolWriter<P> {"
         },
         {
           "name": "SlashingManagerSolWriter",
@@ -86,7 +86,7 @@
         {
           "name": "PlaintextAggregated",
           "by": "InterfoldSolWriter",
-          "ref": "crates/evm/src/interfold_writing/handlers.rs@217@InterfoldEventData::PlaintextAggregated(data) => {"
+          "ref": "crates/evm/src/interfold_writing/handlers.rs@222@InterfoldEventData::PlaintextAggregated(data) => {"
         },
         {
           "name": "PublicKeyAggregated",
@@ -118,7 +118,7 @@
         {
           "name": "HistoricalEvmEventsReceived (buffered history to the sync actor)",
           "by": "EvmChainGateway",
-          "ref": "crates/evm/src/chain_gateway/actor.rs@212@HistoricalEvmEventsReceived::new(state.buffer, event.chain_id)"
+          "ref": "crates/evm/src/chain_gateway/actor.rs@245@HistoricalEvmEventsReceived::new(state.buffer, event.chain_id)"
         },
         {
           "name": "CommitteePublished (key assembled from chunks)",
@@ -222,7 +222,7 @@
         {
           "name": "ensure_node_release",
           "what": "startup check: verifies this binary and acknowledges it on INodeReleaseRegistry before the readers start",
-          "ref": "crates/evm/src/node_release.rs@71@pub async fn ensure_node_release<P>("
+          "ref": "crates/evm/src/node_release.rs@74@pub async fn ensure_node_release<P>("
         },
         {
           "name": "ProviderCache",
@@ -243,7 +243,7 @@
         },
         {
           "why": "the reader's start block comes from the routing table and the chain's deploy block",
-          "ref": "crates/evm/src/chain_system.rs@124@Filters::from_routing_table(router.get_routing_table(), deploy_block)"
+          "ref": "crates/evm/src/chain_system.rs@136@Filters::from_routing_table(router.get_routing_table(), deploy_block)"
         },
         {
           "why": "restart: the block cursor saved with the snapshot replaces the deploy block",
@@ -258,8 +258,8 @@
         },
         {
           "pattern": "actix-timer",
-          "note": "a failed publication is retried after a fixed delay with run_later",
-          "ref": "crates/evm/src/interfold_writing/handlers.rs@105@ctx.run_later(PUBLICATION_RETRY_DELAY, move |actor, ctx| {"
+          "note": "a failed deferred-plaintext history read is retried after a fixed delay with run_later",
+          "ref": "crates/evm/src/interfold_writing/handlers.rs@109@ctx.run_later(PUBLICATION_RETRY_DELAY, move |actor, ctx| {"
         },
         {
           "pattern": "let-else",
@@ -269,7 +269,7 @@
         {
           "pattern": "enum-match",
           "note": "the gateway matches each InterfoldEvmEvent variant and fails closed on the ones it must not receive",
-          "ref": "crates/evm/src/chain_gateway/actor.rs@181@InterfoldEvmEvent::Rejected(rejected) => bail!("
+          "ref": "crates/evm/src/chain_gateway/actor.rs@214@InterfoldEvmEvent::Rejected(rejected) => bail!("
         }
       ],
       "depends_on": [

@@ -60,6 +60,10 @@ support specialized assembly. Watch `failure_receiver()` for explicit persistenc
 signals. Global shared-store/reader caches are opt-in and process-local, not inter-process database
 sharing.
 
+Both in-memory and persisted assembly connect the aggregate router to that same failure watch. An
+event with no configured store therefore reports fatal storage failure without a panic or dispatch
+to another aggregate. The CLI or library caller must monitor the watch to stop its process.
+
 For production lifecycle/replay use [CiphernodeBuilder](../ciphernode-builder/README.md) and the
 [persistence contract](../../docs/architecture/persistence-and-replay.md).
 

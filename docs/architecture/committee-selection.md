@@ -29,7 +29,7 @@ Before accepting a paid request it requires:
 - expected token/configuration equality and `totalFee <= maxFee`, before exact escrow transfer.
 
 Mainnet supports secure-8192 at minimum/micro/small; configured launch `minCommitteeSize = 19`
-admits Small only. Sepolia/local also support insecure-512. A route being configured does not itself
+admits Small only. Sepolia/local also support insecure-64. A route being configured does not itself
 authorize its price-policy committee size. Different tuples, H/N, or verifier thresholds require
 matching artifacts and contracts. Runtime rejects a request or saved E3 whose crypto ID differs from
 its build's expected ID. [Upgrades](upgrades.md) preserves historical parameter-set index 1 and new
@@ -116,6 +116,9 @@ Before dispatching its canonical ticket, a selected node persists one provisiona
 reservation. Replay reuses it. Canonical committee finalization retains selected reservations and
 releases unselected ones; failure/completion releases idempotently. This makes concurrent local
 requests see capacity already used during ticket submission, not only after DKG.
+
+Startup releases reservations for E3s that lifecycle records as terminal. A finalization delivered
+after a terminal event cannot reserve capacity again, including during historical chain sync.
 
 Ticket numbers range from 1 through frozen availableTickets; take each operator's best score. Local
 or remote active-job counts never shrink that canonical range or owner shortlist. Only this node's

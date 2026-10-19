@@ -53,6 +53,10 @@ Use `publish_shutdown_and_wait` and `flush_event_pipeline` for acknowledged shut
 by the data store's shutdown. A successful enqueue alone does not prove durable acceptance. Explicit
 store/admission health signals do not supervise every actor panic.
 
+An event naming an unconfigured aggregate signals fatal storage failure instead of panicking or
+writing to another aggregate. EventSystem connects that signal to node health; a standalone router
+without the signal does not obtain process-level monitoring.
+
 ## Tests
 
 Run `cargo test --locked -p e3-events` with the

@@ -35,6 +35,9 @@ sets needs coordinated producer, validator, NodeFold, wire, and circuit changes,
 sizes. [Shape tests](../../crates/zk-prover/src/share_verification/workflow_tests/shape.rs) pin that
 distinction for both presets.
 
+Both insecure-64 and secure-8192 use three threshold Shamir rows. Each recipient bundle therefore
+contains one C2a, one C2b, three C3a, and three C3b proofs.
+
 | Boundary                                             | Requirement and reason                                                                                                                                                                                                                                                             |
 | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `CiphernodeSelected` → initialization                | Read `getDeadlines` and the request-frozen timeout configuration at `CommitteeFinalized`. Retry unavailable RPC; do not substitute a local window. Record the encrypted BFV keypair with flushed `DurableIntent` before using or publishing it.                                    |
@@ -62,9 +65,12 @@ unrecoverable or mismatched signer cannot name the claimed dealer in an accusati
 
 The encryption-key hard cutoff is 10% of the frozen DKG window. The threshold-share 75% checkpoint
 is **soft**: at H−1 external shares verification can start, but collection remains open; below H−1
-it keeps waiting. Only completion or the canonical on-chain DKG deadline ends that collection. C4
-collection has the canonical deadline. Overrides may advance a cutoff, never extend it. Restart uses
-absolute remaining time, not a new window.
+it keeps waiting. The checkpoint can occur earlier when every missing dealer had no C0 key when key
+collection closed. Such a dealer received no share from this node, so no mutually ready roster can
+contain both. Recorded keys count as present, and rebuilt collectors receive the same keyless dealer
+set. Only completion or the canonical on-chain DKG deadline ends that collection. C4 collection has
+the canonical deadline. Overrides may advance a cutoff, never extend it. Restart uses absolute
+remaining time, not a new window.
 
 A restart after the key cutoff but before the DKG deadline applies the cutoff to recorded keys
 without a new timer. Peer history sync does not carry missing key documents: reannouncement after
@@ -108,8 +114,9 @@ does not prove crash durability of that write.
 
 Deriving a valid roster, or receiving a supported roster not yet derivable from all local peer
 reports, starts the durable 10-minute roster budget. Acceptance ends that phase and clears its
-skips. C5 has a separate readiness-gated budget. Unchanged ready assignment preserves its absolute
-deadline; promotion gets a new budget. Re-arm or fire overdue only after effects resume.
+skips. C5 has a separate readiness-gated 40-minute budget because it also waits for the H node-fold
+proofs. Unchanged ready assignment preserves its absolute deadline; promotion gets a new budget.
+Re-arm or fire overdue only after effects resume.
 
 This is not Byzantine agreement. An aggregator can choose any qualifying mutually ready H-set or
 withhold until failover. On-chain proof verification and single publication prevent two accepted
@@ -167,6 +174,11 @@ rejection. Peer `PublicKeyAggregated` copies distribute state but cannot create 
 intents.
 
 ## Recovery and evidence
+
+During replay, `ThresholdKeyshare` records keys, threshold shares, and C4 shares without starting
+collectors or their timers. Both hydrated actors and actors created during replay inherit the
+router's `E3Context::effects_enabled`. At `EffectsEnabled`, `resume_in_flight_work` rebuilds
+collectors from recorded inputs before work continues.
 
 Randomized successful TrBFV responses are protocol contributions: reuse their exact bytes. Hold
 early replayed `GenPkShareAndSkSss`/`GenEsiSss` until prerequisites return; identical replay is

@@ -24,7 +24,7 @@
         {
           "name": "ThresholdShareCollector",
           "role": "collects the threshold shares sent to this node with their proofs, then sends AllThresholdSharesCollected",
-          "ref": "crates/keyshare/src/threshold_keyshare/threshold_share_collector.rs@42@pub struct ThresholdShareCollector {"
+          "ref": "crates/keyshare/src/threshold_keyshare/threshold_share_collector.rs@50@pub struct ThresholdShareCollector {"
         },
         {
           "name": "DecryptionKeySharedCollector",
@@ -51,7 +51,7 @@
         {
           "name": "ThresholdShareCreated",
           "by": "ThresholdShareCollector",
-          "ref": "crates/keyshare/src/threshold_keyshare/threshold_share_collector.rs@162@impl Handler<TypedEvent<ThresholdShareCreated>> for ThresholdShareCollector {"
+          "ref": "crates/keyshare/src/threshold_keyshare/threshold_share_collector.rs@189@impl Handler<TypedEvent<ThresholdShareCreated>> for ThresholdShareCollector {"
         },
         {
           "name": "ShareVerificationComplete",
@@ -78,12 +78,12 @@
         {
           "name": "EncryptionKeyPending",
           "by": "ThresholdKeyshare",
-          "ref": "crates/keyshare/src/threshold_keyshare/effects/initialize_dkg.rs@153@EncryptionKeyPending {"
+          "ref": "crates/keyshare/src/threshold_keyshare/effects/initialize_dkg.rs@158@EncryptionKeyPending {"
         },
         {
           "name": "ComputeRequest (TrBFV GenPkShareAndSkSss)",
           "by": "ThresholdKeyshare",
-          "ref": "crates/keyshare/src/threshold_keyshare/effects/initialize_dkg.rs@283@let event = ComputeRequest::trbfv("
+          "ref": "crates/keyshare/src/threshold_keyshare/effects/initialize_dkg.rs@291@let event = ComputeRequest::trbfv("
         },
         {
           "name": "ThresholdSharePending",
@@ -118,7 +118,7 @@
         {
           "name": "KeyshareCreated",
           "by": "ThresholdKeyshare",
-          "ref": "crates/keyshare/src/threshold_keyshare/effects/verify_decryption_key.rs@284@KeyshareCreated {"
+          "ref": "crates/keyshare/src/threshold_keyshare/effects/verify_decryption_key.rs@288@KeyshareCreated {"
         },
         {
           "name": "E3Failed",
@@ -252,7 +252,7 @@
         {
           "name": "CiphernodeSelector (e3-sortition, outside this crate)",
           "role": "decides is_aggregator for each E3 and publishes AggregatorChanged",
-          "ref": "crates/sortition/src/ciphernode_selection/actor.rs@108@pub struct CiphernodeSelector {"
+          "ref": "crates/sortition/src/ciphernode_selection/actor.rs@112@pub struct CiphernodeSelector {"
         },
         {
           "name": "CiphernodeRegistrySolWriter (e3-evm, outside this crate)",
@@ -262,7 +262,7 @@
         {
           "name": "InterfoldSolWriter (e3-evm, outside this crate)",
           "role": "takes a locally computed PlaintextAggregated and submits publishPlaintextOutput on chain",
-          "ref": "crates/evm/src/interfold_writing/handlers.rs@217@InterfoldEventData::PlaintextAggregated(data) => {"
+          "ref": "crates/evm/src/interfold_writing/handlers.rs@222@InterfoldEventData::PlaintextAggregated(data) => {"
         }
       ],
       "consumes": [

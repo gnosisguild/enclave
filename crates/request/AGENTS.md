@@ -6,10 +6,14 @@ authorities.
 
 - Only chain facts/restored contexts admit an E3. Peer inputs cannot create one, and local result
   production cannot manufacture canonical completion.
+- Keep the pre-admission peer hold separate from missing-recipient queues. Preserve identity/order
+  when chain admission drains it; its oldest-event eviction and restart loss are explicit limits.
 - Preserve checkpoint highest-sequence semantics across aggregates; the live routing path must not
   synchronously read repositories or replace hydrated actors with fresh ones.
 - Extensions declare expected recipients. Deliver deferred history before the recipient-creating
   event, accounting each retained recipient copy. Bootstrap expects no protocol recipients.
+- Propagate `E3Context::effects_enabled` when constructing actors during replay. Hydration is not
+  the only path that must suppress timers and external effects until `EffectsEnabled`.
 - Overflow isolates the missing recipient queue; it does not authorize silent whole-node dropping.
   Deferred queues/failure records and slashable-failure teardown grace are not durable today.
 - Lifecycle is a projection; it accepts forward progress without regressing terminal state. Retained

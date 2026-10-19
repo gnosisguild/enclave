@@ -7,6 +7,10 @@ separate from mailbox/effects without changing authenticated dealer identity or 
   accuse its claimed dealer or consume that dealer's valid replacement.
 - Reuse successful randomized contributions exactly after restart. Early replayed responses wait for
   restored prerequisites; local worker failure before success can retry without accusing peers.
+- During replay, record inputs but start no collectors or timers. Actors created from replayed
+  selection inherit `E3Context::effects_enabled`; rebuild collectors at `EffectsEnabled`.
+- Keyless missing dealers may advance the soft share checkpoint, never the canonical DKG deadline or
+  H−1 verification requirement. Rebuilt collectors must receive the same keyless-dealer set.
 - C2/C3 outcomes authorize only their dispatch batch. Late growth, replaced proof plans, and retired
   collectors must not reuse earlier verdicts/correlations.
 - Roster choice is not first-arrival immutability: a supported lower-ranked roster may replace one

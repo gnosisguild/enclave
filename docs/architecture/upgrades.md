@@ -25,6 +25,10 @@ Node-generation changes do **not** isolate unsafe old peers. Acknowledgment is o
 self-attestation against accidental skew, not Byzantine protection; proofs, signatures, thresholds,
 and slashing remain necessary.
 
+Release acknowledgment gets three attempts with capped exponential backoff and jitter. Each attempt
+rereads the acknowledged release and operator status. A mined acknowledgment is not sent again when
+the exact release/counters already match and the operator is active or unregistered.
+
 ## Choose rollout deliberately
 
 - **Compatible rolling:** keep both counters, verify mixed-peer/storage/deployed-verifier
@@ -134,6 +138,18 @@ state halts as no migration; newer state halts as unsupported downgrade and name
 release/pre-upgrade backup. Read raw marker and detect unmarked log segments without decoding.
 `node validate --repair` cannot bypass mismatch. v0.19 requires its **new binary** for reset: v0.18
 and older lack keyshare guards.
+
+### Insecure testnet preset reset
+
+`InsecureThreshold64` and `InsecureDkg64` occupy persisted `BfvPreset` discriminants 0 and 1.
+On-chain parameter-set index 0 carries the degree-64 tuple. Degree-512 stores used the same
+discriminants under schema 8, so the schema marker cannot reject them. Before starting against a
+fresh testnet stack, testnet nodes must run `interfold node reset-data` under the guards below.
+Redeploy a testnet that holds degree-512 index-0 E3s; do not upgrade it in place or reinterpret
+those E3s with degree-64 parameters. This requirement does not replace mainnet's secure index-2
+cutover procedure.
+
+### Identity and active-state guards
 
 Operator/libp2p keys are in the same store under `//eth_private_key` and `//libp2p/keypair`;
 deleting a data directory destroys bonded identity. `nodes purge` also deletes cipher-key

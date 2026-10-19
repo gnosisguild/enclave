@@ -29,6 +29,9 @@ Register `ext::ThresholdKeyshareExtension::create(...)` on `E3RouterBuilder` wit
 `threshold_keyshare`. It creates `ThresholdKeyshare` on `CiphernodeSelected` and hydrates the
 corresponding saved actor during restart. It is not one globally shared keyshare actor.
 
+Actors created during replay inherit the context's disabled effects, as hydrated actors do. They
+record keys/shares without starting collectors or timers until `EffectsEnabled` rebuilds them.
+
 The constructor takes the bus, local encryption `Cipher`, operator address, per-chain Interfold
 addresses, `DkgTimingReader`, signer, and shared `canonical_key::CanonicalPublicKeys`. The timing
 reader returns the request's canonical deadline/window; metadata comes from the router context. See
@@ -39,6 +42,10 @@ The crate exports actor construction parameters, recovery payload/state types, a
 `ThresholdKeyshareRepositoryFactory` for specialized harnesses. `EncryptionKeyCollector` is the
 dealer-key collection boundary. Canonical-key types are shared from `e3-request`; a local aggregate
 intent is not permission to decrypt under an unconfirmed key.
+
+The threshold-share soft checkpoint can advance when every missing dealer lacked a C0 key at
+key-collection closure. Verification still needs H−1 external shares, and collection remains open
+until completion or the canonical DKG deadline.
 
 Successful randomized contributions are reused after restart. Secret material is wrapped in local
 encrypted storage; do not treat the exported state types as safe plaintext diagnostics. Detailed

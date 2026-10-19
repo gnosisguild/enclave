@@ -15,6 +15,7 @@ dependencies.
 | [`nodes/`](src/nodes)                                                                                                                   | Managed-node clients/daemon, process supervision, and start/stop/status operations.            |
 | [`nodes/purge/`](src/nodes/purge), [`nodes/state_guard.rs`](src/nodes/state_guard.rs), [`nodes/reset_data.rs`](src/nodes/reset_data.rs) | Destructive-operation facts/plans/effects, active-state guards, and identity-preserving reset. |
 | [`validate.rs`](src/validate.rs)                                                                                                        | Offline schema, log, snapshot, and repair checks.                                              |
+| [`actor_panics.rs`](src/actor_panics.rs)                                                                                                | First-panic signal for the thread running the node's actors.                                   |
 | [`wallet/`](src/wallet), [`password/`](src/password), [`net/`](src/net)                                                                 | Local identity/password/peer operations delegated by CLI commands.                             |
 
 The CLI resolves `AppConfig` and calls these library operations. Startup composes the node through
@@ -48,6 +49,11 @@ cleanup failure yields a nonzero supervisor exit. Exited state is restartable by
 not reported as Started. There is no persisted desired-state or automatic unexpected-exit restart
 policy. Detached daemon launch outlives its CLI launcher; managed-child containment is different.
 
+The CLI installs `ActorPanics::watch()` before actors start. It records the first panic on that
+thread; the CLI uses the normal shutdown barrier and exits unsuccessfully after receiving it. Panics
+on other threads remain with their owners, and library callers do not acquire this monitoring
+automatically.
+
 ## Tests
 
 Use `cargo test --locked -p e3-entrypoint` with the
@@ -55,5 +61,6 @@ Use `cargo test --locked -p e3-entrypoint` with the
 Inline tests cover fencing, child cleanup, validation, and identity setup. The [`tests/`](tests)
 targets exercise purge/reset guards and old/corrupt snapshot/schema cases. The integration suite
 owns multi-process restart/shutdown scenarios. Supervisor cleanup tests do not prove all detached
-application tasks have drained. CLI persistence-health monitoring is owned by `e3-cli`, not implied
-by an Actix actor panic. See [AGENTS.md](AGENTS.md) for safety-boundary change rules.
+application tasks have drained. [`actor_panic_stop.rs`](tests/actor_panic_stop.rs) checks the
+actor-thread filter and panic signal, not the CLI's full shutdown/exit path. The CLI owns production
+monitoring. See [AGENTS.md](AGENTS.md) for safety-boundary change rules.

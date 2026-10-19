@@ -12,8 +12,13 @@ timer/publication effects explicit.
 - Restore commitment history/accepted roster before comparisons. Non-prefix roster rows and
   full-committee recipient slots use different indices; absence from an incomplete cache is not
   fault.
-- Recreating an actor after restart does not reconstruct volatile votes/timers. Keep that limit and
-  failed-snapshot-write behavior visible rather than describing the whole capability as durable.
+- Save and restore pending voted accusations, admitted votes, absolute timeouts, failed-proof
+  evidence, and accused-proof identities. Re-arm timers and release deferred local accusations only
+  at `EffectsEnabled`, including for actors created during replay.
+- Remove voters only on `CommitteeMemberExpelled`, idempotently across raw/enriched copies. A
+  `SlashExecuted` without expulsion preserves their rights and fixed finalized slots.
+- Buffered votes, window-move limits, and in-flight re-verifications remain volatile. Keep those
+  limits and failed-snapshot-write behavior visible rather than claiming complete crash durability.
 
 [Slashing](../../docs/architecture/slashing.md) owns lanes and settlement dependencies;
 [DKG](../../docs/architecture/dkg.md) owns commitment links. Use the

@@ -352,6 +352,11 @@ test('config generation binds both BFV parameter sets to circuit version v5', ()
     builder.syncProtocolConfig('insecure-64', 'minimum')
     const contract = readFileSync(contractPath, 'utf8')
     const utils = readFileSync(utilsPath, 'utf8')
+    assert.equal(
+      contract,
+      readFileSync(join(__dirname, '../../packages/interfold-contracts/contracts/lib/ActiveCryptoConfig.sol'), 'utf8'),
+      'regenerating the committed default must not produce source drift',
+    )
     assert.match(contract, /CIRCUIT_VERSION = keccak256\("interfold-bfv-v5"\)/)
     for (const [prefix, params] of [
       ['INSECURE', BFV_PARAMS.insecure64],

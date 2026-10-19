@@ -17,6 +17,7 @@ committee authorization remains with the protocol capability receiving it.
 | [`event_buffer/`](src/event_buffer), [`event_conversion/`](src/event_conversion), [`event_translation/`](src/event_translation)                                  | Startup buffering and translation between network and domain events.                  |
 | [`network_sync/`](src/network_sync), [`live_history.rs`](src/live_history.rs)                                                                                    | Bounded peer-history exchange and live coverage tracking.                             |
 | [`direct_requester.rs`](src/direct_requester.rs), [`direct_responder.rs`](src/direct_responder.rs)                                                               | Correlated peer request/response API.                                                 |
+| [`examples/bandwidth_bench.rs`](examples/bandwidth_bench.rs), [`bandwidth_bench.sh`](examples/bandwidth_bench.sh)                                                | Production document-path benchmark with shaped container uplinks.                     |
 
 The swarm admits compatible peers and separates control/command results from application ingress.
 Startup gathers history while application events wait in a bounded buffer. Once sync ends, the
@@ -52,6 +53,29 @@ Documents are content-checked and fetched with bounded work; DHT acknowledgments
 replication. Publications wait for initial synchronization, while registered command responses
 remain deliverable during startup. See
 [network delivery](../../docs/architecture/network-delivery.md) for policies and loss windows.
+
+Received broadcast-document recovery retains log references until historical chain sync prunes
+closed E3s. It then selects documents within the restore allowance and reloads older bytes as
+needed. Replica puts and recipient-specific shares still have no durable restore guarantee.
+
+## Bandwidth benchmark
+
+On a Debian or Ubuntu host with Docker Compose, build the benchmark from the repository root:
+
+```sh
+cargo build --locked --release -p e3-net --example bandwidth_bench
+MBIT=10 crates/net/examples/bandwidth_bench.sh /path/to/new-results
+```
+
+The runner starts one container per peer and shapes each uplink with `tc`; containers require
+`NET_ADMIN`. Its defaults model 30 peers and 19 dealers. `COMMITTEE_MBIT`, `SLOW`, payload sizes,
+delay, and deadline overrides are documented in the script header. The output directory retains
+per-node JSON, settings, container logs, and a summary. Use a fresh directory for each run.
+
+The benchmark sends padded C0/share documents through production networking, not a complete DKG or
+proof-validation flow. See the
+[operator bandwidth guidance](../../docs/pages/operate/requirements.mdx#network-bandwidth) for
+deployment recommendations. The Linux container runner does not run natively on macOS.
 
 ## Tests
 

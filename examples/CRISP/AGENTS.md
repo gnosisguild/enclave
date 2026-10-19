@@ -9,6 +9,9 @@ server/program packages. [Readme.md](Readme.md) owns setup, profiles, service ex
   contract rather than duplicating it in component guidance.
 - Input/event/durable-record changes cannot silently migrate an in-flight round. Preserve the
   [server's refusal and deployment procedure](server/Readme.md#upgrading-across-an-input-format-change).
+- Index-0 degree-512 rounds cannot use degree-64 circuits or stores. Follow the shared
+  [testnet reset/redeployment requirement](../../docs/architecture/upgrades.md#insecure-testnet-preset-reset)
+  and use the SDK entry point matching the deployed parameter set.
 - The native service and separate guest both link `program/`; shared runner sources belong in
   `crates/support-scripts`, not copied `.interfold` caches. Follow their
   [project-context guidance](../../crates/support-scripts/AGENTS.md) for changes there.

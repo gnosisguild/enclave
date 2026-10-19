@@ -164,7 +164,7 @@
     "supported": true,
     "refs": [
       "crates/cli/src/cli.rs@205@start::execute(config, peers, bootstrap)",
-      "crates/cli/src/start.rs@167@e3_entrypoint::start::start::execute(config, bootstrap)"
+      "crates/cli/src/start.rs@174@e3_entrypoint::start::start::execute(config, bootstrap)"
     ],
     "line_text": [
       "start::execute(config, peers, bootstrap).await?",
@@ -219,7 +219,7 @@
     "supported": true,
     "refs": [
       "crates/evm/src/event_decoding/catalog.rs@33@pub(crate) fn find(",
-      "crates/evm/src/event_decoding/observation.rs@15@pub(crate) fn observe("
+      "crates/evm/src/event_decoding/observation.rs@16@pub(crate) fn observe("
     ],
     "line_text": ["pub(crate) fn find(contract: &str, topic0: B256) -> Option<&'static EvmEventDefinition> {", "pub(crate) fn observe("],
     "note": "catalog.rs names a log by its topic0, observation.rs turns it into an EvmLogObserved node event, and protocol events use typed decoders."

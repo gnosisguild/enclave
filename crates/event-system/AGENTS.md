@@ -9,7 +9,7 @@ builder or protocol orchestration crates.
 - Persisted schema admission precedes opening logs/indexes. Seed the bus clock from every store's
   durable maximum before enabling publication, not merely from snapshot time.
 - Attach `SubscribePreFanout` before creating BusHandle so dedup cannot hide snapshot admission.
-  Connect persistence failure signals on every production store path.
+  Connect the same persistence failure signal to stores and the aggregate router, for both backends.
 - Aggregate log names and `sequence_index.{index}` are persisted locations, not cosmetic filenames.
   Keep both in-memory and persisted recipients usable; the existing recipient helpers cover both.
 - Shared store/reader caches retain their first instance; only production composition opts into

@@ -19,7 +19,7 @@ preset/committee pair has its own H-shaped PK and T-shaped decryption public-inp
 `pnpm check:committee` compares committee Noir/Rust/ActiveCryptoConfig/deployment utils, complete
 threshold BFV tuples across deployment constants/Rust/preset Noir, and configuration IDs across
 contracts, tasks, SDK, and EVM helpers. Drift can register a tuple nodes/circuits do not implement.
-The committed default is insecure-512/minimum; CI rebuilds that selection and rejects diffs. Local
+The committed default is insecure-64/minimum; CI rebuilds that selection and rejects diffs. Local
 active-preset cache mismatch is only a note. **Limits:** the gate does not compare
 `scripts/circuits/constants.ts` committee values; manually review those. Parity regeneration/diff
 runs only with `target/release/zk-artifacts` and nargo; Repository Checks can skip it, while
@@ -33,6 +33,10 @@ declarations seeded in both preset files, removing the old name, then run genera
 updates deployment utils and ActiveCryptoConfig only; it neither switches Noir selectors nor
 regenerates bounds. General generated-file policy does not permit guessing new generated values by
 hand.
+
+Generated provenance headers retain their original spelling across tooling moves. Changing those
+bytes requires a coordinated generated-source refresh; renaming a script alone must not make CI's
+source-regeneration comparison fail. Maintained documentation links identify the current owner.
 
 Toolchain is one compatibility unit: Nargo/Rust Noir beta.26, witness serialization, bb 5.2.0,
 archive, VKs, SDK noir_js/bb.js, and generated verifiers. **Gap:** no script compares every version
@@ -65,7 +69,7 @@ tree** under the old hash scheme. Another tree needs a rebuild, not a new label.
 `required_circuits_version` equals Interfold release version without v; binary resolves GitHub tag
 `v{version}` / `circuits-{version}.tar.gz`. Release workflow rejects mismatch. All six pairs in
 [supported-configurations](../../crates/zk-prover/supported-configurations.json) must ship:
-insecure-512 and secure-8192 × minimum/micro/small. That matrix is canonical for
+insecure-64 and secure-8192 × minimum/micro/small. That matrix is canonical for
 release/installation, must match builder pairs (tooling test), and is not itself a SOURCE_HASH
 input.
 

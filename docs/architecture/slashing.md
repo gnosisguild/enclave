@@ -31,6 +31,11 @@ committee members, not the accused. All affirmative votes must bind the same evi
 single-preimage on-chain format cannot prove every payload. Timeout without quorum is
 `Inconclusive`, not slashable.
 
+Only `CommitteeMemberExpelled` removes a member from the voters and discards its pending/buffered
+votes. Raw and enriched copies are idempotent. `SlashExecuted` alone does not remove voting or
+accusation rights. Finalized party slots remain fixed. **Gap:** restart rebuilds voters from the
+finalized committee, so an expulsion before the router checkpoint is not reapplied.
+
 The byte contract must agree between Rust and Solidity:
 
 ```text
@@ -50,8 +55,19 @@ Lane A reports. Each E3 freezes its nonzero maximum vote window and objective re
 
 - one day); assignment closure and manager retirement must wait past it.
 
-**Open gap:** hydration recreates recipients, not accumulated votes or timers. Peers must resend
-valid messages before signed deadlines. Request-router slashable-failure teardown is also
+The manager saves pending accusations holding this node's vote, their admitted votes, absolute
+timeouts, failed-proof evidence, and accused-proof identities in a versioned per-E3 record.
+Hydration restores that record. At `EffectsEnabled`, vote timers resume with their remaining time.
+Changed per-E3 events save state; a timeout's quorum event returns to the actor to save its result.
+Snapshot enqueue is not a durable flush acknowledgment; the shared snapshot limits still apply.
+
+During replay, local proof failures and commitment violations wait, one per proof, until effects
+run. Actors created during replay inherit `E3Context::effects_enabled`, like hydrated actors.
+Replayed own accusations mark proofs as accused without signing again. A restored peer accusation
+with this node's vote also suppresses another local accusation of that proof.
+
+**Open gaps:** buffered votes, window-move limits, in-flight forwarded-proof re-verifications, and
+the rest of the verification cache are not saved. Request-router slashable-failure teardown is
 memory-only: one day plus maximum vote validity after a local failure, or completion on restart. A
 local Failed lifecycle lacks its reason, so restart can prematurely complete accusation work; see
 [persistence gaps](persistence-and-replay.md#remaining-durability-gaps).
@@ -60,13 +76,17 @@ local Failed lifecycle lacks its reason, so restart can prematurely complete acc
 
 At node startup, each enabled chain reads `Interfold.slashingManager()` and uses that result for
 reader/writer routing and its EIP-712 signing domain. A differing configured address warns but does
-not override a live result. After two failed-read retries, a zero result, or for a disabled chain
-without a provider, configuration is the fallback. **Operational limit:** that address can be
-retired; the failed-read path logs ERROR and lasts until restart. An E3 without its chain's manager
-cannot start accusation work; startup requires at least one resolved manager. Configured deploy
-blocks still control backfill. [Resolution tests](../../crates/evm/src/slashing_manager_address.rs)
-pin address precedence, not availability of every historical manager after arbitrary governance
-changes.
+not override a live result. After two failed-read retries, or a zero result, an enabled chain has no
+manager and a full node fails startup. Configuration is a fallback only for a disabled chain without
+a provider. An E3 without its chain's manager cannot start accusation work; startup requires at
+least one resolved manager. Configured deploy blocks still control backfill.
+[Resolution tests](../../crates/evm/src/slashing_manager_address.rs) pin address precedence, not
+availability of every historical manager after arbitrary governance changes.
+
+After startup sync, an Interfold `SlashingManagerSet` log naming a different address fails that
+chain's gateway closed. The node exits unsuccessfully; restart resolves the new manager. **Gap:** a
+replacement between the startup read and the end of startup sync is historical, so it does not
+trigger this stop. The node retains the old manager until restart.
 
 The writer saves `AccusedFaulted` in a versioned per-chain outbox before policy/RPC work, coalesced
 by the contract replay tuple, and waits for `EffectsEnabled`. Startup backfills missing records from
@@ -77,9 +97,16 @@ enabled non-attestation configuration is a terminal configuration error.
 Agreeing voters sort ascending by address; ranks 0–2 submit at rank × 30 seconds. Other ranks do not
 submit. Prefer `proposeSlashByDkgParty` when canonical slot resolves, else `proposeSlash` by
 address. Temporary RPC/nonce/unknown errors retry after 30 seconds. Confirmed submission, matching
-execution, or durable exclusion clears the intent; duplicate evidence/stale attribution is terminal.
-**Gap:** the intent persists but its due time does not, so restart repeats the full fallback delay.
-`SlashSubmission` in `workflow.rs` owns these pure decisions; the writer runs its effects.
+execution, or durable exclusion clears the intent. Decoded errors in
+`TERMINAL_SLASH_SUBMISSION_ERRORS`, including `SlashSubmissionDeadlinePassed`, end retries. Every
+listed error must exist in the Rust `ISlashingManager` ABI; undecodable reverts retry every 30
+seconds. `AccusationIssuedInFuture` remains retryable because time can make it valid.
+
+`SlashIntentTimes` saves when this node first recorded each intent. Fallback ranks subtract elapsed
+time, including the policy read, so restart waits only for the remaining delay. A failed attempt
+forgets that timestamp; its retry waits the full rank delay, also after restart. A crash before the
+timestamp snapshot flushes can lengthen, but not shorten, the wait. `SlashSubmission` in
+`workflow.rs` owns these pure decisions; the writer runs its effects.
 
 Local exclusion changes only this E3's availability. Sortition enriches it with canonical party ID;
 collectors, applicable aggregators, and failover stop waiting for that member. It does **not**
@@ -159,5 +186,8 @@ drain policy.
 - [Typed accusation admission](../../crates/slashing/src/accusation_voting/transitions/admission.rs)
   and [writer workflow](../../crates/evm/src/slashing_writing/workflow.rs) contain owner-level
   tests; use `cargo test -p e3-slashing` / `cargo test -p e3-evm` as relevant.
-- `pnpm rust:test:slashing` exercises the existing proof/slashing integration harness. It does not
-  reconstruct volatile votes/timers across a process crash or prove the one-day reporting allowance.
+- [Accusation actor tests](../../crates/slashing/src/accusation_voting/actor_tests.rs) and
+  [extension tests](../../crates/slashing/src/accusation_manager_ext.rs) cover saved votes/timeouts
+  and accusation deferral during replay. These do not prove every snapshot crash window.
+- `pnpm rust:test:slashing` exercises the proof/slashing integration harness. It does not prove the
+  one-day reporting allowance or reconstruct the unsaved state listed above.

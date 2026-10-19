@@ -5,13 +5,32 @@
 # without even the implied warranty of MERCHANTABILITY
 # or FITNESS FOR A PARTICULAR PURPOSE.
 
-# Check production build and deployment configuration. These checks do not establish runtime
-# delivery or proof-verification behavior; those contracts need behavior tests at their owners.
+# Check production configuration, the startup proof guard, and the fire-and-forget send ceiling.
+# These static checks do not establish runtime delivery or proof-verification behavior.
 
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 fail=0
+
+# Retain the send ratchet while the acknowledged event pipeline remains incomplete (#2266).
+baseline_file="scripts/checks/repository-baselines.env"
+DO_SEND_BASELINE="$(sed -nE 's/^DO_SEND_BASELINE=([0-9]+)$/\1/p' "$baseline_file" 2>/dev/null || true)"
+if [[ ! "$DO_SEND_BASELINE" =~ ^[0-9]+$ ]]; then
+  echo "check-repository: FAILED — invalid or missing DO_SEND_BASELINE in $baseline_file"
+  exit 1
+fi
+count=$({ grep -rE '\.do_send\(' crates --include='*.rs' || true; } | wc -l | tr -d ' ')
+if ((count > DO_SEND_BASELINE)); then
+  echo "check-repository: FAILED — .do_send( call sites grew: $count > baseline $DO_SEND_BASELINE"
+  echo "  Use an acknowledged, timeout-bounded send for correctness-critical delivery."
+  echo "  Existing calls include correctness paths; this ceiling does not prove safe delivery."
+  echo "  Any baseline increase needs an explicit review of the new call sites."
+  fail=1
+elif ((count < DO_SEND_BASELINE)); then
+  echo "check-repository: do_send count dropped to $count (baseline $DO_SEND_BASELINE)."
+  echo "  Please ratchet: set DO_SEND_BASELINE=$count in $baseline_file."
+fi
 
 # --- 1. skip-proof feature containment --------------------------------------------
 # The containment check parses Cargo.toml with tomllib, which is stdlib only from
@@ -83,7 +102,15 @@ check_compose_shutdown_grace() {
 check_compose_shutdown_grace dappnode/docker-compose.yml
 check_compose_shutdown_grace deploy/docker-compose.yml
 
+# Keep the runtime rejection as well as Cargo feature containment.
+if ! grep -rq 'fn validate_proof_aggregation_mode' crates/entrypoint/src ||
+  ! grep -rEq 'validate_proof_aggregation_mode\(config' crates/entrypoint/src; then
+  echo "check-repository: FAILED — validate_proof_aggregation_mode missing or no longer called"
+  echo "  in crates/entrypoint/src; production startup must reject proof-skipping mode."
+  fail=1
+fi
+
 if ((fail == 0)); then
-  echo "✓ check:repository: feature containment, Docker coverage, and configured shutdown grace verified"
+  echo "✓ check:repository: do_send=$count (≤ $DO_SEND_BASELINE), feature containment, runtime proof guard, Docker coverage, and shutdown grace verified"
 fi
 exit "$fail"

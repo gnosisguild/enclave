@@ -570,7 +570,7 @@
         },
         {
           "why": "retry_with_backoff: retries an operation with a delay between attempts",
-          "ref": "crates/utils/src/retry.rs@34@pub async fn retry_with_backoff<F, Fut, T>("
+          "ref": "crates/utils/src/retry.rs@48@pub async fn retry_with_backoff<F, Fut, T>("
         }
       ],
       "rust_patterns": [
@@ -592,7 +592,7 @@
         {
           "pattern": "async-await",
           "note": "retry_with_backoff is an async function over a closure that returns a future",
-          "ref": "crates/utils/src/retry.rs@34@pub async fn retry_with_backoff<F, Fut, T>("
+          "ref": "crates/utils/src/retry.rs@48@pub async fn retry_with_backoff<F, Fut, T>("
         },
         {
           "pattern": "derive-macro",
@@ -788,7 +788,7 @@
         },
         {
           "why": "the layout-lock test that compares the persisted layouts with the fixture",
-          "ref": "crates/tests/tests/layout_lock.rs@246@fn persisted_layouts_match_the_locked_fixture()"
+          "ref": "crates/tests/tests/layout_lock.rs@251@fn persisted_layouts_match_the_locked_fixture()"
         }
       ],
       "rust_patterns": [
@@ -810,7 +810,7 @@
         {
           "pattern": "unit-test",
           "note": "the layout test is a plain #[test] that calls the fixture check",
-          "ref": "crates/tests/tests/layout_lock.rs@245@#[test]"
+          "ref": "crates/tests/tests/layout_lock.rs@250@#[test]"
         }
       ],
       "depends_on": [

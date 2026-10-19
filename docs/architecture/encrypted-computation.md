@@ -149,13 +149,11 @@ caller identities.
 
 TREE_DEPTH 20 gives 2^20 entries, but every operation consumes the round's smaller `inputLimit`, at
 most 100,000 (`MAX_INPUTS_PER_ROUND`), on both publish and validation. Every input adds at most one
-fresh ciphertext. Secure preset `SEARCH_Z` must cover that maximum (100,000); insecure-512 covers
-only 1,024 additions and some CUSTOM/zero-credit test rounds can exceed it. Masks require no voter
-signature, so anyone with valid proofs/attestations/transactions can fill the limit; no implemented
-rate policy makes this impossible.
+fresh ciphertext. Both presets set `SEARCH_Z` to 100,000, covering that maximum. Masks require no
+voter signature, so anyone with valid proofs/attestations/transactions can fill the limit; no
+implemented rate policy makes this impossible.
 
-Every option total must remain below the round's plaintext modulus t (insecure 100; secure
-17,000,000):
+Every option total must remain below the round's plaintext modulus t (17,000,000 for both presets):
 
 - CONSTANT: reject `credits >= t`; input limit is `min((t-1)/credits,100000)`. Zero credits use
   100,000.

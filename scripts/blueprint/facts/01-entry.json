@@ -103,7 +103,7 @@
         {
           "pattern": "tokio-select",
           "note": "startup races the node build against the shutdown signal",
-          "ref": "crates/cli/src/start.rs@45@let node = tokio::select! {"
+          "ref": "crates/cli/src/start.rs@47@let node = tokio::select! {"
         }
       ],
       "depends_on": [
@@ -275,12 +275,12 @@
         {
           "name": "CiphernodeSelector",
           "role": "selection state for this address, attached before Sortition",
-          "ref": "crates/ciphernode-builder/src/builder/sortition.rs@46@let ciphernode_selector = CiphernodeSelector::attach("
+          "ref": "crates/ciphernode-builder/src/builder/sortition.rs@48@let ciphernode_selector = CiphernodeSelector::attach("
         },
         {
           "name": "Sortition",
           "role": "attached with its backend and stores; the production node uses the score backend",
-          "ref": "crates/ciphernode-builder/src/builder/sortition.rs@57@let sortition = Sortition::attach(SortitionAttachParams {"
+          "ref": "crates/ciphernode-builder/src/builder/sortition.rs@59@let sortition = Sortition::attach(SortitionAttachParams {"
         },
         {
           "name": "EvmSystemChainBuilder",
@@ -330,7 +330,7 @@
         {
           "name": "in-memory event system (tests and benchmarks)",
           "where": "memory",
-          "ref": "crates/ciphernode-builder/src/builder/startup.rs@456@EventSystemType::InMem => EventSystem::in_mem(),"
+          "ref": "crates/ciphernode-builder/src/builder/startup.rs@461@EventSystemType::InMem => EventSystem::in_mem(),"
         }
       ],
       "key_types": [
@@ -583,7 +583,7 @@
         },
         {
           "why": "where a node starts its control server and runs forwarded commands",
-          "ref": "crates/cli/src/start.rs@141@pub fn launch_socket_server(ctrl_port: u16) {"
+          "ref": "crates/cli/src/start.rs@148@pub fn launch_socket_server(ctrl_port: u16) {"
         }
       ],
       "rust_patterns": [

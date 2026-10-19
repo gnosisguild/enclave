@@ -8,8 +8,9 @@ orchestration merely because many crates already import it.
   distinct logs and equal verdicts from distinct dispatch batches must still reach projections.
 - Snapshot pre-fanout admission happens before domain dedup, including replay. Log sync precedes
   dispatch; enqueuing a send is not durable acceptance.
-- Route only configured aggregates. A panic from an invalid route or a dead fire-and-forget mailbox
-  is not automatically a process failure signal. Append/flush errors use the explicit health path.
+- Route only configured aggregates. An unknown aggregate must signal fatal storage failure without
+  dispatch or misrouting, using the same health path as append/flush errors. Dead fire-and-forget
+  mailboxes do not automatically acquire that signal.
 - Durable payload changes need schema/wire review beyond a Rust compile or updated layout fixture.
   Process readiness/effect/shutdown signals are current-boot control, not replayable instructions.
 

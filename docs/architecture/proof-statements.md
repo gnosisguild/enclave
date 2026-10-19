@@ -39,7 +39,7 @@ C1 commits to the residues C2b splits, not the lift. The shared `PK_GENERATION_B
 the lifted integer check (IF-005), even if an optimization branch predates that repair.
 
 ct0 and C3 use `e0` directly in the reduced identity, with bounded reduction quotients and operands.
-DKG `error1_variance <= 16` keeps `e0_bound = 2 * variance` (20 secure, 6 insecure) below every
+DKG `error1_variance <= 16` keeps `e0_bound = 2 * variance` (20 for both presets) below every
 `q_i/2`; witness generation asserts this. Raising it enters a different uniform-sampler bound and
 requires reconsidering the assumption. C3 and user-data-encryption `k1` are non-centered `[0,t-1]`
 residues; Rust witnesses, Noir equations, and asymmetric quotient bounds must agree. The workspace
@@ -102,7 +102,7 @@ witness binding: deriving it caused an unexplained Noir
 witness, including under `--silence-warnings`, does not make that diagnostic acceptable. C3's scaled
 rounding carry z is a prover witness with `BIT_Z` and `[0,t)` checks, not an in-circuit unchecked
 hint; retain negative tests for inflated/deflated carries. The scaled quotient branch is generated
-false for insecure-512, so default insecure E2E tests miss it.
+false for insecure-64, so default insecure E2E tests miss it.
 
 The CRISP ballot relation is a narrow exception: plain packing can preserve a coefficient-aligned
 linear relation across equal-width carriers when all commitments have bounded openings fixed

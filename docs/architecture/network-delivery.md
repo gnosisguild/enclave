@@ -107,10 +107,10 @@ hints, and shared budgets. They do not prove that two peers retained every fact 
 The publisher reconstructs outbox and received IDs from durable logs. Store each document in its own
 DHT first, then announce a small notification independent of peer-upload success. A failed upload
 must not delay announcement. Reannounce notifications from 30 seconds, doubling to five minutes,
-with 10% jitter where configured; refresh full uploads only every 30 minutes, one upload started at
-a time with two put attempts. Retry failed announce/upload from 15 seconds to five minutes; an
-announce retry does not upload again. Library-driven hourly replication stays disabled; prune expiry
-every minute. Kademlia stream timeout is 60 seconds.
+plus up to 10% jitter; refresh full uploads only every 30 minutes, one upload started at a time with
+two put attempts. Failed announcements, uploads, and fetches back off from 15 seconds to five
+minutes before adding the same jitter. An announce retry does not upload again. Library-driven
+hourly replication stays disabled; prune expiry every minute. Kademlia stream timeout is 60 seconds.
 
 Recovery derives a missing publication request from a durable local key/share artifact. A crash
 after artifact commit but before the derived request therefore need not lose publication. This is a
@@ -134,8 +134,10 @@ The DHT replication factor stays 20, so a refresh can still upload to 20 peers. 
 reaches the original publisher only in a network of roughly that size; larger networks depend on
 replication success. libp2p-gossipsub 0.49.4 also does not decrement its publish counter for an
 expired queued publish. Bounded publish-result timeouts and retransmission mitigate liveness, not
-guaranteed delivery; no-peer errors use a longer join retry window and invalid payloads do not
-retry.
+guaranteed delivery. Transient event-gossip publish failures get three attempts, with waits doubling
+from two seconds plus up to 10% jitter. The shared delay calculation caps the base at 30 seconds.
+No-peer failures instead get up to 20 attempts with fixed 30-second waits. Permanent payload
+failures do not retry.
 
 ## Fetch and storage fairness
 
@@ -183,14 +185,16 @@ handlers still run, and a query looking up closest peers continues then uploads.
 is unresolved.**
 
 At SyncEnded, restore received **broadcast** documents into the in-memory DHT one at a time, best
-effort: at most 512 documents/128 MiB, last received in log order, selected while paging local
-history (1,024 events/16 MiB). Expired/full-store records are skipped. Receipts replayed after the
-committee snapshot may join the queue. Party-filtered documents are not restored because their sole
-recipient is this node. Replica puts themselves are not persisted.
+effort: at most 512 documents/128 MiB, last received in log order. While paging local history (1,024
+events/16 MiB), recovery retains candidate references into the log, with bytes only for the newest
+candidates within those bounds. After historical chain sync prunes closed E3s, selection keeps the
+newest eligible candidates and reloads referenced bytes from the log. Closed E3s therefore cannot
+displace an open E3's document from the restore allowance. Expired/full-store records are skipped.
+Receipts replayed after the committee snapshot may join the queue. Party-filtered documents are not
+restored because their sole recipient is this node. Replica puts themselves are not persisted.
 
-**Open risks (#75/#76):** ended E3s can take restore slots before backfill prunes them, evicting
-open rounds. Live chain facts held by the gateway until SyncEnded can close an E3 only after
-publications start, allowing one stale announce/upload. An offline dealer's recipient-specific
+**Open risks (#75/#76):** live chain facts held by the gateway until SyncEnded can close an E3 only
+after publications start, allowing one stale announce/upload. An offline dealer's recipient-specific
 shares are lost when the nodes holding their in-memory replicas restart. "Replicated" does not imply
 durable availability.
 

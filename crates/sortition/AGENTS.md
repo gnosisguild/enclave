@@ -10,6 +10,7 @@ IDs.
   fallback.
 - Active-job limits gate this node's voluntary submission, never the canonical ticket range. Persist
   provisional reservation before dispatch and reconcile it on canonical finalization/termination.
+  Startup must release terminal reservations; late historical finalization cannot recreate them.
 - Aggregator deadlines begin at durable phase readiness, not merely a stage event. Preserve absolute
   deadline and phase-local skips on unchanged assignment; roster and PK phases have separate
   budgets.

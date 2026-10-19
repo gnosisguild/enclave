@@ -26,6 +26,10 @@ roles. The [builder caller](../ciphernode-builder/src/builder/sortition.rs) show
 setup, including committee reconciliation and pending ticket intents. Consumers query the actor with
 messages such as `GetNodesForE3`; they do not rerun selection from current balances.
 
+`FailoverPolicy` supplies a 10-minute roster/plaintext budget and a 40-minute public-key budget in
+the production selector. `timeout(phase)` selects the budget; `with_public_key_timeout` overrides
+the public-key value. Deadlines begin at phase readiness and survive restart with remaining time.
+
 ## Overview
 
 The Interfold system uses a score-based sortition mechanism to select a committee of ciphernodes to
@@ -290,6 +294,9 @@ persists a provisional reservation before ticket dispatch. `CommitteeFinalized` 
 reservation or releases it when the node is not in the final committee. Terminal events release all
 remaining reservations. Remote operators keep their full on-chain-valid ticket ranges. This local
 policy does not reserve collateral or reduce the range that Solidity accepts.
+
+Startup releases reservations whose lifecycle is terminal. A finalization arriving after failure or
+completion cannot reserve that E3's capacity again.
 
 ### 4. Sortition Actor
 

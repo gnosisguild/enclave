@@ -44,15 +44,18 @@ keeps equal EVM facts from different logs and equal local verdicts/errors from d
 dispatches deliverable, while redelivery of one occurrence remains idempotent. Do not collapse that
 identity into only payload equality when changing the event pipeline.
 
-EventStore append/index/flush error paths call `report_fatal_failure` and stop the actor;
-EventSystem connects the health watch, builder fails startup, and the CLI monitors it after startup
-and exits unsuccessfully. A standalone helper without the signal does not acquire that process
-guarantee. Tests in [eventstore.rs](../../crates/events/src/eventstore.rs) cover append/flush
-failure and stopping before dispatch; [CLI start](../../crates/cli/src/start.rs) owns the health
-wait. **Other actor panics and dead fire-and-forget mailboxes are not universally supervised**: for
-example an unconfigured aggregate panics EventStoreRouter without using that explicit health path.
-Logging/trapping a handler error is also not itself a restart. Broader acknowledged pipeline work is
-tracked in [#2266](https://github.com/theinterfold/interfold/issues/2266).
+EventStore append/index/flush errors call `report_fatal_failure` and stop the store before dispatch.
+An event with no configured aggregate store sets the same failure signal without dispatch or
+misrouting. EventSystem connects the health watch, builder fails startup, and the CLI monitors it
+after startup and exits unsuccessfully. A standalone helper without the signal does not acquire that
+process guarantee. Tests in [eventstore.rs](../../crates/events/src/eventstore.rs) cover
+append/flush failure and stopping before dispatch; [CLI start](../../crates/cli/src/start.rs) owns
+the health wait. The start command also installs `e3_entrypoint::actor_panics::ActorPanics`: the
+first panic on the thread running the node's actors triggers the shutdown barrier and an
+unsuccessful exit. Panics on other threads remain with their owners; compute-pool panics become job
+errors. Dead fire-and-forget mailboxes are not universally supervised. Logging/trapping a handler
+error is not itself a restart. Broader acknowledged pipeline work is tracked in
+[#2266](https://github.com/theinterfold/interfold/issues/2266).
 
 Before enabling EventBus, seed its HLC above the greatest timestamp in **all durable logs**,
 including post-snapshot suffixes. A snapshot alone is not a clock floor. Correlation IDs similarly
@@ -127,10 +130,25 @@ raw topics/data. Settlement receipts are global facts and cannot reopen complete
 
 ## Deferred recipients and capacity
 
-Only chain facts or restored snapshots admit an E3; peers cannot create unknown contexts. Installed
-extensions declare expected recipient keys; dependency-only extensions and bootstrap contexts expect
-none. A missing recipient receives deferred events in arrival order **before** its creation event.
-Each recipient copy reserves its own item and byte budget:
+Only chain facts or restored snapshots admit an E3; peers cannot create unknown contexts. The router
+holds peer events for unknown E3s in `UnadmittedInputs` until a chain fact admits the E3. It then
+forwards them after that fact, in arrival order, through each extension and the normal recipient
+buffer, preserving sequence and identity. Completed E3s ignore them; teardown removes them. This
+memory-only hold has separate limits:
+
+| Scope  | Items | Accounted bytes |
+| ------ | ----: | --------------: |
+| One E3 |   512 |         128 MiB |
+| Router | 1,024 |         256 MiB |
+
+Overflow drops the oldest held event, within the same E3 for its per-E3 limit, and logs a warning.
+An event exceeding the per-E3 byte allowance is not held. A restart before admission loses held
+events because the checkpoint already passed them. During startup, `NetEventBuffer` instead holds
+gossip until `SyncEnded`, after historical chain events.
+
+Installed extensions declare expected recipient keys; dependency-only extensions and bootstrap
+contexts expect none. A missing recipient receives deferred events in arrival order **before** its
+creation event. Each recipient copy reserves its own item and byte budget:
 
 | Scope                         |  Items | Accounted bytes |
 | ----------------------------- | -----: | --------------: |
@@ -180,6 +198,11 @@ replay, uses durable lifecycle, coalesces requests/new hydrated correlations, re
 responses but not replayed errors, and answers every waiting correlation. Outcomes must match the
 E3. Discard DKG work after KeyPublished while keeping C6 verification (inspect proof type in the
 shared verification request). Before release/reuse, canonical C6 admission still applies.
+
+`E3Context::effects_enabled` stays false until the router receives `EffectsEnabled`. Extensions must
+propagate it to actors created during replay, not only hydrated actors. Keyshare collectors and
+accusation signing wait for that signal; replay records their inputs without starting timers or
+signing another accusation.
 
 After ten minutes without an outcome for a fresh ID, resend only once no identical request remains
 queued/running. A hung run waits for its prover cap. Terminal E3 cancels queued node-scoped compute
@@ -248,6 +271,12 @@ framing, or opaque encoded/encrypted contents (SharedSecret shares, fhe.rs keys 
 Rewriting a fixture does not raise a version; review must connect the diff to schema or wire
 rollout. Rust type compatibility is not a migration strategy.
 
+`BfvPreset` also persists enum discriminants. Under schema 8, variants 0 and 1 mean the degree-64
+insecure presets. Degree-512 stores used those same positions and marker, so preflight cannot detect
+the changed meaning. Testnet nodes must reset state against a fresh testnet stack, as
+[upgrades](upgrades.md#insecure-testnet-preset-reset) describes. Future changes to a persisted
+discriminant's parameters require a schema increase or an explicit, coordinated reset requirement.
+
 `node validate` opens no absent store, reports unreadable cursors/projections as failed checks, and
 detects recoverable tails read-only. With node stopped, `--repair` applies narrowly bounded
 tail/index recovery and reconciles derived sortition membership/history against intact logs without
@@ -263,8 +292,11 @@ deleting identity or already matching history. It is not generic repair for comm
 - Current recovery needs matching snapshots, not log alone. No test compares full replay and
   hydration for equivalent state/pending intents. Canonical startup failure observations add the gap
   above.
-- Accusation votes/timers, slashable-failure teardown, compute-gate buffers, and deferred recipient
-  queues are memory-only. Slash fallback due time resets. Collector clocks are not injected.
+- Accusation buffered votes, window-move limits, in-flight re-verifications, and other verification
+  cache entries remain memory-only. Pending accusations with this node's vote, admitted votes,
+  absolute timeouts, failed-proof evidence, and accused-proof identities are saved per E3.
+  Slashable-failure teardown, compute-gate buffers, deferred recipient queues, and peer events held
+  before admission remain memory-only. Collector and slash-fallback clocks are not injected.
 - Checker snapshot failure and terminal DKG snapshot publication remain unacknowledged; C4
   roster-fixed writes can be stale after restart. [DKG](dkg.md) retains exact failure windows.
 - `sync/state.rs` reads repositories; document workflow and keyshare timeout policy read wall clock,
@@ -279,10 +311,12 @@ deleting identity or already matching history. It is not generic repair for comm
 
 ## Existing guards
 
-Use `pnpm check:repository` for Cargo feature containment, Docker workspace coverage, and configured
-shutdown grace. These configuration checks do not prove runtime delivery or a successful shutdown.
-The remaining `do_send` sites include correctness paths; a call-count ceiling cannot establish safe
-delivery. Proof-skipping rejection is tested in
+Use `pnpm check:repository` for Cargo feature containment, Docker workspace coverage, configured
+shutdown grace, the startup proof-guard presence check, and the `.do_send(` line-count ratchet. The
+ceiling lives in `scripts/checks/repository-baselines.env`; retain both interim runtime guards until
+the acknowledged pipeline work in #2266 is complete. These static checks do not prove runtime
+delivery or a successful shutdown. The remaining `do_send` sites include correctness paths; a
+call-count ceiling cannot establish safe delivery. Proof-skipping rejection is tested in
 [`start/start.rs`](../../crates/entrypoint/src/start/start.rs), but those unit tests exercise the
 validation function rather than the full startup path.
 [Schema tests](../../crates/entrypoint/tests/validate_older_schema.rs) check failure before

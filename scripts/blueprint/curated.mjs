@@ -992,7 +992,7 @@ function ciphernode({ units }) {
         both: true,
         label: 'remote events',
         refs: [
-          H('crates/net/src/event_translation/actor.rs', 261, '.publish_from_remote(data, ec.ts(), None, EventSource::Net)'),
+          H('crates/net/src/event_translation/actor.rs', 263, '.publish_from_remote(data, ec.ts(), None, EventSource::Net)'),
           H('crates/net/src/event_conversion/actor.rs', 71, 'self.bus.publish(evt, ctx)?;'),
         ],
       },
@@ -1061,7 +1061,7 @@ function ciphernode({ units }) {
         refs: [
           H(
             'crates/slashing/src/accusation_voting/handlers.rs',
-            46,
+            65,
             'impl Handler<TypedEvent<ProofVerificationFailed>> for AccusationManager',
           ),
           ...ev('B13'),
@@ -1083,7 +1083,7 @@ function ciphernode({ units }) {
         refs: [
           'crates/keyshare/src/ext.rs@66@InterfoldEventData::CiphernodeSelected',
           'crates/aggregator/src/ext.rs@98@InterfoldEventData::CiphernodeSelected',
-          'crates/slashing/src/accusation_manager_ext.rs@183@InterfoldEventData::CommitteeFinalized',
+          'crates/slashing/src/accusation_manager_ext.rs@211@InterfoldEventData::CommitteeFinalized',
         ],
       },
       {

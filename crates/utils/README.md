@@ -39,8 +39,11 @@ meaning of the decoded value.
 - `AsBytesSerde` and the re-exported `BytesSerde` derive encode human-readable hex versus binary
   byte strings. See [derive usage](../utils-derive/README.md) for caller dependencies/validation.
 - `retry_with_backoff` distinguishes `RetryError::Retry` and `RetryError::Failure` according to
-  caller classification. `require_successful_receipt` checks a transaction receipt rather than
-  mistaking RPC submission for successful execution.
+  caller classification. Its waits double from the initial delay, capped at five minutes before
+  adding up to 10% jitter. `backoff_delay(base, attempt, cap)` exposes the same calculation;
+  attempts start at 1. RPC defaults use three attempts and a two-second initial delay.
+- `require_successful_receipt` checks a transaction receipt rather than mistaking RPC submission for
+  successful execution.
 - `actix` exposes message/channel adapters and `NotifySync`; `OnceTake` transfers a shared value at
   most once. Awaited acknowledgments and fire-and-forget sends have different contracts.
 - `enumerate_path`, ordering, and formatting helpers avoid duplicating mechanical conversions.
@@ -49,6 +52,7 @@ meaning of the decoded value.
 
 Run `cargo test --locked -p e3-utils`. Inline cases cover malformed/over-budget/trailing bincode,
 byte wrapper capacity/serde use, receipt status, enumerated paths, bounded formatting, and one-shot
-actor execution. No chain RPC or prover is required. Serialized helpers serve saved/wire data; see
+actor execution. Retry cases cover exponential growth, the cap, and the jitter interval. No chain
+RPC or prover is required. Serialized helpers serve saved/wire data; see
 [upgrades](../../docs/architecture/upgrades.md) and [AGENTS.md](AGENTS.md) for compatibility
 changes.

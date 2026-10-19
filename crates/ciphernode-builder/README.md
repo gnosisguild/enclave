@@ -77,6 +77,10 @@ operator address/peer ID. `with_history_collector()` enables the optional `histo
 `persistence_health()` and `gateway_failure()` for fatal storage or chain-ingestion failure; these
 are explicit signals, not supervision of every actor panic.
 
+The CLI supplies separate actor-thread panic monitoring. Library embedders must choose their own
+process supervision. Full-node startup requires a live SlashingManager on every enabled chain;
+bootstrap does not resolve managers or sign accusation votes.
+
 Consume the handle with `shutdown(deadline).await`: it acknowledges shutdown handlers, flushes the
 event pipeline, then drains snapshots and closes storage within the supplied deadline. See
 [persistence and replay](../../docs/architecture/persistence-and-replay.md) for guarantees and

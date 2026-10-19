@@ -3,17 +3,19 @@
 ## Purpose
 
 Use the root `pnpm check:*` commands. `repository.sh` checks Cargo feature containment, ciphernode
-Docker workspace membership, and production Compose shutdown grace. It is static configuration
-validation, not runtime/proof assurance. The grace check accepts the maintained two-space service /
-four-space integer-second `stop_grace_period` layout and requires exactly one budget above 60
-seconds per service. It rejects duplicate, missing, quoted, or non-integer-second fields; it is not
-a general YAML/Compose validator (aliases and other valid duration notations are not supported).
+Docker workspace membership, production Compose shutdown grace, startup proof-guard presence, and
+the `.do_send(` line-count ceiling. It is static configuration validation, not runtime/proof
+assurance. The grace check accepts the maintained two-space service / four-space integer-second
+`stop_grace_period` layout and requires exactly one budget above 60 seconds per service. It rejects
+duplicate, missing, quoted, or non-integer-second fields; it is not a general YAML/Compose validator
+(aliases and other valid duration notations are not supported).
 
 ## Map
 
 | File                                                           | Responsibility                                                                       |
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| [`repository.sh`](repository.sh)                               | Runs feature, Docker-membership, and per-service shutdown checks.                    |
+| [`repository.sh`](repository.sh)                               | Runs configuration, startup proof-guard, and send-count checks.                      |
+| [`repository-baselines.env`](repository-baselines.env)         | Owns the send-count ceiling; increases need explicit call-site review.               |
 | [`cargo-feature-containment.py`](cargo-feature-containment.py) | Reads Cargo manifests to detect production proof-skip feature enablement.            |
 | [`ciphernode-docker-members.py`](ciphernode-docker-members.py) | Compares workspace members with Docker manifest copies.                              |
 | [`committee.sh`](committee.sh)                                 | Compares cross-language committee and BFV configuration.                             |
@@ -30,6 +32,14 @@ Run commands from the repository root after `pnpm install --frozen-lockfile` for
 and formatting. Cargo manifest checks need Python 3.11+ or `tomli`; the shell checks need Bash.
 `check:bindings` requires `pnpm evm:build` first. Committee parity comparison additionally needs the
 Rust generator and Nargo; the command reports when that comparison is skipped.
+
+Until the acknowledged event pipeline in
+[#2266](https://github.com/theinterfold/interfold/issues/2266) is complete, retain the send-count
+ratchet and startup `validate_proof_aggregation_mode` checks. `repository-baselines.env` holds the
+ceiling. Lower it when calls disappear; do not increase it without reviewing new call sites. The
+count includes test sources and measures matching lines, not acknowledgment safety. The startup
+check verifies the guard and its configuration call exist; the entrypoint's behavior tests still own
+proof-skip rejection.
 
 `pnpm check:shell` parses each tracked shell source and Husky hook separately, choosing `sh` for
 POSIX shebangs and Bash otherwise. Local untracked, nonignored scripts are included too.

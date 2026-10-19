@@ -16,6 +16,7 @@ live separately in [e3-evm-helpers](../evm-helpers/README.md).
 | [`interfold/`](src/interfold), [`ciphernode_registry/`](src/ciphernode_registry), [`bonding_registry/`](src/bonding_registry) | Contract-specific reader projections.                                              |
 | [`interfold_writing/`](src/interfold_writing), [`slashing_writing/`](src/slashing_writing)                                    | Publication preflights/retries and slash outbox.                                   |
 | [`canonical_key.rs`](src/canonical_key.rs), [`data_availability/`](src/data_availability)                                     | Confirmed key authority and referenced-output retrieval.                           |
+| [`node_release.rs`](src/node_release.rs), [`slashing_manager_address.rs`](src/slashing_manager_address.rs)                    | Startup release acknowledgment and authoritative manager resolution.               |
 
 The read path fetches confirmed logs, decodes observations, orders the startup handoff, and sends
 facts to the bus. The write path consumes local intents; confirmed results return through the read
@@ -38,6 +39,15 @@ confirmation depth applies independently of whether the RPC URL is loopback. Gat
 readiness/failure handles expose live transition and fail-closed ingestion errors. Confirmed chain
 history, not gossip or local aggregation intents, authorizes canonical keys and completion. Writer
 preflights and retry results are separate from accepted chain facts.
+
+Enabled chains use only `Interfold.slashingManager()`. A full node fails startup if the read stays
+unavailable or returns zero; configured fallback applies only to disabled chains. A different
+manager observed after startup sync stops the gateway so restart can resolve the new address.
+
+Slash intents retain their first-recorded time, preserving the remaining fallback-rank wait across
+restart. Decoded permanent contract errors end retries. Failure-path reads/transactions use capped
+per-E3 backoff; a successful call clears its count. Release acknowledgment rereads state on each of
+three attempts to avoid sending again after a mined success.
 
 Public helpers also include `ProviderConfig`, canonical DKG timing/lifecycle reads,
 `fetch_operator_status`, and slashing-manager resolution. See

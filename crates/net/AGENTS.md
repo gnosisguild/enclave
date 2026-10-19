@@ -13,6 +13,8 @@ signed gossip envelope authenticates a peer, not that peer's right to fill an E3
   bounded fetches, and terminal cleanup; cancellation of already-handed-off requests is incomplete.
 - Command results go directly to their registered caller before broadcast; do not accidentally fence
   them behind startup application buffering. Publications themselves wait for SyncEnded.
+- Select restore candidates after canonical history prunes closed E3s. Retain log references when
+  dropping cached bytes so ended rounds cannot consume an open round's restore allowance.
 
 [Network delivery](../../docs/architecture/network-delivery.md) owns budgets and loss windows. Use
 the [README test map](README.md#tests); a restart regression must assert topic readiness, not

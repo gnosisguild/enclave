@@ -11,9 +11,11 @@ domain owner; keep receipt/preflight failures distinct from accepted chain facts
   an opportunistic registry read. Only local result intents can cause publication transactions.
 - Slash submissions have a durable semantic outbox. Other writer gates rebuild from journaled
   intents plus chain preflights; in-process nonce serialization is not a distributed nonce journal.
-- Resolve each enabled chain's slashing manager from Interfold at startup. A configured fallback
-  after exhausted reads/zero response is a degraded path that can name a retired manager; keep its
-  error and warning visible, chain-specific signing domain, and configured backfill start.
+- Preserve saved slash-intent times and remaining rank delays across restart. Permanent decoded
+  errors must exist in the Rust ABI and end retries; transport/unknown errors remain retryable.
+- Resolve each enabled chain's slashing manager only from Interfold. Exhausted reads/zero response
+  fail full-node startup; configuration is a fallback only for disabled chains. Preserve the
+  chain-specific signing domain, deploy-block backfill, and live manager-replacement stop.
 
 See [selection](../../docs/architecture/committee-selection.md),
 [decryption](../../docs/architecture/threshold-decryption.md), and

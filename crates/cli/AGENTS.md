@@ -9,10 +9,15 @@ to their existing owners rather than implementing another startup path.
 - `build.rs` reads `packages/interfold-contracts/deployed_contracts.json` and generates Rust data in
   `OUT_DIR`. Change deployment records through the contract tooling, not generated Rust. `GIT_SHA`
   overrides build identity; without local Git metadata the build may query the remote.
-- Preserve explicit confirmation and stopped-node safety for reset/purge/update commands. A
-  successful prompt is not a replacement for entrypoint's process fence and state checks.
+- Preserve explicit confirmation and stopped-node safety for reset/purge commands. A successful
+  prompt is not a replacement for entrypoint's process fence and state checks.
+- Update/uninstall change only the installed binary and run before configuration handling. Preserve
+  atomic same-directory replacement, symlink resolution, and the running-node warning without
+  creating node state or treating that warning as a stopped-node requirement.
 - Keep proof-skip arguments behind the dedicated test-only feature; never make missing proof
   artifacts silently choose an unproved production mode.
+- Retain the actor-thread panic watch before startup and its bounded shutdown/error path. Do not
+  widen it to compute or dashboard worker threads whose failures have separate owners.
 
 Use the [README tests/build prerequisites](README.md#tests). Command changes need the affected
 executable/daemon path, not only parser assertions. Contract API changes also need the binding check

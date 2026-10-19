@@ -31,8 +31,10 @@ depend on an aggregator role. Startup restores failed IDs from lifecycle state.
 
 Recognize `NoPaymentToRefund` (already processed) and `SettlementBlocked` only from decoded revert
 data, never RPC error text containing a selector. Simulate before taking the nonce guard. A blocked
-settlement retries from 30 seconds with doubling to 30 minutes without emitting a false protocol
-error; this backoff is process-local and resets on restart.
+settlement retries from 30 seconds with doubling to 30 minutes, plus up to 10% jitter, without
+emitting a false protocol error. Failed stage/deadline reads and failure transactions use the same
+backoff policy with a separate per-E3 attempt count, cleared on success. Both backoffs are
+process-local and reset on restart.
 
 ## Payer and immutable base split
 
