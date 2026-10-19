@@ -137,13 +137,28 @@ fn generator_manifest(source: &str) -> Result<String> {
     Ok(toml::to_string(&inputs)?)
 }
 
+/// Frame source records with a one-byte tag and big-endian u64 lengths for the name and content.
+fn hash_record(hash: &mut Sha256, tag: u8, name: &str, contents: &[u8]) {
+    hash.update([tag]);
+    hash.update((name.len() as u64).to_be_bytes());
+    hash.update(name.as_bytes());
+    hash.update((contents.len() as u64).to_be_bytes());
+    hash.update(contents);
+}
+
 fn hash_dir(
+    root: &Path,
     path: &Path,
     hash: &mut Sha256,
     relative: &str,
     bounds: bool,
     updates: &[(PathBuf, String)],
 ) -> Result<()> {
+    let directory = path
+        .strip_prefix(root)?
+        .to_str()
+        .context("Source directory path must be UTF-8")?;
+    hash_record(hash, b'd', directory, b"");
     let mut entries: std::collections::BTreeSet<_> = if path.exists() {
         fs::read_dir(path)?
             .map(|entry| entry.map(|entry| entry.path()))
@@ -182,10 +197,8 @@ fn hash_dir(
             );
         }
         if entry.is_dir() {
-            hash.update(format!("{relative}/"));
-            hash_dir(&entry, hash, &relative, bounds, updates)?;
+            hash_dir(root, &entry, hash, &relative, bounds, updates)?;
         } else if entry.is_file() || updates.iter().any(|(path, _)| path == &entry) {
-            hash.update(&relative);
             let mut bytes = match updates.iter().find(|(path, _)| path == &entry) {
                 Some((_, text)) => text.as_bytes().to_vec(),
                 None => fs::read(&entry)?,
@@ -211,7 +224,11 @@ fn hash_dir(
             if name.ends_with(".rs") {
                 bytes = strip_test_modules(std::str::from_utf8(&bytes)?).into_bytes();
             }
-            hash.update(bytes);
+            let file = entry
+                .strip_prefix(root)?
+                .to_str()
+                .context("Source file path must be UTF-8")?;
+            hash_record(hash, b'f', file, &bytes);
         }
     }
     Ok(())
@@ -235,10 +252,12 @@ pub fn source_hash_with_updates(
     updates: &[(PathBuf, String)],
 ) -> Result<String> {
     let mut hash = Sha256::new();
+    hash.update(b"interfold:zk-source:v2\0");
     if let Some(name) = selected_preset {
         let tier = tier(preset(name)?);
-        hash.update(format!("preset:{name}\nnoir_config:{tier}\n"));
+        hash_record(&mut hash, b'p', name, tier.as_bytes());
         hash_dir(
+            root,
             &root.join("circuits/lib/src/configs").join(tier),
             &mut hash,
             "",
@@ -247,8 +266,9 @@ pub fn source_hash_with_updates(
         )?;
     }
     if let Some(name) = committee {
-        hash.update(format!("committee:{name}\n"));
+        hash_record(&mut hash, b'c', name, b"");
         hash_dir(
+            root,
             &root.join("circuits/lib/src/configs/committee").join(name),
             &mut hash,
             "",
@@ -257,7 +277,7 @@ pub fn source_hash_with_updates(
         )?;
     }
     for circuit in artifacts::discover(root, request)? {
-        hash_dir(&circuit.path, &mut hash, "", false, updates)?;
+        hash_dir(root, &circuit.path, &mut hash, "", false, updates)?;
     }
     for path in [
         "circuits/lib/src/core",
@@ -274,13 +294,14 @@ pub fn source_hash_with_updates(
         "crates/parity-matrix/src",
         "crates/safe/src",
     ] {
-        hash_dir(&root.join(path), &mut hash, "", false, updates)?;
+        hash_dir(root, &root.join(path), &mut hash, "", false, updates)?;
     }
     if root.join("crates/zk-prover/Cargo.toml").exists()
         && root.join("crates/zk-prover/versions.json").exists()
     {
         let (nargo, bb) = toolchain(root)?;
-        hash.update(format!("toolchain:nargo {nargo} bb {bb}\n"));
+        hash_record(&mut hash, b't', "nargo", nargo.as_bytes());
+        hash_record(&mut hash, b't', "bb", bb.as_bytes());
     }
     for path in [
         "circuits/lib/Nargo.toml",
@@ -297,7 +318,6 @@ pub fn source_hash_with_updates(
         if !root.join(path).exists() && !updates.iter().any(|(file, _)| *file == root.join(path)) {
             continue;
         }
-        hash.update(path);
         let mut source = match updates.iter().find(|(file, _)| *file == root.join(path)) {
             Some((_, text)) => text.clone(),
             None => fs::read_to_string(root.join(path))?,
@@ -316,7 +336,7 @@ pub fn source_hash_with_updates(
         if path == "crates/zk/build/Cargo.toml" {
             source = generator_manifest(&source)?;
         }
-        hash.update(source);
+        hash_record(&mut hash, b'f', path, source.as_bytes());
     }
     Ok(hex::encode(hash.finalize())[..16].to_string())
 }

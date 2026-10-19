@@ -39,7 +39,7 @@ every section.
   `protocol/deployContracts.ts`; `BfvPkVerifierRouter.sol`
 - Parity matrices (`parity_{insecure,secure}.nr`) are derived artifacts regenerated from preset
   `QIS` + committee `(N, T)`. Do not hand-edit them. With `nargo` available,
-  `scripts/check-committee.sh` calls `pnpm build:circuits check --committee all`. The Rust example
+  `scripts/check-committee.sh` calls `pnpm build:circuits check --committee all`. The Rust builder
   renders and formats an isolated library copy, then compares the generated files without swapping
   live files. The CI circuits job also checks the committed selection through its rebuild diff.
 - The C1 and C2 bound globals (`PK_GENERATION_*`, `SHARE_COMPUTATION_*`) are derived artifacts of
@@ -109,6 +109,13 @@ every section.
   another version. It normalizes the active preset selector because each pair already identifies its
   preset. A library-only change invalidates every affected pair. Rebuild and push those pairs before
   release.
+- Source identity uses a versioned hash stream. Each record has a type tag, a name, content, and
+  explicit name and content lengths. File and directory names are repository-relative UTF-8 paths,
+  so moving a source between generator roots changes its identity. Cache reuse and release checks
+  reject hashes from another scheme; development hydration retains the published artifact hash.
+  CRISP binding updates format an isolated repository-relative package and shared library, so local
+  Noir dependencies resolve without changing live dependency files. —
+  `crates/zk/build/src/{identity,configuration}.rs`
 - The pair source hash ignores generated C1/C2 bound values and includes the Rust sources that
   generate them, including `zk/build/src` and its templates, `fhe-params`, `committee`,
   `polynomial/src`, and `polynomial/fhe-adapter/src`, without their `#[cfg(test)]` modules or the

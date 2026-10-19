@@ -1549,7 +1549,7 @@ jobs:
             packages/interfold-contracts/scripts/utils.ts
 
       - name: Test circuit artifact validation and verifier selection
-        run: pnpm test:circuit-build && pnpm test:circuit-tooling
+        run: pnpm test:circuit-build -- --include-ignored && pnpm test:circuit-tooling
 
       # The generated verifier contracts must match the freshly built verification keys. A drift
       # means the deployed verifier accepts a different circuit from the one in this tree.

@@ -399,6 +399,58 @@ fn source_identity_tracks_inputs_not_generated_selections_or_tests() {
 }
 
 #[test]
+fn source_identity_frames_file_boundaries_and_source_roots() {
+    let cases = [
+        (
+            "directory file boundaries",
+            vec![
+                ("crates/zk/config/src/a.rs", "// first"),
+                ("crates/zk/config/src/b.rs", "// secondc.rs// third"),
+            ],
+            vec![
+                ("crates/zk/config/src/a.rs", "// firstb.rs// second"),
+                ("crates/zk/config/src/c.rs", "// third"),
+            ],
+        ),
+        (
+            "source root identity",
+            vec![("crates/zk/config/src/lib.rs", "// source")],
+            vec![("crates/zk/witness/src/lib.rs", "// source")],
+        ),
+        (
+            "top-level file boundaries",
+            vec![
+                ("circuits/lib/Nargo.toml", "# first"),
+                (
+                    "circuits/lib/src/lib.nr",
+                    "// secondcircuits/lib/src/configs/mod.nr// third",
+                ),
+            ],
+            vec![
+                (
+                    "circuits/lib/Nargo.toml",
+                    "# firstcircuits/lib/src/lib.nr// second",
+                ),
+                ("circuits/lib/src/configs/mod.nr", "// third"),
+            ],
+        ),
+    ];
+    for (case, left, right) in cases {
+        let first = tempfile::tempdir().unwrap();
+        let second = tempfile::tempdir().unwrap();
+        for (root, files) in [(first.path(), left), (second.path(), right)] {
+            for (path, contents) in files {
+                write(root, path, contents);
+            }
+        }
+        let hash = |root| {
+            identity::source_hash(root, &request(), Some("insecure-64"), Some("minimum")).unwrap()
+        };
+        assert_ne!(hash(first.path()), hash(second.path()), "{case}");
+    }
+}
+
+#[test]
 fn source_identity_tracks_external_pins_and_pinned_tools() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path();
@@ -589,6 +641,13 @@ fn crisp_binding_update_preserves_input_order_and_other_preset() {
     write_pins(root);
     write(
         root,
+        "circuits/lib/Nargo.toml",
+        "[package]\nname = \"interfold_lib\"\ntype = \"lib\"\nauthors = []\n",
+    );
+    let library = "pub fn identity( x : Field )->Field{x}\n";
+    write(root, "circuits/lib/src/lib.nr", library);
+    write(
+        root,
         "circuits/bin/.active-preset.json",
         r#"{"preset":"insecure-64","committee":"minimum"}"#,
     );
@@ -616,7 +675,7 @@ fn crisp_binding_update_preserves_input_order_and_other_preset() {
         write(
             root,
             &format!("examples/CRISP/circuits/bin/{fold}/Nargo.toml"),
-            format!("[package]\nname = \"{fold}\"\ntype = \"bin\"\nauthors = []\n"),
+            format!("[package]\nname = \"{fold}\"\ntype = \"bin\"\nauthors = []\n[dependencies]\ninterfold_lib = {{ path = \"../../../../../circuits/lib\" }}\n"),
         );
         write(root, &format!("examples/CRISP/circuits/bin/{fold}/src/main.nr"), format!("pub global {prefix}_EXPECTED_KEY_HASH_INSECURE: Field = 0;\npub global {prefix}_EXPECTED_KEY_HASH_SECURE: Field = 123;\nfn main() {{}}\n"));
     }
@@ -626,6 +685,11 @@ fn crisp_binding_update_preserves_input_order_and_other_preset() {
         CiphernodesCommitteeSize::Minimum,
     )
     .unwrap();
+    assert_eq!(
+        fs::read_to_string(root.join("circuits/lib/src/lib.nr")).unwrap(),
+        library,
+        "formatting a fold must not modify the live dependency"
+    );
     let expected = compute_vk_hash(vec![
         Fr::from(1_u64),
         Fr::from(2_u64),

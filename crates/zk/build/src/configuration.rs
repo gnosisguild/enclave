@@ -96,23 +96,35 @@ fn formatted_noir_changes(
     }
     super::identity::check_tools(root, true, false)?;
     let temp = tempfile::tempdir()?;
+    let staged_directory = temp.path().join(directory.strip_prefix(root)?);
     super::artifacts::copy_tree(
         directory,
-        temp.path(),
+        &staged_directory,
         &["target", "Prover.toml", "Witness.toml"],
     )?;
+    let library = root.join("circuits/lib");
+    if directory != library {
+        super::artifacts::copy_tree(
+            &library,
+            &temp.path().join("circuits/lib"),
+            &["target", "Prover.toml", "Witness.toml"],
+        )?;
+    }
     for (path, contents) in &changed {
-        let staged = temp.path().join(path.strip_prefix(directory)?);
+        let staged = staged_directory.join(path.strip_prefix(directory)?);
         if let Some(parent) = staged.parent() {
             fs::create_dir_all(parent)?;
         }
         fs::write(staged, contents)?;
     }
-    run(Command::new("nargo").arg("fmt").current_dir(temp.path()))?;
+    run(Command::new("nargo")
+        .arg("fmt")
+        .current_dir(&staged_directory))?;
     changed
         .into_iter()
         .map(|(path, _)| {
-            let contents = fs::read_to_string(temp.path().join(path.strip_prefix(directory)?))?;
+            let contents =
+                fs::read_to_string(staged_directory.join(path.strip_prefix(directory)?))?;
             Ok((path, contents))
         })
         .collect()
