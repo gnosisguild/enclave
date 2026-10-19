@@ -1,23 +1,25 @@
 # OpenVM proving
 
 OpenVM replaces RISC Zero and Boundless. Each project proves its own E3 program: the guest and the
-proving service link the project's `program/` crate, so the guest, the native host and the contract
-use one processor and one input policy. This is a new guest and verifier deployment, not an upgrade
-of an existing receipt. Existing deployment records and legacy RISC Zero contracts stay unchanged.
+project's `runner/` link the project's `program/` crate, so the guest, the native host and the
+contract use one processor and one input policy. This is a new guest and verifier deployment, not an
+upgrade of an existing receipt. Existing deployment records and legacy RISC Zero contracts stay
+unchanged.
 
 ## Pieces
 
-| Piece                                  | What it is                                                                 |
-| -------------------------------------- | -------------------------------------------------------------------------- |
-| `guest/` in the project                | The OpenVM guest. Its own workspace, built with `cargo openvm`             |
-| `.interfold/support/openvm/service`    | The proving service: `e3-program-server` with `e3-openvm-host` as runner   |
-| `.interfold/support/openvm/compile`    | Builds the guest, keys, receipt identity, worker configuration and service |
-| `.interfold/support/openvm/start`      | Starts the service                                                         |
-| `interfold-openvm-prover` (this crate) | The worker. A separate process, in a CPU build and a CUDA build            |
+| Piece                                  | What it is                                                                                            |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `guest/` in the project                | The OpenVM guest. Its own workspace, built with `cargo openvm`                                        |
+| `runner/` in the project               | The `program-runner` binary. `program-runner openvm` is the proving service (`crates/program-runner`) |
+| `interfold-openvm-prover` (this crate) | The worker. A separate process, in a CPU build and a CUDA build                                       |
 
-`interfold init` copies the service folder and pins the guest's Interfold crates to the template's
-commit. In this repository, `templates/default` and `examples/CRISP` link the folder from
-`crates/support-scripts/openvm`.
+The proving service is `e3-program-server` with `e3-openvm-host` as runner. `interfold init` pins
+the guest's Interfold crates to the template's commit. `interfold program compile` runs
+`crates/cli/scripts/openvm-compile.sh`, which builds the guest, keys, receipt identity, worker
+configuration and `program-runner`. `interfold program start` runs `program-runner openvm` with
+`cargo run --release`. In this repository, `templates/default` and `examples/CRISP` have a `runner/`
+crate that calls `e3_program_runner::run`.
 
 The guest reads the round one item at a time: a header, every ciphertext in index order, then the
 ciphertexts the policy selected, again in index order. It keeps a hash of each ciphertext from the
@@ -76,9 +78,9 @@ interfold program compile
 
 This builds `guest/`, generates its application key, runs the worker's `prepare` for the aggregation
 key and receipt identity, writes the worker configuration (`OPENVM_PROVER_CONFIG`, or
-`.interfold/caches/openvm/prover.json`), and builds the service. `start` and the deploys read the
-same path. The keys are regenerated only when the guest executable or `guest/openvm.toml` changes.
-The receipt identity is in `.interfold/caches/openvm/prepared/identity.json`.
+`.interfold/caches/openvm/prover.json`), and builds `program-runner`. `start` and the deploys read
+the same path. The keys are regenerated only when the guest executable or `guest/openvm.toml`
+changes. The receipt identity is in `.interfold/caches/openvm/prepared/identity.json`.
 
 Deploy the contracts next. The template and CRISP deploys read the identity and verifier artifact
 from that `prover.json` unless `OPENVM_APP_EXE_COMMIT`, `OPENVM_APP_VM_COMMIT`, and either

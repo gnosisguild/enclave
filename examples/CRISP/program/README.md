@@ -24,8 +24,7 @@ reference. Both the protocol and application verifier must pass before the E3 re
 
 Follow [the OpenVM instructions](../../../crates/openvm-prover/README.md). Configure
 `program.openvm` with the worker paths, then run `interfold program compile` in `examples/CRISP`.
-The guest in `examples/CRISP/guest` and the service in `.interfold/support/openvm` both link this
-crate.
+The guest in `examples/CRISP/guest` and the runner in `examples/CRISP/runner` both link this crate.
 
 For a local round with real proofs, set `CRISP_REAL_PROOFS=1` in `crisp.dev.env`, then from
 `examples/CRISP` run:
