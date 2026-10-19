@@ -289,7 +289,7 @@ class NoirCircuitBuilder {
       outputDir: join(this.rootDir, 'dist', 'circuits'),
       clean: true,
       skipVk: false,
-      preset: CIRCUIT_PRESETS.INSECURE_512,
+      preset: CIRCUIT_PRESETS.INSECURE_64,
       committee: CIRCUIT_COMMITTEES.MINIMUM,
       ...options,
     }
@@ -435,9 +435,9 @@ class NoirCircuitBuilder {
 
   private bfvConfig(preset: CircuitPreset, committee: CircuitCommittee) {
     const { h, t, n } = COMMITTEE_PARAMS[committee]
-    const paramSet = preset === CIRCUIT_PRESETS.INSECURE_512 ? 0 : 2
+    const paramSet = preset === CIRCUIT_PRESETS.INSECURE_64 ? 0 : 2
     const committeeSize = ALL_COMMITTEES.indexOf(committee)
-    const params = paramSet === 0 ? BFV_PARAMS.insecure512 : BFV_PARAMS.secure8192
+    const params = paramSet === 0 ? BFV_PARAMS.insecure64 : BFV_PARAMS.secure8192
     const encodedParams = AbiCoder.defaultAbiCoder().encode(
       ['tuple(uint256 degree,uint256 plaintext_modulus,uint256[] moduli,string error1_variance)'],
       [[params.degree, params.plaintextModulus, [...params.moduli], params.error1Variance]],
@@ -455,7 +455,7 @@ class NoirCircuitBuilder {
   private patchUtilsTs(preset: CircuitPreset, committee: CircuitCommittee): void {
     if (this.options.skipUtilsPatch) return
     const { h, t, n, paramSet, committeeSize } = this.bfvConfig(preset, committee)
-    const insecure = this.bfvConfig(CIRCUIT_PRESETS.INSECURE_512, CIRCUIT_COMMITTEES.MINIMUM)
+    const insecure = this.bfvConfig(CIRCUIT_PRESETS.INSECURE_64, CIRCUIT_COMMITTEES.MINIMUM)
     const secure = this.bfvConfig(CIRCUIT_PRESETS.SECURE_8192, CIRCUIT_COMMITTEES.SMALL)
     const path = join(this.rootDir, 'packages', 'interfold-contracts', 'scripts', 'utils.ts')
     if (!existsSync(path)) return // optional in minimal checkouts
@@ -614,7 +614,7 @@ class NoirCircuitBuilder {
     const production = this.bfvConfig(CIRCUIT_PRESETS.SECURE_8192, CIRCUIT_COMMITTEES.SMALL)
     const secureMinimum = this.bfvConfig(CIRCUIT_PRESETS.SECURE_8192, CIRCUIT_COMMITTEES.MINIMUM)
     const secureMicro = this.bfvConfig(CIRCUIT_PRESETS.SECURE_8192, CIRCUIT_COMMITTEES.MICRO)
-    const testnet = this.bfvConfig(CIRCUIT_PRESETS.INSECURE_512, CIRCUIT_COMMITTEES.MINIMUM)
+    const testnet = this.bfvConfig(CIRCUIT_PRESETS.INSECURE_64, CIRCUIT_COMMITTEES.MINIMUM)
     const path = join(this.rootDir, 'packages', 'interfold-contracts', 'contracts', 'lib', 'ActiveCryptoConfig.sol')
     const source = `// SPDX-License-Identifier: LGPL-3.0-only
 //
@@ -1564,7 +1564,7 @@ library ActiveCryptoConfig {
           source = Buffer.from(
             source
               .toString()
-              .replace(/preset: (insecure-512|secure-8192)/g, 'preset: <selected>')
+              .replace(/preset: (insecure-64|secure-8192)/g, 'preset: <selected>')
               .replace(/super::(insecure|secure)::/g, 'super::<selected>::'),
           )
         }
@@ -1667,12 +1667,12 @@ async function main() {
     if (options.preset === 'all' || options.committee === 'all') {
       throw new Error('sync-config requires one preset and one committee')
     }
-    builder.syncProtocolConfig(options.preset ?? CIRCUIT_PRESETS.INSECURE_512, options.committee ?? CIRCUIT_COMMITTEES.MINIMUM)
+    builder.syncProtocolConfig(options.preset ?? CIRCUIT_PRESETS.INSECURE_64, options.committee ?? CIRCUIT_COMMITTEES.MINIMUM)
   } else if (command === 'sync-preset') {
     if (options.preset === 'all' || options.committee === 'all') {
       throw new Error('sync-preset requires one preset and one committee')
     }
-    builder.syncPresetConfigs(options.preset ?? CIRCUIT_PRESETS.INSECURE_512, options.committee ?? CIRCUIT_COMMITTEES.MINIMUM)
+    builder.syncPresetConfigs(options.preset ?? CIRCUIT_PRESETS.INSECURE_64, options.committee ?? CIRCUIT_COMMITTEES.MINIMUM)
   } else {
     const result = await builder.buildAll()
     builder.writeGitHubOutput(result)
@@ -1689,7 +1689,7 @@ Commands: build (default), hash, sync-config, sync-preset
 Options:
   --group <groups>    Circuit groups (comma-separated: dkg,threshold)
   --circuit <name>    Build specific circuit(s)
-  --preset <preset>   Parameter preset: insecure-512 (default), secure-8192, or all
+  --preset <preset>   Parameter preset: insecure-64 (default), secure-8192, or all
   --committee <name>  Committee size: minimum (default), micro, small, or all
   --skip-utils-patch  Don't rewrite BFV_DKG_H/T in packages/interfold-contracts/scripts/utils.ts
   --skip-vk           Skip verification key generation

@@ -39,8 +39,8 @@ else process.exit(1)
     0o755,
   )
   process.env.PATH = `${root}/bin:${resolve(__dirname, '../../node_modules/.bin')}:${oldPath}`
-  write('circuits/bin/.active-preset.json', '{"preset":"insecure-512","committee":"minimum"}')
-  write('dist/circuits/insecure-512/minimum/.build-stamp.json', '{"preset":"insecure-512","committee":"minimum"}')
+  write('circuits/bin/.active-preset.json', '{"preset":"insecure-64","committee":"minimum"}')
+  write('dist/circuits/insecure-64/minimum/.build-stamp.json', '{"preset":"insecure-64","committee":"minimum"}')
   write('circuits/bin/recursive_aggregation/dkg_aggregator/Nargo.toml', '[package]\nname = "dkg_aggregator"\n')
   write('circuits/bin/recursive_aggregation/dkg_aggregator/target/dkg_aggregator.json', '{}')
   write('circuits/bin/recursive_aggregation/dkg_aggregator/target/dkg_aggregator.vk', 'synthetic fixture, not a key')

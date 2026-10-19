@@ -6,7 +6,7 @@
       "documentation": [{ "title": "Preset and artifact identity", "path": "docs/architecture/circuit-artifacts.md" }],
       "kind": "crate",
       "path": "crates/fhe-params",
-      "one_line": "BFV parameter presets (insecure 512 and secure 8192, threshold and DKG variants) and the committee sizes they assume.",
+      "one_line": "BFV parameter presets (insecure 64 and secure 8192, threshold and DKG variants) and the committee sizes they assume.",
       "actors": [],
       "consumes": [],
       "emits": [],
@@ -38,8 +38,8 @@
           "ref": "crates/fhe-params/src/presets.rs@40@pub enum BfvPreset"
         },
         {
-          "why": "the insecure 512 constants: degree, moduli and party count per threshold or DKG set",
-          "ref": "crates/fhe-params/src/constants.rs@13@pub mod insecure_512 {"
+          "why": "the insecure 64 constants: degree, moduli and party count per threshold or DKG set",
+          "ref": "crates/fhe-params/src/constants.rs@13@pub mod insecure_64 {"
         },
         {
           "why": "turns a preset into its threshold and DKG BFV parameter pair",

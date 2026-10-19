@@ -21,12 +21,12 @@ npm install @crisp-e3/sdk
 ## Choosing a preset
 
 Proving needs the BFV-shaped circuits, and those exist once per parameter set. They are not part of
-the main entry point: the `secure-8192` set is far larger than `insecure-512`. Each preset has its
+the main entry point: the `secure-8192` set is far larger than `insecure-64`. Each preset has its
 own subpath, so your bundler can pull only the one the round needs.
 
 ```ts
 import { setCircuits } from '@crisp-e3/sdk'
-import { loadCircuits } from '@crisp-e3/sdk/insecure-512' // or '@crisp-e3/sdk/secure-8192'
+import { loadCircuits } from '@crisp-e3/sdk/insecure-64' // or '@crisp-e3/sdk/secure-8192'
 
 setCircuits(await loadCircuits())
 ```
@@ -132,6 +132,28 @@ const maskProof = await generateMaskVoteProof({
   previousCiphertext: previousCiphertextBytes, // optional
 })
 ```
+
+#### Report Proving Progress
+
+A ballot proof is five proofs in sequence, listed in `PROOF_STAGES`. `finishBallotProof`,
+`finishMaskProof` and `CrispSDK.finishBallot` take an optional `onProgress`, called as each stage
+starts:
+
+```typescript
+import { finishBallotProof } from '@crisp-e3/sdk'
+
+const proof = await finishBallotProof(prepared, digest, signature, {
+  onProgress: ({ stage, index, total }) => console.log(`${index + 1}/${total}: ${stage}`),
+})
+```
+
+| Stage            | Circuit                    | What it proves                                                                                                                       |
+| ---------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `encryption_ct0` | `user_data_encryption_ct0` | The ciphertext half that carries the ballot is a well-formed encryption of it                                                        |
+| `encryption_ct1` | `user_data_encryption_ct1` | The other ciphertext half is well formed                                                                                             |
+| `ballot`         | `crisp` / `crisp_onchain`  | A vote is signed by the slot owner and within voting power, or a mask is zero; the new slot ciphertext is the ballot plus the addend |
+| `encryption`     | `user_data_encryption`     | Both halves verify and share the same encryption randomness                                                                          |
+| `fold`           | `fold` / `fold_onchain`    | Encryption and ballot proofs cover the same ciphertext; outputs the key commitment the contract checks against the committee key     |
 
 #### Verify Proof
 
@@ -294,6 +316,7 @@ const { stage, retryOffered } = getSubmissionStage({
 - `MAX_VOTE_OPTIONS` - Maximum number of options in a round
 - `MAX_MSG_NON_ZERO_COEFFS` - Number of plaintext coefficients published as the tally
 - `SIGNATURE_MESSAGE_HASH` - Hash of the signature message
+- `PROOF_STAGES` - The ballot proof stages in the order they run
 
 ### Types
 

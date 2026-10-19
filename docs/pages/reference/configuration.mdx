@@ -310,7 +310,7 @@ from [Contracts & Addresses](/reference/contracts).
 | `interfold`                     | Yes                    | The node, `print-env`, `config check`                                                    |
 | `ciphernode_registry`           | Yes                    | The node, `print-env`, `config check`                                                    |
 | `bonding_registry`              | Yes                    | The node, the `ciphernode` on-chain commands, `print-env`, `config check`                |
-| `slashing_manager`              | For `interfold start`  | The node, which submits slash proposals, and `config check`                              |
+| `slashing_manager`              | No                     | `config check`. The node uses the manager that the `interfold` contract names.           |
 | `fee_token`                     | No                     | `print-env`, `config check`                                                              |
 | `faucet`                        | For `interfold faucet` | `interfold faucet`, `config check`. Sepolia publishes a faucet. Mainnet does not.        |
 | `e3_program`                    | No                     | `print-env`. An application sets its own E3 program. `config check` does not compare it. |

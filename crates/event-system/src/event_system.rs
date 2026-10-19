@@ -92,11 +92,23 @@ impl EventStoreAddrs {
         }
     }
 
-    /// Start a new router over these event stores.
-    fn start_router(self) -> RouterAddr {
+    /// Start a new router over these event stores. It reports an event of an aggregate without a
+    /// store on the stores' failure signal.
+    fn start_router(
+        self,
+        failure_signal: tokio::sync::watch::Sender<Option<String>>,
+    ) -> RouterAddr {
         match self {
-            Self::InMem(addrs) => RouterAddr::InMem(EventStoreRouter::new(addrs).start()),
-            Self::Persisted(addrs) => RouterAddr::Persisted(EventStoreRouter::new(addrs).start()),
+            Self::InMem(addrs) => RouterAddr::InMem(
+                EventStoreRouter::new(addrs)
+                    .with_failure_signal(failure_signal)
+                    .start(),
+            ),
+            Self::Persisted(addrs) => RouterAddr::Persisted(
+                EventStoreRouter::new(addrs)
+                    .with_failure_signal(failure_signal)
+                    .start(),
+            ),
         }
     }
 }
@@ -258,7 +270,9 @@ impl EventSystem {
     pub fn sequencer(&self) -> Result<Addr<Sequencer>> {
         self.sequencer
             .get_or_try_init(|| {
-                let router = self.eventstore_addrs()?.start_router();
+                let router = self
+                    .eventstore_addrs()?
+                    .start_router(self.failure_signal.clone());
                 Ok(Sequencer::new_with_flush(
                     &self.eventbus(),
                     router.recipient::<StoreEventRequested>(),
@@ -366,11 +380,16 @@ impl EventSystem {
 
     /// Get an EventStoreRouter Recipient
     pub fn eventstore_router(&self) -> Result<Recipient<StoreEventRequested>> {
-        Ok(self.eventstore_addrs()?.start_router().recipient())
+        Ok(self
+            .eventstore_addrs()?
+            .start_router(self.failure_signal.clone())
+            .recipient())
     }
 
     pub fn eventstore_reader(&self) -> Result<EventStoreReader> {
-        let router = self.eventstore_addrs()?.start_router();
+        let router = self
+            .eventstore_addrs()?
+            .start_router(self.failure_signal.clone());
         let reader = EventStoreReader::new(router.recipient(), router.recipient());
 
         if self.global_shared_eventstore {
@@ -675,6 +694,36 @@ mod tests {
         let next = HlcTimestamp::from(bus.ts()?);
 
         assert_eq!(next, HlcTimestamp::new(5_000, 18, 7));
+        Ok(())
+    }
+
+    /// An event of an aggregate that has no EventStore sets the storage failure signal, so the node
+    /// exits with an error as for any other storage failure.
+    #[actix::test]
+    async fn an_event_of_an_aggregate_without_a_store_sets_the_failure_signal() -> Result<()> {
+        let system = EventSystem::in_mem().with_fresh_bus();
+        let mut failure = system.failure_receiver();
+        let event = InterfoldEvent::<Unsequenced>::new_with_timestamp(
+            TestEvent::new("unrouted", 1)
+                .with_e3_id(e3_events::E3id::new("1", 31_337))
+                .into(),
+            None,
+            1,
+            None,
+            EventSource::Local,
+        );
+        let (recipient, _response) = e3_utils::actix::channel::oneshot::<StoreEventResponse>();
+        system
+            .eventstore_router()?
+            .send(StoreEventRequested::new(event, recipient))
+            .await?;
+
+        let reason = failure
+            .wait_for(|reason| reason.is_some())
+            .await?
+            .clone()
+            .context("failure reason")?;
+        assert!(reason.contains("No EventStore is configured"), "{reason}");
         Ok(())
     }
 

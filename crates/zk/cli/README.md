@@ -42,7 +42,7 @@ pnpm zk parity-matrices --committee minimum
 `configs.nr` to `output/`. Use `--toml` to also write `Prover.toml`. With `--toml --no-configs`, it
 writes only `Prover.toml`. Use `--output <path>` to select another directory.
 
-`--preset` accepts `insecure` (degree 512), `secure` (degree 8192), or aliases `2` and `80`.
+`--preset` accepts `insecure` (degree 64), `secure` (degree 8192), or aliases `2` and `80`.
 `--committee` accepts `minimum` (default), `micro`, or `small`. The committee must match the
 compiled Noir circuits.
 

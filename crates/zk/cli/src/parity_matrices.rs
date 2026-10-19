@@ -65,11 +65,11 @@ fn output_root(args: &Args) -> Result<PathBuf> {
 /// that `committee::active::PARITY_MATRIX_INSECURE / _SECURE` re-export from.
 fn file_for(root: &Path, committee: &str, preset: BfvPreset) -> PathBuf {
     let suffix = match preset {
-        BfvPreset::InsecureThreshold512 => "insecure",
+        BfvPreset::InsecureThreshold64 => "insecure",
         BfvPreset::SecureThreshold8192 => "secure",
         // Codegen runs against the threshold side of each preset family.
         // DKG-only variants don't need their own file.
-        BfvPreset::InsecureDkg512 => "insecure",
+        BfvPreset::InsecureDkg64 => "insecure",
         BfvPreset::SecureDkg8192 => "secure",
     };
     root.join(committee).join(format!("parity_{suffix}.nr"))
@@ -79,7 +79,7 @@ fn file_for(root: &Path, committee: &str, preset: BfvPreset) -> PathBuf {
 /// stable across regenerations (so the lefthook check can diff against a fresh run).
 fn render(committee: &str, preset_suffix: &str, l_module: &str, matrix_literal: &str) -> String {
     let preset_label = match preset_suffix {
-        "insecure" => "insecure-512 (L_THRESHOLD=2)",
+        "insecure" => "insecure-64 (L_THRESHOLD=3)",
         "secure" => "secure-8192 (L_THRESHOLD=3)",
         other => other,
     };
@@ -130,7 +130,7 @@ pub(super) fn run(args: Args) -> Result<()> {
                 )
             })?;
         let (suffix, l_module) = match preset {
-            BfvPreset::InsecureThreshold512 => ("insecure", "insecure"),
+            BfvPreset::InsecureThreshold64 => ("insecure", "insecure"),
             BfvPreset::SecureThreshold8192 => ("secure", "secure"),
             _ => continue, // PAIR_PRESETS only carries the threshold variants
         };
