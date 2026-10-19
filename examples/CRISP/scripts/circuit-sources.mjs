@@ -47,7 +47,7 @@ const SKIP_DIRS = new Set(['target', 'node_modules'])
 /**
  * The generated preset selector, which the digest must ignore.
  *
- * `build-circuits.ts` rewrites this file on every preset switch, and `build-presets.mjs` builds
+ * The Rust circuit builder rewrites this file on every preset switch, and `build-presets.mjs` builds
  * insecure-64 last so the working tree is left on the default preset. The tree therefore never
  * holds the selector the secure-8192 archive was staged under, and a digest that included it would
  * report a fresh secure archive as stale every time — which is exactly what it did.

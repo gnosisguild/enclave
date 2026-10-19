@@ -2299,11 +2299,102 @@ fn handle_decrypted_shares_aggregation_proof(
 }
 
 #[cfg(test)]
-mod decrypted_shares_aggregation_tests {
+mod aggregation_request_tests {
     use super::*;
     use e3_events::CorrelationId;
     use e3_utils::utility_types::ArcBytes;
     use fhe_traits::Serialize;
+
+    #[test]
+    fn aggregation_requests_reject_mismatched_thresholds_without_proof_tools() {
+        use fhe::bfv::SecretKey;
+        use fhe::mbfv::AggregateIter;
+        use rand::SeedableRng;
+
+        let temp = e3_zk_prover::test_utils::get_tempdir().unwrap();
+        let prover = ZkProver::new(&ZkBackend {
+            base_dir: temp.path().to_owned(),
+            bb_binary: temp.path().join("absent-bb"),
+            circuits_dir: temp.path().join("absent-circuits"),
+            work_dir: temp.path().join("work"),
+            config: Default::default(),
+            using_custom_bb: true,
+            bb_timeout: Duration::from_secs(1),
+        });
+        let preset = BfvPreset::InsecureThreshold64;
+        let (params, _) = build_pair_for_preset(preset).unwrap();
+        let crp = create_deterministic_crp_from_default_seed(&params);
+        let mut rng = rand_chacha::ChaCha20Rng::seed_from_u64(7);
+        for size in [
+            CiphernodesCommitteeSize::Minimum,
+            CiphernodesCommitteeSize::Micro,
+        ] {
+            let committee = size.values();
+            let shares: Vec<_> = (0..committee.h)
+                .map(|_| {
+                    let secret = SecretKey::random(&params, &mut rng);
+                    PublicKeyShare::new(&secret, crp.clone(), &mut rng).unwrap()
+                })
+                .collect();
+            let keyshare_bytes = shares
+                .iter()
+                .map(|share| ArcBytes::from_bytes(&share.to_bytes()))
+                .collect();
+            let public: PublicKey = shares.into_iter().aggregate().unwrap();
+            let mut req = PkAggregationProofRequest {
+                keyshare_bytes,
+                aggregated_pk_bytes: ArcBytes::from_bytes(&public.to_bytes()),
+                params_preset: preset,
+                committee_n: committee.n,
+                committee_h: committee.h,
+                committee_threshold: committee.threshold,
+            };
+            let request = ComputeRequest::zk(
+                ZkRequest::PkAggregation(req.clone()),
+                CorrelationId::new(),
+                E3id::new("threshold-guard", 1),
+            );
+            let accepted =
+                handle_pk_aggregation_proof(&prover, req.clone(), request.clone()).unwrap_err();
+            assert!(
+                matches!(accepted.get_err(), ComputeRequestErrorKind::Zk(ZkEventError::ProofGenerationFailed(message)) if message.contains(&format!("insecure-64/{size}/default/threshold/pk_aggregation/pk_aggregation.json"))),
+                "{accepted:?}"
+            );
+            req.committee_threshold += 1;
+            let rejected = handle_pk_aggregation_proof(&prover, req, request.clone()).unwrap_err();
+            assert!(format!("{:?}", rejected.get_err()).contains("C5 request threshold"));
+            assert_eq!(rejected.request(), &request);
+
+            let req = DecryptedSharesAggregationProofRequest {
+                d_share_polys: vec![],
+                plaintext: vec![],
+                params_preset: preset,
+                threshold_m: committee.threshold as u64,
+                threshold_n: committee.n as u64,
+                committee_size: size,
+            };
+            let request = ComputeRequest::zk(
+                ZkRequest::DecryptedSharesAggregation(req.clone()),
+                CorrelationId::new(),
+                E3id::new("threshold-guard", 1),
+            );
+            // A zero-ciphertext batch isolates admission from proof generation.
+            handle_decrypted_shares_aggregation_proof(&prover, req.clone(), request.clone())
+                .unwrap();
+            for (index, mut mismatch) in [req.clone(), req].into_iter().enumerate() {
+                if index == 0 {
+                    mismatch.threshold_m += 1;
+                } else {
+                    mismatch.threshold_n += 1;
+                }
+                let rejected =
+                    handle_decrypted_shares_aggregation_proof(&prover, mismatch, request.clone())
+                        .unwrap_err();
+                assert!(format!("{:?}", rejected.get_err()).contains("C7 request threshold"));
+                assert_eq!(rejected.request(), &request);
+            }
+        }
+    }
 
     #[test]
     #[ignore = "requires E3_TEST_ARTIFACTS_ROOT insecure-64/small artifacts and E3_CUSTOM_BB"]
@@ -2368,11 +2459,5 @@ mod decrypted_shares_aggregation_tests {
                 &artifacts
             )
             .unwrap());
-        let mut mismatch = req;
-        mismatch.threshold_m = committee.h as u64 - 1;
-        let error = handle_decrypted_shares_aggregation_proof(&prover, mismatch, request.clone())
-            .unwrap_err();
-        assert!(format!("{:?}", error.get_err()).contains("C7 request threshold"));
-        assert_eq!(error.request(), &request);
     }
 }

@@ -15,12 +15,7 @@ use tokio::fs;
 
 /// Root of the compiled circuit artifacts: `{workspace}/circuits/bin/`.
 fn circuits_build_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("..")
-        .join("circuits")
-        .join("bin")
+    e3_zk_prover::test_utils::workspace_root().join("circuits/bin")
 }
 
 pub async fn setup_compiled_circuit(backend: &ZkBackend, group: &str, circuit_name: &str) {

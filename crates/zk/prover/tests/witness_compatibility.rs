@@ -17,7 +17,7 @@ use num_bigint::BigInt;
 #[test]
 #[ignore = "requires prepared insecure-64/minimum C6/C7 artifacts"]
 fn c6_c7_zero_products_execute_and_nondefault_widths_reject_fixed_abi() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../circuits/bin");
+    let root = e3_zk_prover::test_utils::workspace_root().join("circuits/bin");
     let active: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(root.join(".active-preset.json")).unwrap())
             .unwrap();

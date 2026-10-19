@@ -44,7 +44,7 @@ use common::find_anvil;
 use e3_events::{CircuitName, E3id, Proof, ProofPayload, ProofType};
 use e3_utils::utility_types::ArcBytes;
 use serde::Deserialize;
-use std::{collections::BTreeMap, path::PathBuf, sync::OnceLock};
+use std::{collections::BTreeMap, sync::OnceLock};
 
 // ── Contract ABI definitions (bytecodes loaded from Hardhat artifacts at runtime) ──
 
@@ -146,8 +146,8 @@ struct SlashingArtifacts {
 }
 
 fn read_artifact(subpath: &str) -> ContractArtifact {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../packages/interfold-contracts/artifacts/contracts")
+    let path = e3_zk_prover::test_utils::workspace_root()
+        .join("packages/interfold-contracts/artifacts/contracts")
         .join(subpath);
     let raw = std::fs::read_to_string(&path).unwrap_or_else(|error| {
         panic!(

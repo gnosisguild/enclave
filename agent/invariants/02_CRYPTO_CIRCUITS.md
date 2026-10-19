@@ -128,6 +128,9 @@ every section.
   explicit name and content lengths. File and directory names are repository-relative UTF-8 paths,
   so moving a source between generator roots changes its identity. Cache reuse and release checks
   reject hashes from another scheme; development hydration retains the published artifact hash.
+  Required source files, source directories, and tool pins must exist. Missing inputs fail the hash
+  operation unless the build supplies that generated file's staged contents. Circuit-group selection
+  order does not change the identity of the same source set.
   CRISP binding updates format an isolated repository-relative package and shared library, so local
   Noir dependencies resolve without changing live dependency files. —
   `crates/zk/build/src/{identity,configuration}.rs`
@@ -241,7 +244,10 @@ every section.
   `crates/zk/prover/src/proof_request/effects/publish_threshold_shares.rs`; `flow-trace/04`
 - The compiled runtime plaintext width is exactly 50 u64 coefficients: `MAX_MSG_NON_ZERO_COEFFS` in
   Noir (`configs/default/mod.nr`, written by `pnpm build:circuits`) and in `zk/config`, and
-  `MESSAGE_COEFFS_COUNT` in `BfvDecryptionVerifier.sol`. **Gap:** no gate compares these copies.
+  `MESSAGE_COEFFS_COUNT` in `BfvDecryptionVerifier.sol`. The Rust builder emits the Noir value from
+  `e3_zk_config::MAX_MSG_NON_ZERO_COEFFS`. The build crate's
+  `shared_operation_material_serves_parity_bounds_and_protocol_renderers` test compares the rendered
+  Noir and Solidity widths with the Rust constant.
 - A CRT consistency equation of the form `lifted[j] == limb[i][j] + quotient[i][j] * q_i` constrains
   nothing on its own: `q_i` is invertible modulo the proof-system prime, so every limb admits a
   quotient that satisfies it. It binds the witnesses only when the lifted value, the limbs **and**

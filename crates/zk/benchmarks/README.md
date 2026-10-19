@@ -5,7 +5,7 @@ links the unpublished `e3-zk-samples` crate as a normal dependency to build arti
 material. Samples are not live application inputs. The runner executes production preparation, the
 production Noir witness generator, and the production BB adapters.
 
-Run `pnpm bench:circuits -- --help` for every flag. This page lists the commands and the measurement
+Run `pnpm bench:circuits --help` for every flag. This page lists the commands and the measurement
 rules that the recorded numbers depend on.
 
 ## Commands
@@ -75,9 +75,10 @@ Rust toolchain, including the `wasm32-unknown-unknown` target. Setup can take se
 
 The CRISP SDK build selects `insecure-64/minimum`. Its partial threshold archive stays under
 `examples/CRISP/circuits/dist/threshold-build`, not the complete node archive in `dist/circuits`.
-Setup restores the selected node pair through the canonical builder, including after a build
-failure. Select a complete archived node pair before setup. Run setup and benchmarks serially: they
-change shared Noir selectors. A failed setup stops the run before protocol proving.
+Setup restores the selected node pair through the canonical builder, including after a build failure
+or `SIGINT`/`SIGTERM`. Restoration completes before setup exits with the signal's failure status.
+Select a complete archived node pair before setup. Run setup and benchmarks serially: they change
+shared Noir selectors. A failed setup stops the run before protocol proving.
 
 The active preset and committee must match the request, and the driver verifies the runtime artifact
 inventory and checksums. To select an archived pair without compiling:
@@ -103,7 +104,8 @@ pnpm bench:circuits replay --input <saved-integration-summary> \
 
 Create the export's parent directory first. Keep the saved integration export and its original
 metadata unchanged. Replay records new EVM measurements; it does not repeat protocol proving or
-include the separately run CRISP setup and test durations.
+include the separately run CRISP setup and test durations. If `--gas-json` supplies a saved protocol
+report, replay preserves its CRISP outcome and rejects a failed or unmeasured CRISP stage.
 
 Replay re-verifies saved folded proofs against matching verification keys; it does not regenerate
 proofs to hide a mismatch, and an explicit selection that disagrees with the export fails. Report

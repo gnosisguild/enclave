@@ -12,6 +12,34 @@ use std::{
     process::Command,
 };
 
+const SOURCE_DIRS: &[&str] = &[
+    "circuits/lib/src/core",
+    "circuits/lib/src/math",
+    "crates/zk/config/src",
+    "crates/zk/build/src",
+    "crates/zk/build/templates",
+    "crates/zk/witness/src",
+    "crates/committee/src",
+    "crates/fhe-params/src",
+    "crates/fhe/src",
+    "crates/polynomial/src",
+    "crates/polynomial/fhe-adapter/src",
+    "crates/parity-matrix/src",
+    "crates/safe/src",
+];
+const SOURCE_FILES: &[&str] = &[
+    "circuits/lib/Nargo.toml",
+    "circuits/lib/src/lib.nr",
+    "circuits/lib/src/configs/mod.nr",
+    "circuits/lib/src/configs/committee/mod.nr",
+    "circuits/lib/src/configs/default/mod.nr",
+    "crates/zk/build/Cargo.toml",
+    "scripts/circuit-constants.ts",
+    "scripts/circuit-build-pairs.json",
+    "packages/interfold-contracts/scripts/protocol/constants.ts",
+    "Cargo.lock",
+];
+
 pub fn toolchain(root: &Path) -> Result<(String, String)> {
     let manifest_path = root.join("crates/zk/prover/Cargo.toml");
     let manifest = fs::read_to_string(&manifest_path)
@@ -56,8 +84,11 @@ pub fn strip_test_modules(source: &str) -> String {
     while i < lines.len() {
         if let Some(capture) = attribute.captures(lines[i]) {
             let indent = &capture[1];
-            let external_module =
-                Regex::new(&format!(r"^{}mod \w+;\s*$", regex::escape(indent))).unwrap();
+            let external_module = Regex::new(&format!(
+                r"^{}(?:pub(?:\([^)]*\))?\s+)?mod \w+;\s*$",
+                regex::escape(indent)
+            ))
+            .unwrap();
             if lines
                 .get(i + 1)
                 .is_some_and(|line| external_module.is_match(line))
@@ -65,8 +96,11 @@ pub fn strip_test_modules(source: &str) -> String {
                 i += 2;
                 continue;
             }
-            let module =
-                Regex::new(&format!(r"^{}mod \w+ \{{\s*$", regex::escape(indent))).unwrap();
+            let module = Regex::new(&format!(
+                r"^{}(?:pub(?:\([^)]*\))?\s+)?mod \w+ \{{\s*$",
+                regex::escape(indent)
+            ))
+            .unwrap();
             if lines.get(i + 1).is_some_and(|line| module.is_match(line)) {
                 if let Some(end) =
                     (i + 2..lines.len()).find(|&end| lines[end] == format!("{indent}}}"))
@@ -159,13 +193,10 @@ fn hash_dir(
         .to_str()
         .context("Source directory path must be UTF-8")?;
     hash_record(hash, b'd', directory, b"");
-    let mut entries: std::collections::BTreeSet<_> = if path.exists() {
-        fs::read_dir(path)?
-            .map(|entry| entry.map(|entry| entry.path()))
-            .collect::<std::io::Result<_>>()?
-    } else {
-        Default::default()
-    };
+    let mut entries: std::collections::BTreeSet<_> = fs::read_dir(path)
+        .with_context(|| format!("Read required source directory {directory}"))?
+        .map(|entry| entry.map(|entry| entry.path()))
+        .collect::<std::io::Result<_>>()?;
     entries.extend(
         updates
             .iter()
@@ -276,51 +307,22 @@ pub fn source_hash_with_updates(
             updates,
         )?;
     }
-    for circuit in artifacts::discover(root, request)? {
+    let mut circuits = artifacts::discover(root, request)?;
+    circuits.sort_by(|left, right| left.path.cmp(&right.path));
+    for circuit in circuits {
         hash_dir(root, &circuit.path, &mut hash, "", false, updates)?;
     }
-    for path in [
-        "circuits/lib/src/core",
-        "circuits/lib/src/math",
-        "crates/zk/config/src",
-        "crates/zk/build/src",
-        "crates/zk/build/templates",
-        "crates/zk/witness/src",
-        "crates/committee/src",
-        "crates/fhe-params/src",
-        "crates/fhe/src",
-        "crates/polynomial/src",
-        "crates/polynomial/fhe-adapter/src",
-        "crates/parity-matrix/src",
-        "crates/safe/src",
-    ] {
+    for path in SOURCE_DIRS {
         hash_dir(root, &root.join(path), &mut hash, "", false, updates)?;
     }
-    if root.join("crates/zk/prover/Cargo.toml").exists()
-        && root.join("crates/zk/prover/versions.json").exists()
-    {
-        let (nargo, bb) = toolchain(root)?;
-        hash_record(&mut hash, b't', "nargo", nargo.as_bytes());
-        hash_record(&mut hash, b't', "bb", bb.as_bytes());
-    }
-    for path in [
-        "circuits/lib/Nargo.toml",
-        "circuits/lib/src/lib.nr",
-        "circuits/lib/src/configs/mod.nr",
-        "circuits/lib/src/configs/committee/mod.nr",
-        "circuits/lib/src/configs/default/mod.nr",
-        "crates/zk/build/Cargo.toml",
-        "scripts/circuit-constants.ts",
-        "scripts/circuit-build-pairs.json",
-        "packages/interfold-contracts/scripts/protocol/constants.ts",
-        "Cargo.lock",
-    ] {
-        if !root.join(path).exists() && !updates.iter().any(|(file, _)| *file == root.join(path)) {
-            continue;
-        }
+    let (nargo, bb) = toolchain(root)?;
+    hash_record(&mut hash, b't', "nargo", nargo.as_bytes());
+    hash_record(&mut hash, b't', "bb", bb.as_bytes());
+    for &path in SOURCE_FILES {
         let mut source = match updates.iter().find(|(file, _)| *file == root.join(path)) {
             Some((_, text)) => text.clone(),
-            None => fs::read_to_string(root.join(path))?,
+            None => fs::read_to_string(root.join(path))
+                .with_context(|| format!("Read required source file {path}"))?,
         };
         if path == "circuits/lib/src/configs/default/mod.nr" {
             source = Regex::new(r"preset: (insecure-64|secure-8192)")?
@@ -355,4 +357,95 @@ pub fn checksum(path: &Path) -> Result<String> {
         hash.update(&buffer[..count]);
     }
     Ok(hex::encode(hash.finalize()))
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+
+    pub(crate) fn seed_sources(root: &Path) {
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+        for path in SOURCE_DIRS.iter().copied().chain([
+            "circuits/lib/src/configs/insecure",
+            "circuits/lib/src/configs/committee/minimum",
+            "circuits/lib/src/configs/committee/micro",
+        ]) {
+            assert!(
+                repo.join(path).is_dir(),
+                "Missing repository source directory {path}"
+            );
+            fs::create_dir_all(root.join(path)).unwrap();
+        }
+        for path in SOURCE_FILES {
+            let dest = root.join(path);
+            fs::create_dir_all(dest.parent().unwrap()).unwrap();
+            if !dest.exists() {
+                fs::copy(repo.join(path), dest).unwrap();
+            }
+        }
+        crate::tests::write_pins(root);
+    }
+
+    #[test]
+    fn source_identity_requires_every_input_and_accepts_projected_generated_files() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join("repository");
+        seed_sources(&root);
+        let request = crate::tests::request();
+        let hash = || source_hash(&root, &request, Some("insecure-64"), Some("minimum"));
+        hash().unwrap();
+        for path in SOURCE_DIRS.iter().chain(SOURCE_FILES).copied().chain([
+            "circuits/lib/src/configs/insecure",
+            "circuits/lib/src/configs/committee/minimum",
+            "crates/zk/prover/Cargo.toml",
+            "crates/zk/prover/versions.json",
+        ]) {
+            let source = root.join(path);
+            let absent = temp.path().join("absent");
+            fs::rename(&source, &absent).unwrap();
+            let result = hash();
+            fs::rename(&absent, &source).unwrap();
+            let error = result.expect_err(path);
+            assert!(format!("{error:#}").contains(path), "{path}: {error:#}");
+        }
+        let selector = root.join("circuits/lib/src/configs/default/mod.nr");
+        let contents = fs::read_to_string(&selector).unwrap();
+        let expected = hash().unwrap();
+        fs::remove_file(&selector).unwrap();
+        assert_eq!(
+            source_hash_with_updates(
+                &root,
+                &request,
+                Some("insecure-64"),
+                Some("minimum"),
+                &[(selector, contents)]
+            )
+            .unwrap(),
+            expected
+        );
+    }
+
+    #[test]
+    fn source_identity_is_independent_of_group_selection_order() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path();
+        seed_sources(root);
+        for group in ["dkg", "threshold", "recursive_aggregation"] {
+            let package = root.join("circuits/bin").join(group).join("example");
+            fs::create_dir_all(&package).unwrap();
+            fs::write(package.join("Nargo.toml"), "[package]\nname = 'example'\n").unwrap();
+        }
+        let mut request = crate::tests::request();
+        let expected = source_hash(root, &request, Some("insecure-64"), Some("minimum")).unwrap();
+        request.groups = crate::GroupSelection::Selected(vec![
+            crate::Group::Threshold,
+            crate::Group::RecursiveAggregation,
+            crate::Group::Dkg,
+            crate::Group::Threshold,
+        ]);
+        assert_eq!(
+            source_hash(root, &request, Some("insecure-64"), Some("minimum")).unwrap(),
+            expected
+        );
+    }
 }

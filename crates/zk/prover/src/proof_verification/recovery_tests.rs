@@ -7,7 +7,6 @@ use e3_config::BBPath;
 use e3_events::{E3RequestComplete, HistoryCollector};
 use e3_slashing::AccusationManager;
 use std::fs;
-use std::path::PathBuf;
 
 #[path = "restart_tests.rs"]
 mod restart;
@@ -172,8 +171,7 @@ fn assert_no_blame(events: &[InterfoldEventData]) {
 
 #[actix::test]
 async fn c0_local_verifier_failures_retry_without_peer_blame() {
-    let artifacts =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../circuits/bin/dkg/target");
+    let artifacts = crate::test_utils::workspace_root().join("circuits/bin/dkg/target");
     let Some(bb) = e3_test_helpers::find_bb().await else {
         eprintln!("skipping C0 recovery test: bb is not installed");
         return;

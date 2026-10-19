@@ -250,11 +250,9 @@ fn replay_rejects_bad_proofs_and_wrong_configuration_before_evm_execution() {
     assert!(!output.join("evm-replay.log").exists());
 }
 
-#[test]
-fn gas_setup_failure_stops_before_protocol_proving_and_keeps_its_own_measurement() {
+fn protocol_root() -> tempfile::TempDir {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path();
-    let output = root.join("output");
     for directory in [
         "scripts",
         "circuits/bin",
@@ -286,6 +284,60 @@ fn gas_setup_failure_stops_before_protocol_proving_and_keeps_its_own_measurement
         &serde_json::json!([]),
     )
     .unwrap();
+    temp
+}
+
+#[test]
+fn replay_preserves_saved_crisp_failures_instead_of_completing_the_report() {
+    let temp = protocol_root();
+    let root = temp.path();
+    fs::create_dir_all(root.join("packages/interfold-contracts")).unwrap();
+    write_json(&root.join("packages/interfold-contracts/package.json"), &serde_json::json!({"scripts":{"hardhat":"node -e \"require('fs').writeFileSync(process.env.BENCHMARK_GAS_OUTPUT, JSON.stringify({bfv_preset:'secure-8192',bfv_committee:'minimum',verify_gas:{dkg:100,dec:200}}))\" --"}})).unwrap();
+    let input = root.join("saved.json");
+    let artifact = serde_json::json!({"proof_hex":"0x01", "public_inputs_hex":format!("0x{}", "00".repeat(32))});
+    write_json(&input, &serde_json::json!({"benchmark_config":{"mode":"secure","committee":"minimum"},"folded_artifacts":{"dkg_aggregator":artifact,"decryption_aggregator":artifact}})).unwrap();
+    for (name, saved, complete) in [
+        (
+            "failed",
+            serde_json::json!({"verify_gas":{"user":300},"crisp":{"measurement":{"time_seconds":2.0,"success":false,"metric":"external_command_wall"},"error":"saved CRISP failure"}}),
+            false,
+        ),
+        (
+            "successful",
+            serde_json::json!({"verify_gas":{"user":300},"crisp":{"measurement":{"time_seconds":2.0,"success":true,"metric":"external_command_wall"},"error":null}}),
+            true,
+        ),
+        (
+            "unmeasured",
+            serde_json::json!({"verify_gas":{"user":300},"crisp":{"measurement":{"time_seconds":null,"success":null,"metric":"external_command_wall"},"error":null}}),
+            false,
+        ),
+        (
+            "raw-export",
+            serde_json::json!({"verify_gas":{"user":300},"preset":"secure-8192"}),
+            true,
+        ),
+    ] {
+        let gas = root.join(format!("{name}.json"));
+        write_json(&gas, &saved).unwrap();
+        let output = root.join(name);
+        fs::create_dir_all(&output).unwrap();
+        let result = protocol::replay(root, &output, &input, None, None, Some(&gas));
+        assert_eq!(result.is_ok(), complete, "{name}: {result:?}");
+        let result = protocol::read_json(&output.join("protocol_results.json")).unwrap();
+        assert_eq!(result["complete"], complete, "{name}");
+        assert_eq!(result["verify_gas"]["user"], 300);
+        if saved["crisp"].is_object() {
+            assert_eq!(result["crisp"], saved["crisp"], "{name}");
+        }
+    }
+}
+
+#[test]
+fn gas_setup_failure_stops_before_protocol_proving_and_keeps_its_own_measurement() {
+    let temp = protocol_root();
+    let root = temp.path();
+    let output = root.join("output");
     write_json(&root.join("package.json"), &serde_json::json!({"scripts":{"bench:crisp:prepare":"node -e \"require('fs').writeFileSync('setup-started', ''); process.exit(17)\""}})).unwrap();
     let cfg = protocol::Configuration {
         mode: "secure".into(),

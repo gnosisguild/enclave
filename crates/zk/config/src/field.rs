@@ -13,7 +13,7 @@ use num_traits::Zero;
 use std::fmt::Display;
 use std::str::FromStr;
 
-pub fn join_display<T: Display>(values: &[T], separator: &str) -> String {
+pub(crate) fn join_display<T: Display>(values: &[T], separator: &str) -> String {
     values
         .iter()
         .map(ToString::to_string)

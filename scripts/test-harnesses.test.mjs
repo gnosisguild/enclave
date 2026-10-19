@@ -35,6 +35,7 @@ if (args[0] === 'wasm:build') { fail('wasm'); write('wasm-ready') }
 else if (args.includes('build:sdk')) {
   requireFile('wasm-ready')
   execFileSync(process.execPath, [path.join(root, 'examples/CRISP/scripts/build-presets.mjs')], { stdio: 'inherit' })
+  if (process.env.INTERRUPT_SIGNAL) process.kill(process.ppid, process.env.INTERRUPT_SIGNAL)
   fail('sdk')
   write('sdk-ready')
 } else if (args[0] === 'build:circuits') {
@@ -78,6 +79,20 @@ else if (args.includes('build:sdk')) {
     if (failed !== 'restore') assert.deepEqual(JSON.parse(readFileSync(active)), { preset: 'secure-8192', committee: 'micro' })
     if (!failed) assert.equal(ballot().status, 0)
     else assert.equal(existsSync(join(dir, 'packages/interfold-contracts/dist/tasks/utils.js')), false)
+  }
+  for (const [signal, code] of [
+    ['SIGINT', 130],
+    ['SIGTERM', 143],
+  ]) {
+    writeFileSync(active, JSON.stringify({ preset: 'secure-8192', committee: 'micro' }))
+    const result = spawnSync(process.execPath, ['scripts/prepare-crisp-gas.mjs'], {
+      cwd: dir,
+      env: { ...env, INTERRUPT_SIGNAL: signal },
+      encoding: 'utf8',
+      timeout: 15000,
+    })
+    assert.equal(result.status, code, result.stdout + result.stderr)
+    assert.deepEqual(JSON.parse(readFileSync(active)), { preset: 'secure-8192', committee: 'micro' })
   }
 })
 
