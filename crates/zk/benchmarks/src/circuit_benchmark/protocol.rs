@@ -25,7 +25,7 @@ pub(crate) struct Configuration {
     pub bb_binary: Option<PathBuf>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct Outcome {
     pub measurement: Stage,
     pub error: Option<String>,
@@ -493,6 +493,20 @@ pub(crate) fn collect(
 
 fn apply_user_gas(results: &mut Results, document: &serde_json::Value) -> Result<()> {
     results.verify_gas.user = document["verify_gas"]["user"].as_u64();
+    if let Some(outcome) = document.get("crisp") {
+        results.crisp =
+            serde_json::from_value(outcome.clone()).context("Invalid saved CRISP outcome")?;
+        if results.crisp.measurement.success != Some(true) || results.crisp.error.is_some() {
+            bail!(
+                "Saved CRISP stage did not succeed: {}",
+                results
+                    .crisp
+                    .error
+                    .as_deref()
+                    .unwrap_or("no successful measurement")
+            );
+        }
+    }
     if results.verify_gas.user.is_none() {
         bail!("CRISP export omitted measured user verifier gas");
     }

@@ -337,7 +337,8 @@
         "e3-request",
         "e3-slashing",
         "e3-utils",
-        "e3-zk-helpers"
+        "e3-zk-config",
+        "e3-zk-witness"
       ],
       "tests": "cargo test -p e3-zk-prover (in-module tests and src/*_tests.rs). Integration: cargo test -p e3-zk-prover --features integration-tests (tests/integration_tests.rs). build.rs runs scripts/build_fixtures.sh unless E3_ZK_PROVER_SKIP_FIXTURE_BUILD=1 (build.rs:25). Tests marked #[ignore] need prepared artifacts; their message names pnpm rust:test:proofs.",
       "unverified": [
@@ -347,116 +348,6 @@
         "NodeProofAggregator persists through e3-data Repositories (node_proof_aggregation/actor.rs:45); whether that store is sled-backed was not traced (crates/data/src/lib.rs:18 declares sled_db).",
         "The commitment_links/*.rs consistency rules and the ECDSA checks in share_verification/transitions/ecdsa.rs were not read beyond their names.",
         "The TaskPool, retry and memory logic in crates/multithread was not read beyond the dispatch path."
-      ]
-    },
-    {
-      "id": "e3-zk-helpers",
-      "kind": "crate",
-      "path": "crates/zk-helpers",
-      "one_line": "Builds the Noir input JSON and output layouts for each ZK circuit from BFV keys, ciphertexts and shares.",
-      "explain": "A ZK circuit can only prove something when its inputs have exactly the shape the Noir code expects. This crate computes those inputs from BFV data (public keys, secret and smudging shares, ciphertexts, decryption shares) by converting polynomials to CRT limbs and serializing them as JSON. Without it, zk-prover would have no witness to prove, and the Noir configs would not match the parameters the nodes run.",
-      "analogy": "Like a prep cook who measures each ingredient into the exact portion on the recipe card, so the oven gets only what it expects.",
-      "actors": [],
-      "consumes": [],
-      "emits": [],
-      "state": [],
-      "key_types": [
-        {
-          "name": "PkCircuit",
-          "what": "C0: BFV public key proof (NAME pk)",
-          "ref": "crates/zk-helpers/src/circuits/dkg/pk/circuit.rs@15@impl Circuit for PkCircuit"
-        },
-        {
-          "name": "PkGenerationCircuit",
-          "what": "C1: threshold public key share",
-          "ref": "crates/zk-helpers/src/circuits/threshold/pk_generation/circuit.rs@16@impl Circuit for PkGenerationCircuit"
-        },
-        {
-          "name": "ShareComputationCircuit",
-          "what": "C2a and C2b: DKG shares; dkg_input_type picks SecretKey (C2a) or SmudgingNoise (C2b)",
-          "ref": "crates/zk-helpers/src/circuits/dkg/share_computation/circuit.rs@18@impl Circuit for ShareComputationCircuit"
-        },
-        {
-          "name": "ShareEncryptionCircuit",
-          "what": "C3: encrypted shares per recipient, used for SK and smudging shares",
-          "ref": "crates/zk-helpers/src/circuits/dkg/share_encryption/circuit.rs@22@impl Circuit for ShareEncryptionCircuit"
-        },
-        {
-          "name": "ShareDecryptionCircuit (dkg)",
-          "what": "C4: recipient decrypts received shares (NAME share-decryption); the same struct name as the threshold one",
-          "ref": "crates/zk-helpers/src/circuits/dkg/share_decryption/circuit.rs@19@impl Circuit for ShareDecryptionCircuit"
-        },
-        {
-          "name": "PkAggregationCircuit",
-          "what": "C5: aggregated public key",
-          "ref": "crates/zk-helpers/src/circuits/threshold/pk_aggregation/circuit.rs@17@impl Circuit for PkAggregationCircuit"
-        },
-        {
-          "name": "ShareDecryptionCircuit (threshold)",
-          "what": "C6: decryption share (NAME threshold-share-decryption)",
-          "ref": "crates/zk-helpers/src/circuits/threshold/share_decryption/circuit.rs@35@impl Circuit for ShareDecryptionCircuit"
-        },
-        {
-          "name": "DecryptedSharesAggregationCircuit",
-          "what": "C7: plaintext from decryption shares",
-          "ref": "crates/zk-helpers/src/circuits/threshold/decrypted_shares_aggregation/circuit.rs@17@impl Circuit for DecryptedSharesAggregationCircuit"
-        },
-        {
-          "name": "UserDataEncryptionCircuit",
-          "what": "not numbered C0-C7; its inputs are computed by e3-bfv-client",
-          "ref": "crates/zk-helpers/src/circuits/threshold/user_data_encryption/circuit.rs@15@impl Circuit for UserDataEncryptionCircuit"
-        },
-        {
-          "name": "CircuitName",
-          "what": "e3-events' enum (zk-prover imports it) that gives the C-numbers; both share-decryption circuits map to the share_decryption string and are told apart by group dir",
-          "ref": "crates/events/src/interfold_event/proof.rs@108@pub enum CircuitName"
-        }
-      ],
-      "read_first": [
-        {
-          "why": "module tree: the circuits, the circuit metadata, encoding and packing",
-          "ref": "crates/zk-helpers/src/lib.rs@7@pub mod circuits;"
-        },
-        {
-          "why": "the metadata contract: NAME, PREFIX, supported parameter, DKG input type",
-          "ref": "crates/zk-helpers/src/metadata.rs@12@pub trait Circuit: Send + Sync {"
-        },
-        {
-          "why": "one sub-result: compute from preset and data, then to_json",
-          "ref": "crates/zk-helpers/src/circuits/computation.rs@25@pub trait Computation: Sized {"
-        },
-        {
-          "why": "the per-circuit entry point: bounds, bits and inputs",
-          "ref": "crates/zk-helpers/src/circuits/dkg/pk/computation.rs@33@impl CircuitComputation for PkCircuit"
-        }
-      ],
-      "rust_patterns": [
-        {
-          "pattern": "trait-def",
-          "note": "Computation: compute from preset and data, then serialize with to_json",
-          "ref": "crates/zk-helpers/src/circuits/computation.rs@25@pub trait Computation: Sized {"
-        },
-        {
-          "pattern": "trait-impl",
-          "note": "Circuit trait implemented with associated consts (NAME, PREFIX, SUPPORTED_PARAMETER)",
-          "ref": "crates/zk-helpers/src/circuits/dkg/pk/circuit.rs@15@impl Circuit for PkCircuit {"
-        },
-        {
-          "pattern": "result-question-mark",
-          "note": "polynomial conversion errors bubble up with ?",
-          "ref": "crates/zk-helpers/src/circuits/dkg/pk/computation.rs@148@fhe_poly_to_crt_centered(&data.public_key.c[0], moduli)?"
-        },
-        {
-          "pattern": "thiserror-enum",
-          "note": "CircuitsErrors derives Error with per-variant messages",
-          "ref": "crates/zk-helpers/src/circuits/errors.rs@16@pub enum CircuitsErrors"
-        }
-      ],
-      "depends_on": ["e3-fhe-params", "e3-parity-matrix", "e3-polynomial", "e3-safe"],
-      "tests": "cargo test -p e3-zk-helpers (in-module #[cfg(test)] tests in each circuit file). The artifact CLI is the e3-zk-artifacts crate in crates/zk/cli.",
-      "unverified": [
-        "The UserDataEncryption proof path was traced only as far as its input call in crates/bfv-client/src/client.rs:129.",
-        "The C-number labels come from doc comments and from the Provable::circuit impls in zk-prover; I did not check them against the Noir sources under circuits/."
       ]
     }
   ]

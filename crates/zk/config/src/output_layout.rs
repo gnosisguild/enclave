@@ -53,14 +53,6 @@ impl CircuitOutputLayout {
         }
     }
 
-    /// Look up a field index by name.
-    pub fn field_index(&self, name: &str) -> Option<usize> {
-        match self {
-            CircuitOutputLayout::Fixed { fields } => fields.iter().position(|f| f.name == name),
-            _ => None,
-        }
-    }
-
     /// Extract a named output field from raw `public_signals` bytes.
     ///
     /// Return values sit at the **end** of `public_signals`, after any
@@ -78,35 +70,6 @@ impl CircuitOutputLayout {
         let output_start = public_signals.len() - total_output_bytes;
         let offset = output_start + idx * FIELD_BYTE_LEN;
         Some(&public_signals[offset..offset + FIELD_BYTE_LEN])
-    }
-
-    /// Extract all output fields from raw `public_signals` bytes.
-    ///
-    /// Returns a vec of `(name, &[u8])` pairs in field order.
-    pub fn extract_all<'a>(
-        &self,
-        public_signals: &'a [u8],
-    ) -> Option<Vec<(&'static str, &'a [u8])>> {
-        let fields = match self {
-            CircuitOutputLayout::Fixed { fields } => fields,
-            CircuitOutputLayout::None => return Some(Vec::new()),
-            CircuitOutputLayout::Dynamic => return None,
-        };
-        let total_output_bytes = fields.len() * FIELD_BYTE_LEN;
-        if public_signals.len() < total_output_bytes {
-            return None;
-        }
-        let output_start = public_signals.len() - total_output_bytes;
-        Some(
-            fields
-                .iter()
-                .enumerate()
-                .map(|(i, f)| {
-                    let offset = output_start + i * FIELD_BYTE_LEN;
-                    (f.name, &public_signals[offset..offset + FIELD_BYTE_LEN])
-                })
-                .collect(),
-        )
     }
 }
 
@@ -170,14 +133,6 @@ impl CircuitInputLayout {
         match self {
             CircuitInputLayout::Fixed { fields } => Some(fields.len()),
             CircuitInputLayout::None => Some(0),
-        }
-    }
-
-    /// Look up a field index by name.
-    pub fn field_index(&self, name: &str) -> Option<usize> {
-        match self {
-            CircuitInputLayout::Fixed { fields } => fields.iter().position(|f| f.name == name),
-            _ => None,
         }
     }
 

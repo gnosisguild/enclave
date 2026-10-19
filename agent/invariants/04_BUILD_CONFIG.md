@@ -37,7 +37,8 @@ every section.
 - CRISP's partial threshold build writes to `examples/CRISP/circuits/dist/threshold-build`, not the
   complete node archive in `dist/circuits`. `pnpm bench:crisp:prepare` builds the gas test's WASM
   and SDK dependencies, restores the selected node pair through the canonical builder even after a
-  build failure, then compiles the contracts and TypeScript tasks. Gas collection runs this setup
+  build failure or `SIGINT`/`SIGTERM`, then compiles the contracts and TypeScript tasks unless
+  interrupted. Gas collection runs this setup
   before protocol proving and measures it separately from verifier gas. —
   `examples/CRISP/scripts/build-presets.mjs`; `scripts/prepare-crisp-gas.mjs`;
   `crates/zk/benchmarks/src/circuit_benchmark/protocol.rs`

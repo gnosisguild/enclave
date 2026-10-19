@@ -152,6 +152,50 @@ fn report_reads_both_schemas_without_relabeling_metrics_or_confusing_ude_wrapper
 }
 
 #[test]
+fn report_excludes_failed_schema_two_phase_durations() {
+    let mut failed = Record::new(
+        Case::Ct0,
+        "insecure",
+        e3_zk_prover::CircuitVariant::Recursive,
+    );
+    let failure: anyhow::Result<()> = Err(anyhow::anyhow!("phase failed"));
+    for stage in [
+        &mut failed.preparation,
+        &mut failed.compilation,
+        &mut failed.execution,
+        &mut failed.vk_generation,
+        &mut failed.proof_generation,
+        &mut failed.verification,
+    ] {
+        stage.finish(std::time::Duration::from_secs(3), &failure);
+    }
+    failed.error = Some("phase failed".into());
+    let mut successful = Record::new(
+        Case::Ct1,
+        "insecure",
+        e3_zk_prover::CircuitVariant::Recursive,
+    );
+    successful.proof_generation.success = Some(true);
+    successful.proof_generation.time_seconds = Some(0.0);
+    successful.verification.success = Some(true);
+    successful.verification.time_seconds = Some(1.0);
+    let data = report::Data {
+        leaves: [failed, successful]
+            .into_iter()
+            .map(|record| report::parse_leaf(serde_json::to_value(record).unwrap()).unwrap())
+            .collect(),
+        metadata: serde_json::Value::Null,
+        integration: serde_json::Value::Null,
+        gas: serde_json::Value::Null,
+        files: vec![],
+    };
+    let rendered = report::render(&data).unwrap();
+    assert!(rendered.contains("| threshold/user_data_encryption_ct0 | external_bb_prove_wall | N/A | N/A | N/A | N/A | N/A | N/A | failed |"));
+    assert!(rendered.contains("prove time: N/A s; verify time: N/A s."));
+    assert!(rendered.contains("| threshold/user_data_encryption_ct1 | external_bb_prove_wall | N/A | N/A | N/A | N/A | 0.000000 | 1.000000 | verified |"));
+}
+
+#[test]
 fn report_only_uses_saved_data_and_does_not_overwrite_its_input() {
     let temp = tempfile::tempdir().unwrap();
     let saved = temp.path().join("saved");
@@ -206,11 +250,9 @@ fn replay_rejects_bad_proofs_and_wrong_configuration_before_evm_execution() {
     assert!(!output.join("evm-replay.log").exists());
 }
 
-#[test]
-fn gas_setup_failure_stops_before_protocol_proving_and_keeps_its_own_measurement() {
+fn protocol_root() -> tempfile::TempDir {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path();
-    let output = root.join("output");
     for directory in [
         "scripts",
         "circuits/bin",
@@ -242,6 +284,60 @@ fn gas_setup_failure_stops_before_protocol_proving_and_keeps_its_own_measurement
         &serde_json::json!([]),
     )
     .unwrap();
+    temp
+}
+
+#[test]
+fn replay_preserves_saved_crisp_failures_instead_of_completing_the_report() {
+    let temp = protocol_root();
+    let root = temp.path();
+    fs::create_dir_all(root.join("packages/interfold-contracts")).unwrap();
+    write_json(&root.join("packages/interfold-contracts/package.json"), &serde_json::json!({"scripts":{"hardhat":"node -e \"require('fs').writeFileSync(process.env.BENCHMARK_GAS_OUTPUT, JSON.stringify({bfv_preset:'secure-8192',bfv_committee:'minimum',verify_gas:{dkg:100,dec:200}}))\" --"}})).unwrap();
+    let input = root.join("saved.json");
+    let artifact = serde_json::json!({"proof_hex":"0x01", "public_inputs_hex":format!("0x{}", "00".repeat(32))});
+    write_json(&input, &serde_json::json!({"benchmark_config":{"mode":"secure","committee":"minimum"},"folded_artifacts":{"dkg_aggregator":artifact,"decryption_aggregator":artifact}})).unwrap();
+    for (name, saved, complete) in [
+        (
+            "failed",
+            serde_json::json!({"verify_gas":{"user":300},"crisp":{"measurement":{"time_seconds":2.0,"success":false,"metric":"external_command_wall"},"error":"saved CRISP failure"}}),
+            false,
+        ),
+        (
+            "successful",
+            serde_json::json!({"verify_gas":{"user":300},"crisp":{"measurement":{"time_seconds":2.0,"success":true,"metric":"external_command_wall"},"error":null}}),
+            true,
+        ),
+        (
+            "unmeasured",
+            serde_json::json!({"verify_gas":{"user":300},"crisp":{"measurement":{"time_seconds":null,"success":null,"metric":"external_command_wall"},"error":null}}),
+            false,
+        ),
+        (
+            "raw-export",
+            serde_json::json!({"verify_gas":{"user":300},"preset":"secure-8192"}),
+            true,
+        ),
+    ] {
+        let gas = root.join(format!("{name}.json"));
+        write_json(&gas, &saved).unwrap();
+        let output = root.join(name);
+        fs::create_dir_all(&output).unwrap();
+        let result = protocol::replay(root, &output, &input, None, None, Some(&gas));
+        assert_eq!(result.is_ok(), complete, "{name}: {result:?}");
+        let result = protocol::read_json(&output.join("protocol_results.json")).unwrap();
+        assert_eq!(result["complete"], complete, "{name}");
+        assert_eq!(result["verify_gas"]["user"], 300);
+        if saved["crisp"].is_object() {
+            assert_eq!(result["crisp"], saved["crisp"], "{name}");
+        }
+    }
+}
+
+#[test]
+fn gas_setup_failure_stops_before_protocol_proving_and_keeps_its_own_measurement() {
+    let temp = protocol_root();
+    let root = temp.path();
+    let output = root.join("output");
     write_json(&root.join("package.json"), &serde_json::json!({"scripts":{"bench:crisp:prepare":"node -e \"require('fs').writeFileSync('setup-started', ''); process.exit(17)\""}})).unwrap();
     let cfg = protocol::Configuration {
         mode: "secure".into(),

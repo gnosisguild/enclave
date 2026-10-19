@@ -27,7 +27,7 @@ pub fn deterministic_crp_crt_polynomial(
 }
 
 /// Builds the CRP matrix (deterministic common random polynomial) constant string for Noir.
-pub fn crp_matrix_constant_string(
+pub(crate) fn crp_matrix_constant_string(
     threshold_params: &std::sync::Arc<fhe::bfv::BfvParameters>,
 ) -> Result<String, ConfigError> {
     let a = deterministic_crp_crt_polynomial(threshold_params)?;

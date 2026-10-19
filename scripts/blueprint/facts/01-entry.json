@@ -126,7 +126,6 @@
         "e3-logger",
         "e3-trbfv",
         "e3-fhe-params",
-        "e3-zk-helpers",
         "e3-init",
         "e3-daemon-server",
         "e3-utils",

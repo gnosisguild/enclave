@@ -613,8 +613,7 @@ mod tests {
         identity::check_tools(&repo, true, true).unwrap();
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path();
-        // The formatter probe reads the pinned tool versions from these manifests.
-        crate::tests::write_pins(root);
+        identity::tests::seed_sources(root);
         fs::create_dir_all(root.join("scripts")).unwrap();
         fs::write(
             root.join("scripts/circuit-build-pairs.json"),

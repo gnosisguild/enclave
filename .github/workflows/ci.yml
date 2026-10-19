@@ -489,6 +489,10 @@ jobs:
           cargo nextest run -p e3-entrypoint --test reset_data_guard --test purge_guard --test validate_older_schema --test
           validate_snapshot_errors -p e3-cli --bins --test cli_secrets
 
+      - name: Run circuit benchmark unit tests
+        if: matrix.suite == 'doc'
+        run: pnpm test:circuit-bench
+
       # `parallel` is off by default, so the library tests compile the sequential fallback of
       # `recompute_commitments` and the rayon body of that function ships untested. This step is
       # what exercises it. Scoped with `-p` rather than `--all-features`: the feature is the one
@@ -1673,6 +1677,10 @@ jobs:
             test -f "$artifact" || { echo "Missing required artifact: $artifact"; exit 1; }
             echo "  ok $artifact"
           done
+
+      - name: Check C6/C7 witness and ABI compatibility
+        if: matrix.leg == 'suites'
+        run: cargo test --locked -p e3-zk-prover --test witness_compatibility -- --include-ignored --nocapture
 
       - name: Run ZK prover e2e tests
         if: matrix.leg == 'suites'

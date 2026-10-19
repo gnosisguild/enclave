@@ -46,8 +46,8 @@ use serde::Serialize;
 use serde_json::json;
 
 fn recursive_aggregation_compiled_json_path(circuit: CircuitName) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../circuits/bin")
+    e3_zk_prover::test_utils::workspace_root()
+        .join("circuits/bin")
         .join(circuit.group())
         .join(circuit.as_str())
         .join("target")
@@ -55,8 +55,8 @@ fn recursive_aggregation_compiled_json_path(circuit: CircuitName) -> PathBuf {
 }
 
 fn c3_fold_json_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../circuits/bin/recursive_aggregation/c3_fold/target/c3_fold.json")
+    e3_zk_prover::test_utils::workspace_root()
+        .join("circuits/bin/recursive_aggregation/c3_fold/target/c3_fold.json")
 }
 
 fn c3_fold_total_slots_from_compiled_json() -> usize {

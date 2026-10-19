@@ -11,7 +11,7 @@ use ark_ff::{BigInteger, PrimeField};
 use e3_zk_witness::compute_vk_hash;
 use std::time::{Duration, SystemTime};
 
-fn request() -> Request {
+pub(crate) fn request() -> Request {
     Request {
         operation: Operation::Build,
         preset: PresetSelection::Single(BfvPreset::InsecureThreshold64),
@@ -322,7 +322,7 @@ fn age_files(root: &Path, relatives: &[&str]) {
 fn source_identity_tracks_inputs_not_generated_selections_or_tests() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path();
-    fs::create_dir_all(root.join("crates/zk/build/src")).unwrap();
+    identity::tests::seed_sources(root);
     let opts = request();
     let hash = || identity::source_hash(root, &opts, Some("insecure-64"), Some("micro")).unwrap();
     let config = "circuits/lib/src/configs/insecure/threshold.nr";
@@ -350,8 +350,10 @@ fn source_identity_tracks_inputs_not_generated_selections_or_tests() {
             "pub fn bound() -> u64 { 7 }\n#[cfg(test)]\nmod tests {\n    fn sample() {}\n}\n",
         );
         let before = hash();
-        write(root, path, "pub fn bound() -> u64 { 7 }\n#[cfg(test)]\nmod tests {\n    fn another_sample() {}\n}\n");
-        assert_eq!(hash(), before, "test-only edit of {path}");
+        for visibility in ["", "pub ", "pub(crate) ", "pub(super) "] {
+            write(root, path, format!("pub fn bound() -> u64 {{ 7 }}\n#[cfg(test)]\n{visibility}mod tests {{\n    fn another_sample() {{}}\n}}\n"));
+            assert_eq!(hash(), before, "test-only edit of {path} ({visibility})");
+        }
         write(root, path, "pub fn bound() -> u64 { 8 }\n#[cfg(test)]\nmod tests {\n    fn another_sample() {}\n}\n");
         assert_ne!(hash(), before, "generator edit of {path}");
     }
@@ -439,6 +441,7 @@ fn source_identity_frames_file_boundaries_and_source_roots() {
         let first = tempfile::tempdir().unwrap();
         let second = tempfile::tempdir().unwrap();
         for (root, files) in [(first.path(), left), (second.path(), right)] {
+            identity::tests::seed_sources(root);
             for (path, contents) in files {
                 write(root, path, contents);
             }
@@ -454,6 +457,7 @@ fn source_identity_frames_file_boundaries_and_source_roots() {
 fn source_identity_tracks_external_pins_and_pinned_tools() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path();
+    identity::tests::seed_sources(root);
     let opts = request();
     let lock = "version = 3\n[[package]]\nname = \"e3-example\"\nversion = \"0.14.0\"\ndependencies = [\"external\"]\n[[package]]\nname = \"external\"\nversion = \"1.0.0\"\nsource = \"registry+https://github.com/rust-lang/crates.io-index\"\nchecksum = \"1111\"\n";
     write(root, "Cargo.lock", lock);
@@ -631,6 +635,40 @@ fn shared_operation_material_serves_parity_bounds_and_protocol_renderers() {
         "{:#x}",
         params.get(BfvPreset::SecureThreshold8192).config_id
     )));
+    let selection = configuration::prepare_selection(
+        root,
+        BfvPreset::InsecureThreshold64,
+        CiphernodesCommitteeSize::Minimum,
+        true,
+    )
+    .unwrap();
+    let selector = &selection
+        .noir
+        .iter()
+        .find(|(path, _)| path.ends_with("configs/default/mod.nr"))
+        .unwrap()
+        .1;
+    let declarations = configuration::declarations(selector);
+    let width = declarations["MAX_MSG_NON_ZERO_COEFFS"]
+        .split('=')
+        .nth(1)
+        .unwrap()
+        .trim()
+        .trim_end_matches(';')
+        .parse::<usize>()
+        .unwrap();
+    assert_eq!(width, e3_zk_config::MAX_MSG_NON_ZERO_COEFFS);
+    let verifier = fs::read_to_string(
+        repo.join("packages/interfold-contracts/contracts/verifiers/bfv/BfvDecryptionVerifier.sol"),
+    )
+    .unwrap();
+    let width = regex::Regex::new(r"\bMESSAGE_COEFFS_COUNT\s*=\s*(\d+)\s*;")
+        .unwrap()
+        .captures(&verifier)
+        .unwrap()[1]
+        .parse::<usize>()
+        .unwrap();
+    assert_eq!(width, e3_zk_config::MAX_MSG_NON_ZERO_COEFFS);
 }
 
 #[test]
