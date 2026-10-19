@@ -10,7 +10,7 @@
 
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use e3_config::ProgramConfig;
-use std::{env, path::Path};
+use std::{env, io::Write, path::Path};
 use tokio::{fs, process::Command, signal};
 
 /// The binary of the project's `runner/` crate.
@@ -71,13 +71,19 @@ pub async fn compile(config: &ProgramConfig, dev: Option<bool>) -> Result<()> {
         return run(&cwd, "cargo", &["build", "--bin", RUNNER_BIN], &[]).await;
     }
     let environment = openvm_environment(config)?;
-    run(
-        &cwd,
-        "bash",
-        &["-c", OPENVM_COMPILE, "openvm-compile.sh"],
-        &environment,
-    )
-    .await
+    // The script reaches bash as a file, not as an argument, so its text stays out of the process
+    // list.
+    let mut script = tempfile::Builder::new()
+        .prefix("openvm-compile")
+        .suffix(".sh")
+        .tempfile()
+        .context("failed to create the OpenVM compile script")?;
+    script
+        .write_all(OPENVM_COMPILE.as_bytes())
+        .and_then(|()| script.flush())
+        .context("failed to write the OpenVM compile script")?;
+    let script_path = script.path().to_string_lossy().into_owned();
+    run(&cwd, "bash", &[&script_path], &environment).await
 }
 
 pub async fn start(config: &ProgramConfig, dev: Option<bool>) -> Result<()> {
@@ -140,8 +146,7 @@ async fn ensure_project(cwd: &Path) -> Result<()> {
 
 /// Runs `program` in `cwd` and waits for it. Ctrl-C stops it.
 ///
-/// Errors name only `program`: the compile script's source is an argument, and an argument may
-/// hold a credential.
+/// Errors name only `program`, never `args`: an argument may hold a credential.
 async fn run(
     cwd: &Path,
     program: &str,

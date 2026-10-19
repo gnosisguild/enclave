@@ -149,8 +149,8 @@
       ],
       "read_first": [
         {
-          "why": "the entry point: argument parsing and the choice between the two modes",
-          "ref": "crates/program-runner/src/lib.rs@27@pub fn run(processor: FHEProcessor, policy: InputPolicy) -> Result<()> {"
+          "why": "the entry point: the argument that picks one of the two modes",
+          "ref": "crates/program-runner/src/lib.rs@38@fn mode_from(args: impl IntoIterator<Item = OsString>) -> Result<Mode> {"
         },
         {
           "why": "the dev mode: mock proof server",

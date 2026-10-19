@@ -15,7 +15,7 @@
         {
           "name": ".interfold/caches folder in the project directory, deleted by `program cache purge`",
           "where": "disk",
-          "ref": "crates/cli/src/program_support.rs@115@let caches = env::current_dir()?"
+          "ref": "crates/cli/src/program_support.rs@121@let caches = env::current_dir()?"
         }
       ],
       "key_types": [
@@ -106,12 +106,12 @@
         {
           "pattern": "tokio-select",
           "note": "the child process races against Ctrl-C, which kills it",
-          "ref": "crates/cli/src/program_support.rs@159@tokio::select! {"
+          "ref": "crates/cli/src/program_support.rs@164@tokio::select! {"
         },
         {
           "pattern": "unit-test",
           "note": "checks that --dev overrides program.dev and that OpenVM is the default",
-          "ref": "crates/cli/src/program_support.rs@177@fn the_dev_flag_overrides_the_configuration_and_openvm_is_the_default() {"
+          "ref": "crates/cli/src/program_support.rs@182@fn the_dev_flag_overrides_the_configuration_and_openvm_is_the_default() {"
         }
       ],
       "depends_on": [
