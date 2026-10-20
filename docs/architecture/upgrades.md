@@ -179,9 +179,10 @@ Reset clears schema/role markers and leaves identity-only store as the explicit 
 exception; next start stamps new role/schema and resyncs from deploy_block. Clearing only store or
 logs is invalid. This is also the supported full↔bootstrap role change. DAppNode's historical
 v0.2.3 bridge atomically renames `.enclave` to `.interfold`, preserves identities, and stamps schema
-1 for shipped v0.1.8 data; ambiguous dual roots fail closed. Container state must stay in configured
-persistent volume; entrypoint refuses competing state locations rather than initializing another
-identity.
+1 for shipped v0.1.8 data; ambiguous dual roots fail closed. The current Mainnet and Sepolia
+packages migrate no `.enclave` root; each keeps its own `/data` volume and refuses a saved
+configuration for another network. Container state must stay in configured persistent volume;
+entrypoint refuses competing state locations rather than initializing another identity.
 
 The image entrypoint, not baked image metadata, supplies E3_CONFIG_DIR/E3_DATA_DIR for the
 persistent `/home/ciphernode/.local/share/interfold` volume. Explicit `--entrypoint interfold` keeps
