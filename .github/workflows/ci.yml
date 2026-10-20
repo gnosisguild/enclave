@@ -73,6 +73,7 @@ jobs:
       integration_prebuild: ${{ steps.jobs.outputs.integration_prebuild }}
       zk_prover_integration: ${{ steps.jobs.outputs.zk_prover_integration }}
       build_interfold_cli: ${{ steps.jobs.outputs.build_interfold_cli }}
+      dappnode: ${{ steps.jobs.outputs.dappnode }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -181,6 +182,11 @@ jobs:
               - '.dockerignore'
               - '!**/*.md'
               - '!**/*.mdx'
+            # The DAppNode images build from the repository root and copy the deployment manifest.
+            dappnode:
+              - 'dappnode/**'
+              - 'deployments/manifest.json'
+              - '!**/*.md'
             # Only the workflow, its path filters, and the local actions that it runs. Other
             # workflows, the PR template, and `.github/scripts` do not change what these jobs
             # produce.
@@ -226,6 +232,7 @@ jobs:
           INTEGRATION="${{ steps.filter.outputs.integration_tests }}"
           NET="${{ steps.filter.outputs.net }}"
           DOCKER="${{ steps.filter.outputs.docker }}"
+          DAPPNODE="${{ steps.filter.outputs.dappnode }}"
           CI="${{ steps.filter.outputs.ci }}"
           TOOLING="${{ steps.filter.outputs.tooling }}"
           OPENVM_WORKER="${{ steps.filter.outputs.openvm_worker }}"
@@ -251,6 +258,7 @@ jobs:
           # The rust jobs already compile the workspace, so the image build only
           # needs to run when the Dockerfiles or their build context change.
           echo "docker_ciphernode=$(any $FORCE $DOCKER $CI)" >> $GITHUB_OUTPUT
+          echo "dappnode=$(any $FORCE $DAPPNODE $CI)" >> $GITHUB_OUTPUT
           echo "net=$(any $FORCE $NET $CI)" >> $GITHUB_OUTPUT
           echo "init=$(any $FORCE $TEMPLATES $RUST $CONTRACTS $CI $TOOLING)" >> $GITHUB_OUTPUT
           # Both feed template_integration, so each must cover every path that
@@ -304,6 +312,25 @@ jobs:
           PATH="/usr/bin:$PATH" npm test --prefix dappnode
       - name: Test the ciphernode image state location
         run: bash crates/tests/docker/test-ciphernode-entrypoint.sh
+
+  test_dappnode_image:
+    needs: [detect_changes]
+    if: needs.detect_changes.outputs.dappnode == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: dappnode/package-lock.json
+      - name: Build both DAppNode packages with the release command
+        run: |
+          npm ci --ignore-scripts --prefix dappnode
+          npm run build --prefix dappnode -- --skip_upload --skip_save
+      - name: Test provisioning and the RPC proxy in the built image
+        run: npm run test:image --prefix dappnode
 
   rust_unit_tests:
     needs: [detect_changes]
