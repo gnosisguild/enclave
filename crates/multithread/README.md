@@ -32,8 +32,8 @@ Prover-specific memory budgets remain in this runtime, not in the generic execut
 
 The composition root supplies the same pool and node scope to this dispatcher and the prover's C0
 verification actor. C0 verification waits asynchronously for admission, keeps serial completion and
-barrier ordering, and shares protocol cancellation groups. Pool failures/cancellation are local
-infrastructure outcomes, never invalid-peer evidence.
+barrier ordering, and shares protocol cancellation groups. Pool failures are local infrastructure
+outcomes. Cancellation retires pending C0 verification without retry or invalid-peer evidence.
 
 ### Ownership boundary
 

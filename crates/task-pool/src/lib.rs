@@ -59,6 +59,8 @@ impl TaskPool {
         }
     }
 
+    /// Wait for shared admission, then execute the closure on Rayon and return its result.
+    /// Timed logs are diagnostic only; panics and channel failures return `TaskPoolError`.
     pub async fn spawn<OP, T: Debug + Send + 'static>(
         &self,
         task_name: String,
@@ -71,6 +73,8 @@ impl TaskPool {
         self.spawn_inner(None, task_name, timed_logs, op).await
     }
 
+    /// Execute within a caller-defined group, rejecting cancellation before admission or execution.
+    /// A group cancelled after its closure starts does not preempt that closure.
     pub async fn spawn_in_group<OP, T: Debug + Send + 'static>(
         &self,
         group: String,
@@ -85,6 +89,7 @@ impl TaskPool {
             .await
     }
 
+    /// Permanently cancel queued, waiting and future work in this group across every pool clone.
     pub fn cancel_group(&self, group: &str) {
         let sender = {
             let mut groups = self.task_groups.lock().expect("task group lock poisoned");
@@ -268,6 +273,7 @@ impl Deref for TaskTimeouts {
 }
 
 impl TaskTimeouts {
+    /// Set elapsed-time diagnostic milestones; this does not impose a task execution deadline.
     pub fn new(logs: Vec<TimedLog>) -> Self {
         Self(logs)
     }

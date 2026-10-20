@@ -8,7 +8,7 @@
 
 use actix::{Actor, AtomicResponse, Context, Handler, WrapFuture};
 use e3_events::TypedEvent;
-use e3_task_pool::{scoped_task_group, TaskPool, TaskTimeouts};
+use e3_task_pool::{scoped_task_group, TaskPool, TaskPoolError, TaskTimeouts};
 use tracing::{debug, error};
 
 use crate::{ZkBackend, ZkProver};
@@ -211,9 +211,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(response.key.party_id, 1);
-        assert!(
-            matches!(response.outcome, ZkVerificationOutcome::InfrastructureError(ref error) if error.contains("cancelled"))
-        );
+        assert!(matches!(response.outcome, ZkVerificationOutcome::Cancelled));
         assert!(
             rx.try_recv().is_err(),
             "another node bypassed shared admission"
@@ -367,6 +365,11 @@ impl Handler<TypedEvent<ZkVerificationRequest>> for ZkActor {
                                 key: msg.key,
                             }
                         }
+                        Err(TaskPoolError::Cancelled(_)) => ZkVerificationResponse {
+                            outcome: ZkVerificationOutcome::Cancelled,
+                            e3_id: msg.e3_id,
+                            key: msg.key,
+                        },
                         Err(error) => ZkVerificationResponse {
                             outcome: ZkVerificationOutcome::InfrastructureError(error.to_string()),
                             e3_id: msg.e3_id,

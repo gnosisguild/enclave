@@ -55,6 +55,8 @@ pub enum ZkVerificationOutcome {
     Valid,
     Invalid,
     InfrastructureError(String),
+    /// The node's protocol task group ended; this outcome must not be retried or blamed on a peer.
+    Cancelled,
 }
 
 #[derive(Clone, Debug)]

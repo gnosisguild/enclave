@@ -881,7 +881,7 @@
         },
         {
           "why": "the pool: semaphore wait, Rayon spawn, and the oneshot result",
-          "ref": "crates/task-pool/src/lib.rs@123@async fn spawn_inner<OP, T: Debug + Send + 'static>("
+          "ref": "crates/task-pool/src/lib.rs@128@async fn spawn_inner<OP, T: Debug + Send + 'static>("
         },
         {
           "why": "the worker function that dispatches TrBFV and ZK requests",
@@ -907,17 +907,17 @@
         {
           "pattern": "channel",
           "note": "a oneshot channel carries each Rayon result back to the async caller",
-          "ref": "crates/task-pool/src/lib.rs@208@let (tx, rx) = tokio::sync::oneshot::channel();"
+          "ref": "crates/task-pool/src/lib.rs@213@let (tx, rx) = tokio::sync::oneshot::channel();"
         },
         {
           "pattern": "tokio-select",
           "note": "the pool waits for either a group cancellation or a free semaphore permit",
-          "ref": "crates/task-pool/src/lib.rs@145@tokio::select! {"
+          "ref": "crates/task-pool/src/lib.rs@150@tokio::select! {"
         },
         {
           "pattern": "tokio-spawn",
           "note": "a warning task logs long jobs and is aborted when the result arrives",
-          "ref": "crates/task-pool/src/lib.rs@173@let warning_handle = tokio::spawn(async move {"
+          "ref": "crates/task-pool/src/lib.rs@178@let warning_handle = tokio::spawn(async move {"
         }
       ],
       "depends_on": [

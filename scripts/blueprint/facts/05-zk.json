@@ -24,7 +24,7 @@
         {
           "name": "ProofVerificationActor",
           "role": "Checks a peer's BFV public key (C0): recovers the signer, asks ZkActor to verify, then emits pass or fail",
-          "ref": "crates/zk/prover/src/proof_verification/actor.rs@70@pub struct ProofVerificationActor"
+          "ref": "crates/zk/prover/src/proof_verification/actor.rs@72@pub struct ProofVerificationActor"
         },
         {
           "name": "ShareVerificationActor",
@@ -76,7 +76,7 @@
         {
           "name": "EncryptionKeyReceived",
           "by": "ProofVerificationActor",
-          "ref": "crates/zk/prover/src/proof_verification/actor.rs@146@EventType::EncryptionKeyReceived"
+          "ref": "crates/zk/prover/src/proof_verification/actor.rs@148@EventType::EncryptionKeyReceived"
         },
         {
           "name": "ZkVerificationResponse (message)",
@@ -106,7 +106,7 @@
         {
           "name": "ZkVerificationRequest (message)",
           "by": "ZkActor",
-          "ref": "crates/zk/prover/src/zk_actor.rs@312@impl Handler<TypedEvent<ZkVerificationRequest>> for ZkActor"
+          "ref": "crates/zk/prover/src/zk_actor.rs@310@impl Handler<TypedEvent<ZkVerificationRequest>> for ZkActor"
         }
       ],
       "emits": [
@@ -148,17 +148,17 @@
         {
           "name": "ProofVerificationPassed",
           "by": "ProofVerificationActor",
-          "ref": "crates/zk/prover/src/proof_verification/handlers.rs@154@ProofVerificationPassed {"
+          "ref": "crates/zk/prover/src/proof_verification/handlers.rs@158@ProofVerificationPassed {"
         },
         {
           "name": "SignedProofFailed",
           "by": "ProofVerificationActor",
-          "ref": "crates/zk/prover/src/proof_verification/handlers.rs@180@SignedProofFailed {"
+          "ref": "crates/zk/prover/src/proof_verification/handlers.rs@184@SignedProofFailed {"
         },
         {
           "name": "ProofVerificationFailed",
           "by": "ProofVerificationActor",
-          "ref": "crates/zk/prover/src/proof_verification/handlers.rs@201@ProofVerificationFailed {"
+          "ref": "crates/zk/prover/src/proof_verification/handlers.rs@205@ProofVerificationFailed {"
         },
         {
           "name": "ComputeRequest (ZkRequest::VerifyShareProofs, VerifyShareDecryptionProofs)",
@@ -188,7 +188,7 @@
         {
           "name": "ZkVerificationResponse (message to the sender)",
           "by": "ZkActor",
-          "ref": "crates/zk/prover/src/zk_actor.rs@380@msg.sender.do_send(response)"
+          "ref": "crates/zk/prover/src/zk_actor.rs@383@msg.sender.do_send(response)"
         }
       ],
       "state": [
@@ -215,7 +215,7 @@
         {
           "name": "pending C0 verifications keyed by E3 and party",
           "where": "memory",
-          "ref": "crates/zk/prover/src/proof_verification/actor.rs@73@pending: HashMap<(E3id, u64), PendingVerification>"
+          "ref": "crates/zk/prover/src/proof_verification/actor.rs@75@pending: HashMap<(E3id, u64), PendingVerification>"
         },
         {
           "name": "in-flight proof requests keyed by correlation id",
@@ -311,7 +311,7 @@
         {
           "pattern": "actix-recipient",
           "note": "the verifier is a Recipient; the wiring passes ZkActor's recipient in (actor_system.rs:134)",
-          "ref": "crates/zk/prover/src/proof_verification/actor.rs@72@verifier: Recipient<TypedEvent<ZkVerificationRequest>>,"
+          "ref": "crates/zk/prover/src/proof_verification/actor.rs@74@verifier: Recipient<TypedEvent<ZkVerificationRequest>>,"
         },
         {
           "pattern": "actix-timer",

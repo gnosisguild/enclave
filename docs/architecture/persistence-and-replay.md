@@ -212,8 +212,9 @@ group, survives local failure, and ends with request teardown.
 
 The composition root shares one `e3-task-pool` budget and node scope between ordinary compute and
 the C0 verification adapter. C0 waits asynchronously for admission but preserves serial completion
-and mailbox barriers. Queued cancellation and pool failures return infrastructure outcomes; existing
-verification admission/terminal filtering still decides whether a late result can progress.
+and mailbox barriers. Pool failures return infrastructure outcomes; queued cancellation retires the
+pending C0 verification plan without retry or peer blame. Existing verification admission/terminal
+filtering still decides whether a late result can progress.
 
 Local resource/prover/verifier failure retries exact requests, never labels peer data invalid.
 Production begins at two compute jobs/two reserved CPUs, reduces against CPU and host/cgroup memory
