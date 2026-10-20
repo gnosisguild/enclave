@@ -58,8 +58,9 @@ Public helpers also include `ProviderConfig`, canonical DKG timing/lifecycle rea
 `fetch_operator_committees` (`ciphernode status`) reads the bonding registry's obligation views at
 the confirmed head's hash. When a view read fails, it scans the `CommitteeObligationUpdated` events
 and can save the scan for each operator (the CLI uses `committee-scans/` in the node data
-directory). A later call resumes a saved scan only while the provider returns its block hash;
-another hash rescans from the deploy block. See
+directory). A later call resumes a saved scan when the provider returns the saved block hash, and
+rescans from the deploy block when it returns another hash. When the provider has no block at that
+height, such as a lagging node, the call returns its result and does not save it. See
 [registration and bonding](../../docs/architecture/registration-and-bonding.md) for the views.
 
 ## Tests and build prerequisites

@@ -17,8 +17,9 @@ domain owner; keep receipt/preflight failures distinct from accepted chain facts
   fail full-node startup; configuration is a fallback only for disabled chains. Preserve the
   chain-specific signing domain, deploy-block backfill, and live manager-replacement stop.
 - `fetch_operator_committees` trusts the obligation views only when every index answers at one
-  confirmed block hash; any failed read falls back to the event scan. A saved scan resumes only
-  while the provider returns its block hash, checked before and after the read.
+  confirmed block hash; any failed read falls back to the event scan. Check the saved block hash
+  before and after a resumed read: another hash rescans from the deploy block, and a missing block
+  (a lagging provider) returns the result unsaved.
 
 See [selection](../../docs/architecture/committee-selection.md),
 [decryption](../../docs/architecture/threshold-decryption.md), and
