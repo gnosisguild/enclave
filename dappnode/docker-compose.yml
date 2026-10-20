@@ -2,7 +2,9 @@ version: '3.5'
 services:
   ciphernode:
     build:
-      context: '${DAPPNODE_BUILD_CONTEXT:-..}'
+      # The build script runs the SDK here. Compose (relative to this file) and Buildx (relative to
+      # the working directory) then both resolve the repository root.
+      context: ..
       dockerfile: dappnode/Dockerfile
       args:
         UPSTREAM_VERSION: 0.19.0
