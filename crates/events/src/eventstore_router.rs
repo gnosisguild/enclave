@@ -16,6 +16,7 @@ use actix::{
 use anyhow::{Context as _, Result};
 use e3_utils::MAILBOX_LIMIT_LARGE;
 use std::collections::HashMap;
+use tokio::sync::watch;
 use tracing::{debug, error, warn};
 
 /// QueryAggregator - handles a single query's lifecycle
@@ -153,6 +154,8 @@ impl Handler<Die> for QueryAggregator {
 /// EventStoreRouter - routes events and spawns query aggregators to handle eventstore queries
 pub struct EventStoreRouter<I: SequenceIndex, L: EventLog> {
     stores: HashMap<AggregateId, Addr<EventStore<I, L>>>,
+    /// The storage failure signal that the stores share. The node exits when it is set.
+    failure_signal: Option<watch::Sender<Option<String>>>,
 }
 
 impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
@@ -162,17 +165,32 @@ impl<I: SequenceIndex, L: EventLog> EventStoreRouter<I, L> {
             .into_iter()
             .map(|(index, addr)| (AggregateId::new(index), addr))
             .collect();
-        Self { stores }
+        Self {
+            stores,
+            failure_signal: None,
+        }
+    }
+
+    pub fn with_failure_signal(mut self, signal: watch::Sender<Option<String>>) -> Self {
+        self.failure_signal = Some(signal);
+        self
     }
 
     pub fn handle_store_event_requested(&mut self, msg: StoreEventRequested) {
         debug!("Handling store event requested....");
         let aggregate_id = msg.event.aggregate_id();
-        let store_addr = self.stores.get(&aggregate_id).unwrap_or_else(|| {
-            panic!(
+        let Some(store_addr) = self.stores.get(&aggregate_id) else {
+            // Writing the event to another aggregate would break its order, and dropping it loses
+            // it, so the node stops as for any other storage failure.
+            let detail = format!(
                 "No EventStore is configured for aggregate {aggregate_id}; refusing to write it to another aggregate"
-            )
-        });
+            );
+            error!(%detail, "Unrecoverable event storage failure");
+            if let Some(signal) = &self.failure_signal {
+                signal.send_replace(Some(detail));
+            }
+            return;
+        };
         let event = msg.event;
         let sender = msg.sender;
         store_addr.do_send(StoreEventRequested::new(event, sender));

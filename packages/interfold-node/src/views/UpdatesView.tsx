@@ -7,7 +7,7 @@ import type { UpdateSnapshot } from '../types'
 export default function UpdatesView({ updates, activeE3s }: { updates: QueryState<UpdateSnapshot>; activeE3s: number }) {
   const [copied, setCopied] = useState(false)
   const copyUpdate = () => {
-    void navigator.clipboard.writeText('interfoldup update').then(() => {
+    void navigator.clipboard.writeText('interfold update').then(() => {
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1_500)
     })
@@ -68,7 +68,7 @@ export default function UpdatesView({ updates, activeE3s }: { updates: QueryStat
             <li>
               <strong>Install the release.</strong>
               <button type='button' className='copy-command mono' onClick={copyUpdate}>
-                {copied ? 'Copied' : 'interfoldup update'}
+                {copied ? 'Copied' : 'interfold update'}
               </button>
             </li>
             <li>

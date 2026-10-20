@@ -94,7 +94,7 @@ impl Handler<TypedEvent<DecryptionshareCreated>> for ThresholdPlaintextAggregato
         ctx: &mut Self::Context,
     ) -> Self::Result {
         trap(
-            EType::PublickeyAggregation,
+            EType::PlaintextAggregation,
             &self.bus.with_ec(msg.get_ctx()),
             || {
                 if !matches!(
@@ -127,7 +127,7 @@ impl Handler<E3CommitteeContainsResponse<TypedEvent<DecryptionshareCreated>>>
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         trap(
-            EType::PublickeyAggregation,
+            EType::PlaintextAggregation,
             &self.bus.with_ec(msg.get_ctx()),
             || {
                 let e3_id = &msg.e3_id;
@@ -188,7 +188,7 @@ impl Handler<TypedEvent<ComputeResponse>> for ThresholdPlaintextAggregator {
     fn handle(
         &mut self,
         msg: TypedEvent<ComputeResponse>,
-        ctx: &mut Self::Context,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
         if !self.can_continue_aggregation_effects() {
             return;
@@ -196,7 +196,7 @@ impl Handler<TypedEvent<ComputeResponse>> for ThresholdPlaintextAggregator {
         trap(
             EType::PlaintextAggregation,
             &self.bus.with_ec(msg.get_ctx()),
-            || self.handle_compute_response(msg, ctx),
+            || self.handle_compute_response(msg),
         )
     }
 }
@@ -314,7 +314,7 @@ impl Handler<TypedEvent<AggregationProofSigned>> for ThresholdPlaintextAggregato
     fn handle(
         &mut self,
         msg: TypedEvent<AggregationProofSigned>,
-        ctx: &mut Self::Context,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
         if !self.can_continue_aggregation_effects() {
             return;
@@ -322,7 +322,7 @@ impl Handler<TypedEvent<AggregationProofSigned>> for ThresholdPlaintextAggregato
         trap(
             EType::PlaintextAggregation,
             &self.bus.with_ec(msg.get_ctx()),
-            || self.handle_aggregation_proof_signed(msg, ctx),
+            || self.handle_aggregation_proof_signed(msg),
         )
     }
 }

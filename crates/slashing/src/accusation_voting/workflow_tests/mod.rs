@@ -116,6 +116,7 @@ fn insert_pending(
             accusation,
             votes_for: vec![own_vote],
             ec: ctx(),
+            timeout_at: NOW + 300,
         },
     );
     id

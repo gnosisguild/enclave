@@ -348,10 +348,12 @@ pnpm ciphernode:add --ciphernode-address "$CIPHERNODE_ADDRESS_4" --network local
 pnpm ciphernode:add --ciphernode-address "$CIPHERNODE_ADDRESS_5" --network localhost
 
 ENCODED_PARAMS=0x$("$SCRIPT_DIR/lib/pack_e3_params.sh" \
-  --moduli 0xffffee001 \
-  --moduli 0xffffc4001 \
-  --degree 512 \
-  --plaintext-modulus 100)
+  --moduli 0x00ffffffffffc601 \
+  --moduli 0x00ffffffffffc301 \
+  --moduli 0x00ffffffffffa501 \
+  --degree 128 \
+  --plaintext-modulus 100 \
+  --error1-variance 50471587840)
 
 FIRST_E3_ID=""
 RESET_NODES=""

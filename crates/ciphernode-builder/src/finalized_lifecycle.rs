@@ -6,12 +6,12 @@
 
 //! Startup reconciliation of the local E3 lifecycle with the finalized chain lifecycle.
 
-use crate::{ciphernode_builder::validate_chain_id, ProviderCache};
 use alloy::primitives::Address;
 use anyhow::{anyhow, bail, Context, Result};
 use e3_config::chain_config::ChainConfig;
 use e3_events::{AggregateId, E3Stage, E3id, EventStoreQueryBy, FailureReason, SeqAgg};
 use e3_evm::{read_finalized_e3_lifecycles, FinalizedE3Lifecycle};
+use e3_evm::{validate_chain_id, ProviderCache};
 use e3_request::E3LifecycleRepositoryFactory;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -617,7 +617,7 @@ mod tests {
 
         // Events of an E3 belong to the aggregate of its chain.
         let aggregate_id = AggregateId::from_chain_id(Some(anvil.chain_id()));
-        let system = crate::EventSystem::new()
+        let system = e3_event_system::EventSystem::new()
             .with_fresh_bus()
             .with_aggregate_config(e3_events::AggregateConfig::new(HashMap::from([(
                 aggregate_id,

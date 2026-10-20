@@ -631,28 +631,53 @@ describe("Interfold", function () {
       );
     });
 
-    it("rejects secure-16384 with a committee that has no V2 route", async function () {
-      const { interfold, request } = await loadFixture(setup);
-      await interfold.setParamSet(3, BFV_PARAMS_SECURE_16384);
-      await interfold.setTimeoutConfig({
-        ...timeoutConfig,
-        dkgWindow: secure16384MinDkgWindow,
-      });
-      const now = await time.latest();
+    for (const [committee, committeeSize, h, n] of [
+      ["micro", 1, 5, 9],
+      ["small", 2, 14, 19],
+    ] as const) {
+      it(`accepts a secure-16384 ${committee} request with the canonical threshold`, async function () {
+        const { interfold, request, usdcToken } = await deployInterfoldSystem({
+          setupOperators: n,
+          committeeThresholds: [[committeeSize, [h, n]]],
+        });
+        const e3Id = await interfold.nexte3Id();
+        await interfold.setParamSet(3, BFV_PARAMS_SECURE_16384);
+        await interfold.setTimeoutConfig({
+          ...timeoutConfig,
+          dkgWindow: secure16384MinDkgWindow,
+        });
+        const now = await time.latest();
 
-      // Micro has no secure-16384 verifier route; minimum and small do.
-      for (const committeeSize of [1]) {
-        await expect(
-          interfold.getE3Quote({
-            ...request,
-            committeeSize,
-            paramSet: 3,
-            inputWindow: [now + 10, now + inputWindowDuration],
-            expectedCryptoConfigId: SECURE_16384_CRYPTO_CONFIG_ID,
-          }),
-        ).to.be.revertedWithCustomError(interfold, "UnsupportedCryptoConfig");
-      }
-    });
+        const pairRequest: typeof request = {
+          ...request,
+          committeeSize,
+          paramSet: 3,
+          inputWindow: [now + 10, now + inputWindowDuration],
+          expectedCryptoConfigId: SECURE_16384_CRYPTO_CONFIG_ID,
+        };
+        await interfold.getE3Quote(pairRequest);
+        await usdcToken.approve(
+          await interfold.getAddress(),
+          ethers.MaxUint256,
+        );
+        await expect(interfold.request(pairRequest)).to.emit(
+          interfold,
+          "E3Requested",
+        );
+        const e3 = await interfold.getE3(e3Id);
+        expect(e3.paramSet).to.equal(3);
+        expect(e3.committeeSize).to.equal(committeeSize);
+        expect(await interfold.committeeThresholds(committeeSize, 0)).to.equal(
+          h,
+        );
+        expect(await interfold.committeeThresholds(committeeSize, 1)).to.equal(
+          n,
+        );
+        expect(await interfold.e3CryptoConfigIds(e3Id)).to.equal(
+          SECURE_16384_CRYPTO_CONFIG_ID,
+        );
+      });
+    }
 
     it("binds new secure requests to slot 2", async function () {
       const { interfold, request, usdcToken } = await loadFixture(setup);
@@ -1177,7 +1202,7 @@ describe("Interfold", function () {
     });
 
     // The CRISP server reads `requests[e3Id]` here before it pays for availability
-    // (examples/CRISP/crates/evm_helpers), because Interfold has no getter for it.
+    // (https://github.com/theinterfold/CRISP/tree/main/crates/evm_helpers), because Interfold has no getter for it.
     it("stores the request-time verifier and parameter hash at the namespaced location", async function () {
       const { interfold, request, usdcToken, mocks } = await loadFixture(setup);
       const replacement = await ethers.deployContract("MockCiphertextVerifier");

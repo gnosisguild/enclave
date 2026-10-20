@@ -40,11 +40,11 @@ use std::collections::HashMap;
 
 /// Full finalized committee from the chain (length `N`)
 /// for `committee_hash_*` binding in downstream ZK requests.
-pub const COMMITTEE_ADDRESSES_KEY: TypedKey<Vec<Address>> = TypedKey::new("committee_addresses");
+const COMMITTEE_ADDRESSES_KEY: TypedKey<Vec<Address>> = TypedKey::new("committee_addresses");
 
 /// Honest subset from the chain DKG anchors (length `H`)
 /// for decryption-share collection gating.
-pub const HONEST_COMMITTEE_ADDRESSES_KEY: TypedKey<Vec<Address>> =
+const HONEST_COMMITTEE_ADDRESSES_KEY: TypedKey<Vec<Address>> =
     TypedKey::new("honest_committee_addresses");
 const ACTIVE_AGGREGATOR_KEY: TypedKey<bool> = TypedKey::new("active_aggregator");
 const PENDING_CIPHERTEXT_OUTPUT_KEY: TypedKey<CiphertextOutputPublished> =
@@ -1226,6 +1226,7 @@ mod tests {
             ciphernode_selector: selector,
             address: "node".into(),
             submitted_e3s: Default::default(),
+            finished_e3s: Default::default(),
         })
         .start();
         let id = E3id::new("81", 1);

@@ -1174,7 +1174,7 @@ pub(crate) mod tests {
         LbfvRelinearizationKeyShareDocumentV2, Proof, ProofPayload, ProofType, SignedProofPayload,
     };
     use e3_utils::ArcBytes;
-    use e3_zk_helpers::FIELD_BYTE_LEN;
+    use e3_zk_config::FIELD_BYTE_LEN;
 
     const LEGACY_COLLECTION_STATE: &[u8] =
         include_bytes!("fixtures/lbfv_contribution_collection_state_v1.bincode");

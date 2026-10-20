@@ -486,7 +486,7 @@ where
 #[cfg(test)]
 mod tests {
     use actix::{Actor, Handler, Message};
-    use e3_ciphernode_builder::EventSystem;
+    use e3_event_system::EventSystem;
     // NOTE: We cannot pull from crate as the features will be missing as they are not default.
     use e3_events::{
         hlc::{Hlc, HlcTimestamp},

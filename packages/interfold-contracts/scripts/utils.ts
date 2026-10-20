@@ -58,8 +58,11 @@ export const isLocalDeploymentChain = (chain: string): boolean =>
   (LOCAL_DEPLOYMENT_NETWORKS as readonly string[]).includes(chain) ||
   (LEGACY_LOCAL_DEPLOYMENT_ALIASES as readonly string[]).includes(chain);
 
-/** Monorepo root (`interfold/`). Works from `scripts/` and compiled `dist/scripts/`. */
-function resolveRepoRoot(): string {
+/**
+ * Monorepo root (`interfold/`), or `undefined` when this package is installed outside it. Works
+ * from `scripts/` and compiled `dist/scripts/`.
+ */
+export function findMonorepoRoot(): string | undefined {
   let dir = path.dirname(fileURLToPath(import.meta.url));
   const root = path.parse(dir).root;
   while (dir !== root) {
@@ -78,16 +81,19 @@ function resolveRepoRoot(): string {
     }
     dir = path.dirname(dir);
   }
-  throw new Error(
-    "Could not find interfold repo root (expected package.json name @interfold/main)",
-  );
+  return undefined;
 }
 
 let _repoRoot: string | undefined;
 
-/** Lazy version of REPO_ROOT — only resolves when called, safe for import-time. */
+/** Monorepo root, resolved on first call. Throws when this package is installed outside it. */
 export function getRepoRoot(): string {
-  if (!_repoRoot) _repoRoot = resolveRepoRoot();
+  _repoRoot ??= findMonorepoRoot();
+  if (!_repoRoot) {
+    throw new Error(
+      "Could not find interfold repo root (expected package.json name @interfold/main)",
+    );
+  }
   return _repoRoot;
 }
 
@@ -148,7 +154,7 @@ export function localBfvParamSet(): number {
   const override = process.env.BFV_PARAM_SET;
   if (override === undefined || override === "") return ACTIVE_BFV_PARAM_SET;
   const paramSet = Number(override);
-  const insecureArtifacts = ACTIVE_BFV_PARAM_SET === 0;
+  const insecureArtifacts = ACTIVE_BFV_CONFIG.preset === "insecure";
   if (paramSet === ACTIVE_BFV_PARAM_SET) return paramSet;
   if (paramSet === INSECURE_LBFV_PARAM_SET && insecureArtifacts)
     return paramSet;
@@ -192,6 +198,7 @@ function bfvConfig(
   };
 }
 
+// Generated from scripts/circuits/build-pairs.json and canonical committee values.
 export const INSECURE_MINIMUM_BFV_CONFIG: ActiveBfvConfig = bfvConfig(
   "insecure",
   "minimum",
@@ -255,6 +262,12 @@ export const SECURE_16384_MINIMUM_BFV_CONFIG: ActiveBfvConfig = bfvConfig(
   { committeeSize: 0, h: 2, t: 1, n: 3 },
 );
 
+export const SECURE_16384_MICRO_BFV_CONFIG: ActiveBfvConfig = bfvConfig(
+  "secure-16384",
+  "micro",
+  { committeeSize: 1, h: 5, t: 4, n: 9 },
+);
+
 export const SECURE_16384_SMALL_BFV_CONFIG: ActiveBfvConfig = bfvConfig(
   "secure-16384",
   "small",
@@ -282,8 +295,39 @@ export const TESTNET_BFV_CONFIGS: readonly ActiveBfvConfig[] = [
   SECURE_MICRO_BFV_CONFIG,
   SECURE_SMALL_BFV_CONFIG,
   SECURE_16384_MINIMUM_BFV_CONFIG,
+  SECURE_16384_MICRO_BFV_CONFIG,
   SECURE_16384_SMALL_BFV_CONFIG,
 ] as const;
+
+/** The pair of the generated `ACTIVE_BFV_*` constants, which `ActiveCryptoConfig.sol` matches. */
+export const ACTIVE_BFV_CONFIG = TESTNET_BFV_CONFIGS.find(
+  (config) =>
+    config.paramSet === ACTIVE_BFV_PARAM_SET &&
+    config.committeeSize === ACTIVE_BFV_COMMITTEE_SIZE,
+)!;
+
+/** Source namespace shared by protocol deployment and local Ignition modules. */
+export function bfvHonkSource(
+  config: ActiveBfvConfig,
+  contractName:
+    | "DkgAggregatorVerifier"
+    | "DecryptionAggregatorVerifier"
+    | "DkgAggregatorV2Verifier",
+): string {
+  const pair =
+    config.preset === "insecure" && config.committee === "minimum"
+      ? ""
+      : `${config.preset}/${config.committee}/`;
+  return `contracts/verifiers/bfv/honk/${pair}${contractName}.sol`;
+}
+
+/**
+ * Names a circuit directory in the release-archive layout (`<preset>/<committee>/default/...`):
+ * the `circuits/` directory of `circuits-<version>.tar.gz`, or the directory that
+ * `interfold noir setup` installs, from the release of this package. Only a package installed
+ * outside the monorepo reads it; the monorepo reads its own release-verified circuit build.
+ */
+const CIRCUITS_DIR_ENV = "INTERFOLD_CIRCUITS_DIR";
 
 export function isTestnetOrLocalChainId(chainId: number): boolean {
   return chainId === 11155111 || chainId === 31337 || chainId === 1337;
@@ -420,13 +464,26 @@ export function bfvDecCiphertextCommitmentIndex(): number {
   return 6;
 }
 
-function distCircuitRoot(config: ActiveBfvConfig): string {
-  return path.join(
-    getRepoRoot(),
-    "dist/circuits",
-    config.preset,
-    config.committee,
-  );
+/**
+ * Release-layout directory of a preset/committee pair, or `undefined` for the monorepo circuit
+ * build under `circuits/bin`. In the monorepo, a selected `config` reads `dist/circuits`. Outside
+ * it, `INTERFOLD_CIRCUITS_DIR` is required, and a missing `config` selects the active pair.
+ */
+function releaseCircuitRoot(config?: ActiveBfvConfig): string | undefined {
+  const root = findMonorepoRoot();
+  if (root) {
+    return config
+      ? path.join(root, "dist/circuits", config.preset, config.committee)
+      : undefined;
+  }
+  const dir = process.env[CIRCUITS_DIR_ENV];
+  if (!dir) {
+    throw new Error(
+      `Outside the Interfold monorepo, set ${CIRCUITS_DIR_ENV} to a release circuit directory to read BFV VK hashes`,
+    );
+  }
+  const { preset, committee } = config ?? ACTIVE_BFV_CONFIG;
+  return path.join(dir, preset, committee);
 }
 
 function localCircuitArtifactPath(
@@ -448,11 +505,17 @@ function localCircuitArtifactPath(
     : path.join(root, "circuits/bin", group, "target", fileName);
 }
 
-function localRecursiveVkHashPath(group: string, circuit: string): string {
+type BfvVkVariant = "default" | "recursive";
+
+function localRecursiveVkHashPath(
+  group: string,
+  circuit: string,
+  variant: BfvVkVariant = "default",
+): string {
   return localCircuitArtifactPath(
     group,
     circuit,
-    `${circuit}.vk_recursive_hash`,
+    `${circuit}.${variant === "recursive" ? "vk_noir_hash" : "vk_recursive_hash"}`,
   );
 }
 
@@ -463,23 +526,23 @@ function localVkTreeHashPath(group: string, circuit: string): string {
 
 /** Complete nodes-fold VK-tree anchor and C5 recursive VK hash. */
 export function getBfvPkSubCircuitVkHashPaths(config?: ActiveBfvConfig) {
-  if (config) {
-    const root = distCircuitRoot(config);
+  const releaseRoot = releaseCircuitRoot(config);
+  if (releaseRoot) {
     return {
       nodesFold: path.join(
-        root,
+        releaseRoot,
         "default/recursive_aggregation/nodes_fold/nodes_fold.vk_tree_hash",
       ),
       c5: path.join(
-        root,
+        releaseRoot,
         "default/threshold/pk_aggregation/pk_aggregation.vk_hash",
       ),
       skC2Chunk: path.join(
-        root,
+        releaseRoot,
         "recursive/dkg/sk_share_computation_chunk/sk_share_computation_chunk.vk_hash",
       ),
       esmC2Chunk: path.join(
-        root,
+        releaseRoot,
         "recursive/dkg/esm_share_computation_chunk/esm_share_computation_chunk.vk_hash",
       ),
     } as const;
@@ -488,104 +551,115 @@ export function getBfvPkSubCircuitVkHashPaths(config?: ActiveBfvConfig) {
   return {
     nodesFold: localVkTreeHashPath("recursive_aggregation", "nodes_fold"),
     c5: localRecursiveVkHashPath("threshold", "pk_aggregation"),
-    skC2Chunk: localRecursiveVkHashPath("dkg", "sk_share_computation_chunk"),
-    esmC2Chunk: localRecursiveVkHashPath("dkg", "esm_share_computation_chunk"),
+    skC2Chunk: localRecursiveVkHashPath(
+      "dkg",
+      "sk_share_computation_chunk",
+      "recursive",
+    ),
+    esmC2Chunk: localRecursiveVkHashPath(
+      "dkg",
+      "esm_share_computation_chunk",
+      "recursive",
+    ),
   } as const;
 }
 
 /**
  * Recursive VK hashes of the l-BFV path's legacy DKG pipeline, in the order `dkg_aggregator_v2`
- * binds them (`legacy_vk_binding` in `crates/zk-prover/src/circuits/aggregation/v2.rs`).
+ * binds them (`legacy_vk_binding` in `crates/zk/prover/src/circuits/aggregation/v2.rs`).
  */
 export function getBfvPkVkBindingHashPaths(config?: ActiveBfvConfig) {
-  const root = config ? distCircuitRoot(config) : getRepoRoot();
-  const recursive = config ? "recursive" : "target";
-  const defaultVariant = config ? "default" : "target";
-  const local = (group: string, circuit: string) =>
-    localRecursiveVkHashPath(group, circuit);
+  const root = releaseCircuitRoot(config);
+  const recursive = "recursive";
+  const defaultVariant = "default";
+  const local = (
+    group: string,
+    circuit: string,
+    variant: BfvVkVariant = "default",
+  ) => localRecursiveVkHashPath(group, circuit, variant);
   return [
-    config
+    root
       ? path.join(
           root,
           "default/recursive_aggregation/node_fold_chunked/node_fold_chunked.vk_hash",
         )
       : local("recursive_aggregation", "node_fold_chunked"),
-    config
+    root
       ? path.join(root, `${recursive}/dkg/pk/pk.vk_hash`)
-      : local("dkg", "pk"),
-    config
+      : local("dkg", "pk", recursive),
+    root
       ? path.join(
           root,
           `${defaultVariant}/recursive_aggregation/c2ab_chunk_fold/c2ab_chunk_fold.vk_hash`,
         )
       : local("recursive_aggregation", "c2ab_chunk_fold"),
-    config
+    root
       ? path.join(
           root,
           `${defaultVariant}/recursive_aggregation/c3ab_fold_chunked/c3ab_fold_chunked.vk_hash`,
         )
       : local("recursive_aggregation", "c3ab_fold_chunked"),
-    config
+    root
       ? path.join(
           root,
           `${defaultVariant}/recursive_aggregation/c4ab_fold/c4ab_fold.vk_hash`,
         )
       : local("recursive_aggregation", "c4ab_fold"),
-    config
+    root
       ? path.join(
           root,
-          `${defaultVariant}/recursive_aggregation/sk_c2_chunk_finalize/sk_c2_chunk_finalize.vk_hash`,
+          `${recursive}/recursive_aggregation/sk_c2_chunk_finalize/sk_c2_chunk_finalize.vk_hash`,
         )
-      : local("recursive_aggregation", "sk_c2_chunk_finalize"),
-    config
+      : local("recursive_aggregation", "sk_c2_chunk_finalize", recursive),
+    root
       ? path.join(
           root,
-          `${defaultVariant}/recursive_aggregation/esm_c2_chunk_finalize/esm_c2_chunk_finalize.vk_hash`,
+          `${recursive}/recursive_aggregation/esm_c2_chunk_finalize/esm_c2_chunk_finalize.vk_hash`,
         )
-      : local("recursive_aggregation", "esm_c2_chunk_finalize"),
-    config
+      : local("recursive_aggregation", "esm_c2_chunk_finalize", recursive),
+    root
       ? path.join(
           root,
           `${defaultVariant}/recursive_aggregation/c2_chunk_batch/c2_chunk_batch.vk_hash`,
         )
       : local("recursive_aggregation", "c2_chunk_batch"),
-    config
+    root
       ? path.join(
           root,
           `${recursive}/dkg/sk_share_computation_chunk/sk_share_computation_chunk.vk_hash`,
         )
-      : local("dkg", "sk_share_computation_chunk"),
-    config
+      : local("dkg", "sk_share_computation_chunk", recursive),
+    root
       ? path.join(
           root,
           `${recursive}/dkg/esm_share_computation_chunk/esm_share_computation_chunk.vk_hash`,
         )
-      : local("dkg", "esm_share_computation_chunk"),
-    config
+      : local("dkg", "esm_share_computation_chunk", recursive),
+    root
       ? path.join(
           root,
           `${defaultVariant}/recursive_aggregation/c3_fold_chunked/c3_fold_chunked.vk_hash`,
         )
       : local("recursive_aggregation", "c3_fold_chunked"),
-    config
+    root
       ? path.join(
           root,
           `${recursive}/dkg/share_encryption_chunked/share_encryption_chunked.vk_hash`,
         )
-      : local("dkg", "share_encryption_chunked"),
-    config
+      : local("dkg", "share_encryption_chunked", recursive),
+    root
       ? path.join(
           root,
           `${recursive}/dkg/share_decryption_chunked/share_decryption_chunked.vk_hash`,
         )
-      : local("dkg", "share_decryption_chunked"),
-    config
+      : local("dkg", "share_decryption_chunked", recursive),
+    root
       ? path.join(
           root,
           `${defaultVariant}/recursive_aggregation/c3_fold_kernel_chunked/c3_fold_kernel_chunked.vk_hash`,
         )
       : local("recursive_aggregation", "c3_fold_kernel_chunked"),
-    config
+    root
       ? path.join(
           root,
           `${defaultVariant}/recursive_aggregation/nodes_fold_kernel/nodes_fold_kernel.vk_hash`,
@@ -596,9 +670,9 @@ export function getBfvPkVkBindingHashPaths(config?: ActiveBfvConfig) {
 
 /** Recursive VK hashes used by the V2 DKG aggregation wrapper. */
 export function getBfvV2SubCircuitVkHashPaths(config?: ActiveBfvConfig) {
-  const root = config ? distCircuitRoot(config) : getRepoRoot();
+  const root = releaseCircuitRoot(config);
   return {
-    nodesFold: config
+    nodesFold: root
       ? path.join(
           root,
           "default/recursive_aggregation/nodes_fold_v2/nodes_fold_v2.vk_hash",
@@ -609,13 +683,13 @@ export function getBfvV2SubCircuitVkHashPaths(config?: ActiveBfvConfig) {
 
 /** V2 recursive VK binding manifest in the order consumed by `dkg_aggregator_v2`. */
 export function getBfvV2VkBindingHashPaths(config?: ActiveBfvConfig) {
-  const root = config ? distCircuitRoot(config) : getRepoRoot();
-  const defaultVariant = config ? "default" : "target";
-  const recursive = config ? "recursive" : "target";
-  const pathFor = (variant: string, group: string, circuit: string) =>
-    config
+  const root = releaseCircuitRoot(config);
+  const defaultVariant = "default";
+  const recursive = "recursive";
+  const pathFor = (variant: BfvVkVariant, group: string, circuit: string) =>
+    root
       ? path.join(root, `${variant}/${group}/${circuit}/${circuit}.vk_hash`)
-      : localRecursiveVkHashPath(group, circuit);
+      : localRecursiveVkHashPath(group, circuit, variant);
 
   return [
     pathFor(defaultVariant, "recursive_aggregation", "node_fold_v2"),
@@ -648,8 +722,8 @@ export function getBfvDecryptionSubCircuitVkHashPaths(
   const c7Circuit = isLbfvParamSet(config?.paramSet ?? localBfvParamSet())
     ? "decrypted_shares_aggregation_wide"
     : "decrypted_shares_aggregation";
-  if (config) {
-    const root = distCircuitRoot(config);
+  const root = releaseCircuitRoot(config);
+  if (root) {
     return {
       c6Fold: path.join(
         root,

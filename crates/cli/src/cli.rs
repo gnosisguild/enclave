@@ -16,13 +16,14 @@ use crate::noir::NoirCommands;
 use crate::password::PasswordCommands;
 use crate::program::{self, ProgramCommands};
 use crate::wallet::WalletCommands;
-use crate::{init, noir, password, purge_all, rev, wallet};
+use crate::{init, noir, password, purge_all, rev, update, wallet};
 use crate::{print_env, start};
 use anyhow::{bail, Result};
 use clap::{command, ArgAction, Parser, Subcommand};
 use e3_config::validation::ValidUrl;
 use e3_config::{load_config, AppConfig};
 use e3_console::{log, Console};
+use e3_daemon_server::connect_daemon;
 use e3_entrypoint::helpers::datastore::close_all_connections;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -87,6 +88,16 @@ impl Cli {
     #[instrument(skip_all)]
     pub async fn execute(self, out: Console, config_result: Result<AppConfig>) -> Result<()> {
         let log_level = self.log_level();
+        // These commands change only the installed binary. They need no configuration, and they
+        // create no log file, password, or wallet.
+        match &self.command {
+            Commands::Update { version } => {
+                let node_running = connect_daemon(config_result.as_ref().ok()).await.is_some();
+                return update::execute(out, version.clone(), node_running).await;
+            }
+            Commands::Uninstall => return update::uninstall(out),
+            _ => {}
+        }
         // Attempt to load the config, but only treat "not found" as
         // the trigger for the init flow.  All other errors bubble up.
         let config = match config_result {
@@ -197,7 +208,7 @@ impl Cli {
                 bail!("Cannot run `interfold init` when a configuration exists.");
             }
             Commands::Compile { dev } => {
-                e3_support_scripts::program_compile(config.program().clone(), dev).await?
+                crate::program_support::compile(config.program(), dev).await?
             }
             Commands::PrintEnv { vite, chain } => {
                 print_env::execute(out, &config, &chain, vite).await?
@@ -230,6 +241,9 @@ impl Cli {
             Commands::Config { command } => config::execute(out, command, &config).await?,
             Commands::Faucet { chain } => {
                 faucet::execute(out, &config, chain.chain.as_deref()).await?
+            }
+            Commands::Update { .. } | Commands::Uninstall => {
+                unreachable!("`execute` runs these commands before it reads the configuration")
             }
         }
 
@@ -399,6 +413,19 @@ pub enum Commands {
         #[command(flatten)]
         chain: ChainArgs,
     },
+
+    /// Replace this binary with another release: the latest release by default, or the release
+    /// that `--version` names. Use an older tag to downgrade
+    #[command(visible_alias = "upgrade")]
+    Update {
+        /// Release to install: `latest` (default), `dev` (the most recently published release,
+        /// stable or pre-release), or a release tag, for example `v0.19.0`
+        #[arg(long, value_name = "TAG")]
+        version: Option<String>,
+    },
+
+    /// Remove this binary. The configuration, the keys, and the node data stay
+    Uninstall,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -622,6 +649,23 @@ mod tests {
             } if param == "key_file"
         ));
         Ok(())
+    }
+
+    /// `update --version <TAG>` selects a release, and the root `--version` still prints the
+    /// version of this binary.
+    #[test]
+    fn update_version_selects_a_release() {
+        let cli = Cli::parse_from(["interfold", "update", "--version", "v0.18.0"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Update { version: Some(ref tag) } if tag == "v0.18.0"
+        ));
+        let cli = Cli::parse_from(["interfold", "upgrade"]);
+        assert!(matches!(cli.command, Commands::Update { version: None }));
+
+        let error = Cli::try_parse_from(["interfold", "--version"]).unwrap_err();
+        assert_eq!(error.kind(), clap::error::ErrorKind::DisplayVersion);
+        assert!(Cli::try_parse_from(["interfold", "update", "--version"]).is_err());
     }
 
     #[test]

@@ -168,14 +168,15 @@ const sdk = InterfoldSDK.create({
 The preset selects the BFV parameters that the client uses to encrypt. It must match the `paramSet`
 of the E3.
 
-| Preset name              | `paramSet` | Ring degree | CRT moduli (L) | Use                                              |
-| ------------------------ | ---------- | ----------- | -------------- | ------------------------------------------------ |
-| `INSECURE_THRESHOLD`     | 0          | 128         | 3              | Local development and tests                      |
-| `SECURE_THRESHOLD_8192`  | 2          | 8192        | 3              | Production and secure test runs                  |
-| `SECURE_THRESHOLD_16384` | 3          | 16384       | 5              | l-BFV with a `minimum` committee; not on mainnet |
+| Preset name               | `paramSet` | Ring degree | CRT moduli (L) | Use                                               |
+| ------------------------- | ---------- | ----------- | -------------- | ------------------------------------------------- |
+| `INSECURE_THRESHOLD`      | 0          | 128         | 3              | Local development and tests                       |
+| `SECURE_THRESHOLD_8192`   | 2          | 8192        | 3              | Production and secure test runs                   |
+| `SECURE_THRESHOLD_16384`  | 3          | 16384       | 5              | l-BFV with a `minimum` committee; not on mainnet  |
+| `INSECURE_THRESHOLD_LBFV` | 4          | 128         | 3              | Test-only l-BFV path with the insecure parameters |
 
 The insecure preset has no production security. Use it only for tests.
-`ThresholdBfvParamsPresetNames` lists the three names, and
+`ThresholdBfvParamsPresetNames` lists these four names, and
 `DEFAULT_THRESHOLD_BFV_PARAMS_PRESET_NAME` is `INSECURE_THRESHOLD`.
 
 <Callout type='warning'>
@@ -277,7 +278,7 @@ await sdk.onInterfoldEvent(
   `publicKey`) when a candidate is complete and its Keccak-256 hash matches. Otherwise it returns
   `undefined`.
 - It accepts only the first candidate from each publisher.
-- It rejects keys larger than `MAX_COMMITTEE_PUBLIC_KEY_BYTES` (512 KiB). Each chunk is at most
+- It rejects keys larger than `MAX_COMMITTEE_PUBLIC_KEY_BYTES` (16 MiB). Each chunk is at most
   `MAX_COMMITTEE_PUBLIC_KEY_CHUNK_BYTES` (90 KiB).
 - It tracks 128 E3s by default. `clear(e3Id)` removes the state for one E3.
 
@@ -337,7 +338,8 @@ It fails with one of these codes when the stamp does not match:
 
 For another preset, another committee size, or an on-chain verifier, compile your own circuits. Use
 `encryptNumberAndGenInputs` or `encryptVectorAndGenInputs` to get the witness for your prover. See
-[Noir circuits](/build/noir-circuits). `examples/CRISP` shows a complete custom pipeline.
+[Noir circuits](/build/noir-circuits). The [CRISP repository](https://github.com/theinterfold/CRISP)
+shows a complete custom pipeline.
 
 ## Submodule imports
 
@@ -569,8 +571,9 @@ export function useTemplateSdk() {
 ## Application SDKs
 
 A complex E3 program can ship its own SDK next to the Interfold SDK. CRISP uses `@crisp-e3/sdk`
-(`examples/CRISP/packages/crisp-sdk`). It exports `CrispSDK`, vote functions such as `encryptVote`,
-`prepareBallot`, and `decodeTally`, and Merkle helpers such as `generateMerkleProof`.
+([`packages/crisp-sdk`](https://github.com/theinterfold/CRISP/tree/main/packages/crisp-sdk) in the
+CRISP repository). It exports `CrispSDK`, vote functions such as `encryptVote`, `prepareBallot`, and
+`decodeTally`, and Merkle helpers such as `generateMerkleProof`.
 
 ## Next steps
 
