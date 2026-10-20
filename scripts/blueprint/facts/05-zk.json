@@ -293,8 +293,8 @@
           "ref": "crates/zk/prover/src/prover.rs@312@let mut args = vec!["
         },
         {
-          "why": "where a ComputeRequest becomes a prover call (crates/multithread)",
-          "ref": "crates/multithread/src/multithread.rs@1321@fn handle_zk_request("
+          "why": "protocol request adaptation, witness decryption and prover execution without actor scheduling",
+          "ref": "crates/zk/prover/src/request_execution.rs@98@pub fn execute_zk_request("
         }
       ],
       "rust_patterns": [
@@ -333,6 +333,11 @@
         "e3-committee",
         "e3-committee-hash",
         "e3-config",
+        "e3-crypto",
+        "e3-bfv-client",
+        "e3-trbfv",
+        "e3-polynomial",
+        "e3-polynomial-fhe",
         "e3-data",
         "e3-events",
         "e3-fhe-params",

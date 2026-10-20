@@ -780,7 +780,7 @@
         {
           "name": "Multithread",
           "role": "runs compute requests off the event path and publishes their responses",
-          "ref": "crates/multithread/src/multithread.rs@94@pub struct Multithread {"
+          "ref": "crates/multithread/src/multithread.rs@53@pub struct Multithread {"
         },
         {
           "name": "ComputeEffectGate",
@@ -807,19 +807,19 @@
         {
           "name": "E3Failed, E3StageChanged and E3RequestComplete, which cancel the E3's task groups",
           "by": "Multithread",
-          "ref": "crates/multithread/src/multithread.rs@220@EventType::E3Failed,"
+          "ref": "crates/multithread/src/multithread.rs@179@EventType::E3Failed,"
         }
       ],
       "emits": [
         {
           "name": "ComputeResponse",
           "by": "Multithread",
-          "ref": "crates/multithread/src/multithread.rs@710@bus.publish(value, ctx)?;"
+          "ref": "crates/multithread/src/multithread.rs@669@bus.publish(value, ctx)?;"
         },
         {
           "name": "ComputeRequestError, for failures that are not retried",
           "by": "Multithread",
-          "ref": "crates/multithread/src/multithread.rs@690@bus.publish(ComputeRequestError::new(error_kind, request_snapshot), ctx)?;"
+          "ref": "crates/multithread/src/multithread.rs@649@bus.publish(ComputeRequestError::new(error_kind, request_snapshot), ctx)?;"
         },
         {
           "name": "stored outcomes sent to the other request IDs waiting on the same work",
@@ -869,7 +869,7 @@
       "read_first": [
         {
           "why": "wiring: attach creates the actor, subscribes it to the bus, and starts the gate",
-          "ref": "crates/multithread/src/multithread.rs@145@pub fn attach("
+          "ref": "crates/multithread/src/multithread.rs@104@pub fn attach("
         },
         {
           "why": "the gate: when a request goes to the worker, and when a stored result is reused",
@@ -877,7 +877,7 @@
         },
         {
           "why": "the actor's request handler and its retry loop",
-          "ref": "crates/multithread/src/multithread.rs@594@async fn handle_compute_request_event("
+          "ref": "crates/multithread/src/multithread.rs@553@async fn handle_compute_request_event("
         },
         {
           "why": "the pool: semaphore wait, Rayon spawn, and the oneshot result",
@@ -885,24 +885,24 @@
         },
         {
           "why": "the worker function that dispatches TrBFV and ZK requests",
-          "ref": "crates/multithread/src/multithread.rs@1193@fn handle_compute_request("
+          "ref": "crates/multithread/src/multithread.rs@878@fn handle_compute_request("
         }
       ],
       "rust_patterns": [
         {
           "pattern": "actix-actor",
           "note": "Multithread implements Actor and sets its mailbox capacity from MAILBOX_LIMIT on start",
-          "ref": "crates/multithread/src/multithread.rs@549@impl Actor for Multithread {"
+          "ref": "crates/multithread/src/multithread.rs@508@impl Actor for Multithread {"
         },
         {
           "pattern": "actix-handler",
           "note": "the actor handles bus events by queuing compute requests to itself as typed messages",
-          "ref": "crates/multithread/src/multithread.rs@556@impl Handler<InterfoldEvent> for Multithread {"
+          "ref": "crates/multithread/src/multithread.rs@515@impl Handler<InterfoldEvent> for Multithread {"
         },
         {
           "pattern": "actix-recipient",
           "note": "the gate receives the actor as a Recipient, so it sends events without naming the actor type",
-          "ref": "crates/multithread/src/multithread.rs@169@addr.clone().recipient(),"
+          "ref": "crates/multithread/src/multithread.rs@128@addr.clone().recipient(),"
         },
         {
           "pattern": "channel",
@@ -920,24 +920,7 @@
           "ref": "crates/task-pool/src/lib.rs@178@let warning_handle = tokio::spawn(async move {"
         }
       ],
-      "depends_on": [
-        "e3-committee",
-        "e3-request",
-        "e3-bfv-client",
-        "e3-committee-hash",
-        "e3-data",
-        "e3-fhe-params",
-        "e3-trbfv",
-        "e3-crypto",
-        "e3-events",
-        "e3-polynomial",
-        "e3-polynomial-fhe",
-        "e3-zk-config",
-        "e3-zk-witness",
-        "e3-task-pool",
-        "e3-utils",
-        "e3-zk-prover"
-      ],
+      "depends_on": ["e3-request", "e3-trbfv", "e3-crypto", "e3-events", "e3-task-pool", "e3-utils", "e3-zk-prover"],
       "tests": "cargo test -p e3-multithread covers dispatch, task-group lifetime, retries, replay/redrive and memory admission. Pool cancellation and panic cases live in e3-task-pool and run with cargo test -p e3-task-pool.",
       "unverified": [
         "The ZK prover (ZkProver) lives in crates/zk/prover and was not read; the proof side is described only from the dispatch in multithread.rs.",

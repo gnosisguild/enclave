@@ -44,11 +44,11 @@ zk/prover          -> task-pool
 task-pool          -> Rayon, Tokio (no protocol dependencies)
 ```
 
-This is the executor/admission slice of
-[#2321](https://github.com/theinterfold/interfold/issues/2321). Circuit-request adapters in
-`multithread.rs` still need a separate behavior-preserving move to `zk/prover`; deterministic
-preparation remains in `zk/witness`. Replay gates, retry policy and terminal filtering stay here.
-The memory-only gate is not a transactional outbox.
+Circuit-request adaptation and ZK execution belong to
+[`zk/prover`](../zk/prover/src/request_execution.rs); deterministic preparation remains in
+`zk/witness`. This dispatcher owns admission, replay gates, retry policy, correlation, timing
+publication and terminal filtering. TrBFV arithmetic belongs to `trbfv`; the dispatcher currently
+adapts its typed requests and responses. The memory-only gate is not a transactional outbox.
 
 The extraction preserves the existing pool-type re-exports and changes no persisted/event/wire
 encoding or cryptographic statement. `setup_zk_actors` and `ZkActor::new` now require the shared
