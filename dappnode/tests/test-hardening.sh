@@ -381,6 +381,24 @@ fi
 [ ! -s "$missing_config_dir/calls" ] || fail "incomplete backup invoked credential commands"
 assert_contains "$missing_config_dir/output" 'restore the complete backup'
 
+# An upload must not replace the identity of existing state whose key file is missing.
+for leftover in database marker; do
+    rekey_dir="$TEST_ROOT/rekey-$leftover"
+    mkdir -p "$rekey_dir/data" "$rekey_dir/secrets"
+    cp "$success_dir/data/config.yaml" "$rekey_dir/data/config.yaml"
+    if [ "$leftover" = database ]; then
+        mkdir -p "$rekey_dir/data/.interfold/data"
+    else
+        : > "$rekey_dir/data/credentials.provisioned"
+    fi
+    write_secrets "$rekey_dir/secrets/secrets.json"
+    if run_entrypoint "$rekey_dir"; then
+        fail "an upload replaced the identity of existing state: $leftover"
+    fi
+    [ ! -s "$rekey_dir/calls" ] || fail "existing state without its key invoked credential commands: $leftover"
+    assert_contains "$rekey_dir/output" 'restore the complete backup'
+done
+
 # A failed network switch leaves the saved configuration and wallet unchanged.
 original_config=$(cksum "$success_dir/data/config.yaml")
 if run_entrypoint "$success_dir" NETWORK=sepolia RPC_URL="$RPC_FIXTURE_URL/sepolia"; then

@@ -129,6 +129,9 @@ configure_credentials() {
         return
     fi
 
+    # The database holds the encrypted identity. A lost key file must not let an upload replace it.
+    [ ! -e "$CREDENTIALS_READY_FILE" ] && [ ! -e "$CURRENT_STATE_DIR/data" ] \
+        || fail "the credential key is missing for existing node state; restore the complete backup"
     log "Setting up the node identity..."
     jq -jr '.password, "\n"' "$SECRETS_FILE" \
         | interfold password set --password-stdin --config "$CONFIG_FILE" \
