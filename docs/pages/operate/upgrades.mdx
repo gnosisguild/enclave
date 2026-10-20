@@ -337,10 +337,12 @@ state to the volume, and then it resets the state.
 
 The DAppNode package stores its state on the `/data` volume. Keep that volume. On a release with
 `interfold node reset-data --if-schema-older`, the package runs that command before each start, so
-an update resets an older state by itself. A refusal stops the package with the same lists. After
-you checked each listed E3 on chain, set `ALLOW_ACTIVE_E3S_RESET` to `true` in the package Config to
-add `--allow-active-e3s`, and set it back to `false` after the start. On v0.19.0, use the one-off
-container commands below instead of the CLI image migration procedure.
+an update resets an older state by itself. A refusal stops the package with the same lists. Do the
+checks in [If the command refuses](#if-the-command-refuses). For a package, the release that the
+node ran before is the previous package version. Set `ALLOW_ACTIVE_E3S_RESET` to `true` in the
+package Config only where those checks say to add `--allow-active-e3s`, and set it back to `false`
+after the start. On v0.19.0, use the one-off container commands below instead of the CLI image
+migration procedure.
 
 <Steps>
 

@@ -183,7 +183,7 @@ case "$reset_help" in
         RESET_ARGS=(node reset-data --yes --if-schema-older --config "$CONFIG_FILE")
         [ "$ALLOW_ACTIVE_E3S_RESET" != true ] || RESET_ARGS+=(--allow-active-e3s)
         interfold "${RESET_ARGS[@]}" \
-            || fail "the state reset for this release stopped; wait until the E3s listed above finish, or read ALLOW_ACTIVE_E3S_RESET in the package README"
+            || fail "the state reset for this release refused; follow the README section on updates before you set ALLOW_ACTIVE_E3S_RESET"
         ;;
     *) log "This node release has no automatic state reset." ;;
 esac

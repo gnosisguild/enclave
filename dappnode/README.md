@@ -57,10 +57,13 @@ This needs a node release with `interfold node reset-data --if-schema-older`. On
 [one-off reset](https://docs.theinterfold.com/operate/upgrades#reset-node-state) instead.
 
 The reset refuses while the node holds a key share for an E3 that it has not seen complete, or slash
-reports that it has not sent. The node then stays stopped, and the log lists each E3 or chain. Wait
-until they finish. Set `ALLOW_ACTIVE_E3S_RESET` to `true` in package **Config** only after you
-checked on chain that each listed E3 is complete or failed. The node then deletes those key shares.
-Set it back to `false` after the node starts.
+reports that it has not sent. The node then stays stopped, and the log lists each E3 or chain. Do
+the checks in
+[If the command refuses](https://docs.theinterfold.com/operate/upgrades#if-the-command-refuses).
+Where they say to start the release that the node ran before, install the previous package version,
+so that the node finishes its work or sends its reports. Set `ALLOW_ACTIVE_E3S_RESET` to `true` in
+package **Config** only where they say to add `--allow-active-e3s`. The node then deletes those key
+shares and reports. Set it back to `false` after the node starts.
 
 To repair a state that `interfold node validate` reports, stop the package. Then run its image in a
 one-off container with the package volume:
