@@ -11,7 +11,7 @@
  * `deployments/manifest.json` is the single source of truth. A separate check,
  * `pnpm --filter @interfold/contracts gen:manifest:check`, keeps that file equal
  * to `deployed_contracts.json`. This check covers the other direction: the docs,
- * the dashboard, the DAppNode package, and the CRISP example all quote the same
+ * the dashboard, and the DAppNode package all quote the same
  * addresses, and a redeploy that updates the manifest alone leaves them stale.
  *
  * Two rules apply:
@@ -59,7 +59,6 @@ const FILES: Record<string, Role> = {
   'packages/interfold-contracts/deploy/protocol/sepolia-protocol.config.json': 'record',
   'packages/interfold-contracts/deploy/protocol/sepolia-protocol.deployment.json': 'record',
   'packages/interfold-contracts/deploy/protocol/sepolia-protocol.safe-transactions.json': 'record',
-  'examples/CRISP/packages/crisp-contracts/deployed_contracts.json': 'record',
   'dappnode/tests/test-hardening.sh': 'record',
 
   'docs/pages/operate/index.mdx': 'consumer',
@@ -69,7 +68,6 @@ const FILES: Record<string, Role> = {
   'docs/pages/reference/contracts.mdx': 'consumer',
   'packages/interfold-dashboard/.env.example': 'consumer',
   'packages/interfold-dashboard/src/lib/networks.ts': 'consumer',
-  'examples/CRISP/interfold.config.yaml': 'consumer',
   'dappnode/docker-compose.yml': 'consumer',
 }
 
@@ -90,7 +88,7 @@ const ALLOWED: Record<string, string> = {
 
   // Sepolia contracts that the docs list but the manifest does not publish (it publishes only
   // the CONTRACT_KEYS set). Source: packages/interfold-contracts/deploy/protocol/sepolia-protocol.deployment.json
-  // and examples/CRISP/packages/crisp-contracts/deployed_contracts.json.
+  // and packages/crisp-contracts/deployed_contracts.json in the CRISP repository.
   '0x00a49042e0550a272ed393dd324749c18c0c8e62': 'MockOpenVmReceiptVerifier (CRISP), sepolia',
   '0x6d373da705b443ef76e37cb96275623818c50657': 'AvailVectorXDataAvailabilityVerifier (CRISP), sepolia',
   '0x3d5d8c688545a3c336d373cc61e501211238226a': 'HonkVerifier (CRISP), sepolia',
@@ -108,19 +106,6 @@ const ALLOWED: Record<string, string> = {
   // Not an address: the first 20 bytes of the 32-byte OpenVM guest image ID that the mainnet
   // OpenVmBfvCiphertextVerifier checks. The address pattern matches the start of the hash.
   '0x126eb3ea8c2d24cbf8e89f7e41dd2f0be5050be7': 'prefix of the mainnet ciphertext guest image ID (a hash, not an address)',
-
-  // Deterministic Anvil accounts used by the local CRISP stack.
-  '0x70997970c51812dc3a010c7d01b50e0d17dc79c8': 'Anvil account 1',
-  '0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc': 'Anvil account 2',
-  '0x90f79bf6eb2c4f870365e785982e1f101e93b906': 'Anvil account 3',
-  '0x15d34aaf54267db7d7c367839aaf71a00a2c6a65': 'Anvil account 4',
-  '0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc': 'Anvil account 5',
-  '0x9a676e781a523b5d0c0e43731313a708cb607508': 'Anvil account 7',
-  '0x8198f5d8f8cffe8f9c413d98a0a55aeb8ab9fbb7': 'local devnet deployment',
-  '0xa513e6e4b8f2a923d98304ec87f64353c4d5c853': 'local devnet deployment',
-  '0xc3e53f4d16ae77db1c982e75a937b9f60fe63690': 'local devnet deployment',
-  '0xdc64a140aa3e981100a9beca4e685f962f0cf6c9': 'local devnet deployment',
-  '0xe7f1725e7734ce288f8367e1bb143e90bb3f0512': 'local devnet deployment',
 }
 
 /**

@@ -367,11 +367,6 @@
           "ref": "crates/indexer/src/indexer.rs@142@pub struct InMemoryStore {"
         },
         {
-          "name": "E3 records and the block cursor in CRISP's SledDB, which implements DataStore",
-          "where": "disk",
-          "ref": "examples/CRISP/server/src/server/database.rs@196@impl DataStore for SledDB {"
-        },
-        {
           "name": "callback queue and cursor flags (backfill_enabled, cursor_high, caught_up)",
           "where": "memory",
           "ref": "crates/indexer/src/indexer.rs@286@callbacks: CallbackQueue,"
@@ -455,10 +450,7 @@
       ],
       "depends_on": ["e3-bfv-client", "e3-evm-helpers", "e3-fhe-params"],
       "tests": "cargo test -p e3-indexer. Unit tests: indexer.rs (cfg(test) at line 1202), repo.rs (line 132) and callback_queue.rs. Integration tests in tests/integration.rs start Anvil (tests/helpers.rs:11), and build.rs runs scripts/build_fixtures.sh, which needs solc and jq on PATH.",
-      "unverified": [
-        "examples/CRISP/server/src/server/database.rs (SledDB) was located, but its persistence behaviour was not read.",
-        "The integration tests were not run in this pass; only their setup was read."
-      ]
+      "unverified": ["The integration tests were not run in this pass; only their setup was read."]
     },
     {
       "id": "e3-evm-helpers",

@@ -33,7 +33,7 @@ list:
 - `contracts/verifiers/bfv/Risc0BfvCiphertextVerifier.sol`
 - `contracts/lib/InterfoldLifecycle.sol`, `lib/Risc0ComputeProof.sol`,
   `lib/FailurePayerLib.sol`
-- `examples/CRISP/**`
+- the CRISP application (https://github.com/theinterfold/CRISP)
 
 Several `Z-` entries in `docs/architecture/protocol-history.md` were remediated
 by adding files that are themselves outside both file lists, so the remediation

@@ -1,10 +1,13 @@
 # Application data availability
 
 Owners: [ciphernode DA coordinator](../../crates/evm/src/data_availability/),
-[CRISP server](../../examples/CRISP/server/), and
+[CRISP server](https://github.com/theinterfold/CRISP/tree/main/server), and
 [DA contract adapter](../../packages/interfold-contracts/contracts/). Committee public keys use
 bounded Ethereum event chunks, not Avail; [DKG](dkg.md) owns their commitment validation. Voter and
-aggregate ciphertexts use Avail with VectorX finalization on Ethereum.
+aggregate ciphertexts use Avail with VectorX finalization on Ethereum. CRISP lives in its own
+[repository](https://github.com/theinterfold/CRISP); this document covers its availability flow
+because that flow uses the DA coordinator, the compute provider, and the OpenVM host of this
+repository.
 
 ## Exact bytes and two-step commitment
 
@@ -217,11 +220,12 @@ rounds; otherwise they fail at their existing compute/decryption deadline.
 ## Evidence and deployment acceptance
 
 [Avail adapter tests](../../packages/interfold-contracts/test/DataAvailability/AvailVectorX.spec.ts),
-[CRISP tests](../../examples/CRISP/packages/crisp-contracts/tests/), and server tests own exact
-deadline, hash/commitment, job/finality, and quota boundaries. Run `pnpm evm:test` and relevant
-CRISP tests. Unit/contract suites do not reproduce the deployed OpenVM guest. Follow
-[OpenVM](../../crates/openvm-prover/README.md) and
+[CRISP tests](https://github.com/theinterfold/CRISP/tree/main/packages/crisp-contracts/tests), and
+server tests own exact deadline, hash/commitment, job/finality, and quota boundaries. Run
+`pnpm evm:test` here and the relevant tests in the CRISP repository. Unit/contract suites do not
+reproduce the deployed OpenVM guest. Follow [OpenVM](../../crates/openvm-prover/README.md) and
 [provenance](../pages/build/e3-program/verify-compute-provider.mdx): checked worker
-commitments/Halo2 code, both gates bound to one identity, full local Playwright, and one real
-Sepolia Avail Turing/VectorX round. Observe InputCommitted → Avail final → InputPublished → OpenVM
-proof → aggregate Avail final → CiphertextOutputReferencePublished → plaintext completion.
+commitments/Halo2 code, both gates bound to one identity, the full local Playwright flow of CRISP,
+and one real Sepolia Avail Turing/VectorX round. Observe InputCommitted → Avail final →
+InputPublished → OpenVM proof → aggregate Avail final → CiphertextOutputReferencePublished →
+plaintext completion.

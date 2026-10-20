@@ -120,7 +120,8 @@ pnpm --filter @interfold/dashboard preview     # serve dist/
 
 ## Deploy (Vercel)
 
-This is a separate Vercel **Project** from the CRISP client, both pointing at the same repo.
+The CRISP client lives in the [CRISP repository](https://github.com/theinterfold/CRISP). The
+dashboard is a separate Vercel **Project** that points at this repo.
 
 1. New Project → import this repo → set **Root Directory** to `packages/interfold-dashboard`.
 2. `vercel.json` (committed here) drives the rest:

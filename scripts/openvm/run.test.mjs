@@ -25,7 +25,6 @@ test('OpenVM dispatcher retains workspace ownership, arguments, target override 
     })
   for (const [task, manifest] of [
     ['cli-build', 'Cargo.toml'],
-    ['fixture', 'examples/CRISP/Cargo.toml'],
     ['prover-check', 'crates/openvm-prover/Cargo.toml'],
   ]) {
     const result = run(task, ['argument with spaces'])
@@ -35,6 +34,6 @@ test('OpenVM dispatcher retains workspace ownership, arguments, target override 
     assert.equal(args.at(-1), 'argument with spaces')
     assert.equal(target, join(dir, 'target override'))
   }
-  assert.equal(run('fixture', [], '17').status, 17)
+  assert.equal(run('cli-build', [], '17').status, 17)
   assert.equal(run('no-such-task').status, 2)
 })

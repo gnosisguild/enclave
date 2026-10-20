@@ -89,14 +89,21 @@ PK/decryption routers/OpenVM ciphertext verifier; register/bind new CRISP and re
 programs; require protocol 8/generation 2; keep paused. Mainnet requires `--openvm-identity`.
 Preparation verifies drain/pause, records against live implementation, CRISP owner/binding, common
 image/receipt identity, guest commitments, Halo2 runtime hash, Avail bridge/windows, and signer.
+CRISP is not in this repository: `prepare` reads the CRISP deployment record from
+`--crisp-deployments <path>`, the `packages/crisp-contracts/deployed_contracts.json` of the
+[CRISP repository](https://github.com/theinterfold/CRISP). A missing option or file stops the
+script. `validate`, `refresh`, and `resume` read the saved plan, not the record.
 
 `upgrade:v19:validate` is read-only/repeatable; `--write-records` updates deployment records and
 deployed_contracts for release provenance. After execution restart matching nodes;
 `upgrade:v19:refresh` reads registration logs and refreshes each inactive entry. In the next block,
 `upgrade:v19:resume -- --ciphernodes-restarted` revalidates readiness/capacity and writes the
-unpause batch. `upgrade:v19:simulate` exercises the sequence on an Anvil mainnet fork. The flag is
-an explicit operator confirmation of running/reachable processes, not evidence inferred from active
-status.
+unpause batch. The `--ciphernodes-restarted` flag is an explicit operator confirmation of
+running/reachable processes, not evidence inferred from active status.
+`upgrade:v19:simulate -- --crisp-dir <CRISP checkout>` exercises the sequence on an Anvil mainnet
+fork. It overwrites the `mainnet` entry of the checkout's
+`packages/crisp-contracts/deployed_contracts.json` with the fork's addresses, passes that file as
+`--crisp-deployments`, and restores the file when it ends.
 
 During an ordered legacy CRISP server cutover, missing `earliestVotingStart()` can temporarily fall
 back to live protocol windows. Install/register new program and update server/DAO addresses before
@@ -104,6 +111,12 @@ resume; old servers do not schedule the required separate voting start and canno
 rounds.
 
 ## Historical secure CRISP activation and dependency replacement
+
+`upgrade:secure-crisp` reads the CRISP deployment record from `--crisp-deployments <path>` (the
+`packages/crisp-contracts/deployed_contracts.json` of the
+[CRISP repository](https://github.com/theinterfold/CRISP)). A missing option or file stops the
+script, unless `--crisp-program`, `--ciphertext-verifier`, and `--data-availability-verifier` give
+the three addresses. The validator and `resume` read the saved plan, not the record.
 
 `upgrade:secure-crisp`/validator read the **RISC Zero** program and frozen ImageID.sol; they cannot
 activate v0.19 OpenVM. Its historical batch upgraded four proxies, replaced SlashingManager while

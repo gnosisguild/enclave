@@ -193,7 +193,7 @@ describe('npm publication recovery', () => {
 })
 
 test('publication gate handles stable and pre-release jobs', () => {
-  const common = { CIPHERNODE_RESULT: 'success', NPM_RESULT: 'success', SUPPORT_RESULT: 'success' }
+  const common = { CIPHERNODE_RESULT: 'success', NPM_RESULT: 'success' }
   assert.doesNotThrow(() => verifyPublications({ ...common, DAPPNODE_RESULT: 'success', IS_PRERELEASE: 'false' }))
   assert.doesNotThrow(() => verifyPublications({ ...common, DAPPNODE_RESULT: 'skipped', IS_PRERELEASE: 'true' }))
   assert.throws(() => verifyPublications({ ...common, DAPPNODE_RESULT: 'failure', IS_PRERELEASE: 'false' }), /DAppNode result/)
@@ -348,11 +348,10 @@ test('publication gate fails on every missing, failed, cancelled or skipped requ
   const common = {
     CIPHERNODE_RESULT: 'success',
     NPM_RESULT: 'success',
-    SUPPORT_RESULT: 'success',
     DAPPNODE_RESULT: 'success',
     IS_PRERELEASE: 'false',
   }
-  for (const publisher of ['CIPHERNODE_RESULT', 'NPM_RESULT', 'SUPPORT_RESULT']) {
+  for (const publisher of ['CIPHERNODE_RESULT', 'NPM_RESULT']) {
     for (const result of ['', 'failure', 'cancelled', 'skipped'])
       assert.throws(() => verifyPublications({ ...common, [publisher]: result }), /publication did not succeed/)
   }
@@ -371,7 +370,6 @@ test('publication CLI still loads without development dependencies installed', (
     env: {
       ...process.env,
       CIPHERNODE_RESULT: 'success',
-      SUPPORT_RESULT: 'success',
       NPM_RESULT: 'success',
       DAPPNODE_RESULT: 'skipped',
       IS_PRERELEASE: 'true',

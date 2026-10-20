@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 import { ethers as ethersLib } from "ethers";
-import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -18,13 +17,12 @@ import {
 } from "../protocol/constants";
 import { deployBfvVerifierRoutes } from "../protocol/deployContracts";
 import {
+  crispDeploymentsPath,
   deploymentPath,
   governanceSafeBuilderPath,
   protocolDir,
   readJson,
   repoRelativePath,
-  repoRoot,
-  resolvePath,
   writeJson,
 } from "../protocol/files";
 import {
@@ -116,17 +114,6 @@ function batchPath(config: ProtocolConfigFile): string {
   );
 }
 
-function defaultCrispDeploymentsPath(): string {
-  return path.join(
-    repoRoot,
-    "examples",
-    "CRISP",
-    "packages",
-    "crisp-contracts",
-    "deployed_contracts.json",
-  );
-}
-
 export function resolveCrispAddresses(): {
   crispProgram: string;
   ciphertextVerifier: string;
@@ -160,13 +147,7 @@ export function resolveCrispAddresses(): {
     };
   }
 
-  const file = resolvePath(
-    arg("crisp-deployments") ?? defaultCrispDeploymentsPath(),
-  );
-  if (!fs.existsSync(file)) {
-    throw new Error(`CRISP deployment file not found: ${file}`);
-  }
-  const deployments = readJson<CrispDeploymentRecord>(file);
+  const deployments = readJson<CrispDeploymentRecord>(crispDeploymentsPath());
   const deployment = deployments[networkName()];
   if (!deployment) {
     throw new Error(`No CRISP deployment is recorded for ${networkName()}`);

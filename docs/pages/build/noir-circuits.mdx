@@ -347,15 +347,15 @@ function verify(
 ## Verifiers for your own circuits
 
 An E3 program can check its inputs with its own circuits. CRISP does this in
-`examples/CRISP/scripts/compile_circuits.sh`:
+[`scripts/compile_circuits.sh`](https://github.com/theinterfold/CRISP/blob/main/scripts/compile_circuits.sh)
+in the CRISP repository. The `user_data_encryption` circuits and their keys come compiled from the
+Interfold release. For each ballot stack, the script does these steps:
 
-1. It compiles `user_data_encryption_ct0`, `user_data_encryption_ct1`, and `user_data_encryption`
-   from `circuits/bin/threshold`.
-2. It writes their verification keys with `bb write_vk -t noir-recursive-no-zk`.
-3. It compiles the application circuit and writes its key the same way.
-4. It compiles the fold circuit, which verifies both proofs, and writes its key with
+1. It compiles the application circuit and writes its verification key with
+   `bb write_vk -t noir-recursive-no-zk`.
+2. It compiles the fold circuit, which verifies both proofs, and writes its key with
    `bb write_vk --oracle_hash keccak`.
-5. It runs `bb write_solidity_verifier` on the fold key and copies the result to
+3. It runs `bb write_solidity_verifier` on the fold key and copies the result to
    `packages/crisp-contracts/contracts/verifiers/`.
 
 The script makes two verifiers: `CRISPVerifier.sol` from the `crisp` and `fold` circuits, and

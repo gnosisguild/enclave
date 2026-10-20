@@ -9,7 +9,6 @@ import { ROOT_DIR, fail, readJson } from './core.mjs'
 export function verifyPublications(environment = process.env) {
   const required = [
     ['ciphernode image', environment.CIPHERNODE_RESULT],
-    ['e3-support image', environment.SUPPORT_RESULT],
     ['npm packages', environment.NPM_RESULT],
   ]
 
@@ -60,7 +59,7 @@ export function checkReleaseSafeguards(rootDir = ROOT_DIR) {
     }
   }
   command('validate-and-prepare', 'node scripts/release/index.mjs prepare')
-  for (const publisher of ['build-ciphernode-image-release', 'build-e3-support-release', 'publish-npm-packages']) {
+  for (const publisher of ['build-ciphernode-image-release', 'publish-npm-packages']) {
     requires(publisher, ['release-candidate-gate'])
     if (job(publisher).if !== undefined) fail(`${publisher} must retain implicit dependency success gating`)
   }
@@ -69,7 +68,6 @@ export function checkReleaseSafeguards(rootDir = ROOT_DIR) {
   requires('publication-gate', [
     'validate-and-prepare',
     'build-ciphernode-image-release',
-    'build-e3-support-release',
     'publish-npm-packages',
     'build-dappnode-package-release',
   ])
@@ -102,7 +100,7 @@ export function checkReleaseSafeguards(rootDir = ROOT_DIR) {
   const create = steps.findIndex((step) => step.uses?.startsWith('softprops/action-gh-release@'))
   const promote = steps.findIndex((step) => step.run?.startsWith('node scripts/release/index.mjs promote-stable'))
   if (promote < 0 || create <= promote) fail('the stable release must be created after its stable tag is promoted')
-  command('create-github-release', 'aliases=(--tag "${image}:dev")')
+  command('create-github-release', 'aliases=(--tag "${CIPHERNODE_IMAGE_NAME}:dev")')
 
   if (packageJson.scripts['release:tag'] !== 'node scripts/release/index.mjs tag') {
     fail('release:tag does not use the protected release command')

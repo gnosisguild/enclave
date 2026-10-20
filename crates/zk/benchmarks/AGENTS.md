@@ -9,8 +9,7 @@ This unpublished development runner owns benchmark selection, orchestration, rec
   success. Do not sum overlapping job time into end-to-end wall time.
 - Validate artifact digests, pair, compiler, and proof variant. A config cache needs its own source,
   compiled, and VK provenance; never assign a hydrated hash to a fresh compilation.
-- Forward the validated BB path to protocol children. CRISP gas setup must preserve the complete
-  node archive and restore its selected pair on failure or interruption.
+- Forward the validated BB path to protocol children.
 - Replay saved proofs without reproving; report runs no tools. Preserve historical runs and refuse
   nonempty output directories. Calldata gas cannot substitute for verifier gas.
 

@@ -96,9 +96,8 @@ The expected archive digest ships **with the binary**, never fetched from the ar
 0.18.0's pin is the published GitHub asset digest; other version pins live in versions.json. Release
 packaging hashes and retains exact bytes, passes `E3_CIRCUITS_ARCHIVE_SHA256` to binary/image
 compilation, and build.rs validates it. ZkConfig binds it to crate version. `noir status` checks
-binary and ciphernode image against that digest before candidate publication. Program-runner image
-builds no CLI/node; DAppNode copies the checked image. Unpinned builds compile, but downloads fail
-before network access.
+binary and ciphernode image against that digest before candidate publication. DAppNode copies the
+checked ciphernode image. Unpinned builds compile, but downloads fail before network access.
 
 Both download and local install require nonempty SHA-256 checksums.json, verify every entry, reject
 uncovered artifacts, and require every path in
@@ -174,17 +173,12 @@ local source identity, not a hydrated archive hash. Protocol children receive th
 through `E3_CUSTOM_BB`. Replay uses saved folded proofs; missing verifier measurements remain
 incomplete.
 
-CRISP's partial threshold build writes to `examples/CRISP/circuits/dist/threshold-build`, never the
-complete node archive. `pnpm bench:crisp:prepare` builds WASM/SDK dependencies, restores the
-selected node pair even after failure or SIGINT/SIGTERM, then compiles contracts/tasks unless
-interrupted. Gas collection runs this setup before protocol proving and records setup time
-separately from gas. Run setup and benchmark selection serially because both change shared Noir
-selectors.
-
-`pnpm provenance:manifest` ties source/lockfiles/artifact digests/OpenVM commitments/worker identity
-and deployed protocol/receipt/Halo2 verifiers. Missing fields mean `complete: false`, not partial
-"verified" output. Even complete manifests need independent reproducibility evidence. **Gap:**
-release workflow does not attach the manifest; a maintainer must run it manually. See
+`pnpm provenance:manifest --project <checkout>` ties source/lockfiles/artifact digests/OpenVM
+commitments/worker identity and deployed protocol/receipt/Halo2 verifiers. `--project` names the
+clean checkout of the project whose guest the worker configuration describes. Missing fields mean
+`complete: false`, not partial "verified" output. Even complete manifests need independent
+reproducibility evidence. **Gap:** release workflow does not attach the manifest; a maintainer must
+run it manually. See
 [verification procedure](../pages/build/e3-program/verify-compute-provider.mdx).
 
 Use `pnpm check:committee`, `pnpm test:circuit-tooling`, `pnpm check:verifiers` after prepared

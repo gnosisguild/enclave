@@ -36,7 +36,7 @@ pub(crate) struct Options {
     /// Separate integration summary for saved-data reporting.
     #[arg(long)]
     pub summary: Option<PathBuf>,
-    /// Saved gas document for reporting or preserving user gas during replay.
+    /// Saved gas document for reporting.
     #[arg(long)]
     pub gas_json: Option<PathBuf>,
     #[arg(long)]
@@ -186,14 +186,12 @@ pub(crate) fn execute(root: &Path, options: &Options) -> Result<()> {
                 .context("replay requires --input <summary-or-run>")?,
         );
         let output = new_output(root, options)?;
-        let gas = options.gas_json.as_ref().map(|path| resolve(root, path));
         let result = protocol::replay(
             root,
             &output,
             &input,
             options.mode.as_deref(),
             options.committee.as_deref(),
-            gas.as_deref(),
         );
         render_saved(&output)?;
         println!("Replay output: {}", output.display());
@@ -345,7 +343,6 @@ pub(crate) fn execute(root: &Path, options: &Options) -> Result<()> {
             &protocol_config,
             options.command == "gas",
             None,
-            None,
         );
         render_saved(&output)?;
         println!("Protocol output: {}", output.display());
@@ -393,7 +390,7 @@ pub(crate) fn execute(root: &Path, options: &Options) -> Result<()> {
     }
     write_json(&output.join("benchmark_run_meta.json"), &metadata)?;
     if !options.leaf_only && !options.witness_only && failures.is_empty() {
-        if let Err(error) = protocol::collect(root, &output, &protocol_config, true, None, None) {
+        if let Err(error) = protocol::collect(root, &output, &protocol_config, true, None) {
             failures.push(format!("Protocol/gas stage incomplete: {error:#}"));
         }
     }

@@ -83,11 +83,12 @@ One delegate represents at most three (`MAX_BONDED_OWNERS`) owners because each 
 again on every query. Only owner/current delegate can end the link; `dropBonded(owner)` must check
 its caller. Escrow and wallet delegation stay in their own sources, not duplicated here. Emit
 `BondedDelegateChanged`, not IVotes `DelegateChanged`: CRISP's
-[token census](../../examples/CRISP/server/src/server/token_holders/etherscan.rs) discovers bonded
-delegates from that event. `EtherscanClient::get_delegate_candidates` collects nonzero `toDelegate`
-addresses, then `getPastVotes` filters them at the snapshot. When `BondedVotes.votesSource()` is not
-the token, the census also reads the source adapter's `DelegateChanged` events: an escrow delegate
-can have votes without a lock NFT or token log. A replacement adapter starts with no delegations.
+[token census](https://github.com/theinterfold/CRISP/blob/main/server/src/server/token_holders/etherscan.rs)
+discovers bonded delegates from that event. `EtherscanClient::get_delegate_candidates` collects
+nonzero `toDelegate` addresses, then `getPastVotes` filters them at the snapshot. When
+`BondedVotes.votesSource()` is not the token, the census also reads the source adapter's
+`DelegateChanged` events: an escrow delegate can have votes without a lock NFT or token log. A
+replacement adapter starts with no delegations.
 
 Excluded addresses are fixed at construction (mainnet configuration names the Foundation and Gnosis
 Guild Safes). `getPastVotes`, `getVotes`, and `balanceOf` return zero, and either excluded endpoint

@@ -77,8 +77,6 @@ test('the production verifier filter excludes artifact transport and gas setup b
   const cases = [
     ['scripts/circuits/artifacts.ts', 1],
     ['scripts/circuits/artifacts.test.ts', 1],
-    ['scripts/circuits/prepare-crisp-gas.mjs', 1],
-    ['scripts/circuits/prepare-crisp-gas.test.mjs', 1],
     ['scripts/circuits/README.md', 1],
     ['scripts/circuits/constants.ts', 0],
     ['scripts/circuits/build-pairs.json', 0],

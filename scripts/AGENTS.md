@@ -7,8 +7,7 @@ entry points. [README.md](README.md) documents flags, prerequisites, and operati
   [RELEASING.md](../RELEASING.md) owns the procedure; do not introduce another release sequence
   here.
 - Preserve argument forwarding, exit status, dry-run/check behavior, and cleanup ownership when
-  changing wrappers. CRISP's `examples/CRISP/scripts/test-isolated.sh` tests committed HEAD, not
-  pending edits; use script unit tests to check a wrapper change before invoking that runner.
+  changing wrappers; use script unit tests to check a wrapper change.
 - Circuit build, hydration, verifier generation, and source hashing share preset/committee identity.
   The Rust owner is `crates/zk/build`; `circuits/` here owns transport/adapters and the shared pair
   policy. Change the owning helpers rather than bypassing stamps or rewriting generated outputs. See

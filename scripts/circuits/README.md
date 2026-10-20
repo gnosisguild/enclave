@@ -14,7 +14,6 @@ compatibility.
 | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | [Rust build crate](../../crates/zk/build/README.md)                                | Selects pairs, compiles Noir, generates keys, and stages artifacts.                |
 | [`build-pairs.json`](build-pairs.json)                                             | Shared build policy, separate from release requirements.                           |
-| [`prepare-crisp-gas.mjs`](prepare-crisp-gas.mjs)                                   | Cold gas-test dependencies and node-pair restoration.                              |
 | [`constants.ts`](constants.ts)                                                     | Shared circuit group, variant, preset, and committee metadata.                     |
 | [`artifacts.ts`](artifacts.ts)                                                     | Published artifact transport, checksums, and release-inventory validation.         |
 | [`verifiers.ts`](verifiers.ts)                                                     | Generates/checks Solidity verifiers and applies contract-specific transformations. |
@@ -26,10 +25,10 @@ compatibility.
 
 `pnpm test:circuit-tooling` exercises transport/inventory and verifier transformations.
 `pnpm test:circuit-build` checks the Rust generator; `pnpm test:circuit-bench` checks benchmark
-orchestration and measurement. `pnpm test:harnesses` covers CRISP setup/restoration. Install
-workspace dependencies first. These tests are separate from `pnpm noir:test` and real-proof suites.
-`pnpm noir:lint` runs compiler/format checks, but reports a skip when Nargo is absent. The commands
-below describe the pinned tools and prepared artifacts needed for actual circuit/verifier work.
+orchestration and measurement. Install workspace dependencies first. These tests are separate from
+`pnpm noir:test` and real-proof suites. `pnpm noir:lint` runs compiler/format checks, but reports a
+skip when Nargo is absent. The commands below describe the pinned tools and prepared artifacts
+needed for actual circuit/verifier work.
 
 ## Circuit Builder
 
@@ -65,9 +64,6 @@ pnpm build:circuits sync-config --preset insecure-64 --committee minimum
 
 # Regenerate static declarations without proving
 pnpm build:circuits sync-preset --preset insecure-64 --committee minimum
-
-# Update CRISP fold bindings from compiled inner verification keys
-pnpm build:circuits sync-crisp --preset insecure-64 --committee minimum
 
 # Compare generated files in an isolated copy
 pnpm build:circuits check --committee all
@@ -253,12 +249,11 @@ default pair; releases require the complete supported matrix.
 
 The script has two modes:
 
-- **`--check` (used by test/benchmark/CI flows)** — regenerate in memory and diff against the
-  committed files. Exits non-zero on drift without touching the working tree. This is how
-  `tests/integration/lib/prebuild.sh`, `circuits/benchmarks/scripts/extract_crisp_verify_gas.sh`,
-  and `circuits/benchmarks/scripts/replay_folded_verify_gas.sh` invoke the script — so accidental
-  drift between committed verifiers and current circuit VKs surfaces as a failure rather than a
-  silent rewrite mid-test.
+- **`--check` (used by test and CI flows)** — regenerate in memory and diff against the committed
+  files. Exits non-zero on drift without touching the working tree.
+  `tests/integration/lib/prebuild.sh`, `pnpm check:verifiers` in CI, and the pre-push hook invoke
+  the script this way — so accidental drift between committed verifiers and current circuit VKs
+  surfaces as a failure rather than a silent rewrite mid-test.
 - **`--write` (default for manual runs)** — regenerate and overwrite the committed files. Use this
   when you intentionally bump the canonical-preset circuits or the Noir/bb toolchain.
 
