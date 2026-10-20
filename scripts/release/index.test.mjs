@@ -304,7 +304,14 @@ test('stable release validates and updates both DAppNode network variants', () =
 
   const rootDir = temporaryDirectory('interfold-dappnode-versions')
   mkdirSync(join(rootDir, 'dappnode'))
-  for (const file of ['dappnode_package.json', 'package.json', 'package-lock.json', 'docker-compose.yml', 'Dockerfile', 'package_variants']) {
+  for (const file of [
+    'dappnode_package.json',
+    'package.json',
+    'package-lock.json',
+    'docker-compose.yml',
+    'Dockerfile',
+    'package_variants',
+  ]) {
     cpSync(join(ROOT_DIR, 'dappnode', file), join(rootDir, 'dappnode', file), { recursive: true })
   }
   bumpDappnodeVersions(rootDir, '0.20.0', '0.11.0')
@@ -386,7 +393,7 @@ test('publication CLI still loads without development dependencies installed', (
   const root = temporaryDirectory('interfold-release-no-dependencies')
   const scripts = join(root, 'scripts/release')
   mkdirSync(scripts, { recursive: true })
-  for (const file of ['index.mjs', 'assets.mjs', 'core.mjs', 'gates.mjs', 'git.mjs', 'npm.mjs', 'version.mjs'])
+  for (const file of ['index.mjs', 'assets.mjs', 'core.mjs', 'dappnode.mjs', 'gates.mjs', 'git.mjs', 'npm.mjs', 'version.mjs'])
     copyFileSync(join(ROOT_DIR, 'scripts/release', file), join(scripts, file))
   const result = execFileSync(process.execPath, [realpathSync(join(scripts, 'index.mjs')), 'verify-publications'], {
     cwd: root,

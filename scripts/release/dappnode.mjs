@@ -28,6 +28,18 @@ function replace(rootDir, path, pattern, value) {
   writeFileSync(file, source.replace(pattern, value))
 }
 
+/** Files that a stable version bump changes, for staging. */
+export function dappnodeVersionFiles(rootDir) {
+  return [
+    'dappnode/dappnode_package.json',
+    'dappnode/package.json',
+    'dappnode/package-lock.json',
+    'dappnode/docker-compose.yml',
+    'dappnode/Dockerfile',
+    ...variants(rootDir).map(({ path }) => join(path, 'docker-compose.yml')),
+  ]
+}
+
 export function bumpDappnodeVersions(rootDir, upstreamVersion, wrapperVersion) {
   const manifest = readJson(rootDir, 'dappnode/dappnode_package.json')
   manifest.version = wrapperVersion

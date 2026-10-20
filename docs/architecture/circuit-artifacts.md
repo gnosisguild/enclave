@@ -96,8 +96,9 @@ The expected archive digest ships **with the binary**, never fetched from the ar
 0.18.0's pin is the published GitHub asset digest; other version pins live in versions.json. Release
 packaging hashes and retains exact bytes, passes `E3_CIRCUITS_ARCHIVE_SHA256` to binary/image
 compilation, and build.rs validates it. ZkConfig binds it to crate version. `noir status` checks
-binary and ciphernode image against that digest before candidate publication. DAppNode copies the
-checked ciphernode image. Unpinned builds compile, but downloads fail before network access.
+binary and ciphernode image against that digest before candidate publication. Both DAppNode packages
+extend the checked ciphernode image. Unpinned builds compile, but downloads fail before network
+access.
 
 Both download and local install require nonempty SHA-256 checksums.json, verify every entry, reject
 uncovered artifacts, and require every path in
