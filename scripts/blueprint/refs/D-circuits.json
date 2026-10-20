@@ -145,19 +145,6 @@
     "note": "Interfold passes its decryption verifier to InterfoldLifecycle, which calls verify (line 332), and BfvDecryptionVerifier forwards the proof to the DecryptionAggregatorVerifier Honk contract (line 218)."
   },
   {
-    "id": "D11",
-    "supported": true,
-    "refs": [
-      "examples/CRISP/circuits/bin/fold/src/main.nr@41@user_data_encryption_proof,",
-      "examples/CRISP/circuits/bin/fold/src/main.nr@47@crisp_proof,",
-      "circuits/bin/threshold/user_data_encryption/src/main.nr@11@P3: ct0 inner proof.",
-      "circuits/bin/threshold/user_data_encryption/src/main.nr@24@ct0_proof,",
-      "circuits/bin/threshold/user_data_encryption/src/main.nr@30@ct1_proof,"
-    ],
-    "line_text": ["user_data_encryption_proof,", "crisp_proof,", "// P3: ct0 inner proof.", "ct0_proof,", "ct1_proof,"],
-    "note": "The CRISP fold verifies the user_data_encryption proof (P3, which itself verifies the ct0 and ct1 inner proofs) together with the crisp voter proof."
-  },
-  {
     "id": "D12",
     "supported": true,
     "refs": [
@@ -211,7 +198,7 @@
     "refs": [
       "crates/aggregator/src/public_key_aggregation/state.rs@76@GeneratingC5Proof {",
       "crates/aggregator/src/public_key_aggregation/handlers.rs@189@if !self.can_continue_aggregation_effects() {",
-      "crates/aggregator/src/public_key_aggregation/actor.rs@148@fn can_continue_aggregation_effects",
+      "crates/aggregator/src/public_key_aggregation/actor.rs@146@fn can_continue_aggregation_effects",
       "crates/aggregator/src/public_key_aggregation/effects/verify_key_proofs.rs@373@Publishing PkAggregationProofPending for C5 proof generation",
       "crates/aggregator/src/public_key_aggregation/effects/verify_key_proofs.rs@375@PkAggregationProofPending {",
       "crates/zk/prover/src/proof_request/effects/aggregation_proofs.rs@39@ZkRequest::PkAggregation(msg.proof_request)"

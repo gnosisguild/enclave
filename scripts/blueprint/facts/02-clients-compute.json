@@ -3,11 +3,10 @@
   "units": [
     {
       "id": "e3-program-server",
+      "documentation": [{ "title": "Program server", "path": "docs/pages/build/e3-program/compute-provider.mdx" }],
       "kind": "crate",
       "path": "crates/program-server",
       "one_line": "HTTP service that runs an E3 program over submitted ciphertext inputs in the background and posts the result to a callback URL.",
-      "explain": "A caller POSTs ciphertext inputs to /run_compute, and the server takes one of max_concurrent_jobs slots (default 1) or answers 429. A detached task runs the caller's runner and posts a completed or failed payload to the callback URL, with up to 5 attempts on server errors, 408, 429 and transport failures. Callback URLs must be plain http or https, and private, link-local and .local or .internal hosts are refused unless ALLOW_PRIVATE_CALLBACKS is set. No ciphernode crate depends on this one: the CRISP server is the caller, and the chain checks the compute proof when the output is published.",
-      "analogy": "A bakery counter with one oven per ticket: the order is refused when every oven is busy, the cake is baked out back, and it is delivered to the address written on the order.",
       "actors": [],
       "consumes": [
         {
@@ -119,17 +118,16 @@
       "depends_on": ["e3-compute-provider", "e3-bfv-client", "e3-fhe-params"],
       "tests": "cargo test -p e3-program-server. In-crate tests: lib.rs from line 712 (callback URL rules, localhost rewrite, builder limits, and the 408 stalled-upload, 429 full-server and 413 oversized-body responses) and types.rs (webhook serialization).",
       "unverified": [
-        "agent/CRATES_ARCHITECTURE.md says callbacks may target any HTTP(S) origin; the code also refuses private and internal hosts (lib.rs:316-386), so the code is what is described here.",
+        "Callback filtering checks literal addresses and hostnames, not resolved/pinned sockets; DNS rebinding remains possible (lib.rs:305-386). Loopback is deliberately allowed, and operator-configured localhost rewrites bypass the private-host check.",
         "Whether a deployment puts this server behind authentication is outside this crate; no auth layer is configured in it."
       ]
     },
     {
       "id": "e3-program-runner",
+      "documentation": [{ "title": "Project program runners", "path": "docs/architecture/encrypted-computation.md" }],
       "kind": "crate",
       "path": "crates/program-runner",
       "one_line": "Library behind a project's program-runner binary: serves the project's E3 program as the unproved dev runner or the OpenVM proving service.",
-      "explain": "A project's `runner/` crate calls `run(processor, policy)` with its own `fhe_processor` and `policy()`. The first command-line argument picks the mode: `dev` answers each job with a mock proof, and `openvm` proves the job with `e3-openvm-host`; anything else fails with a usage error. Both modes build an `E3ProgramServer` and pass the same policy to the run, so the published ciphertext and the proof follow one rule. It is a separate crate from the project's `program/` so the server dependencies stay out of the OpenVM guest.",
-      "analogy": "A stage door with two keys: the same actor (the project program) walks on stage either for a rehearsal with a prop proof, or for the real show with a judge watching.",
       "actors": [],
       "consumes": [],
       "emits": [],
@@ -184,11 +182,10 @@
     },
     {
       "id": "e3-compute-provider",
+      "documentation": [{ "title": "Encrypted computation", "path": "docs/architecture/encrypted-computation.md" }],
       "kind": "crate",
       "path": "crates/compute-provider",
       "one_line": "Secure Process library: reads an E3's inputs in two passes, builds the input Merkle root, runs the FHE processor, and returns the result fields.",
-      "explain": "Given an E3's ciphertext inputs, SecureProcess records each input's hash and recomputed commitment and turns every input into a leaf under the program's InputPolicy. It then re-reads only the selected inputs, refusing any whose hash changed, and runs the program's FHE processor over them. The host and the OpenVM guest run this same code, so the journal that the proof commits to describes the ciphertext that is published. Every input adds a leaf even when the policy leaves it out of the computation.",
-      "analogy": "A notary who reads every sealed envelope once to log its fingerprint, then reopens only the chosen ones and checks each fingerprint before using the contents.",
       "actors": [],
       "consumes": [],
       "emits": [],
@@ -293,11 +290,10 @@
     },
     {
       "id": "e3-sdk",
+      "documentation": [{ "title": "Rust client integration", "path": "docs/architecture/rust-client-integration.md" }],
       "kind": "crate",
       "path": "crates/sdk",
       "one_line": "Umbrella crate that re-exports the bfv-client, fhe-params, evm-helpers and indexer crates behind Cargo features.",
-      "explain": "An application that depends on e3-sdk reaches the BFV client, the parameter presets, the EVM helpers and the indexer through one crate, as bfv_client, bfv_params, evm_helpers and indexer. Each re-export sits behind a feature (bfv, evm or indexer), and the default feature set, full, turns all three on. The crate has no logic of its own, and it is separate from the TypeScript package in packages/interfold-sdk.",
-      "analogy": "A power strip with labelled sockets: you plug in only the crates you need, and each label is a feature name.",
       "actors": [],
       "consumes": [],
       "emits": [],
@@ -331,11 +327,10 @@
     },
     {
       "id": "e3-indexer",
+      "documentation": [{ "title": "Rust client catch-up", "path": "docs/architecture/rust-client-integration.md" }],
       "kind": "crate",
       "path": "crates/indexer",
-      "one_line": "Follows the Interfold contract's logs, stores each E3 round through a caller-supplied DataStore, and resumes from a persisted block cursor.",
-      "explain": "InterfoldIndexer registers handlers for the committee-key, ciphertext-output and plaintext-output events and keeps one E3 record per round in a DataStore that the caller supplies. A committee public key is stored only after validate_pk_commitment matches it to the on-chain commitment. Only a call to configure_backfill opts in to a persisted block cursor and to replaying missed logs on each reconnect; without it no cursor is written and nothing is replayed.",
-      "analogy": "A court clerk who copies each filing into the right case folder, notes the last docket page copied, and re-reads the missed pages after an outage.",
+      "one_line": "Tracks E3 contract logs through a caller-supplied DataStore, with opt-in historical catch-up and cursor writes.",
       "actors": [],
       "consumes": [
         {
@@ -370,11 +365,6 @@
           "name": "E3 record under the key _e3:<id> in the crate's InMemoryStore",
           "where": "memory",
           "ref": "crates/indexer/src/indexer.rs@142@pub struct InMemoryStore {"
-        },
-        {
-          "name": "E3 records and the block cursor in CRISP's SledDB, which implements DataStore",
-          "where": "disk",
-          "ref": "examples/CRISP/server/src/server/database.rs@196@impl DataStore for SledDB {"
         },
         {
           "name": "callback queue and cursor flags (backfill_enabled, cursor_high, caught_up)",
@@ -460,18 +450,14 @@
       ],
       "depends_on": ["e3-bfv-client", "e3-evm-helpers", "e3-fhe-params"],
       "tests": "cargo test -p e3-indexer. Unit tests: indexer.rs (cfg(test) at line 1202), repo.rs (line 132) and callback_queue.rs. Integration tests in tests/integration.rs start Anvil (tests/helpers.rs:11), and build.rs runs scripts/build_fixtures.sh, which needs solc and jq on PATH.",
-      "unverified": [
-        "examples/CRISP/server/src/server/database.rs (SledDB) was located, but its persistence behaviour was not read.",
-        "The integration tests were not run in this pass; only their setup was read."
-      ]
+      "unverified": ["The integration tests were not run in this pass; only their setup was read."]
     },
     {
       "id": "e3-evm-helpers",
+      "documentation": [{ "title": "Rust chain integration", "path": "docs/architecture/rust-client-integration.md" }],
       "kind": "crate",
       "path": "crates/evm-helpers",
       "one_line": "Ethereum client layer: Interfold contract bindings, log and block listeners with catch-up, a per-account nonce allocator, and retry helpers.",
-      "explain": "This is the Rust side of the chain connection. contracts.rs binds the Interfold ABI (request, quote, output publishing and reads) behind the InterfoldRead and InterfoldWrite traits, event_listener.rs decodes logs into typed handlers and can replay a block range, and block_listener.rs runs handlers for each new head. nonce.rs gives each transaction sent through send_with_next_nonce a nonce that no other such send in this process holds, so concurrent sends from one key do not collide.",
-      "analogy": "A switchboard with a numbered ticket dispenser for each sender: calls go to the handler registered for them, and each outgoing transaction takes the lowest unused ticket.",
       "actors": [],
       "consumes": [
         {
@@ -610,11 +596,13 @@
     },
     {
       "id": "e3-wasm",
+      "documentation": [
+        { "title": "Browser SDK integration", "path": "docs/pages/build/sdk.mdx" },
+        { "title": "Shared BFV helpers", "path": "docs/architecture/rust-client-integration.md" }
+      ],
       "kind": "crate",
       "path": "crates/wasm",
       "one_line": "WebAssembly build of the BFV client helpers (encryption, public keys, commitments, parameter lookup) for browsers and Node.",
-      "explain": "The crate wraps the e3-bfv-client functions and the parameter presets in wasm-bindgen exports, so browser code can encrypt a value under a public key and compute commitments with the same Rust as crates/bfv-client. scripts/build.js runs wasm-pack once for web and once for Node, and the web build embeds the .wasm as base64; init_web.js loads it with initSync, while Node uses the synchronous package export. Browser code calls the default init from @interfold/wasm/init before it uses any export.",
-      "analogy": "A cast copy of a rubber stamp: the browser gets an exact copy of the stamp used in the back office, so the impressions match.",
       "actors": [],
       "consumes": [],
       "emits": [],
@@ -675,11 +663,13 @@
     },
     {
       "id": "e3-fhe",
+      "documentation": [
+        { "title": "Threshold BFV", "path": "docs/pages/learn/cryptography.mdx" },
+        { "title": "DKG", "path": "docs/architecture/dkg.md" }
+      ],
       "kind": "crate",
       "path": "crates/fhe",
       "one_line": "Ciphernode wrapper around the fhe.rs BFV library that sets up per-E3 parameters and runs key-share, decryption-share and aggregation steps.",
-      "explain": "FheExtension reacts to E3Requested by decoding the E3's BFV parameters, building the deterministic common random polynomial, saving an FheSnapshot in that E3's repository, and putting the Fhe handle in the E3 context under FHE_KEY. After a restart, hydrate rebuilds the handle from the saved snapshot. Fhe then wraps fhe.rs for three jobs: generate a key share, turn a ciphertext into a decryption share, and aggregate public-key or decryption shares.",
-      "analogy": "A lab bench set up for one job ticket: the bench is configured when the ticket arrives, the settings are written on the ticket's file, and the bench is rebuilt from that file after a restart.",
       "actors": [],
       "consumes": [
         {
@@ -782,16 +772,15 @@
     },
     {
       "id": "e3-multithread",
+      "documentation": [{ "title": "Compute effects and recovery", "path": "docs/architecture/persistence-and-replay.md" }],
       "kind": "crate",
       "path": "crates/multithread",
       "one_line": "Ciphernode worker actor that runs TrBFV and ZK compute requests on a Rayon pool and publishes results or errors back to the event bus.",
-      "explain": "ComputeEffectGate holds each ComputeRequest until EffectsEnabled, answers work that is already done from its stored outcomes, and forwards the rest to the Multithread actor. The actor runs each request through TaskPool, where a Tokio semaphore bounds the number of jobs, the closure runs on a Rayon thread, and the result comes back on a oneshot channel. The actor then publishes ComputeResponse or ComputeRequestError to the bus, and it retries recoverable failures after 5, 15 and 60 seconds and then every 300 seconds, with no cap on attempts.",
-      "analogy": "A kitchen ticket rail: orders wait until the restaurant opens, a fixed number of cooks take them to a shared grill, and finished plates go back to the pass for the waiter to carry.",
       "actors": [
         {
           "name": "Multithread",
           "role": "runs compute requests off the event path and publishes their responses",
-          "ref": "crates/multithread/src/multithread.rs@95@pub struct Multithread {"
+          "ref": "crates/multithread/src/multithread.rs@94@pub struct Multithread {"
         },
         {
           "name": "ComputeEffectGate",
@@ -818,19 +807,19 @@
         {
           "name": "E3Failed, E3StageChanged and E3RequestComplete, which cancel the E3's task groups",
           "by": "Multithread",
-          "ref": "crates/multithread/src/multithread.rs@221@EventType::E3Failed,"
+          "ref": "crates/multithread/src/multithread.rs@220@EventType::E3Failed,"
         }
       ],
       "emits": [
         {
           "name": "ComputeResponse",
           "by": "Multithread",
-          "ref": "crates/multithread/src/multithread.rs@711@bus.publish(value, ctx)?;"
+          "ref": "crates/multithread/src/multithread.rs@710@bus.publish(value, ctx)?;"
         },
         {
           "name": "ComputeRequestError, for failures that are not retried",
           "by": "Multithread",
-          "ref": "crates/multithread/src/multithread.rs@691@bus.publish(ComputeRequestError::new(error_kind, request_snapshot), ctx)?;"
+          "ref": "crates/multithread/src/multithread.rs@690@bus.publish(ComputeRequestError::new(error_kind, request_snapshot), ctx)?;"
         },
         {
           "name": "stored outcomes sent to the other request IDs waiting on the same work",
@@ -880,7 +869,7 @@
       "read_first": [
         {
           "why": "wiring: attach creates the actor, subscribes it to the bus, and starts the gate",
-          "ref": "crates/multithread/src/multithread.rs@146@pub fn attach("
+          "ref": "crates/multithread/src/multithread.rs@145@pub fn attach("
         },
         {
           "why": "the gate: when a request goes to the worker, and when a stored result is reused",
@@ -888,7 +877,7 @@
         },
         {
           "why": "the actor's request handler and its retry loop",
-          "ref": "crates/multithread/src/multithread.rs@595@async fn handle_compute_request_event("
+          "ref": "crates/multithread/src/multithread.rs@594@async fn handle_compute_request_event("
         },
         {
           "why": "the pool: semaphore wait, Rayon spawn, and the oneshot result",
@@ -896,24 +885,24 @@
         },
         {
           "why": "the worker function that dispatches TrBFV and ZK requests",
-          "ref": "crates/multithread/src/multithread.rs@1135@fn handle_compute_request("
+          "ref": "crates/multithread/src/multithread.rs@1193@fn handle_compute_request("
         }
       ],
       "rust_patterns": [
         {
           "pattern": "actix-actor",
           "note": "Multithread implements Actor and sets its mailbox capacity from MAILBOX_LIMIT on start",
-          "ref": "crates/multithread/src/multithread.rs@550@impl Actor for Multithread {"
+          "ref": "crates/multithread/src/multithread.rs@549@impl Actor for Multithread {"
         },
         {
           "pattern": "actix-handler",
           "note": "the actor handles bus events by queuing compute requests to itself as typed messages",
-          "ref": "crates/multithread/src/multithread.rs@557@impl Handler<InterfoldEvent> for Multithread {"
+          "ref": "crates/multithread/src/multithread.rs@556@impl Handler<InterfoldEvent> for Multithread {"
         },
         {
           "pattern": "actix-recipient",
           "note": "the gate receives the actor as a Recipient, so it sends events without naming the actor type",
-          "ref": "crates/multithread/src/multithread.rs@170@addr.clone().recipient(),"
+          "ref": "crates/multithread/src/multithread.rs@169@addr.clone().recipient(),"
         },
         {
           "pattern": "channel",
@@ -932,6 +921,7 @@
         }
       ],
       "depends_on": [
+        "e3-committee",
         "e3-request",
         "e3-bfv-client",
         "e3-committee-hash",
@@ -941,6 +931,7 @@
         "e3-crypto",
         "e3-events",
         "e3-polynomial",
+        "e3-polynomial-fhe",
         "e3-zk-config",
         "e3-zk-witness",
         "e3-utils",
@@ -950,16 +941,18 @@
       "unverified": [
         "The ZK prover (ZkProver) lives in crates/zk/prover and was not read; the proof side is described only from the dispatch in multithread.rs.",
         "The memory constants (memory.rs:19 and memory.rs:22) are values in code; their effect on a real host was not measured.",
-        "The thread counts and job limits are set in crates/ciphernode-builder (ciphernode_builder.rs:477-483); the builder was checked only at the call sites."
+        "The thread counts and job limits are set in crates/ciphernode-builder/src/builder/mod.rs (with_multithread_config); the builder was checked only at the call sites."
       ]
     },
     {
       "id": "e3-trbfv",
+      "documentation": [
+        { "title": "Threshold BFV", "path": "docs/pages/learn/cryptography.mdx" },
+        { "title": "Threshold decryption", "path": "docs/architecture/threshold-decryption.md" }
+      ],
       "kind": "crate",
       "path": "crates/trbfv",
       "one_line": "Threshold BFV protocol steps: DKG key and Shamir share generation, decryption-key sums, decryption shares and threshold decryption.",
-      "explain": "In threshold BFV no single node holds the whole secret key. gen_pk_share_and_sk_sss makes a node's public-key share and Shamir shares of its secret key, gen_esi_sss makes Shamir shares of the smudging noise, and calculate_decryption_key sums the shares a node collected. calculate_decryption_share turns a ciphertext into this node's decryption share, and calculate_threshold_decryption combines the shares from a threshold of nodes into plaintext; each step is a request and response pair, and secret fields are sealed with e3_crypto::Cipher.",
-      "analogy": "A bank vault with several keyholders, each given one piece of the combination, that opens only when enough pieces are presented together.",
       "actors": [],
       "consumes": [
         {
@@ -1068,11 +1061,10 @@
     },
     {
       "id": "e3-bfv-client",
+      "documentation": [{ "title": "Rust BFV client", "path": "docs/architecture/rust-client-integration.md" }],
       "kind": "crate",
       "path": "crates/bfv-client",
       "one_line": "Client-side BFV helpers: encrypt a value under a BFV public key, optionally with circuit inputs, and compute or check key and ciphertext commitments.",
-      "explain": "bfv_encrypt encrypts a value under a serialized BFV public key, and bfv_verifiable_encrypt also returns the circuit inputs that a proof of well-formed encryption needs. compute_pk_commitment, validate_pk_commitment and compute_ct_commitment (with a _with_params variant for reuse) produce or check the commitments that the chain and the proofs refer to. The wasm crate and the indexer call these same functions, so browser code and the indexer agree on the bytes.",
-      "analogy": "A postage meter: it seals each letter so only the key-holder can open it, and prints a receipt that anyone can later check against the same rules.",
       "actors": [],
       "consumes": [],
       "emits": [],
@@ -1081,7 +1073,7 @@
         {
           "name": "VerifiableEncryptionResult",
           "what": "ciphertext bytes plus the circuit inputs as a JSON string",
-          "ref": "crates/bfv-client/src/client.rs@73@pub struct VerifiableEncryptionResult {"
+          "ref": "crates/bfv-client/src/client.rs@72@pub struct VerifiableEncryptionResult {"
         },
         {
           "name": "Error",
@@ -1096,11 +1088,11 @@
         },
         {
           "why": "encryption under a public key",
-          "ref": "crates/bfv-client/src/client.rs@46@pub fn bfv_encrypt<T>("
+          "ref": "crates/bfv-client/src/client.rs@45@pub fn bfv_encrypt<T>("
         },
         {
           "why": "verifiable encryption, with the circuit inputs",
-          "ref": "crates/bfv-client/src/client.rs@97@pub fn bfv_verifiable_encrypt<T>("
+          "ref": "crates/bfv-client/src/client.rs@96@pub fn bfv_verifiable_encrypt<T>("
         },
         {
           "why": "the public-key commitment check used before a key is trusted",
@@ -1120,17 +1112,17 @@
         {
           "pattern": "generic-where",
           "note": "the encrypt functions take any value T that fhe.rs can encode, through a where bound",
-          "ref": "crates/bfv-client/src/client.rs@54@Plaintext: for<'a> FheEncoder<&'a T, Error = FheError>,"
+          "ref": "crates/bfv-client/src/client.rs@53@Plaintext: for<'a> FheEncoder<&'a T, Error = FheError>,"
         },
         {
           "pattern": "result-question-mark",
           "note": "building the parameters returns early on error",
-          "ref": "crates/bfv-client/src/client.rs@56@build_client_params(degree, plaintext_modulus, moduli, None)?;"
+          "ref": "crates/bfv-client/src/client.rs@55@build_client_params(degree, plaintext_modulus, moduli, None)?;"
         },
         {
           "pattern": "option-combinators",
           "note": "an unsupported parameter tuple becomes an anyhow error through ok_or_else",
-          "ref": "crates/bfv-client/src/client.rs@108@.ok_or_else(|| {"
+          "ref": "crates/bfv-client/src/client.rs@107@.ok_or_else(|| {"
         },
         {
           "pattern": "unit-test",

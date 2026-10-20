@@ -144,58 +144,6 @@ fn publish_changes(updates: Vec<(PathBuf, String)>) -> Result<()> {
     Ok(())
 }
 
-/// Update the selected CRISP fold binding from its four compiled inner VKs.
-pub fn sync_crisp(
-    root: &Path,
-    preset: BfvPreset,
-    committee: CiphernodesCommitteeSize,
-) -> Result<()> {
-    let active: serde_json::Value =
-        serde_json::from_slice(&fs::read(root.join("circuits/bin/.active-preset.json"))?)?;
-    if active["preset"] != preset_name(preset) || active["committee"] != committee.to_string() {
-        bail!("CRISP binding update requires the matching active artifact pair");
-    }
-    let threshold = root.join("circuits/bin/threshold/target");
-    let crisp = root.join("examples/CRISP/circuits/bin");
-    let mut updates = Vec::new();
-    for (ballot, fold, prefix) in [
-        ("crisp", "fold", "CRISP_FOLD"),
-        ("crisp_onchain", "fold_onchain", "CRISP_ONCHAIN_FOLD"),
-    ] {
-        let files = [
-            threshold.join("user_data_encryption.vk_recursive_hash"),
-            crisp
-                .join(ballot)
-                .join("target")
-                .join(format!("{ballot}.vk_recursive_hash")),
-            threshold.join("user_data_encryption_ct0.vk_recursive_hash"),
-            threshold.join("user_data_encryption_ct1.vk_recursive_hash"),
-        ];
-        let fields = files
-            .iter()
-            .map(|path| super::vk_tree::field_from_file(path))
-            .collect::<Result<Vec<_>>>()?;
-        let hash = e3_zk_witness::compute_vk_hash(fields);
-        let name = format!("{prefix}_EXPECTED_KEY_HASH_{}", tier(preset).to_uppercase());
-        let declaration = format!("pub global {name}: Field = {hash};");
-        let path = crisp.join(fold).join("src/main.nr");
-        let original = fs::read_to_string(&path)?;
-        let updated = replace_declarations(&original, &declaration, &name, &[], true)?;
-        updates.push((path, updated));
-    }
-    let mut packages: BTreeMap<PathBuf, Vec<_>> = BTreeMap::new();
-    for (path, updated) in updates {
-        packages
-            .entry(path.parent().unwrap().parent().unwrap().to_path_buf())
-            .or_default()
-            .push((path, updated));
-    }
-    let mut formatted = Vec::new();
-    for (package, updates) in packages {
-        formatted.extend(formatted_noir_changes(root, &package, updates)?);
-    }
-    publish_changes(formatted)
-}
 const HEADER: &str = "// SPDX-License-Identifier: LGPL-3.0-only\n//\n// This file is provided WITHOUT ANY WARRANTY;\n// without even the implied warranty of MERCHANTABILITY\n// or FITNESS FOR A PARTICULAR PURPOSE.\n";
 pub const BOUND_SOURCES: &[(&str, &str)] = &[
     ("threshold.nr", "PK_GENERATION_"),

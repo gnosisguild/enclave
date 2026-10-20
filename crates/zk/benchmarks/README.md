@@ -1,5 +1,7 @@
 # Circuit and protocol benchmarks
 
+## Purpose
+
 `pnpm bench:circuits` runs this crate, `e3-zk-benchmarks`. It is an unpublished development tool: it
 links the unpublished `e3-zk-samples` crate as a normal dependency to build artificial cryptographic
 material. Samples are not live application inputs. The runner executes production preparation, the
@@ -8,6 +10,16 @@ production Noir witness generator, and the production BB adapters.
 Run `pnpm bench:circuits --help` for every flag. This page lists the commands and the measurement
 rules that the recorded numbers depend on.
 
+## Map
+
+| Location                                                                                     | Responsibility                                                |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| [selection.rs](src/circuit_benchmark/selection.rs)                                           | Configured cases, modes, and committee selection.             |
+| [inputs.rs](src/circuit_benchmark/inputs.rs), [leaf.rs](src/circuit_benchmark/leaf.rs)       | Samples, production preparation, and measured leaf execution. |
+| [artifacts.rs](src/circuit_benchmark/artifacts.rs)                                           | Pair, digest, compiler, and config-cache provenance.          |
+| [protocol.rs](src/circuit_benchmark/protocol.rs)                                             | Existing integration and gas child-process orchestration.     |
+| [records.rs](src/circuit_benchmark/records.rs), [report.rs](src/circuit_benchmark/report.rs) | Schema-preserving records and metric rendering.               |
+
 ## Commands
 
 ```bash
@@ -15,7 +27,6 @@ pnpm bench:circuits list --mode insecure --committee minimum
 pnpm bench:circuits run --mode insecure --committee minimum --circuit dkg/pk --leaf-only
 pnpm bench:circuits protocol --mode insecure --committee minimum --multithread-jobs 2
 pnpm bench:circuits gas --mode insecure --committee minimum
-pnpm bench:crisp:prepare
 pnpm bench:circuits replay --input <saved-run-or-summary> --output <new-directory>
 pnpm bench:circuits report --input <saved-run> [--output <new-report.md>]
 pnpm test:circuit-bench
@@ -60,25 +71,14 @@ canonical builder (`pnpm build:circuits`).
 ## Protocol, gas, replay, and report
 
 `protocol` runs the existing release-profile `e3-tests` integration scenario with full proof
-aggregation. `gas` adds the CRISP verifier test and the existing Hardhat verifier replay tool. `run`
-includes these stages unless `--leaf-only` or `--witness-only` is set. The driver copies no protocol
-workflow and implements no EVM: it sets export paths and concurrency controls, then reads structured
-JSON exports. The integration child receives the runner's validated canonical BB path through
+aggregation. `gas` adds the existing Hardhat verifier replay tool. `run` includes these stages
+unless `--leaf-only` or `--witness-only` is set. The driver copies no protocol workflow and
+implements no EVM: it sets export paths and concurrency controls, then reads structured JSON
+exports. The integration child receives the runner's validated canonical BB path through
 `E3_CUSTOM_BB`, never a PATH lookup; run metadata records that path and version.
 
-Gas collection first runs `pnpm bench:crisp:prepare`, before protocol proving. This command builds
-`@interfold/wasm`, the testing CRISP SDK (including its WASM inputs, staged `insecure-64` circuits,
-and verifiers), and the Interfold contracts and TypeScript tasks. Install workspace dependencies
-with `pnpm install --frozen-lockfile`. The build needs the repository's pinned Noir/BB tools and
-Rust toolchain, including the `wasm32-unknown-unknown` target. Setup can take several minutes;
-`crisp_setup` and `crisp-setup.log` record it separately from the CRISP test and verifier gas.
-
-The CRISP SDK build selects `insecure-64/minimum`. Its partial threshold archive stays under
-`examples/CRISP/circuits/dist/threshold-build`, not the complete node archive in `dist/circuits`.
-Setup restores the selected node pair through the canonical builder, including after a build failure
-or `SIGINT`/`SIGTERM`. Restoration completes before setup exits with the signal's failure status.
-Select a complete archived node pair before setup. Run setup and benchmarks serially: they change
-shared Noir selectors. A failed setup stops the run before protocol proving.
+Install workspace dependencies with `pnpm install --frozen-lockfile`. Select a complete archived
+node pair before gas collection. Run benchmarks serially: they change shared Noir selectors.
 
 The active preset and committee must match the request, and the driver verifies the runtime artifact
 inventory and checksums. To select an archived pair without compiling:
@@ -88,24 +88,18 @@ pnpm build:circuits --preset insecure-64 --committee minimum --hydrate-bin-only
 ```
 
 Verifier gas and calldata gas stay separate measurements; calldata cost never substitutes for
-verifier gas. The CRISP user-verifier gas uses the installed CRISP ballot preset, which the export
-labels independently of the DKG/decryption preset.
+verifier gas. The gas stage measures the DKG and decryption verifiers. It does not measure the CRISP
+user verifier, which the CRISP repository owns. Saved results that contain a user-verifier gas value
+keep it in reports.
 
-To complete CRISP gas for saved protocol proofs without another integration run:
+To measure gas again for saved protocol proofs without another integration run:
 
 ```bash
-pnpm bench:crisp:prepare
-BENCHMARK_CRISP_GAS_OUTPUT=/absolute/path/to/new/crisp_user_gas.json \
-  pnpm -C examples/CRISP/packages/crisp-contracts test:ballots:program \
-  --grep 'should verify the proof correctly with the crisp verifier'
-pnpm bench:circuits replay --input <saved-integration-summary> \
-  --gas-json /absolute/path/to/new/crisp_user_gas.json --output <new-directory>
+pnpm bench:circuits replay --input <saved-integration-summary> --output <new-directory>
 ```
 
-Create the export's parent directory first. Keep the saved integration export and its original
-metadata unchanged. Replay records new EVM measurements; it does not repeat protocol proving or
-include the separately run CRISP setup and test durations. If `--gas-json` supplies a saved protocol
-report, replay preserves its CRISP outcome and rejects a failed or unmeasured CRISP stage.
+Keep the saved integration export and its original metadata unchanged. Replay records new EVM
+measurements. It does not repeat protocol proving.
 
 Replay re-verifies saved folded proofs against matching verification keys; it does not regenerate
 proofs to hide a mismatch, and an explicit selection that disagrees with the export fails. Report

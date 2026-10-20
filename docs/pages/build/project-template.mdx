@@ -51,6 +51,10 @@ in a parent folder, or in the default configuration folder. In that case, it sto
 
 ## Layout
 
+The template copier uses `e3-fs`, a small async filesystem adapter. Production copying uses the
+physical filesystem; tests can use the same operations over an in-memory root. That test seam does
+not make copying or replacement an atomic filesystem transaction.
+
 <FileTree>
   <FileTree.Folder name='my-first-e3' defaultOpen>
     <FileTree.Folder name='client'>
@@ -359,8 +363,9 @@ node, change all of these items together with the `nodes` section of `interfold.
 <Callout type='warning'>
   The template is for local development. `MyProgram.publishInput` does not prove that a ciphertext
   matches its commitment, and `verifyDataAvailability` is a local mock. A production E3 program must
-  do both checks. The CRISP program in `examples/CRISP` shows one approach. The program server does
-  not authenticate callers, so it is not safe on an untrusted network.
+  do both checks. The [CRISP program](https://github.com/theinterfold/CRISP/tree/main/program) shows
+  one approach. The program server does not authenticate callers, so it is not safe on an untrusted
+  network.
 </Callout>
 
 ## Next steps

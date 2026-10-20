@@ -23,7 +23,7 @@ use std::{
 const COMMITTEES: &[&str] = &["minimum", "micro", "small"];
 
 pub fn build_pairs(root: &Path) -> Result<Vec<[String; 2]>> {
-    let path = root.join("scripts/circuit-build-pairs.json");
+    let path = root.join("scripts/circuits/build-pairs.json");
     let pairs: Vec<[String; 2]> = serde_json::from_slice(&fs::read(&path)?)
         .with_context(|| format!("Invalid circuit build policy: {}", path.display()))?;
     if pairs.is_empty() {
@@ -55,7 +55,6 @@ pub enum Operation {
     Hash,
     SyncConfig,
     SyncPreset,
-    SyncCrisp,
     Check,
 }
 
@@ -67,10 +66,9 @@ impl FromStr for Operation {
             "hash" => Ok(Self::Hash),
             "sync-config" => Ok(Self::SyncConfig),
             "sync-preset" => Ok(Self::SyncPreset),
-            "sync-crisp" => Ok(Self::SyncCrisp),
             "check" => Ok(Self::Check),
             other => Err(format!(
-                "unknown build operation {other}; expected build, hash, sync-config, sync-preset, sync-crisp, or check"
+                "unknown build operation {other}; expected build, hash, sync-config, sync-preset, or check"
             )),
         }
     }
@@ -83,7 +81,6 @@ impl fmt::Display for Operation {
             Self::Hash => "hash",
             Self::SyncConfig => "sync-config",
             Self::SyncPreset => "sync-preset",
-            Self::SyncCrisp => "sync-crisp",
             Self::Check => "check",
         })
     }
@@ -418,9 +415,6 @@ pub fn execute(root: &Path, request: &Request) -> Result<()> {
         }
         Operation::SyncPreset => {
             configuration::sync_preset(root, request.single_preset()?, request.single_committee()?)?
-        }
-        Operation::SyncCrisp => {
-            configuration::sync_crisp(root, request.single_preset()?, request.single_committee()?)?
         }
         Operation::Check => configuration::check(root, request)?,
         Operation::Build => artifacts::build(root, request)?,

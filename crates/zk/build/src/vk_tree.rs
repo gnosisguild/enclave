@@ -15,7 +15,7 @@ fn load(root: &Path, variant: &str, group: &str, name: &str) -> Result<Fr> {
     field_from_file(&path)
 }
 
-pub(super) fn field_from_file(path: &Path) -> Result<Fr> {
+fn field_from_file(path: &Path) -> Result<Fr> {
     let bytes = fs::read(&path).with_context(|| format!("Read {}", path.display()))?;
     if bytes.len() != 32 {
         bail!("{}: expected 32 bytes, got {}", path.display(), bytes.len());

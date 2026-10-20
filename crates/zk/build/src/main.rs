@@ -9,7 +9,7 @@ use e3_zk_build::{CommitteeSelection, Group, GroupSelection, Operation, PresetSe
 #[derive(Parser)]
 #[command(about = "Build circuit artifacts or check generated configuration.")]
 struct Cli {
-    /// Operation: build, hash, sync-config, sync-preset, sync-crisp, or check.
+    /// Operation: build, hash, sync-config, sync-preset, or check.
     #[arg(default_value = "build")]
     command: Operation,
     /// BFV artifact preset, or all.

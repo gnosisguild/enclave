@@ -1,14 +1,14 @@
-# Polynomial arithmetic
+# e3-polynomial
 
-This arithmetic serves consumers beyond Noir circuits. A representation change can preserve the
-mathematical polynomial while changing a witness, commitment, or serialized value.
+Keep exact integer arithmetic independent of FHE, witness encodings, and actors.
+[README.md](README.md) owns coefficient order, CRT limbs, the FHE adapter, and focused tests.
 
-- Keep circuit-specific shape and encoding decisions at the witness boundary, not in generic
-  arithmetic.
-- Treat serialization changes as compatibility decisions, not incidental cleanup. Ask before
-  changing an established format unless the request includes that migration.
-- A parameter or witness failure is not permission to change arithmetic conventions until a test
-  passes. Establish which boundary owns the mismatch first.
-
-Use `README.md` for coefficient-order conventions, CRT limb meaning, the FHE adapter, and focused
-verification commands. Those details have one owner rather than a second copy here.
+- A representation change can preserve a polynomial but change a witness, commitment, or serialized
+  value. Treat serialization changes as compatibility decisions, not incidental cleanup.
+- Keep integer quotients and exact-division errors. Modular ring arithmetic cannot replace them
+  merely because residues match.
+- Keep circuit-specific shape, reversal, encoding, and padding at the
+  [witness boundary](../zk/witness/README.md). Do not change generic arithmetic to make a witness
+  failure disappear.
+- Preserve canonical scalar zero from multiplication and constructor order/padding. Keep independent
+  arithmetic references and overflow/fallback cases in tests.

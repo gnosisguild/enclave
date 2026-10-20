@@ -21,5 +21,7 @@ Witness JSON, commitment openings, public-input layouts, and parameter choices a
 interfaces. A cleanup is not permission to change them. Tests establish concrete contracts, but they
 cannot approve a deployment migration or a different cryptographic assumption.
 
-Search `agent/invariants/02_CRYPTO_CIRCUITS.md` or `04_BUILD_CONFIG.md` when that compatibility
-question matters. Read only the relevant sections. Update an existing statement if it becomes false.
+Search [proof statements](../../docs/architecture/proof-statements.md) and
+[artifact boundaries](../../docs/architecture/circuit-artifacts.md) for the affected interface.
+Update the owning document when its statement becomes false. Configuration, witness preparation,
+samples, artifact building, runtime proving, and benchmarks have separate crate owners below.

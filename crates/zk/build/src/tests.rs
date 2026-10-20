@@ -59,7 +59,7 @@ fn circuit_root_without_tools() -> tempfile::TempDir {
     let root = temp.path();
     write(
         root,
-        "scripts/circuit-build-pairs.json",
+        "scripts/circuits/build-pairs.json",
         r#"[["insecure-64","minimum"]]"#,
     );
     artifacts::copy_tree(
@@ -104,7 +104,7 @@ fn build_policy_rejects_disabled_pairs_before_tools_and_filters_all_selectors() 
     let temp = tempfile::tempdir().unwrap();
     write(
         temp.path(),
-        "scripts/circuit-build-pairs.json",
+        "scripts/circuits/build-pairs.json",
         serde_json::to_vec(&pairs).unwrap(),
     );
     let mut hydration = request();
@@ -369,7 +369,7 @@ fn source_identity_tracks_inputs_not_generated_selections_or_tests() {
         "circuits/lib/src/math/commitments.nr",
         "circuits/lib/Nargo.toml",
         "circuits/lib/src/configs/committee/micro/mod.nr",
-        "scripts/circuit-build-pairs.json",
+        "scripts/circuits/build-pairs.json",
         "crates/zk/build/templates/active_crypto_config.sol.in",
         "crates/zk/build/templates/committee_active.nr.in",
     ] {
@@ -669,101 +669,6 @@ fn shared_operation_material_serves_parity_bounds_and_protocol_renderers() {
         .parse::<usize>()
         .unwrap();
     assert_eq!(width, e3_zk_config::MAX_MSG_NON_ZERO_COEFFS);
-}
-
-#[test]
-#[ignore = "requires nargo formatting; uses only temporary scalar VK hashes and fold files"]
-fn crisp_binding_update_preserves_input_order_and_other_preset() {
-    let temp = tempfile::tempdir().unwrap();
-    let root = temp.path();
-    write_pins(root);
-    write(
-        root,
-        "circuits/lib/Nargo.toml",
-        "[package]\nname = \"interfold_lib\"\ntype = \"lib\"\nauthors = []\n",
-    );
-    let library = "pub fn identity( x : Field )->Field{x}\n";
-    write(root, "circuits/lib/src/lib.nr", library);
-    write(
-        root,
-        "circuits/bin/.active-preset.json",
-        r#"{"preset":"insecure-64","committee":"minimum"}"#,
-    );
-    let threshold = "circuits/bin/threshold/target";
-    for (name, value) in [
-        ("user_data_encryption", 1_u64),
-        ("user_data_encryption_ct0", 3),
-        ("user_data_encryption_ct1", 4),
-    ] {
-        write(
-            root,
-            &format!("{threshold}/{name}.vk_recursive_hash"),
-            field_bytes(Fr::from(value)),
-        );
-    }
-    for (ballot, fold, prefix) in [
-        ("crisp", "fold", "CRISP_FOLD"),
-        ("crisp_onchain", "fold_onchain", "CRISP_ONCHAIN_FOLD"),
-    ] {
-        write(
-            root,
-            &format!("examples/CRISP/circuits/bin/{ballot}/target/{ballot}.vk_recursive_hash"),
-            field_bytes(Fr::from(2_u64)),
-        );
-        write(
-            root,
-            &format!("examples/CRISP/circuits/bin/{fold}/Nargo.toml"),
-            format!("[package]\nname = \"{fold}\"\ntype = \"bin\"\nauthors = []\n[dependencies]\ninterfold_lib = {{ path = \"../../../../../circuits/lib\" }}\n"),
-        );
-        write(root, &format!("examples/CRISP/circuits/bin/{fold}/src/main.nr"), format!("pub global {prefix}_EXPECTED_KEY_HASH_INSECURE: Field = 0;\npub global {prefix}_EXPECTED_KEY_HASH_SECURE: Field = 123;\nfn main() {{}}\n"));
-    }
-    configuration::sync_crisp(
-        root,
-        BfvPreset::InsecureThreshold64,
-        CiphernodesCommitteeSize::Minimum,
-    )
-    .unwrap();
-    assert_eq!(
-        fs::read_to_string(root.join("circuits/lib/src/lib.nr")).unwrap(),
-        library,
-        "formatting a fold must not modify the live dependency"
-    );
-    let expected = compute_vk_hash(vec![
-        Fr::from(1_u64),
-        Fr::from(2_u64),
-        Fr::from(3_u64),
-        Fr::from(4_u64),
-    ])
-    .to_string();
-    for (fold, prefix) in [
-        ("fold", "CRISP_FOLD"),
-        ("fold_onchain", "CRISP_ONCHAIN_FOLD"),
-    ] {
-        let path = root.join(format!("examples/CRISP/circuits/bin/{fold}/src/main.nr"));
-        let text = compact(&fs::read_to_string(&path).unwrap());
-        assert!(text.contains(&format!(
-            "{prefix}_EXPECTED_KEY_HASH_INSECURE:Field={expected};"
-        )));
-        assert!(text.contains(&format!("{prefix}_EXPECTED_KEY_HASH_SECURE:Field=123;")));
-    }
-    let before = fs::read(root.join("examples/CRISP/circuits/bin/fold/src/main.nr")).unwrap();
-    write(
-        root,
-        &format!("{threshold}/user_data_encryption_ct1.vk_recursive_hash"),
-        [0xff; 32],
-    );
-    assert!(configuration::sync_crisp(
-        root,
-        BfvPreset::InsecureThreshold64,
-        CiphernodesCommitteeSize::Minimum
-    )
-    .unwrap_err()
-    .to_string()
-    .contains("canonical range"));
-    assert_eq!(
-        fs::read(root.join("examples/CRISP/circuits/bin/fold/src/main.nr")).unwrap(),
-        before
-    );
 }
 
 #[test]

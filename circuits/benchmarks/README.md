@@ -1,10 +1,9 @@
 # Circuit benchmarks — results and configuration
 
-This directory keeps benchmark data: the historical `results_*` directories, the current run
-selection in `config.json`, saved `runs/`, and the committed-fixture script
-`scripts/sync_bfv_vk_binding_fixture.sh`. Historical results are immutable inputs for `report`
-and `replay`; they are never benchmark output targets.
+This directory keeps benchmark data: historical `results_*` directories, the current selection in
+`config.json`, saved `runs/`, and `scripts/sync_bfv_vk_binding_fixture.sh`. Historical results are
+immutable inputs for report and replay, never output targets.
 
-The benchmark runner, its commands, and the measurement guide live in the unpublished crate
-[`crates/zk/benchmarks`](../../crates/zk/benchmarks). Start there for `pnpm bench:circuits`
-usage, metric definitions, artifact provenance, and output semantics.
+The runner and measurement guide live in [e3-zk-benchmarks](../../crates/zk/benchmarks/README.md).
+Use `pnpm bench:circuits` from the repository root for leaf, protocol, gas, replay, and report
+commands. See that guide for artifact provenance, nullable measurements, and output ownership.
