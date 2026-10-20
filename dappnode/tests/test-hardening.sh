@@ -36,7 +36,8 @@ class RpcHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         key = self.headers.get("Sec-WebSocket-Key")
-        if not key:
+        # Like a client that restricts WebSocket origins. The node sends no Origin header.
+        if not key or self.headers.get("Origin") is not None:
             self.send_response(404)
             self.end_headers()
             return
@@ -200,7 +201,7 @@ run_entrypoint() {
 success_dir="$TEST_ROOT/success"
 mkdir -p "$success_dir/secrets"
 write_secrets "$success_dir/secrets/secrets.json"
-run_entrypoint "$success_dir"
+run_entrypoint "$success_dir" || fail "first startup failed: $(tail -n 1 "$success_dir/output")"
 [ ! -e "$success_dir/secrets/secrets.json" ] || fail "successful setup retained plaintext credentials"
 [ "$(tr '\n' ' ' < "$success_dir/calls")" = "password wallet wallet-get start " ] || fail "unexpected successful command order"
 assert_not_contains "$success_dir/argv" 'correct horse battery staple'
@@ -416,6 +417,15 @@ if run_entrypoint "$success_dir" NETWORK=sepolia RPC_URL="$RPC_FIXTURE_URL/sepol
 fi
 [ "$(cksum "$success_dir/data/config.yaml")" = "$original_config" ] || fail "network rejection replaced saved config"
 [ ! -s "$success_dir/calls" ] || fail "network rejection changed credentials"
+
+# The HTTP check uses the node's HTTP URL: only the scheme changes, never a query value.
+python3 -B - "$ROOT_DIR" <<'CHECK' || fail "the HTTP RPC check changed more than the URL scheme"
+import sys
+sys.path.insert(0, sys.argv[1])
+from configure import http_url
+assert http_url("wss://user:token@rpc.example/v1?next=ws://other") == "https://user:token@rpc.example/v1?next=ws://other"
+assert http_url("ws://127.0.0.1:8546/path?next=wss://other") == "http://127.0.0.1:8546/path?next=wss://other"
+CHECK
 
 # URL credentials remain a scalar and are absent from startup output.
 quoted_dir="$TEST_ROOT/quoted-rpc"

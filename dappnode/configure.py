@@ -78,12 +78,19 @@ def render():
     Path(os.environ["CONFIG_FILE"]).write_text(yaml.safe_dump(config, sort_keys=False))
 
 
+def http_url(rpc_url):
+    """Return the URL of the node's HTTP signer: only the WebSocket scheme changes."""
+    scheme, rest = rpc_url.split("://", 1)
+    return {"ws": "http", "wss": "https"}[scheme] + "://" + rest
+
+
 def check_rpc():
     config = yaml.safe_load(Path(os.environ["CONFIG_FILE"]).read_text())
     chain = config["chains"][0]
     # WebSocket requests share one connection; both transports share a deadline. Do not print the URL.
     deadline = time.monotonic() + 20
-    with closing(websocket.create_connection(chain["rpc_url"], timeout=10)) as connection:
+    # The node sends no Origin header. Endpoints that restrict origins would reject this check.
+    with closing(websocket.create_connection(chain["rpc_url"], timeout=10, suppress_origin=True)) as connection:
         def request(method, params, request_id):
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -103,8 +110,7 @@ def check_rpc():
             if not re.fullmatch(r"0x(?:[0-9a-fA-F]{2})+", code):
                 raise ConfigurationError(f"no contract code at {contract}; check the deployment overrides")
 
-    # The upstream signer converts the WS scheme to HTTP while preserving the host, port, and path.
-    endpoint = chain["rpc_url"].replace("wss://", "https://", 1).replace("ws://", "http://", 1)
+    endpoint = http_url(chain["rpc_url"])
     parsed = urlsplit(endpoint)
     headers = {"Content-Type": "application/json"}
     if parsed.username is not None:
