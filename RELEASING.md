@@ -50,9 +50,9 @@ authorize bypassing a failed check. This is not just a textual version replaceme
 The bumper updates the shared Cargo workspace, selected core npm packages (including wasm),
 `required_circuits_version`, lockfiles, and CHANGELOG. It also updates Cargo locks for the separate
 template host and guest workspaces that record Interfold dependency versions. For stable releases it
-updates DAppNode upstream and bumps its independent wrapper version according to the upstream
-major/minor/patch progression. Prereleases skip DAppNode.
-[Version validation](scripts/release/version.mjs) defines the exact required files.
+updates DAppNode upstream and bumps the independent wrapper version of both network packages
+(Mainnet and Sepolia) according to the upstream major/minor/patch progression. Prereleases skip
+DAppNode. [Version validation](scripts/release/version.mjs) defines the exact required files.
 
 Add operator instructions under `scripts/release/notes/<version>.md` when needed; asset preparation
 includes them in release notes. Stable notes also include that version's prerelease changelog
@@ -91,14 +91,15 @@ by [scripts/release/](scripts/release/). It serializes release promotions and:
    ciphernode image. `E3_CIRCUITS_ARCHIVE_SHA256` binds that archive to the binary's release
    version; binary/image `interfold noir status` checks must match. Do not repack it afterward.
 4. Requires qualified binaries/circuits before publishing the versioned ciphernode image and core
-   npm packages. Stable releases also require the DAppNode package; prereleases skip it.
+   npm packages. Stable releases also require the DAppNode packages; prereleases skip them.
 5. Requires every publication, assembles binary/circuit archives, address `manifest.json`, checksums
    in release notes, and `release-provenance.json` (candidate/source hash/tag/workflow run).
 6. Promotes container aliases and the stable tag where applicable, then creates the GitHub release.
 
-Rust workspace crates are not published to crates.io by this workflow. DAppNode copies the checked
-ciphernode image. Asset inventory and npm retry semantics are owned by the release scripts, not a
-second checklist of package versions here.
+Rust workspace crates are not published to crates.io by this workflow. Both DAppNode packages extend
+the checked ciphernode image; the workflow builds them but does not upload them to the DAppNode
+registry. Asset inventory and npm retry semantics are owned by the release scripts, not a second
+checklist of package versions here.
 
 The separately named `interfold-test-only-skip-proof-aggregation-linux-x86_64` CLI archive enables
 proof skipping for tests/CI only. Normal platform archives have no proof-skip feature; the workflow

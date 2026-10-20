@@ -73,6 +73,7 @@ jobs:
       integration_prebuild: ${{ steps.jobs.outputs.integration_prebuild }}
       zk_prover_integration: ${{ steps.jobs.outputs.zk_prover_integration }}
       build_interfold_cli: ${{ steps.jobs.outputs.build_interfold_cli }}
+      dappnode: ${{ steps.jobs.outputs.dappnode }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -177,6 +178,11 @@ jobs:
               - '.dockerignore'
               - '!**/*.md'
               - '!**/*.mdx'
+            # The DAppNode images build from the repository root and copy the deployment manifest.
+            dappnode:
+              - 'dappnode/**'
+              - 'deployments/manifest.json'
+              - '!**/*.md'
             # Only the workflow, its path filters, and the local actions that it runs. Other
             # workflows, the PR template, and `.github/scripts` do not change what these jobs
             # produce.
@@ -222,6 +228,7 @@ jobs:
           INTEGRATION="${{ steps.filter.outputs.integration_tests }}"
           NET="${{ steps.filter.outputs.net }}"
           DOCKER="${{ steps.filter.outputs.docker }}"
+          DAPPNODE="${{ steps.filter.outputs.dappnode }}"
           CI="${{ steps.filter.outputs.ci }}"
           TOOLING="${{ steps.filter.outputs.tooling }}"
           OPENVM_WORKER="${{ steps.filter.outputs.openvm_worker }}"
@@ -247,6 +254,7 @@ jobs:
           # The rust jobs already compile the workspace, so the image build only
           # needs to run when the Dockerfiles or their build context change.
           echo "docker_ciphernode=$(any $FORCE $DOCKER $CI)" >> $GITHUB_OUTPUT
+          echo "dappnode=$(any $FORCE $DAPPNODE $CI)" >> $GITHUB_OUTPUT
           echo "net=$(any $FORCE $NET $CI)" >> $GITHUB_OUTPUT
           echo "init=$(any $FORCE $TEMPLATES $RUST $CONTRACTS $CI $TOOLING)" >> $GITHUB_OUTPUT
           # Both feed template_integration, so each must cover every path that
@@ -284,13 +292,58 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: dappnode/package-lock.json
+      - name: Validate DAppNode package variants
+        run: |
+          npm ci --ignore-scripts --prefix dappnode
+          npm run check --prefix dappnode
       - name: Test DAppNode credentials and health checks
         run: |
           timeout 180 sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
-          timeout 180 sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y gettext-base
-          bash dappnode/tests/test-hardening.sh
+          timeout 180 sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y gettext-base python3-websocket python3-yaml
+          PATH="/usr/bin:$PATH" npm test --prefix dappnode
       - name: Test the ciphernode image state location
         run: bash crates/tests/docker/test-ciphernode-entrypoint.sh
+
+  test_dappnode_image:
+    needs: [detect_changes]
+    if: needs.detect_changes.outputs.dappnode == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: dappnode/package-lock.json
+      # A stable release PR pins a version that only the tagged release publishes. The release
+      # workflow builds the packages after it publishes that image.
+      - name: Check that the pinned ciphernode image is published
+        id: upstream
+        run: |
+          image="$(sed -n 's/^FROM \([^:]*\):.*/\1/p' dappnode/Dockerfile):$(node -p "require('./dappnode/dappnode_package.json').upstreamVersion")"
+          if output=$(docker manifest inspect "$image" 2>&1); then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          elif grep -q 'manifest unknown' <<< "$output"; then
+            echo "::notice::$image is not published yet; skipping the DAppNode image test."
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          else
+            printf '%s\n' "$output"
+            exit 1
+          fi
+      - name: Build both DAppNode packages with the release command
+        if: steps.upstream.outputs.published == 'true'
+        run: |
+          npm ci --ignore-scripts --prefix dappnode
+          npm run build --prefix dappnode -- --skip_upload --skip_save
+      - name: Test provisioning and the RPC proxy in the built image
+        if: steps.upstream.outputs.published == 'true'
+        run: npm run test:image --prefix dappnode
 
   rust_unit_tests:
     needs: [detect_changes]
