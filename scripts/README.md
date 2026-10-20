@@ -10,7 +10,7 @@ with the capability they maintain.
 | Owner                                                | Commands and usage                                                                                |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | [checks/](checks/README.md)                          | Repository, committee, address, binding, license, package-manager, and shell checks.              |
-| [circuits/](circuits/README.md)                      | Artifact transport, verifier generation, Noir wrappers, and CRISP gas preparation.                |
+| [circuits/](circuits/README.md)                      | Artifact transport, verifier generation, and Noir wrappers.                                       |
 | [Rust circuit builder](../crates/zk/build/README.md) | `pnpm build:circuits`, `pnpm test:circuit-build`.                                                 |
 | [Rust benchmarks](../crates/zk/benchmarks/README.md) | `pnpm bench:circuits`, `pnpm test:circuit-bench`.                                                 |
 | [release/](release/README.md)                        | Version preparation and explicit publication; [RELEASING.md](../RELEASING.md) owns the procedure. |
@@ -19,8 +19,6 @@ with the capability they maintain.
 | [hooks/](hooks/README.md)                            | Shared helpers for `.husky/` entry points.                                                        |
 | [blueprint/](blueprint/README.md)                    | Architecture navigation, documentation checks, and PR previews.                                   |
 
-CRISP's [isolated runner](../examples/CRISP/scripts/test-isolated.sh) tests committed `HEAD` in a
-temporary worktree and rejects pending changes. Failed runs retain their worktree for diagnosis.
 Network runner regressions live beside [their owner](../crates/net/tests/run.sh).
 
 ## Tests

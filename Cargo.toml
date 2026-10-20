@@ -57,9 +57,6 @@ members = [
   "crates/zk/prover",
 ]
 exclude = [
-  "examples/CRISP",
-  "examples/CRISP/server",
-  "examples/CRISP/program",
   # Built with the OpenVM SDK as a workspace of its own.
   "crates/openvm-prover",
   "templates/default"

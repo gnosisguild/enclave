@@ -13,8 +13,11 @@
 //      once more with requests open.
 //
 // Usage (from packages/interfold-contracts):
-//   FORK_URL=<mainnet RPC> LOG_RPC_URL=<RPCs> tsx scripts/upgrade/simulateV19Cutover.ts [--legacy]
+//   FORK_URL=<mainnet RPC> LOG_RPC_URL=<RPCs> tsx scripts/upgrade/simulateV19Cutover.ts --crisp-dir <CRISP checkout> [--legacy]
 //
+// `--crisp-dir` is a checkout of https://github.com/theinterfold/CRISP with its dependencies
+// installed. Step 3 deploys from its `packages/crisp-contracts` and temporarily overwrites the
+// `mainnet` entry of that package's `deployed_contracts.json`; the file is restored afterwards.
 // FORK_BLOCK pins the fork block. LOG_RPC_URL (comma-separated mainnet RPCs that serve eth_getLogs
 // history) lists the registered operators for the refresh. `--legacy` also runs the v0.18
 // `secureCrisp.ts` against the fork first and reports how it fails. Nothing here signs for
@@ -38,13 +41,6 @@ const packageDir = path.resolve(
   "..",
 );
 const repoRoot = path.resolve(packageDir, "..", "..");
-const crispDir = path.join(
-  repoRoot,
-  "examples",
-  "CRISP",
-  "packages",
-  "crisp-contracts",
-);
 const protocolDir = path.join(packageDir, "deploy", "protocol");
 
 function log(message: string) {
@@ -138,6 +134,13 @@ async function sendAs(
 
 async function main() {
   const legacy = process.argv.includes("--legacy");
+  const crispCheckout = process.argv[process.argv.indexOf("--crisp-dir") + 1];
+  if (!process.argv.includes("--crisp-dir") || !crispCheckout) {
+    throw new Error(
+      "Pass --crisp-dir <path> with a checkout of https://github.com/theinterfold/CRISP",
+    );
+  }
+  const crispDir = path.resolve(crispCheckout, "packages", "crisp-contracts");
   const logRpc = process.env.LOG_RPC_URL;
   if (!logRpc)
     throw new Error(
@@ -163,6 +166,11 @@ async function main() {
     JSON.stringify({ ...deployment, name: "mainnet-fork" }, null, 2),
   );
   const crispRecord = path.join(crispDir, "deployed_contracts.json");
+  if (!fs.existsSync(crispRecord)) {
+    throw new Error(
+      `${crispRecord} not found; --crisp-dir must be a checkout of https://github.com/theinterfold/CRISP with its dependencies installed`,
+    );
+  }
   const crispRecordBackup = fs.readFileSync(crispRecord);
   // `validate --write-records` writes the `mainnet` records of both files.
   const protocolRecord = path.join(packageDir, "deployed_contracts.json");

@@ -17,7 +17,7 @@ const requireContracts = createRequire(path.join(root, 'packages/interfold-contr
 const { AbiCoder, Contract, FetchRequest, JsonRpcProvider, getAddress, id, keccak256 } = requireContracts('ethers')
 type Args = Partial<Record<'config' | 'prover' | 'rpc' | 'verifier' | 'out' | 'project', string>>
 
-function parseArgs(): Args {
+function parseArgs(): Args & { project: string } {
   const args: Args = {}
   const values = process.argv.slice(2)
   for (let i = 0; i < values.length; i += 2) {
@@ -30,7 +30,9 @@ function parseArgs(): Args {
   }
   if (Boolean(args.rpc) !== Boolean(args.verifier)) throw new Error('Supply --rpc and --verifier together')
   if (args.prover && !args.config) throw new Error('--prover requires --config')
-  return args
+  const { project } = args
+  if (!project) throw new Error('--project is required: the project checkout whose guest the worker configuration describes')
+  return { ...args, project }
 }
 
 function command(binary: string, args: string[]): string | null {
@@ -82,8 +84,8 @@ async function parameterDigests(directory: string, relative = ''): Promise<Recor
 async function main() {
   const args = parseArgs()
   const unresolved: string[] = []
-  // The project whose guest the worker configuration describes: CRISP by default, or --project.
-  const project = path.resolve(root, args.project ?? 'examples/CRISP')
+  // The project whose guest the worker configuration describes.
+  const project = path.resolve(root, args.project)
   const files: Record<string, string> = {
     'Cargo.lock': path.join(root, 'Cargo.lock'),
     'crates/openvm-prover/Cargo.lock': path.join(root, 'crates/openvm-prover/Cargo.lock'),

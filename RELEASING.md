@@ -1,9 +1,9 @@
 # Releasing Interfold
 
 This guide covers the shared Rust workspace/core npm release.
-[CRISP releases](examples/CRISP/RELEASING.md) are separate. Publication targets the canonical
-`theinterfold/interfold` repository; do not rename independent `gnosisguild` dependencies such as
-fhe.rs as part of release preparation.
+[CRISP releases](https://github.com/theinterfold/CRISP/blob/main/RELEASING.md) are separate.
+Publication targets the canonical `theinterfold/interfold` repository; do not rename independent
+`gnosisguild` dependencies such as fhe.rs as part of release preparation.
 
 Only perform commit, push, tag, publication, or governance actions with authorization. The commands
 below describe their effects; they are not read-only checks unless explicitly labeled.
@@ -49,10 +49,10 @@ authorize bypassing a failed check. This is not just a textual version replaceme
 
 The bumper updates the shared Cargo workspace, selected core npm packages (including wasm),
 `required_circuits_version`, lockfiles, and CHANGELOG. It also updates Cargo locks for the separate
-CRISP/template host and guest workspaces that record Interfold dependency versions; this does not
-change CRISP's own release version. For stable releases it updates DAppNode upstream and bumps its
-independent wrapper version according to the upstream major/minor/patch progression. Prereleases
-skip DAppNode. [Version validation](scripts/release/version.mjs) defines the exact required files.
+template host and guest workspaces that record Interfold dependency versions. For stable releases it
+updates DAppNode upstream and bumps its independent wrapper version according to the upstream
+major/minor/patch progression. Prereleases skip DAppNode.
+[Version validation](scripts/release/version.mjs) defines the exact required files.
 
 Add operator instructions under `scripts/release/notes/<version>.md` when needed; asset preparation
 includes them in release notes. Stable notes also include that version's prerelease changelog
@@ -90,15 +90,15 @@ by [scripts/release/](scripts/release/). It serializes release promotions and:
 3. Packages circuits once and hashes the **exact archive bytes** before compiling binaries and the
    ciphernode image. `E3_CIRCUITS_ARCHIVE_SHA256` binds that archive to the binary's release
    version; binary/image `interfold noir status` checks must match. Do not repack it afterward.
-4. Requires qualified binaries/circuits before publishing versioned ciphernode/support images and
-   core npm packages. Stable releases also require the DAppNode package; prereleases skip it.
+4. Requires qualified binaries/circuits before publishing the versioned ciphernode image and core
+   npm packages. Stable releases also require the DAppNode package; prereleases skip it.
 5. Requires every publication, assembles binary/circuit archives, address `manifest.json`, checksums
    in release notes, and `release-provenance.json` (candidate/source hash/tag/workflow run).
 6. Promotes container aliases and the stable tag where applicable, then creates the GitHub release.
 
-Rust workspace crates are not published to crates.io by this workflow. The support image contains no
-CLI/ciphernode build; DAppNode copies the checked ciphernode image. Asset inventory and npm retry
-semantics are owned by the release scripts, not a second checklist of package versions here.
+Rust workspace crates are not published to crates.io by this workflow. DAppNode copies the checked
+ciphernode image. Asset inventory and npm retry semantics are owned by the release scripts, not a
+second checklist of package versions here.
 
 The separately named `interfold-test-only-skip-proof-aggregation-linux-x86_64` CLI archive enables
 proof skipping for tests/CI only. Normal platform archives have no proof-skip feature; the workflow

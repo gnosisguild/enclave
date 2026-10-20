@@ -25,9 +25,9 @@ fn main() -> anyhow::Result<()> {
 ```
 
 Use [the template runner](../../templates/default/runner) or
-[CRISP's runner](../../examples/CRISP/runner) as the complete Cargo recipe. The binary accepts `dev`
-or `openvm`; a missing, unknown, or non-UTF-8 mode is a usage error. Both modes preserve the
-project's policy and published metadata.
+[CRISP's runner](https://github.com/theinterfold/CRISP/tree/main/runner) as the complete Cargo
+recipe. The binary accepts `dev` or `openvm`; a missing, unknown, or non-UTF-8 mode is a usage
+error. Both modes preserve the project's policy and published metadata.
 
 From a generated project root, `interfold program compile --dev` builds `program-runner`, and
 `interfold program start --dev` runs its development mode. Without `--dev`, configuration selects

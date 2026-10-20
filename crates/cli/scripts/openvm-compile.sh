@@ -18,8 +18,8 @@
 #   OPENVM_SETUP_DIR             what `cargo openvm setup` wrote (default ~/.openvm)
 #   OPENVM_SEGMENT_MEMORY_BYTES  the proving segment memory limit (default 8 GiB, fits a 16 GB GPU)
 #   CARGO_OPENVM                 the cargo-openvm command (default `cargo openvm`)
-#   OPENVM_PROVER_CONFIG         where to write the worker configuration; `start` and the template
-#                                and CRISP deploys read the same path
+#   OPENVM_PROVER_CONFIG         where to write the worker configuration; `start` and the deploys
+#                                read the same path
 #   OPENVM_BUILD_LOCKED=1        build the guest with --locked (read by cargo-openvm)
 set -euo pipefail
 

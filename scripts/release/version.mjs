@@ -16,7 +16,7 @@ export const PACKAGE_FILES = [
 ]
 
 // Guests are independent Cargo workspaces; all five locks record local release versions.
-export const CARGO_WORKSPACES = ['.', 'examples/CRISP', 'examples/CRISP/guest', 'templates/default', 'templates/default/guest']
+export const CARGO_WORKSPACES = ['.', 'templates/default', 'templates/default/guest']
 
 export function normalizeVersion(input) {
   const version = input.replace(/^v/, '')

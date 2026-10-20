@@ -1,12 +1,13 @@
 # Encrypted computation and application input binding
 
 Owners: [compute-provider](../../crates/compute-provider/),
-[OpenVM prover](../../crates/openvm-prover/), [CRISP program](../../examples/CRISP/program/), and
-[CRISP contracts](../../examples/CRISP/packages/crisp-contracts/). Protocol verification creates
-decryption duty; application verification decides what computation is valid. Neither can stand in
-for the other. This path was **not covered** by the scoped Zenith Solidity audits;
-[audit scope](../../packages/interfold-contracts/audits/README.md) is narrower than repository
-remediation claims.
+[OpenVM prover](../../crates/openvm-prover/), the
+[CRISP program](https://github.com/theinterfold/CRISP/tree/main/program), and the
+[CRISP contracts](https://github.com/theinterfold/CRISP/tree/main/packages/crisp-contracts).
+Protocol verification creates decryption duty; application verification decides what computation is
+valid. Neither can stand in for the other. This path was **not covered** by the scoped Zenith
+Solidity audits; [audit scope](../../packages/interfold-contracts/audits/README.md) is narrower than
+repository remediation claims.
 
 ## Shared computation contract
 
@@ -35,9 +36,14 @@ sequential execution; guest is single-threaded. Schedule must not change the roo
 
 The host/guest share SecureProcess, but accelerated guest Poseidon2, Keccak, SHA-256, RNS packing,
 and power-basis commitments must match native reference behavior. A mismatch does not forge a proof
-(contracts rebuild the journal), but prevents producing one and can fail every round. Guest
-allocation must free per-input temporaries (`heap-embedded-alloc`, not a never-free bump allocator);
-its choice is part of the executable/application commitments.
+(contracts rebuild the journal), but prevents producing one and can fail every round. **Gap:** no
+Interfold CI job runs the accelerated guest paths (`e3-safe/openvm`, `openvm-hashes`,
+`crisp_fhe_optimized`): `openvm_guest` builds only the template guest, and host unit tests build the
+non-`openvm` variants. The CI of [CRISP](https://github.com/theinterfold/CRISP) runs the real guest
+against the host's journal, but only after CRISP pins a published Interfold release, so a parity
+regression on `main` can ship in a release. Guest allocation must free per-input temporaries
+(`heap-embedded-alloc`, not a never-free bump allocator); its choice is part of the
+executable/application commitments.
 
 ## Receipt and output publication
 
@@ -124,8 +130,8 @@ reversal. Zero every non-option coefficient; masks zero the entire polynomial. `
 coefficient, hinted weight v, and quotient r to `[0,t)`, then verifies `k1 + t*r == Q_MOD_T*v` over
 integers. Use the non-centered scale, not `Q_MOD_T_CENTERED`. Weights sum at most the slot bound;
 with two options at most one is nonzero. Bounds give `k1_commitment` one opening, so the fold binds
-the same plaintext the encryption circuit proves. Regenerate both presets' fold VK constants
-(`pnpm build:circuits sync-crisp` from the repository root, for both presets) and verifiers after
+the same plaintext the encryption circuit proves. Regenerate both presets' fold VK constants in the
+CRISP repository (`pnpm compute:vk-hash <preset>`, for both presets) and verifiers after
 ballot-circuit changes; a deployed program retains its old immutable verifier until replacement.
 
 The tree appends rather than updates because anyone may mask an eligible slot without its owner's
@@ -201,14 +207,15 @@ ciphertext gate and callback's terminal preflight prevent a second output.
 parity, changed second reads, complete input consumption;
 [batching tests](../../crates/compute-provider/src/compute_input.rs) include
 `batching_does_not_change_the_root`.
-[Leaf vectors](../../examples/CRISP/program/tests/input_leaf.rs) and
-[on-chain root agreement](../../examples/CRISP/program/tests/onchain_root_agreement.rs) pin the
-cross-language root. [CRISP contract tests](../../examples/CRISP/packages/crisp-contracts/tests/)
+[Leaf vectors](https://github.com/theinterfold/CRISP/blob/main/program/tests/input_leaf.rs) and
+[on-chain root agreement](https://github.com/theinterfold/CRISP/blob/main/program/tests/onchain_root_agreement.rs)
+pin the cross-language root.
+[CRISP contract tests](https://github.com/theinterfold/CRISP/tree/main/packages/crisp-contracts/tests)
 include input-tree, ballot, and real OpenVM service boundaries.
 
-Run `cargo test -p e3-compute-provider`, relevant CRISP tests, and `pnpm openvm guest-parity`
-(insecure and secure fixtures). Deployment additionally needs real rebuilt guest/worker commitments,
-checked Halo2 verifier, full local Playwright, and real Sepolia Avail/VectorX round; native tests
-are not equivalent. Pinned Hardhat 3.0.11 / EDR 0.12.0-next.10 can expire subscriptions after five
-minutes while WebSocket stays open: use Anvil for long live OpenVM tests. That local listener limit
-is not a proof failure.
+Run `cargo test -p e3-compute-provider` here and the relevant tests in the CRISP repository.
+Deployment additionally needs real rebuilt guest/worker commitments, checked Halo2 verifier, the
+full local Playwright flow of CRISP, and a real Sepolia Avail/VectorX round; native tests are not
+equivalent. Pinned Hardhat 3.0.11 / EDR 0.12.0-next.10 can expire subscriptions after five minutes
+while WebSocket stays open: use Anvil for long live OpenVM tests. That local listener limit is not a
+proof failure.

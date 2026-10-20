@@ -63,7 +63,6 @@ pub(crate) struct FoldedArtifacts {
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub(crate) struct VerifyGas {
     pub dkg: Option<u64>,
-    pub user: Option<u64>,
     pub dec: Option<u64>,
 }
 #[derive(Debug, Serialize)]
@@ -317,11 +316,8 @@ struct Results {
     artifact_stamp: serde_json::Value,
     source: &'static str,
     verify_gas: VerifyGas,
-    user_preset: Option<String>,
     artifacts: BTreeMap<String, ArtifactMeasures>,
     integration: Outcome,
-    crisp_setup: Outcome,
-    crisp: Outcome,
     replay: Outcome,
     error: Option<String>,
     complete: bool,
@@ -333,7 +329,6 @@ pub(crate) fn collect(
     cfg: &Configuration,
     gas: bool,
     existing: Option<&serde_json::Value>,
-    user_gas: Option<&serde_json::Value>,
 ) -> Result<()> {
     let mut results = Results {
         schema_version: 2,
@@ -344,30 +339,14 @@ pub(crate) fn collect(
             "integration_and_evm_measurements"
         },
         verify_gas: VerifyGas::default(),
-        user_preset: None,
         artifacts: BTreeMap::new(),
         integration: Outcome::pending(),
-        crisp_setup: Outcome::pending(),
-        crisp: Outcome::pending(),
         replay: Outcome::pending(),
         error: None,
         complete: false,
     };
     let result = (|| -> Result<()> {
         results.artifact_stamp = validate_active(root, cfg)?;
-        if gas && existing.is_none() {
-            results.crisp_setup.execute(
-                Command::new("pnpm")
-                    .arg("bench:crisp:prepare")
-                    .current_dir(root),
-                &output.join("crisp-setup.log"),
-            )?;
-            let restored = validate_active(root, cfg);
-            if let Err(error) = &restored {
-                results.crisp_setup.export_failure(error);
-            }
-            results.artifact_stamp = restored?;
-        }
         let document = if let Some(document) = existing {
             document.clone()
         } else {
@@ -414,38 +393,6 @@ pub(crate) fn collect(
             results.complete = true;
             return Ok(());
         }
-        let mut failures = Vec::new();
-        if existing.is_none() {
-            let mut command = Command::new("pnpm");
-            command
-                .args([
-                    "test:ballots:program",
-                    "--grep",
-                    "should verify the proof correctly with the crisp verifier",
-                ])
-                .current_dir(root.join("examples/CRISP/packages/crisp-contracts"))
-                .env(
-                    "BENCHMARK_CRISP_GAS_OUTPUT",
-                    output.join("crisp_user_gas.json"),
-                );
-            match results
-                .crisp
-                .execute(&mut command, &output.join("crisp.log"))
-            {
-                Ok(()) => match read_json(&output.join("crisp_user_gas.json"))
-                    .and_then(|doc| apply_user_gas(&mut results, &doc))
-                {
-                    Ok(()) => {}
-                    Err(error) => {
-                        results.crisp.export_failure(&error);
-                        failures.push(format!("CRISP export: {error:#}"));
-                    }
-                },
-                Err(error) => failures.push(format!("CRISP gas: {error:#}")),
-            }
-        } else if let Some(document) = user_gas {
-            apply_user_gas(&mut results, document)?;
-        }
         results.replay.execute(
             &mut evm_command(root, output, &folded_path, cfg),
             &output.join("evm-replay.log"),
@@ -468,19 +415,11 @@ pub(crate) fn collect(
         let evm = export?;
         results.verify_gas.dkg = evm.dkg;
         results.verify_gas.dec = evm.dec;
-        results.complete =
-            failures.is_empty() && (existing.is_some() || results.verify_gas.user.is_some());
-        if !failures.is_empty() {
-            bail!("{}", failures.join("\n"));
-        }
+        results.complete = true;
         Ok(())
     })();
     if let Err(error) = &result {
-        if results.integration.error.is_none()
-            && results.crisp_setup.error.is_none()
-            && results.replay.error.is_none()
-            && results.crisp.error.is_none()
-        {
+        if results.integration.error.is_none() && results.replay.error.is_none() {
             results.replay.error = Some(format!("{error:#}"));
         }
         results.error = Some(format!("{error:#}"));
@@ -491,45 +430,12 @@ pub(crate) fn collect(
     result
 }
 
-fn apply_user_gas(results: &mut Results, document: &serde_json::Value) -> Result<()> {
-    results.verify_gas.user = document["verify_gas"]["user"].as_u64();
-    if let Some(outcome) = document.get("crisp") {
-        results.crisp =
-            serde_json::from_value(outcome.clone()).context("Invalid saved CRISP outcome")?;
-        if results.crisp.measurement.success != Some(true) || results.crisp.error.is_some() {
-            bail!(
-                "Saved CRISP stage did not succeed: {}",
-                results
-                    .crisp
-                    .error
-                    .as_deref()
-                    .unwrap_or("no successful measurement")
-            );
-        }
-    }
-    if results.verify_gas.user.is_none() {
-        bail!("CRISP export omitted measured user verifier gas");
-    }
-    results.user_preset = document["preset"]
-        .as_str()
-        .or_else(|| document["user_preset"].as_str())
-        .map(str::to_owned);
-    if document["artifact"].is_object() {
-        let artifact: ProofArtifact = serde_json::from_value(document["artifact"].clone())?;
-        results
-            .artifacts
-            .insert("user".into(), artifact_measures(&artifact)?);
-    }
-    Ok(())
-}
-
 pub(crate) fn replay(
     root: &Path,
     output: &Path,
     input: &Path,
     mode: Option<&str>,
     committee: Option<&str>,
-    gas_path: Option<&Path>,
 ) -> Result<()> {
     let result = (|| -> Result<()> {
         let path: PathBuf = if input.is_dir() {
@@ -540,12 +446,11 @@ pub(crate) fn replay(
         let document = read_json(&path)?;
         let cfg = configuration(&document, mode, committee, 1)?;
         folded(&document)?;
-        let user_gas = gas_path.map(read_json).transpose()?;
-        collect(root, output, &cfg, true, Some(&document), user_gas.as_ref())
+        collect(root, output, &cfg, true, Some(&document))
     })();
     if let Err(error) = &result {
         if !output.join("protocol_results.json").exists() {
-            let document = serde_json::json!({"schema_version":2,"complete":false,"source":"saved_folded_proof_evm_replay","verify_gas":{"dkg":null,"user":null,"dec":null},"replay":{"measurement":{"success":false,"time_seconds":null,"metric":"external_command_wall"},"error":format!("{error:#}")}});
+            let document = serde_json::json!({"schema_version":2,"complete":false,"source":"saved_folded_proof_evm_replay","verify_gas":{"dkg":null,"dec":null},"replay":{"measurement":{"success":false,"time_seconds":null,"metric":"external_command_wall"},"error":format!("{error:#}")}});
             write_json(&output.join("protocol_results.json"), &document)?;
             write_json(&output.join("crisp_verify_gas.json"), &document)?;
         }

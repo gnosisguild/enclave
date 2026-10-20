@@ -297,14 +297,7 @@ export function apps() {
     const loc = files.reduce((n, f) => n + lines(f).length, 0)
     return { id, kind, path, loc, files: files.length }
   }
-  return [
-    unit('@interfold/sdk', 'package', 'packages/interfold-sdk/src', ['.ts']),
-    unit('CRISP program', 'package', 'examples/CRISP/program', ['.rs']),
-    unit('CRISPProgram contract', 'contract', 'examples/CRISP/packages/crisp-contracts/contracts', ['.sol']),
-    unit('CRISP circuits', 'circuit', 'examples/CRISP/circuits', ['.nr']),
-    unit('CRISP server', 'package', 'examples/CRISP/server', ['.rs']),
-    unit('CRISP crates', 'crate', 'examples/CRISP/crates', ['.rs']),
-  ].filter(Boolean)
+  return [unit('@interfold/sdk', 'package', 'packages/interfold-sdk/src', ['.ts'])].filter(Boolean)
 }
 
 export function inventory({ unmapped = false } = {}) {

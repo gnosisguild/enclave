@@ -603,7 +603,7 @@
         }
       ],
       "depends_on": ["e3-events", "e3-fhe-params"],
-      "tests": "Unit tests sit in #[cfg(test)] modules, mainly app_config.rs (uses figment::Jail and the CRISP example config). Run: cargo test -p e3-config",
+      "tests": "Unit tests sit in #[cfg(test)] modules, mainly app_config.rs (uses figment::Jail and inline chain configs). Run: cargo test -p e3-config",
       "unverified": [
         "Which node code reads each ChainConfig and NodeDefinition field was not traced; only the loaders and NetworkProfile were read.",
         "The validation rules in validation.rs and chain_config.rs were only sampled."
