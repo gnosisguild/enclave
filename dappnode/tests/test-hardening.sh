@@ -125,10 +125,15 @@ make_mock_interfold() {
     printf '%s\n' \
         '#!/bin/bash' \
         'set -Eeuo pipefail' \
+        'if [ "${1:-} ${2:-} ${3:-}" = "node reset-data --help" ]; then' \
+        '  [ "${RESET_SUPPORTED:-0}" != 1 ] || printf "      --if-schema-older\n"' \
+        '  exit 0' \
+        'fi' \
         'case "${1:-} ${2:-} ${3:-}" in' \
         '  "password set --password-stdin"*) operation=password ;;' \
         '  "wallet set --private-key-stdin"*) operation=wallet ;;' \
         '  "wallet get --config"*) operation=wallet-get ;;' \
+        '  "node reset-data --yes"*) operation=reset ;;' \
         '  "start "*) operation=start ;;' \
         '  *) operation=unexpected ;;' \
         'esac' \
@@ -154,7 +159,7 @@ make_mock_interfold() {
         '    [ -s "$WALLET_FILE" ] || exit 44' \
         '    printf "0x3333333333333333333333333333333333333333\n"' \
         '    ;;' \
-        '  start)' \
+        '  reset|start)' \
         '    : ;;' \
         '  *)' \
         '    exit 2 ;;' \
@@ -269,6 +274,28 @@ if run_entrypoint "$matching_dir" FAIL_ON=wallet-get; then
 fi
 [ "$(tr '\n' ' ' < "$matching_dir/calls")" = "wallet-get " ] || fail "saved identity read failure re-provisioned credentials"
 [ -e "$matching_dir/secrets/secrets.json" ] || fail "saved identity read failure removed recovery input"
+
+# A release that raises the storage schema resets the old state before the start, without the
+# active-E3 override unless the operator sets it. A binary without that reset skips it.
+reset_dir="$TEST_ROOT/schema-reset"
+mkdir -p "$reset_dir/secrets"
+write_secrets "$reset_dir/secrets/secrets.json"
+run_entrypoint "$reset_dir" RESET_SUPPORTED=1
+[ "$(tr '\n' ' ' < "$reset_dir/calls")" = "password wallet wallet-get reset start " ] \
+    || fail "the state reset did not run before the start"
+assert_contains "$reset_dir/argv" "node reset-data --yes --if-schema-older --config $reset_dir/data/config.yaml"
+assert_not_contains "$reset_dir/argv" '--allow-active-e3s'
+run_entrypoint "$reset_dir" RESET_SUPPORTED=1 ALLOW_ACTIVE_E3S_RESET=true
+assert_contains "$reset_dir/argv" 'node reset-data --yes --if-schema-older --config'
+assert_contains "$reset_dir/argv" '--allow-active-e3s'
+if run_entrypoint "$reset_dir" RESET_SUPPORTED=1 FAIL_ON=reset; then
+    fail "a refused state reset started the node"
+fi
+assert_not_contains "$reset_dir/calls" 'start'
+assert_contains "$reset_dir/output" 'ALLOW_ACTIVE_E3S_RESET'
+run_entrypoint "$reset_dir"
+[ "$(tr '\n' ' ' < "$reset_dir/calls")" = "wallet-get start " ] || fail "a release without the state reset did not start"
+assert_contains "$reset_dir/output" 'no automatic state reset'
 
 # The Node dashboard is optional: a proxy that cannot start must not stop the node.
 dashboard_dir="$TEST_ROOT/dashboard-unavailable"

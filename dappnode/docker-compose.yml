@@ -26,6 +26,8 @@ services:
       LOG_LEVEL: 'info'
       EXTRA_OPTS: ''
       DASHBOARD_ENABLED: 'true'
+      # Set to true only after you checked each E3 that a refused state reset lists. See the README.
+      ALLOW_ACTIVE_E3S_RESET: 'false'
     security_opt:
       - no-new-privileges:true
     healthcheck:

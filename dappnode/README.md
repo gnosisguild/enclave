@@ -46,6 +46,36 @@ Stop the node before a backup. Keep the backup encrypted offline; it contains th
 unlocks the keys. Restore it to the same network package. Mainnet and Sepolia use separate data
 volumes.
 
+## Updates and maintenance
+
+To upgrade, wait until the **Updates** view of the Node dashboard shows no active E3. Then update
+the package in Dappnode. The package restarts the node with the new release.
+
+When a release raises the storage schema, the package resets the node state before the node starts.
+The reset keeps the operator key and the libp2p key, and the node then syncs again from the chain.
+This needs a node release with `interfold node reset-data --if-schema-older`. On v0.19.0, use the
+[one-off reset](https://docs.theinterfold.com/operate/upgrades#reset-node-state) instead.
+
+The reset refuses while the node holds a key share for an E3 that it has not seen complete, or slash
+reports that it has not sent. The node then stays stopped, and the log lists each E3 or chain. Wait
+until they finish. Set `ALLOW_ACTIVE_E3S_RESET` to `true` in package **Config** only after you
+checked on chain that each listed E3 is complete or failed. The node then deletes those key shares.
+Set it back to `false` after the node starts.
+
+To repair a state that `interfold node validate` reports, stop the package. Then run its image in a
+one-off container with the package volume:
+
+```bash
+docker run --rm --volumes-from <stopped-package-container> --workdir /data \
+  --entrypoint interfold <package-image> node validate --repair --config /data/config.yaml
+```
+
+To leave the network, complete the
+[exit checklist](https://docs.theinterfold.com/operate/exits-and-slashing#exit-checklist) before you
+remove the package. The package volume holds the operator key, and its removal does not run the
+checks of `interfold nodes purge`. To change the operator key or the password, exit first, then
+install the package with a new volume.
+
 ## Custom RPC
 
 Change `RPC_URL` in package **Config** to use another endpoint. Use `ws://` or `wss://` for the

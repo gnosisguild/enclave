@@ -362,7 +362,8 @@ cannot register (`CiphernodeBanned`).
   The commands `interfold purge-all` and `interfold nodes purge` delete `.interfold/data` and
   `.interfold/config` in the current directory. These directories contain the operator key. When the
   operator is its own bond owner, only this key can claim the FOLD and the rewards. When the node
-  generated its own key, the local data is the only copy of this key.
+  generated its own key, the local data is the only copy of this key. A DAppNode package keeps the
+  key on its volume. Removing the package volume deletes it without these checks.
 </Callout>
 
 ## Next steps

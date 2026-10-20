@@ -224,7 +224,9 @@ The file must be 16 KiB or smaller. Keep an encrypted offline backup of it.
 ### Fill in the setup wizard
 
 On the first installation, upload the credentials file under **Node credentials (skip on updates)**.
-For updates, leave the upload empty. The package reuses the saved identity.
+For updates, leave the upload empty. The package reuses the saved identity. When a release raises
+the storage schema, the package resets the state before the node starts. See
+[Upgrades](/operate/upgrades#install-the-release).
 
 The network package supplies the chain ID, contract addresses, and deployment blocks from the
 deployment manifest. The node address comes from the saved wallet.

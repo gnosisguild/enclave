@@ -47,6 +47,7 @@ export NETWORK="${NETWORK:-mainnet}"
 export QUIC_PORT="${QUIC_PORT:-37173}"
 export LOG_LEVEL="${LOG_LEVEL:-info}"
 export DASHBOARD_ENABLED="${DASHBOARD_ENABLED:-false}"
+export ALLOW_ACTIVE_E3S_RESET="${ALLOW_ACTIVE_E3S_RESET:-false}"
 case "$LOG_LEVEL" in
     info|debug|trace) ;;
     *) fail "LOG_LEVEL must be one of: info, debug, trace" ;;
@@ -54,6 +55,10 @@ esac
 case "$DASHBOARD_ENABLED" in
     true|false) ;;
     *) fail "DASHBOARD_ENABLED must be true or false" ;;
+esac
+case "$ALLOW_ACTIVE_E3S_RESET" in
+    true|false) ;;
+    *) fail "ALLOW_ACTIVE_E3S_RESET must be true or false" ;;
 esac
 
 DERIVED_NODE_ADDRESS=""
@@ -168,6 +173,20 @@ mv -- "$CONFIG_FILE" "$SAVED_CONFIG_FILE"
 CONFIG_FILE="$SAVED_CONFIG_FILE"
 [ ! -e "$SECRETS_FILE" ] || rm -f "$SECRETS_FILE"
 log "Node address: $NODE_ADDRESS"
+
+# A release that raises the storage schema cannot load the stored state. Such a binary resets only
+# that state before the start and keeps the operator key and the libp2p key, so an update needs no
+# manual step. The reset refuses while the node holds an active E3 key share or unsent slash reports.
+reset_help=$(interfold node reset-data --help 2>/dev/null || true)
+case "$reset_help" in
+    *--if-schema-older*)
+        RESET_ARGS=(node reset-data --yes --if-schema-older --config "$CONFIG_FILE")
+        [ "$ALLOW_ACTIVE_E3S_RESET" != true ] || RESET_ARGS+=(--allow-active-e3s)
+        interfold "${RESET_ARGS[@]}" \
+            || fail "the state reset for this release stopped; wait until the E3s listed above finish, or read ALLOW_ACTIVE_E3S_RESET in the package README"
+        ;;
+    *) log "This node release has no automatic state reset." ;;
+esac
 
 start_dashboard_proxy() {
     local hostname="interfold-ciphernode-${NETWORK}.dappnode"
