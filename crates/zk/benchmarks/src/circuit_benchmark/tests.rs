@@ -254,7 +254,7 @@ fn protocol_root() -> tempfile::TempDir {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path();
     for directory in [
-        "scripts",
+        "scripts/circuits",
         "circuits/bin",
         "dist/circuits/secure-8192/minimum",
         "crates/zk/prover",
@@ -263,7 +263,7 @@ fn protocol_root() -> tempfile::TempDir {
         fs::create_dir_all(root.join(directory)).unwrap();
     }
     write_json(
-        &root.join("scripts/circuit-build-pairs.json"),
+        &root.join("scripts/circuits/build-pairs.json"),
         &serde_json::json!([["secure-8192", "minimum"]]),
     )
     .unwrap();

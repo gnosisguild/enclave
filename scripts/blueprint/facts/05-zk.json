@@ -3,11 +3,13 @@
   "units": [
     {
       "id": "e3-zk-prover",
+      "documentation": [
+        { "title": "Proof statements", "path": "docs/architecture/proof-statements.md" },
+        { "title": "Circuit artifacts", "path": "docs/architecture/circuit-artifacts.md" }
+      ],
       "kind": "crate",
       "path": "crates/zk/prover",
       "one_line": "Turns proof requests into Noir/bb proofs, verifies other nodes' proofs, and folds DKG proofs recursively.",
-      "explain": "Ciphernodes must show that each DKG and decryption message is well formed, and must check the same proofs from peers before using them. A proof request arrives as a bus event; ProofRequestActor sends it on as a ComputeRequest, and the multithread compute actor in crates/multithread builds the witness, runs bb, and returns the proof for signing. Without this crate, peer shares would be accepted unchecked and the folded proofs for on-chain checks would not exist.",
-      "analogy": "Like a certified assay lab: each sample (a request) is measured by one calibrated instrument (bb) following a fixed method file (the compiled circuit), and anyone holding the matching verifying key can re-check the certificate.",
       "actors": [
         {
           "name": "ZkActor",
@@ -255,17 +257,17 @@
         {
           "name": "CircuitName",
           "what": "C0-C7 and fold circuit identifiers; dir_path gives the artifact folder",
-          "ref": "crates/events/src/interfold_event/proof.rs@108@pub enum CircuitName"
+          "ref": "crates/events/src/interfold_event/proof.rs@109@pub enum CircuitName"
         },
         {
           "name": "CircuitVariant",
           "what": "Default (noir-recursive-no-zk), Recursive (inner ZK proofs), Evm (on-chain)",
-          "ref": "crates/events/src/interfold_event/proof.rs@71@pub enum CircuitVariant"
+          "ref": "crates/events/src/interfold_event/proof.rs@72@pub enum CircuitVariant"
         },
         {
           "name": "Proof",
           "what": "proof bytes, public signals and the circuit name",
-          "ref": "crates/events/src/interfold_event/proof.rs@16@pub struct Proof"
+          "ref": "crates/events/src/interfold_event/proof.rs@17@pub struct Proof"
         },
         {
           "name": "ZkError",
@@ -292,7 +294,7 @@
         },
         {
           "why": "where a ComputeRequest becomes a prover call (crates/multithread)",
-          "ref": "crates/multithread/src/multithread.rs@1263@fn handle_zk_request("
+          "ref": "crates/multithread/src/multithread.rs@1321@fn handle_zk_request("
         }
       ],
       "rust_patterns": [
@@ -328,12 +330,12 @@
         }
       ],
       "depends_on": [
+        "e3-committee",
         "e3-committee-hash",
         "e3-config",
         "e3-data",
         "e3-events",
         "e3-fhe-params",
-        "e3-polynomial",
         "e3-request",
         "e3-slashing",
         "e3-utils",
@@ -349,6 +351,108 @@
         "The commitment_links/*.rs consistency rules and the ECDSA checks in share_verification/transitions/ecdsa.rs were not read beyond their names.",
         "The TaskPool, retry and memory logic in crates/multithread was not read beyond the dispatch path."
       ]
+    },
+    {
+      "id": "e3-zk-config",
+      "kind": "crate",
+      "path": "crates/zk/config",
+      "one_line": "Static BFV configuration, bounds, parity, Noir rendering, and public-input layouts, without witnesses or samples.",
+      "documentation": [{ "title": "Configuration and proof interfaces", "path": "docs/architecture/proof-statements.md" }],
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [],
+      "key_types": [],
+      "read_first": [
+        { "why": "Configuration metadata and layout exports", "ref": "crates/zk/config/src/lib.rs@16@pub use metadata::CircuitMetadata;" }
+      ],
+      "rust_patterns": [],
+      "depends_on": ["e3-committee", "e3-fhe-params", "e3-polynomial", "e3-polynomial-fhe", "e3-parity-matrix"],
+      "tests": "cargo test --locked -p e3-zk-config; pnpm test:circuit-build covers generated-source consumers.",
+      "unverified": []
+    },
+    {
+      "id": "e3-zk-witness",
+      "kind": "crate",
+      "path": "crates/zk/witness",
+      "one_line": "Typed production inputs, deterministic witness preparation, commitments, and canonical Noir JSON.",
+      "documentation": [{ "title": "Witness and commitment contracts", "path": "docs/architecture/proof-statements.md" }],
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [],
+      "key_types": [],
+      "read_first": [
+        { "why": "Production preparation and commitment exports", "ref": "crates/zk/witness/src/lib.rs@9@pub mod commitments;" }
+      ],
+      "rust_patterns": [],
+      "depends_on": ["e3-zk-config", "e3-fhe-params", "e3-polynomial", "e3-polynomial-fhe", "e3-safe", "e3-committee"],
+      "tests": "cargo test --locked -p e3-zk-witness; preparation and sample suites do not replace real-proof acceptance.",
+      "unverified": []
+    },
+    {
+      "id": "e3-zk-samples",
+      "kind": "crate",
+      "path": "crates/zk/samples",
+      "one_line": "Unpublished artificial BFV material for tests and development tools, separate from live production inputs.",
+      "documentation": [{ "title": "Sample and evidence boundaries", "path": "docs/architecture/repository-testing.md" }],
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [],
+      "key_types": [],
+      "read_first": [{ "why": "Artificial DKG and threshold constructors", "ref": "crates/zk/samples/src/lib.rs@9@pub mod dkg;" }],
+      "rust_patterns": [],
+      "depends_on": ["e3-zk-config", "e3-zk-witness", "e3-fhe-params"],
+      "tests": "cargo test --locked -p e3-zk-samples; pnpm check:repository enforces dev-only dependency containment except the unpublished benchmark owner.",
+      "unverified": []
+    },
+    {
+      "id": "e3-zk-build",
+      "kind": "crate",
+      "path": "crates/zk/build",
+      "one_line": "Unpublished Rust circuit build owner: typed operations, static generation, source identity, staging, and hydration.",
+      "documentation": [{ "title": "Artifact identity and generation", "path": "docs/architecture/circuit-artifacts.md" }],
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [],
+      "key_types": [
+        {
+          "name": "Request",
+          "what": "Typed build operation, selection, output, and artifact controls",
+          "ref": "crates/zk/build/src/lib.rs@204@pub struct Request {"
+        }
+      ],
+      "read_first": [
+        {
+          "why": "Admit a typed request and execute the owning operation",
+          "ref": "crates/zk/build/src/lib.rs@394@pub fn execute(root: &Path, request: &Request) -> Result<()> {"
+        }
+      ],
+      "rust_patterns": [],
+      "depends_on": ["e3-zk-config", "e3-zk-witness", "e3-committee", "e3-fhe-params"],
+      "tests": "pnpm test:circuit-build; pnpm build:circuits check --committee all compares generated files without replacing live files.",
+      "unverified": []
+    },
+    {
+      "id": "e3-zk-benchmarks",
+      "kind": "crate",
+      "path": "crates/zk/benchmarks",
+      "one_line": "Unpublished benchmark runner for production Rust/Noir/BB phases, protocol gas, and immutable saved replay/reports.",
+      "documentation": [{ "title": "Benchmark provenance", "path": "docs/architecture/circuit-artifacts.md" }],
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [],
+      "key_types": [],
+      "read_first": [
+        { "why": "CLI entry into the benchmark capability", "ref": "crates/zk/benchmarks/src/main.rs@9@fn main() -> anyhow::Result<()> {" }
+      ],
+      "rust_patterns": [],
+      "depends_on": ["e3-zk-build", "e3-zk-config", "e3-zk-witness", "e3-zk-samples", "e3-zk-prover"],
+      "tests": "pnpm test:circuit-bench and pnpm test:harnesses; mocked process outcomes do not qualify protocol proofs or verifier gas.",
+      "unverified": []
     }
   ]
 }

@@ -10,7 +10,6 @@ export const preset: CircuitPreset = 'insecure-64'
 
 export const loadCircuits = async (): Promise<CircuitBundle> => {
   throw new Error(
-    'The insecure-64 circuits are not included in this @crisp-e3/sdk build. ' +
-      'Install an SDK release channel that carries insecure-64.',
+    'The insecure-64 circuits are not included in this @crisp-e3/sdk build. ' + 'Install an SDK release channel that carries insecure-64.',
   )
 }

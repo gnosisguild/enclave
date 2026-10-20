@@ -807,7 +807,7 @@ function ciphernode({ units }) {
     parent: 'system',
     title: 'Inside one ciphernode',
     crumb: 'Ciphernode',
-    sub: 'Every component publishes through the Sequencer, which stores the event and then fans it out on the EventBus to the actors that subscribed to its type.',
+    sub: 'Full-node view: protocol events pass through the Sequencer and EventBus. Bootstrap keeps networking and chain reads, without protocol extensions or compute.',
     w: 2100,
     h: 1340,
     bounds: [{ x: 300, y: 90, w: 1540, h: 1230, label: 'Ciphernode · one Rust binary' }],
@@ -836,10 +836,10 @@ function ciphernode({ units }) {
         w: 300,
         h: 110,
         title: 'ciphernode-builder',
-        lines: ['attaches every actor', 'to the bus'],
+        lines: ['full / bootstrap profile', 'ordered startup phases'],
         mono: true,
         drill: 'crate:e3-ciphernode-builder',
-        tip: 'The composition root: build_inner attaches the actors',
+        tip: 'The composition root: storage and recovery precede the live bus, protocol core, EVM, extensions, networking and sync. e3-event-system assembles the persistence runtime.',
       },
       {
         id: 'config',
@@ -964,7 +964,11 @@ function ciphernode({ units }) {
         to: 'builder',
         fs: 'r',
         ts: 'l',
-        refs: [H('crates/entrypoint/src/start/start.rs', 89, 'CiphernodeBuilder::new(rng, cipher)'), ...ev('B21')],
+        refs: [
+          H('crates/entrypoint/src/start/start.rs', 90, 'CiphernodeBuilder::bootstrap(rng, cipher)'),
+          H('crates/entrypoint/src/start/start.rs', 124, 'CiphernodeBuilder::full(rng, cipher, backend)'),
+          ...ev('B21'),
+        ],
       },
       { from: 'config', to: 'builder', fs: 'l', ts: 'r', label: 'load_config', refs: ev('B22') },
       { from: 'chain', to: 'evm', fs: 'r', ts: 'l', both: true, label: 'logs in\ntxs out', refs: [...ev('A22'), ...ev('B2', 'B3', 'B4')] },
@@ -988,7 +992,7 @@ function ciphernode({ units }) {
         both: true,
         label: 'remote events',
         refs: [
-          H('crates/net/src/event_translation/actor.rs', 261, '.publish_from_remote(data, ec.ts(), None, EventSource::Net)'),
+          H('crates/net/src/event_translation/actor.rs', 263, '.publish_from_remote(data, ec.ts(), None, EventSource::Net)'),
           H('crates/net/src/event_conversion/actor.rs', 71, 'self.bus.publish(evt, ctx)?;'),
         ],
       },
@@ -1057,7 +1061,7 @@ function ciphernode({ units }) {
         refs: [
           H(
             'crates/slashing/src/accusation_voting/handlers.rs',
-            46,
+            65,
             'impl Handler<TypedEvent<ProofVerificationFailed>> for AccusationManager',
           ),
           ...ev('B13'),
@@ -1079,7 +1083,7 @@ function ciphernode({ units }) {
         refs: [
           'crates/keyshare/src/ext.rs@66@InterfoldEventData::CiphernodeSelected',
           'crates/aggregator/src/ext.rs@98@InterfoldEventData::CiphernodeSelected',
-          'crates/slashing/src/accusation_manager_ext.rs@183@InterfoldEventData::CommitteeFinalized',
+          'crates/slashing/src/accusation_manager_ext.rs@211@InterfoldEventData::CommitteeFinalized',
         ],
       },
       {

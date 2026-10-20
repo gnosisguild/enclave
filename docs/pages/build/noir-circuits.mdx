@@ -223,10 +223,10 @@ pnpm build:circuits --preset secure-8192 --committee small
 
 A build selects one BFV preset and one committee size:
 
-| Option        | Values                               | Default        |
-| ------------- | ------------------------------------ | -------------- |
+| Option        | Values                              | Default       |
+| ------------- | ----------------------------------- | ------------- |
 | `--preset`    | `insecure-64`, `secure-8192`, `all` | `insecure-64` |
-| `--committee` | `minimum`, `micro`, `small`, `all`   | `minimum`      |
+| `--committee` | `minimum`, `micro`, `small`, `all`  | `minimum`     |
 
 | Committee | N   | T   | H   |
 | --------- | --- | --- | --- |
@@ -301,8 +301,8 @@ Other circuit commands:
 | `pnpm build:circuits hash`                                     | Prints the source hash that identifies a build.                                                                                                                                              |
 | `pnpm build:circuits sync-config --preset <p> --committee <c>` | Updates `utils.ts` and `ActiveCryptoConfig.sol` only. It does not compile.                                                                                                                   |
 | `pnpm check:committee`                                         | Checks that the committee and BFV values agree across Noir, Rust, TypeScript, and Solidity.                                                                                                  |
-| `pnpm noir:lint` (`scripts/lint-circuits.sh`)                  | Runs `nargo fmt --check` and `nargo check` on the library and each package. It exits with success if `nargo` is missing.                                                                     |
-| `pnpm noir:test` (`scripts/test-circuits.sh`)                  | Runs `nargo test` on `circuits/lib` and `decryption_aggregator`, then `nargo execute` on `bin/config`, then the `dkg_aggregator` and `node_fold` tests for three preset and committee pairs. |
+| `pnpm noir:lint` (`scripts/circuits/lint.sh`)                  | Runs `nargo fmt --check` and `nargo check` on the library and each package. It exits with success if `nargo` is missing.                                                                     |
+| `pnpm noir:test` (`scripts/circuits/test.sh`)                  | Runs `nargo test` on `circuits/lib` and `decryption_aggregator`, then `nargo execute` on `bin/config`, then the `dkg_aggregator` and `node_fold` tests for three preset and committee pairs. |
 
 The Rust benchmark runner creates artificial cryptographic material and executes production witness
 preparation directly. Its preset and committee must match the selected artifacts:
@@ -416,14 +416,15 @@ The crate `e3-zk-prover` (`crates/zk/prover`) runs the circuits for the cipherno
 
 The event types (`CircuitName`, `ProofType`) are in `crates/events`. The protocol flow that uses
 them is in
-[`agent/flow-trace/04_DKG_AND_COMPUTATION.md`](https://github.com/theinterfold/interfold/blob/main/agent/flow-trace/04_DKG_AND_COMPUTATION.md).
+[proof statements](https://github.com/theinterfold/interfold/blob/main/docs/architecture/proof-statements.md)
+and [DKG](https://github.com/theinterfold/interfold/blob/main/docs/architecture/dkg.md).
 
 ## Add or rename a circuit
 
 1. Put the package in `bin/dkg`, `bin/threshold`, or `bin/recursive_aggregation`. The build script
    finds packages in these groups automatically.
 2. Add the package to the `members` list of the group workspace, for `bin/dkg` and `bin/threshold`.
-3. Add the directory to `DIRS` in `scripts/lint-circuits.sh`, for a package in
+3. Add the directory to `DIRS` in `scripts/circuits/lint.sh`, for a package in
    `bin/recursive_aggregation`.
 4. Add a `CircuitName` variant in `crates/events` if the Rust prover must run the circuit.
 5. Rebuild each pair that you ship, and regenerate the verifiers if the circuit goes on-chain.

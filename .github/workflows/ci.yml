@@ -137,7 +137,7 @@ jobs:
               - 'templates/default/Cargo.toml'
               - 'templates/default/guest/**'
               - 'templates/default/program/**'
-              - 'scripts/run-openvm.sh'
+              - 'scripts/openvm/**'
               - '!**/*.md'
               - '!**/*.mdx'
             contracts:
@@ -153,7 +153,7 @@ jobs:
               - '!**/*.mdx'
             # `pnpm check:bindings` in rust_unit_tests runs this script.
             bindings:
-              - 'scripts/check-cli-bindings.ts'
+              - 'scripts/checks/cli-bindings.ts'
             # The `circuits` and `verifiers` filters are in .github/filters/circuits.yml, because
             # .husky/pre-push reads them too. The next step evaluates that file.
             # What the e2e reads: everything in CRISP except the unit test directories
@@ -277,8 +277,8 @@ jobs:
             # check:verifiers reads none of these files, so they stay out of
             # .github/filters/circuits.yml, which also starts check:verifiers in pre-push.
             circuit_build:
-              - 'scripts/circuit-artifacts.ts'
-              - 'scripts/circuit-artifacts.test.ts'
+              - 'scripts/circuits/artifacts.ts'
+              - 'scripts/circuits/artifacts.test.ts'
               - 'packages/interfold-contracts/scripts/protocol/constants.ts'
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         if: ${{ !inputs.release_candidate }}
@@ -368,11 +368,21 @@ jobs:
           echo "zk_prover_integration=$(any $FORCE $RUST $CIRCUITS $CI $TOOLING)" >> $GITHUB_OUTPUT
           echo "build_interfold_cli=$(any $FORCE $RUST $CONTRACTS $CIRCUITS $INTEGRATION $TEMPLATES $CRISP_E2E $SDK $CI $TOOLING)" >> $GITHUB_OUTPUT
 
-      - name: Check release promotion safeguards
-        run: node --test scripts/release.test.mjs
-
       - name: Check test runner dispatch and results
-        run: node --test scripts/test-harnesses.test.mjs
+        run: node --test crates/net/tests/runner.test.mjs scripts/hooks/*.test.mjs scripts/circuits/*.test.mjs
+
+  script_tooling:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:release
+      - run: pnpm test:scripts
 
   test_dappnode:
     runs-on: ubuntu-latest
@@ -454,10 +464,10 @@ jobs:
         if: matrix.suite == 'lib' && matrix.partition == 1
         run: pnpm rust:lint
 
-      # The Agent Harness workflow runs the same script on every pull request.
-      - name: Check repository invariants
+      # The Repository Checks workflow runs the same script on every pull request.
+      - name: Check repository configuration
         if: matrix.suite == 'lib' && matrix.partition == 1 && github.event_name != 'pull_request'
-        run: pnpm check:invariants
+        run: pnpm check:repository
 
       - name: Compile contracts for ABI catalog tests
         run: pnpm evm:build
@@ -649,7 +659,7 @@ jobs:
         run: |
           test -f .ci-noir/circuits/insecure-64/minimum/default/dkg/pk/pk.json
           test -f .ci-noir/circuits/secure-8192/minimum/default/dkg/pk/pk.json
-          pnpm tsx scripts/circuit-artifacts.ts checksums --dir .ci-noir/circuits
+          pnpm tsx scripts/circuits/artifacts.ts checksums --dir .ci-noir/circuits
           mkdir -p "$RUNNER_TEMP/circuit-release"
           tar -czf "$RUNNER_TEMP/circuit-release/circuits-candidate.tar.gz" \
             -C .ci-noir circuits
@@ -1471,10 +1481,10 @@ jobs:
           toolchain: ${{ env.NOIR_TOOLCHAIN }}
 
       - name: Check formatting
-        run: ./scripts/lint-circuits.sh
+        run: ./scripts/circuits/lint.sh
 
       - name: Test Noir circuits
-        run: ./scripts/test-circuits.sh
+        run: ./scripts/circuits/test.sh
 
       - name: Cancel workflow on failure
         if: failure()
@@ -1812,10 +1822,10 @@ jobs:
       # does not run. The secure fixture covers their secure-8192 widths.
       - name: Run the CRISP guest against the native journal
         run: |
-          bash scripts/run-openvm.sh fixture 3 "$RUNNER_TEMP/crisp-fixture" --insecure
-          bash scripts/run-openvm.sh guest-parity "$RUNNER_TEMP/crisp-fixture"
-          bash scripts/run-openvm.sh fixture 2 "$RUNNER_TEMP/crisp-fixture-secure"
-          bash scripts/run-openvm.sh guest-parity "$RUNNER_TEMP/crisp-fixture-secure"
+          bash scripts/openvm/run.sh fixture 3 "$RUNNER_TEMP/crisp-fixture" --insecure
+          bash scripts/openvm/run.sh guest-parity "$RUNNER_TEMP/crisp-fixture"
+          bash scripts/openvm/run.sh fixture 2 "$RUNNER_TEMP/crisp-fixture-secure"
+          bash scripts/openvm/run.sh guest-parity "$RUNNER_TEMP/crisp-fixture-secure"
 
   build_sdk:
     needs: [detect_changes]

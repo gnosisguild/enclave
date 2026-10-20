@@ -1,5 +1,7 @@
 # e3-zk-witness
 
+## Purpose
+
 This crate owns circuit input data, witness preparation, commitments, and canonical Noir JSON
 encoding. Each family's `Inputs::compute` takes its configuration from `e3-zk-config`. It does not
 construct a second configuration from a preset.
@@ -31,7 +33,28 @@ Noir execution and proving belong to `e3-zk-prover`. Artifact file writes belong
 `dkg/<circuit>.rs` and `threshold/<circuit>.rs` keep each circuit's data, preparation, and encoding
 together. C0 accepts a `PublicKey` directly instead of a one-field data wrapper.
 
-Artificial sample constructors belong to the unpublished `e3-zk-samples` crate. Tests use it
-through a dev dependency. The normal dependency graph of this crate excludes sample support. The
-unpublished `e3-zk-benchmarks` crate uses `e3-zk-samples` through a normal dependency. Production input
-types stay here.
+Artificial sample constructors belong to the unpublished `e3-zk-samples` crate. Tests use it through
+a dev dependency. The normal dependency graph of this crate excludes sample support. The unpublished
+`e3-zk-benchmarks` crate uses `e3-zk-samples` through a normal dependency. Production input types
+stay here.
+
+## Map and preparation flow
+
+| Location                                                           | Responsibility                                               |
+| ------------------------------------------------------------------ | ------------------------------------------------------------ |
+| [dkg/](src/dkg), [threshold/](src/threshold)                       | Circuit data, deterministic preparation, and canonical JSON. |
+| [commitments.rs](src/commitments.rs)                               | Checked packing and shared circuit commitments.              |
+| [encoding.rs](src/encoding.rs), [validation.rs](src/validation.rs) | Noir field encoding and malformed-shape rejection.           |
+| [negacyclic.rs](src/negacyclic.rs)                                 | Circuit-specific folded polynomial identities and padding.   |
+| [tests/](tests)                                                    | Preparation and sample-to-production boundary regressions.   |
+
+Construct a concrete configuration from the existing parameter owner. Supply the family's typed
+production data to `Inputs::compute`, then pass `to_json` to the matching compiled Noir ABI. The
+runtime [prover](../prover/README.md) owns execution; the [builder](../build/README.md) owns files.
+
+## Tests
+
+Run `cargo test --locked -p e3-zk-witness`. Integration targets cover DKG/threshold samples,
+deterministic preparation, malformed inputs, encryption intermediates, and canonical JSON. These
+native tests use sample material but do not establish deployed proof acceptance. Changed statements
+also need matching Noir and real-proof coverage. [AGENTS.md](AGENTS.md) owns compatibility hazards.

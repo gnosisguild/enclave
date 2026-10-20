@@ -34,8 +34,8 @@ const SOURCE_FILES: &[&str] = &[
     "circuits/lib/src/configs/committee/mod.nr",
     "circuits/lib/src/configs/default/mod.nr",
     "crates/zk/build/Cargo.toml",
-    "scripts/circuit-constants.ts",
-    "scripts/circuit-build-pairs.json",
+    "scripts/circuits/constants.ts",
+    "scripts/circuits/build-pairs.json",
     "packages/interfold-contracts/scripts/protocol/constants.ts",
     "Cargo.lock",
 ];

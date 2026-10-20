@@ -59,7 +59,7 @@ fn circuit_root_without_tools() -> tempfile::TempDir {
     let root = temp.path();
     write(
         root,
-        "scripts/circuit-build-pairs.json",
+        "scripts/circuits/build-pairs.json",
         r#"[["insecure-64","minimum"]]"#,
     );
     artifacts::copy_tree(
@@ -104,7 +104,7 @@ fn build_policy_rejects_disabled_pairs_before_tools_and_filters_all_selectors() 
     let temp = tempfile::tempdir().unwrap();
     write(
         temp.path(),
-        "scripts/circuit-build-pairs.json",
+        "scripts/circuits/build-pairs.json",
         serde_json::to_vec(&pairs).unwrap(),
     );
     let mut hydration = request();
@@ -369,7 +369,7 @@ fn source_identity_tracks_inputs_not_generated_selections_or_tests() {
         "circuits/lib/src/math/commitments.nr",
         "circuits/lib/Nargo.toml",
         "circuits/lib/src/configs/committee/micro/mod.nr",
-        "scripts/circuit-build-pairs.json",
+        "scripts/circuits/build-pairs.json",
         "crates/zk/build/templates/active_crypto_config.sol.in",
         "crates/zk/build/templates/committee_active.nr.in",
     ] {

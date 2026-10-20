@@ -616,7 +616,7 @@ mod tests {
         identity::tests::seed_sources(root);
         fs::create_dir_all(root.join("scripts")).unwrap();
         fs::write(
-            root.join("scripts/circuit-build-pairs.json"),
+            root.join("scripts/circuits/build-pairs.json"),
             r#"[["insecure-64","minimum"],["secure-8192","minimum"]]"#,
         )
         .unwrap();

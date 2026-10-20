@@ -23,7 +23,7 @@ use std::{
 const COMMITTEES: &[&str] = &["minimum", "micro", "small"];
 
 pub fn build_pairs(root: &Path) -> Result<Vec<[String; 2]>> {
-    let path = root.join("scripts/circuit-build-pairs.json");
+    let path = root.join("scripts/circuits/build-pairs.json");
     let pairs: Vec<[String; 2]> = serde_json::from_slice(&fs::read(&path)?)
         .with_context(|| format!("Invalid circuit build policy: {}", path.display()))?;
     if pairs.is_empty() {

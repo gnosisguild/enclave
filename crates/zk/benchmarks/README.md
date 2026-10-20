@@ -1,5 +1,7 @@
 # Circuit and protocol benchmarks
 
+## Purpose
+
 `pnpm bench:circuits` runs this crate, `e3-zk-benchmarks`. It is an unpublished development tool: it
 links the unpublished `e3-zk-samples` crate as a normal dependency to build artificial cryptographic
 material. Samples are not live application inputs. The runner executes production preparation, the
@@ -7,6 +9,16 @@ production Noir witness generator, and the production BB adapters.
 
 Run `pnpm bench:circuits --help` for every flag. This page lists the commands and the measurement
 rules that the recorded numbers depend on.
+
+## Map
+
+| Location                                                                                     | Responsibility                                                |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| [selection.rs](src/circuit_benchmark/selection.rs)                                           | Configured cases, modes, and committee selection.             |
+| [inputs.rs](src/circuit_benchmark/inputs.rs), [leaf.rs](src/circuit_benchmark/leaf.rs)       | Samples, production preparation, and measured leaf execution. |
+| [artifacts.rs](src/circuit_benchmark/artifacts.rs)                                           | Pair, digest, compiler, and config-cache provenance.          |
+| [protocol.rs](src/circuit_benchmark/protocol.rs)                                             | Existing integration and gas child-process orchestration.     |
+| [records.rs](src/circuit_benchmark/records.rs), [report.rs](src/circuit_benchmark/report.rs) | Schema-preserving records and metric rendering.               |
 
 ## Commands
 

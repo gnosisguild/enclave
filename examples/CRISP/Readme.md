@@ -141,6 +141,11 @@ pnpm cli
 pnpm test:e2e
 ```
 
+For a clean-room run of committed `HEAD`, use `bash scripts/test-isolated.sh [test args]` from this
+directory (or `bash examples/CRISP/scripts/test-isolated.sh` from the repository root). It rejects
+pending changes, creates a temporary worktree, installs/builds its prerequisites, and keeps failed
+runs for diagnosis. It does not test uncommitted wrapper edits.
+
 ## Configuration
 
 ### Ciphernode Configuration
@@ -308,9 +313,6 @@ already contains the staged preset circuits, so Vercel does not compile Noir cir
 - **Project root directory:** `examples/CRISP/client`
 - **`vercel build` in CI:** run from the **repository root** (not `cd examples/CRISP/client` first)
 - Optional Vercel env: `ENABLE_EXPERIMENTAL_COREPACK=1`
-
-Commit `examples/CRISP/client/pnpm-lock.yaml` after dependency bumps
-(`pnpm install --ignore-workspace` in that directory) for reproducible installs.
 
 ## Publishing packages to npm
 

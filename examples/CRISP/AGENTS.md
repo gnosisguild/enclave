@@ -1,0 +1,25 @@
+# Working on CRISP
+
+CRISP is an application with its own Cargo/pnpm workspaces; root `cargo -p` does not select its
+server/program packages. [Readme.md](Readme.md) owns setup, profiles, service exposure, and usage.
+
+- Keep application leaf/slot/parent rules aligned across the contract, SDK/witness generator, server
+  indexing, and program policy. Link
+  [encrypted computation](../../docs/architecture/encrypted-computation.md) for the detailed
+  contract rather than duplicating it in component guidance.
+- Input/event/durable-record changes cannot silently migrate an in-flight round. Preserve the
+  [server's refusal and deployment procedure](server/Readme.md#upgrading-across-an-input-format-change).
+- Index-0 degree-512 rounds cannot use degree-64 circuits or stores. Follow the shared
+  [testnet reset/redeployment requirement](../../docs/architecture/upgrades.md#insecure-testnet-preset-reset)
+  and use the SDK entry point matching the deployed parameter set.
+- The project `runner/` and separate guest both link `program/`. Shared modes belong in
+  [e3-program-runner](../../crates/program-runner/AGENTS.md); CLI compile/start belongs in
+  `crates/cli/src/program_support.rs`. The CLI rejects legacy `.interfold/support` projects.
+- The Vercel client installs published packages outside the workspace. After dependency bumps,
+  update `client/pnpm-lock.yaml` with `pnpm install --ignore-workspace` in that directory; a local
+  workspace build does not verify the published-package deployment.
+
+Use CRISP's focused `pnpm test:contracts`, `pnpm test:sdk`, and `pnpm test:circuits` targets for the
+affected layer. Cross-layer changes need the matching E2E/profile flow in
+[proof configuration](docs/PROOF_AGGREGATION_AND_ZK.md). Report which proof paths were real, mocked,
+or skipped; an unproved development round cannot qualify OpenVM or recursive BFV acceptance.
