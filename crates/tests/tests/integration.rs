@@ -19,8 +19,8 @@ use e3_event_system::EventSystem;
 use e3_events::{
     hlc::HlcTimestamp, prelude::*, AggregateConfig, AggregateId, BusHandle,
     CiphertextOutputPublished, CommitteeFinalized, CommitteeRequested, ComputeRequestKind,
-    ComputeResponseKind, ConfigurationUpdated, DkgFoldAttestationContextEstablished, E3Requested,
-    E3id, EventType, InterfoldEvent, InterfoldEventData, OperatorActivationChanged,
+    ComputeResponseKind, ConfigurationUpdated, CorrelationId, DkgFoldAttestationContextEstablished,
+    E3Requested, E3id, EventType, InterfoldEvent, InterfoldEventData, OperatorActivationChanged,
     PlaintextAggregated, ProofType, Seed, TakeEvents, TicketBalanceUpdated, Unsubscribe,
     VerificationKind, ZkRequest, ZkResponse, DKG_FOLD_ATTESTATION_CONTEXT_SCHEMA_VERSION,
 };
@@ -1174,6 +1174,22 @@ fn publickey_aggregator_marker(data: &InterfoldEventData, e3_id: &E3id) -> Optio
             Some("PublicKeyAggregated")
         }
         _ => None,
+    }
+}
+
+/// Whether a compute request belongs to the public-key phase: node folds, DKG aggregation, and
+/// share-proof checks of anything but C6 decryption shares.
+fn is_key_phase_request(request: &ComputeRequestKind) -> bool {
+    match request {
+        ComputeRequestKind::Zk(
+            ZkRequest::NodeDkgFold { .. } | ZkRequest::DkgAggregation { .. },
+        ) => true,
+        ComputeRequestKind::Zk(ZkRequest::VerifyShareProofs(request)) => request
+            .party_proofs
+            .iter()
+            .flat_map(|party| &party.signed_proofs)
+            .any(|signed| signed.payload.proof_type != ProofType::C6ThresholdShareDecryption),
+        _ => false,
     }
 }
 
@@ -2599,10 +2615,41 @@ async fn test_trbfv_actor() -> Result<()> {
     );
     println!("[bench-progress] PlaintextAggregated observed on node {plaintext_aggregator_index}");
 
-    let active_aggregator_plaintext_events =
-        project_history(&active_aggregator_history[plaintext_start..], |data| {
-            plaintext_aggregator_marker(data, &e3_id)
-        });
+    // After a public-key failover, the parties that held the aggregator role can start or finish
+    // key-phase work (node folds, DKG aggregation, share-proof checks) after the ciphertext is
+    // published. That work is not part of the plaintext flow, so leave out the compute requests and
+    // responses that belong to a key-phase request.
+    let key_phase_work: HashSet<CorrelationId> = if pubkey_failover {
+        active_aggregator_history
+            .iter()
+            .filter_map(|event| match event.get_data() {
+                InterfoldEventData::ComputeRequest(request)
+                    if request.e3_id == e3_id && is_key_phase_request(&request.request) =>
+                {
+                    Some(request.correlation_id)
+                }
+                _ => None,
+            })
+            .collect()
+    } else {
+        HashSet::new()
+    };
+    let active_aggregator_plaintext_events = project_history(
+        &active_aggregator_history[plaintext_start..],
+        |data| match data {
+            InterfoldEventData::ComputeRequest(request)
+                if key_phase_work.contains(&request.correlation_id) =>
+            {
+                None
+            }
+            InterfoldEventData::ComputeResponse(response)
+                if key_phase_work.contains(&response.correlation_id) =>
+            {
+                None
+            }
+            _ => plaintext_aggregator_marker(data, &e3_id),
+        },
+    );
 
     // C6 head layout:
     //   CiphertextOutputPublished, DecryptionshareCreated × K, ShareVerificationDispatched,
