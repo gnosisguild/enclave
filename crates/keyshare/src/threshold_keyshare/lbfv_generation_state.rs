@@ -676,7 +676,7 @@ mod tests {
     use e3_events::{CircuitName, E3id, Proof, ProofPayload, Seed};
     use e3_trbfv::gen_lbfv_key_shares::EncryptedRlkWitness;
     use e3_utils::ArcBytes;
-    use e3_zk_helpers::FIELD_BYTE_LEN;
+    use e3_zk_config::FIELD_BYTE_LEN;
 
     const LEGACY_GENERATION_STATE: &[u8] =
         include_bytes!("fixtures/lbfv_generation_state_v1.bincode");

@@ -37,9 +37,8 @@ use e3_utils::NotifySync;
 use e3_utils::{utility_types::ArcBytes, MAILBOX_LIMIT};
 use tracing::{debug, info, trace, warn};
 
-// Threshold-plaintext aggregation state machine + pure transition logic now live in
-// `crate::workflow::threshold_plaintext_aggregation`; re-exported here to preserve the public path
-// `e3_aggregator::threshold_plaintext_aggregator::*` (and the crate-level glob re-export).
+// The state machine and pure transition logic live in
+// `crate::workflow::threshold_plaintext_aggregation`.
 pub use crate::workflow::threshold_plaintext_aggregation::{
     Collecting, Complete, Computing, GeneratingC7Proof, ThresholdPlaintextAggregatorRecoveryState,
     ThresholdPlaintextAggregatorState, VerifyingC6, THRESHOLD_PLAINTEXT_RECOVERY_SCHEMA_VERSION,

@@ -583,7 +583,7 @@ pub(crate) mod tests {
     use e3_utils::ArcBytes;
 
     fn proof_domain() -> e3_committee_hash::LbfvProofDomainContext {
-        e3_zk_helpers::threshold::lbfv_proof_domain::sample_lbfv_proof_domain()
+        e3_zk_samples::lbfv_proof_domain::sample_lbfv_proof_domain()
     }
 
     #[derive(Message)]
@@ -919,7 +919,7 @@ pub(crate) mod tests {
                 party_ids: Vec::new(),
                 share_bytes: Vec::new(),
                 row_index: 0,
-                component: e3_zk_helpers::threshold::rlk_aggregation::RlkAggregationComponent::D0,
+                component: e3_zk_witness::threshold::rlk_aggregation::RlkAggregationComponent::D0,
                 params_preset: preset,
                 committee_size,
             }),

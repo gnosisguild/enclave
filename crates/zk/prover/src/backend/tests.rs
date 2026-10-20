@@ -1,0 +1,102 @@
+// SPDX-License-Identifier: LGPL-3.0-only
+//
+// This file is provided WITHOUT ANY WARRANTY;
+// without even the implied warranty of MERCHANTABILITY
+// or FITNESS FOR A PARTICULAR PURPOSE.
+
+use std::env;
+
+use super::*;
+use crate::{config::VersionInfo, test_utils::get_tempdir};
+use tokio::fs;
+
+fn test_backend(temp_path: &std::path::Path, config: ZkConfig) -> ZkBackend {
+    let noir_dir = temp_path.join("noir");
+    let bb_binary = BBPath::check(noir_dir.join("bin").join("bb")).unwrap();
+    let circuits_dir = noir_dir.join("circuits");
+    let work_dir = noir_dir.join("work").join("test_node");
+    ZkBackend::with_config(bb_binary, circuits_dir, work_dir, config)
+}
+
+#[tokio::test]
+async fn test_check_status_full_setup_needed() {
+    if env::var("E3_CUSTOM_BB").is_ok() {
+        return;
+    }
+
+    let temp = get_tempdir().unwrap();
+    let backend = test_backend(temp.path(), ZkConfig::default());
+
+    let status = backend.check_status().await;
+    assert!(matches!(status, SetupStatus::FullSetupNeeded));
+
+    let temp_path = temp.path().to_path_buf();
+    drop(temp);
+    assert!(!temp_path.exists());
+}
+
+#[tokio::test]
+async fn test_check_status_ready_when_installed() {
+    if env::var("E3_CUSTOM_BB").is_ok() {
+        return;
+    }
+
+    let temp = get_tempdir().unwrap();
+    let config = ZkConfig::default();
+    let backend = test_backend(temp.path(), config.clone());
+
+    fs::create_dir_all(&backend.base_dir.join("bin"))
+        .await
+        .unwrap();
+    fs::create_dir_all(&backend.circuits_dir).await.unwrap();
+    fs::write(&backend.bb_binary, b"fake bb binary")
+        .await
+        .unwrap();
+
+    let info = VersionInfo {
+        bb_version: Some(config.required_bb_version.clone()),
+        circuits_version: Some(config.required_circuits_version.clone()),
+        ..Default::default()
+    };
+    info.save(&backend.version_file()).await.unwrap();
+
+    let status = backend.check_status().await;
+    assert!(matches!(status, SetupStatus::Ready));
+
+    let temp_path = temp.path().to_path_buf();
+    drop(temp);
+    assert!(!temp_path.exists());
+}
+
+#[tokio::test]
+async fn test_check_status_bb_needs_update() {
+    if env::var("E3_CUSTOM_BB").is_ok() {
+        return;
+    }
+
+    let temp = get_tempdir().unwrap();
+    let config = ZkConfig::default();
+    let backend = test_backend(temp.path(), config.clone());
+
+    fs::create_dir_all(&backend.base_dir.join("bin"))
+        .await
+        .unwrap();
+    fs::create_dir_all(&backend.circuits_dir).await.unwrap();
+    fs::write(&backend.bb_binary, b"fake bb binary")
+        .await
+        .unwrap();
+
+    let info = VersionInfo {
+        bb_version: Some("0.0.1".to_string()),
+        circuits_version: Some(config.required_circuits_version.clone()),
+        ..Default::default()
+    };
+    info.save(&backend.version_file()).await.unwrap();
+
+    let status = backend.check_status().await;
+    assert!(matches!(status, SetupStatus::BbNeedsUpdate { .. }));
+
+    let temp_path = temp.path().to_path_buf();
+    drop(temp);
+    assert!(!temp_path.exists());
+}

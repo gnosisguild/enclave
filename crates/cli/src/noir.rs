@@ -320,22 +320,22 @@ mod tests {
             "noir",
             "setup",
             "--circuits-configuration",
-            "insecure-512/minimum",
+            "insecure/minimum",
         ])
         .is_err());
         let temp = tempfile::tempdir().unwrap();
         let payload = temp.path().join("payload");
         // A preset directory that serves the trBFV path requires the shared and trBFV inventories.
         let artifacts: Vec<&str> = [
-            include_str!("../../zk-prover/required-artifacts.json"),
-            include_str!("../../zk-prover/required-artifacts-trbfv.json"),
+            include_str!("../../zk/prover/required-artifacts.json"),
+            include_str!("../../zk/prover/required-artifacts-trbfv.json"),
         ]
         .into_iter()
         .flat_map(|json| serde_json::from_str::<Vec<&str>>(json).unwrap())
         .collect();
         let mut files = BTreeMap::new();
         for artifact in &artifacts {
-            let relative = format!("insecure-512/minimum/{artifact}");
+            let relative = format!("insecure/minimum/{artifact}");
             let path = payload.join("circuits").join(&relative);
             fs::create_dir_all(path.parent().unwrap()).unwrap();
             fs::write(path, b"{}").unwrap();
@@ -414,7 +414,7 @@ mod tests {
 
         let args = [
             args.as_slice(),
-            &["--circuits-configuration", "insecure-512/minimum"],
+            &["--circuits-configuration", "insecure/minimum"],
         ]
         .concat();
         let cli = Cli::try_parse_from(args).unwrap();

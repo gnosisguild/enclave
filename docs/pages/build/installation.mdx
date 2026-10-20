@@ -1,8 +1,8 @@
 ---
 title: 'Installation'
 description:
-  'Install the Interfold CLI with interfoldup, a release archive, or a source build, and set up the
-  tools that the default project template needs.'
+  'Install the Interfold CLI with the install script, a release archive, or a source build, change
+  its version with interfold update, and set up the tools that the default project template needs.'
 ---
 
 import { Callout, Steps, Tabs } from 'nextra/components'
@@ -21,13 +21,18 @@ To run a ciphernode for the network, read [Operator requirements](/operate/requi
 
 Each release publishes prebuilt archives for two platforms.
 
-| Operating system | Architecture          | CLI archive                      | Installer archive                  |
-| ---------------- | --------------------- | -------------------------------- | ---------------------------------- |
-| Linux            | x86_64                | `interfold-linux-x86_64.tar.gz`  | `interfoldup-linux-x86_64.tar.gz`  |
-| macOS            | Apple silicon (arm64) | `interfold-macos-aarch64.tar.gz` | `interfoldup-macos-aarch64.tar.gz` |
+| Operating system | Architecture          | CLI archive                      |
+| ---------------- | --------------------- | -------------------------------- |
+| Linux            | x86_64                | `interfold-linux-x86_64.tar.gz`  |
+| macOS            | Apple silicon (arm64) | `interfold-macos-aarch64.tar.gz` |
 
 The releases do not include archives for other platforms, for example Linux on arm64 or macOS on
 Intel. On these platforms, [build the CLI from source](#install-the-cli).
+
+Each release also publishes `interfold-test-only-skip-proof-aggregation-linux-x86_64.tar.gz`. This
+CLI has the `test-only-skip-proof-aggregation` Cargo feature, so its nodes can skip recursive proof
+aggregation. Use it only for tests and CI, for example the end-to-end tests of an E3 program. Do not
+use it on a network. The install script and `interfold update` do not install it.
 
 ## Developer tools
 
@@ -71,16 +76,14 @@ toolchain. See [the source toolchain instructions](/build/noir-circuits#toolchai
 
 ## Install the CLI
 
-Select an installation method. The `interfoldup` installer is the recommended method.
+Select an installation method. The install script is the recommended method.
 
-<Tabs items={['interfoldup', 'Release archive', 'From source']}>
+<Tabs items={['Install script', 'Release archive', 'From source']}>
 <Tabs.Tab unmount={false}>
 
 <Steps>
 
-### Install interfoldup
-
-Run the install script:
+### Run the install script
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/theinterfold/interfold/main/install | bash
@@ -92,18 +95,26 @@ If `curl` is not available, use `wget`:
 wget -qO- https://raw.githubusercontent.com/theinterfold/interfold/main/install | bash
 ```
 
-The script detects your platform, downloads the `interfoldup` archive for the latest release, and
-installs `interfoldup` to `~/.local/bin`. If `~/.local/bin` is not in your `PATH`, the script prints
-the commands to add it for bash, zsh, and fish.
+The script detects your platform, downloads the `interfold` archive for the latest release, and
+installs the binary to `~/.local/bin/interfold`. If `~/.local/bin` is not in your `PATH`, the script
+prints the commands to add it for bash, zsh, and fish.
 
-### Install the CLI
+### Select a release (optional)
+
+To install a specific release, give the `--version` option to the script, or set
+`INTERFOLD_VERSION`:
 
 ```bash
-interfoldup install
+# With the script option
+curl -fsSL https://raw.githubusercontent.com/theinterfold/interfold/main/install | bash -s -- --version v0.19.0
+
+# With the environment variable
+curl -fsSL https://raw.githubusercontent.com/theinterfold/interfold/main/install | INTERFOLD_VERSION=v0.19.0 bash
 ```
 
-`interfoldup` downloads the `interfold` archive for the latest release and installs the binary to
-`~/.local/bin/interfold`.
+A tag without the `v` prefix, for example `0.19.0`, also works. To install in another folder, add
+`--dir <folder>` or set `INTERFOLD_INSTALL_DIR`. For a folder that your user cannot write to, run
+the script with `sudo bash` instead of `bash`.
 
 </Steps>
 
@@ -142,7 +153,7 @@ The archive contains one file, `interfold`.
 
 ### Install the binary
 
-Move the binary to a folder in your `PATH`. `interfoldup` uses `~/.local/bin` by default.
+Move the binary to a folder in your `PATH`. The install script uses `~/.local/bin`.
 
 ```bash
 mkdir -p ~/.local/bin
@@ -181,50 +192,43 @@ Cargo installs the binary to `~/.cargo/bin/interfold`.
 
 <Callout type='info'>
   The template integration test (`pnpm test:integration`) needs a CLI that is built with the
-  `test-only-skip-proof-aggregation` Cargo feature. Release binaries do not include this feature. To
-  build it, add `--features test-only-skip-proof-aggregation` to the `cargo install` command.
+  `test-only-skip-proof-aggregation` Cargo feature. Of the release archives, only the [test-only
+  archive](#supported-platforms) has this feature. To build it, add `--features
+  test-only-skip-proof-aggregation` to the `cargo install` command.
 </Callout>
 
 </Tabs.Tab>
 </Tabs>
 
-## Manage versions with interfoldup
+## Change the installed version
 
-`interfoldup` has three commands. Each command uses `~/.local/bin` by default. The `--system` flag
-selects `/usr/local/bin` instead. If your user cannot write to `/usr/local/bin`, run the command
+`interfold update` replaces the binary that runs the command with another release. It downloads the
+archive for your platform from the GitHub release. Use the command to upgrade and to downgrade.
+
+| Command                              | Result                                                                                                                  |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| `interfold update`                   | Installs the latest release.                                                                                            |
+| `interfold update --version v0.19.0` | Installs the release with that tag, newer or older than the installed release. A tag without the `v` prefix also works. |
+| `interfold update --version dev`     | Installs the most recently published release, stable or pre-release (the `dev` channel).                                |
+| `interfold uninstall`                | Removes the `interfold` binary. The configuration, the keys, and the node data stay.                                    |
+
+`interfold upgrade` is another name for `interfold update`. When the installed version and the
+target release are the same, the command prints `interfold is already at <tag>` and makes no change.
+
+The command writes the new binary to a temporary file in the same folder, and then renames that file
+to the name of the binary. A running node continues to use the old release until you restart it. If
+your user cannot write to the folder of the binary, for example `/usr/local/bin`, run the command
 with `sudo`.
 
-| Command                                 | Result                                                                                              |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `interfoldup install`                   | Installs the latest release of `interfold`.                                                         |
-| `interfoldup install --version v0.18.0` | Installs the release with that tag. A tag without the `v` prefix, for example `0.18.0`, also works. |
-| `interfoldup install --version dev`     | Installs the most recently published release, stable or pre-release (the `dev` channel).            |
-| `interfoldup update`                    | Moves to the latest release. If `interfold` is not installed, this command installs it.             |
-| `interfoldup update --version v0.18.0`  | Moves to the release with that tag, forward or backward.                                            |
-| `interfoldup uninstall`                 | Removes the `interfold` binary.                                                                     |
+<Callout type='warning'>
+  Release 0.19.0 and earlier do not have the `update` command. To change the version of such a
+  release, or to go back to a newer release after a downgrade to such a release, run the install
+  script with `--version <TAG>`. If the binary is not in `~/.local/bin`, also give its folder with
+  `--dir <folder>`.
+</Callout>
 
-`interfoldup update` reads the installed version from `interfold --version`. When the installed
-version and the target release are the same, it prints `interfold is already at <version>` and makes
-no change.
-
-An older `interfoldup` does not accept `dev`. To get an `interfoldup` that accepts it, give the tag
-of a dev release to the install script, for example `--version v0.19.0-dev.1`.
-
-### Pin the installer version
-
-The install script installs `interfoldup` from the latest release. To install `interfoldup` from a
-specific release, set `INTERFOLDUP_VERSION` or give the `--version` option to the script:
-
-```bash
-# With the environment variable
-curl -fsSL https://raw.githubusercontent.com/theinterfold/interfold/main/install | INTERFOLDUP_VERSION=v0.18.0 bash
-
-# With the script option
-curl -fsSL https://raw.githubusercontent.com/theinterfold/interfold/main/install | bash -s -- --version v0.18.0
-```
-
-`INTERFOLDUP_VERSION` selects the release of the installer only. To select the release of the CLI,
-use `interfoldup install --version`. To update `interfoldup` itself, run the install script again.
+The `interfoldup` installer of older releases is not necessary. To remove it, run
+`rm ~/.local/bin/interfoldup`.
 
 ## Verify the installation
 
@@ -253,8 +257,9 @@ is not an Interfold project.
 interfold rev --features
 ```
 
-A release binary prints nothing. A binary built with `test-only-skip-proof-aggregation` prints that
-feature name.
+The CLI from the `interfold-<platform>` archive prints nothing. A binary built with
+`test-only-skip-proof-aggregation` prints that feature name. The CLI from the test-only archive is
+such a binary.
 
 </Steps>
 
@@ -265,13 +270,15 @@ feature name.
 
 ## Troubleshooting
 
-| Problem                                               | Cause and fix                                                                                                     |
-| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `command not found: interfold`                        | The install folder is not in your `PATH`. Add `~/.local/bin` (or `/usr/local/bin` for `--system`) to your `PATH`. |
-| `No compatible asset found for <os>-<arch>`           | `interfoldup` found no archive for your platform in the release. Build the CLI from source.                       |
-| `No compatible binary found for platform: <platform>` | The install script found no `interfoldup` archive for your platform. Build the CLI from source.                   |
-| `GitHub API request for release <tag> failed`         | The tag does not exist, or GitHub is not available. Check the tag on the releases page.                           |
-| The source build stops with `solc must be installed`  | Install the Solidity compiler `solc` and run the build again.                                                     |
+| Problem                                               | Cause and fix                                                                                                      |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `command not found: interfold`                        | The install folder is not in your `PATH`. Add `~/.local/bin` to your `PATH`.                                       |
+| `unrecognized subcommand 'update'`                    | The installed CLI is release 0.19.0 or earlier. Run the install script.                                            |
+| `No compatible binary found for platform: <platform>` | The install script found no `interfold` archive for your platform. Build the CLI from source.                      |
+| `No release archive exists for <os> on <arch>`        | `interfold update` found no archive for your platform. Build the CLI from source.                                  |
+| `GitHub API request for release <tag> failed`         | The tag does not exist, or GitHub is not available. Check the tag on the releases page.                            |
+| `Permission denied for <folder>`                      | `interfold update` or `interfold uninstall` cannot write to the folder of the binary. Run the command with `sudo`. |
+| The source build stops with `solc must be installed`  | Install the Solidity compiler `solc` and run the build again.                                                      |
 
 ## Next steps
 

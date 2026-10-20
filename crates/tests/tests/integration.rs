@@ -4,14 +4,18 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
+mod ciphernode_system;
+
 use actix::Actor;
 use alloy::primitives::{Address, FixedBytes, I256, U256};
 use alloy::signers::local::PrivateKeySigner;
 use anyhow::{bail, Context, Result};
+use ciphernode_system::{CiphernodeHistory, CiphernodeSystem, CiphernodeSystemBuilder};
 use e3_bfv_client::decode_bytes_to_vec_u64;
-use e3_ciphernode_builder::{CiphernodeBuilder, EventSystem};
+use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_config::BBPath;
 use e3_crypto::Cipher;
+use e3_event_system::EventSystem;
 use e3_events::{
     hlc::HlcTimestamp, prelude::*, AggregateConfig, AggregateId, BusHandle,
     CiphertextOutputPublished, CommitteeFinalized, CommitteeRequested, ComputeRequestKind,
@@ -26,9 +30,6 @@ use e3_multithread::{Multithread, MultithreadReport, ToReport};
 use e3_net::events::{GossipData, NetEvent};
 use e3_net::NetEventTranslator;
 use e3_sortition::{calculate_buffer_size, RegisteredNode, ScoreSortition, Ticket};
-use e3_test_helpers::ciphernode_system::{
-    CiphernodeHistory, CiphernodeSystem, CiphernodeSystemBuilder,
-};
 use e3_test_helpers::{
     create_seed_from_u64, derive_shared_rng, find_bb, with_tracing, AddToCommittee,
 };
@@ -1898,23 +1899,19 @@ async fn test_trbfv_actor() -> Result<()> {
                 .transpose()?;
             println!("Building collector {}!", addr);
             {
-                let mut b = CiphernodeBuilder::new(node_rng.clone(), cipher.clone())
-                    .with_history_collector()
-                    .with_shared_taskpool(&task_pool)
-                    .with_multithread_concurrent_jobs(concurrent_jobs)
-                    .with_shared_multithread_report(&multithread_report)
-                    .with_trbfv()
-                    .with_zkproof(zk_backend.clone())
-                    .with_signer(signer.clone())
-                    .with_pubkey_aggregation()
-                    .with_sortition_score()
-                    .with_threshold_plaintext_aggregation()
-                    .with_eventstore_aggregate_config_for_testing(
-                        benchmark_aggregate_config.clone(),
-                    )
-                    .with_dkg_timing_reader_for_testing(dkg_timing_reader.clone())
-                    .with_chains(std::slice::from_ref(&bench_chain_config))
-                    .with_logging();
+                let mut b =
+                    CiphernodeBuilder::full(node_rng.clone(), cipher.clone(), zk_backend.clone())
+                        .with_history_collector()
+                        .with_shared_taskpool(&task_pool)
+                        .with_multithread_concurrent_jobs(concurrent_jobs)
+                        .with_shared_multithread_report(&multithread_report)
+                        .with_signer(signer.clone())
+                        .with_eventstore_aggregate_config_for_testing(
+                            benchmark_aggregate_config.clone(),
+                        )
+                        .with_dkg_timing_reader_for_testing(dkg_timing_reader.clone())
+                        .with_chains(std::slice::from_ref(&bench_chain_config))
+                        .with_logging();
                 if !proof_aggregation_enabled {
                     b = b.with_proof_aggregation_disabled_for_testing();
                 }
@@ -1953,23 +1950,22 @@ async fn test_trbfv_actor() -> Result<()> {
                     .transpose()?;
                 println!("Building normal {}", &addr);
                 {
-                    let mut b = CiphernodeBuilder::new(node_rng.clone(), cipher.clone())
-                        .with_history_collector()
-                        .with_shared_taskpool(&task_pool)
-                        .with_multithread_concurrent_jobs(concurrent_jobs)
-                        .with_shared_multithread_report(&multithread_report)
-                        .with_trbfv()
-                        .with_zkproof(zk_backend.clone())
-                        .with_signer(signer.clone())
-                        .with_pubkey_aggregation()
-                        .with_sortition_score()
-                        .with_threshold_plaintext_aggregation()
-                        .with_eventstore_aggregate_config_for_testing(
-                            benchmark_aggregate_config.clone(),
-                        )
-                        .with_dkg_timing_reader_for_testing(dkg_timing_reader.clone())
-                        .with_chains(std::slice::from_ref(&bench_chain_config))
-                        .with_logging();
+                    let mut b = CiphernodeBuilder::full(
+                        node_rng.clone(),
+                        cipher.clone(),
+                        zk_backend.clone(),
+                    )
+                    .with_history_collector()
+                    .with_shared_taskpool(&task_pool)
+                    .with_multithread_concurrent_jobs(concurrent_jobs)
+                    .with_shared_multithread_report(&multithread_report)
+                    .with_signer(signer.clone())
+                    .with_eventstore_aggregate_config_for_testing(
+                        benchmark_aggregate_config.clone(),
+                    )
+                    .with_dkg_timing_reader_for_testing(dkg_timing_reader.clone())
+                    .with_chains(std::slice::from_ref(&bench_chain_config))
+                    .with_logging();
                     if !proof_aggregation_enabled {
                         b = b.with_proof_aggregation_disabled_for_testing();
                     }
@@ -2309,24 +2305,20 @@ async fn test_trbfv_actor() -> Result<()> {
             .restart_node(
                 node_index,
                 Box::pin(async {
-                    let mut builder = CiphernodeBuilder::new(identity.rng, cipher.clone())
-                        .with_history_collector()
-                        .with_shared_taskpool(&task_pool)
-                        .with_multithread_concurrent_jobs(concurrent_jobs)
-                        .with_shared_multithread_report(&multithread_report)
-                        .with_trbfv()
-                        .with_zkproof(zk_backend.clone())
-                        .with_signer(identity.signer)
-                        .with_pubkey_aggregation()
-                        .with_sortition_score()
-                        .with_threshold_plaintext_aggregation()
-                        .with_eventstore_aggregate_config_for_testing(
-                            benchmark_aggregate_config.clone(),
-                        )
-                        .with_dkg_timing_reader_for_testing(dkg_timing_reader.clone())
-                        .with_chains(std::slice::from_ref(&bench_chain_config))
-                        .with_persistence(&identity.log_path, &identity.kv_path)
-                        .with_logging();
+                    let mut builder =
+                        CiphernodeBuilder::full(identity.rng, cipher.clone(), zk_backend.clone())
+                            .with_history_collector()
+                            .with_shared_taskpool(&task_pool)
+                            .with_multithread_concurrent_jobs(concurrent_jobs)
+                            .with_shared_multithread_report(&multithread_report)
+                            .with_signer(identity.signer)
+                            .with_eventstore_aggregate_config_for_testing(
+                                benchmark_aggregate_config.clone(),
+                            )
+                            .with_dkg_timing_reader_for_testing(dkg_timing_reader.clone())
+                            .with_chains(std::slice::from_ref(&bench_chain_config))
+                            .with_persistence(&identity.log_path, &identity.kv_path)
+                            .with_logging();
                     if !proof_aggregation_enabled {
                         builder = builder.with_proof_aggregation_disabled_for_testing();
                     }
@@ -2797,38 +2789,40 @@ async fn test_trbfv_actor() -> Result<()> {
             .cloned()
             .context("restart identity is missing")?;
         println!("Stopping committee party {restart_party_id} at node index {node_index}");
+        let trigger_pipe = trigger_pipes
+            .lock()
+            .unwrap()
+            .remove(&nodes[node_index].address())
+            .context("restart event pipe is missing")?;
         bus.event_bus()
-            .send(Unsubscribe::new(
-                EventType::All,
-                nodes[node_index].bus().event_bus().clone().recipient(),
-            ))
+            .send(Unsubscribe::new(EventType::All, trigger_pipe))
             .await?;
         nodes
-            .restart_node(node_index, async {
-                let mut builder = CiphernodeBuilder::new(identity.rng, cipher.clone())
-                    .with_history_collector()
-                    .with_shared_taskpool(&task_pool)
-                    .with_multithread_concurrent_jobs(concurrent_jobs)
-                    .with_shared_multithread_report(&multithread_report)
-                    .with_trbfv()
-                    .with_zkproof(zk_backend.clone())
-                    .with_signer(identity.signer)
-                    .with_pubkey_aggregation()
-                    .with_sortition_score()
-                    .with_threshold_plaintext_aggregation()
-                    .with_forked_bus(bus.event_bus())
-                    .with_eventstore_aggregate_config_for_testing(
-                        benchmark_aggregate_config.clone(),
-                    )
-                    .with_dkg_timing_reader_for_testing(dkg_timing_reader.clone())
-                    .with_chains(std::slice::from_ref(&bench_chain_config))
-                    .with_persistence(&identity.log_path, &identity.kv_path)
-                    .with_logging();
-                if !proof_aggregation_enabled {
-                    builder = builder.with_proof_aggregation_disabled_for_testing();
-                }
-                builder.build().await
-            })
+            .restart_node(
+                node_index,
+                Box::pin(async {
+                    let mut builder =
+                        CiphernodeBuilder::full(identity.rng, cipher.clone(), zk_backend.clone())
+                            .with_history_collector()
+                            .with_shared_taskpool(&task_pool)
+                            .with_multithread_concurrent_jobs(concurrent_jobs)
+                            .with_shared_multithread_report(&multithread_report)
+                            .with_signer(identity.signer)
+                            .with_eventstore_aggregate_config_for_testing(
+                                benchmark_aggregate_config.clone(),
+                            )
+                            .with_dkg_timing_reader_for_testing(dkg_timing_reader.clone())
+                            .with_chains(std::slice::from_ref(&bench_chain_config))
+                            .with_persistence(&identity.log_path, &identity.kv_path)
+                            .with_logging();
+                    if !proof_aggregation_enabled {
+                        builder = builder.with_proof_aggregation_disabled_for_testing();
+                    }
+                    let node = builder.build().await?;
+                    connect_trigger(&node);
+                    Ok(node)
+                }),
+            )
             .await?;
         println!("Restarted committee party {restart_party_id} at node index {node_index}");
     }
@@ -3051,24 +3045,20 @@ async fn test_trbfv_actor() -> Result<()> {
             .restart_node(
                 node_index,
                 Box::pin(async {
-                    let mut builder = CiphernodeBuilder::new(identity.rng, cipher.clone())
-                        .with_history_collector()
-                        .with_shared_taskpool(&task_pool)
-                        .with_multithread_concurrent_jobs(concurrent_jobs)
-                        .with_shared_multithread_report(&multithread_report)
-                        .with_trbfv()
-                        .with_zkproof(zk_backend.clone())
-                        .with_signer(identity.signer)
-                        .with_pubkey_aggregation()
-                        .with_sortition_score()
-                        .with_threshold_plaintext_aggregation()
-                        .with_eventstore_aggregate_config_for_testing(
-                            benchmark_aggregate_config.clone(),
-                        )
-                        .with_dkg_timing_reader_for_testing(dkg_timing_reader.clone())
-                        .with_chains(std::slice::from_ref(&bench_chain_config))
-                        .with_persistence(&identity.log_path, &identity.kv_path)
-                        .with_logging();
+                    let mut builder =
+                        CiphernodeBuilder::full(identity.rng, cipher.clone(), zk_backend.clone())
+                            .with_history_collector()
+                            .with_shared_taskpool(&task_pool)
+                            .with_multithread_concurrent_jobs(concurrent_jobs)
+                            .with_shared_multithread_report(&multithread_report)
+                            .with_signer(identity.signer)
+                            .with_eventstore_aggregate_config_for_testing(
+                                benchmark_aggregate_config.clone(),
+                            )
+                            .with_dkg_timing_reader_for_testing(dkg_timing_reader.clone())
+                            .with_chains(std::slice::from_ref(&bench_chain_config))
+                            .with_persistence(&identity.log_path, &identity.kv_path)
+                            .with_logging();
                     if !proof_aggregation_enabled {
                         builder = builder.with_proof_aggregation_disabled_for_testing();
                     }
@@ -3830,7 +3820,8 @@ async fn test_p2p_actor_stores_a_replayed_event_at_most_once_more() -> Result<()
     let (tx, rx) = tokio::sync::oneshot::channel();
     let collector = StoredEvents(Some(tx)).start();
     system
-        .in_mem_eventstore_router()?
+        .eventstore_reader()?
+        .ts()
         .send(EventStoreQueryBy::<TsAgg>::new(
             CorrelationId::new(),
             HashMap::from([(AggregateId::new(1), 0)]),

@@ -8,12 +8,13 @@
 
 use anyhow::Result;
 use commitlog::{CommitLog, LogOptions};
-use e3_ciphernode_builder::{CiphernodeBuilder, EventSystem};
+use e3_ciphernode_builder::CiphernodeBuilder;
 use e3_config::{AppConfig, UnscopedAppConfig};
 use e3_crypto::Cipher;
 use e3_data::SledDb;
 use e3_entrypoint::helpers::datastore::get_eventstore_reader;
 use e3_entrypoint::validate::{validate_node, Severity};
+use e3_event_system::EventSystem;
 use e3_events::{Get, Insert, InterfoldEvent, StoreKeys, Unsequenced};
 use e3_sync::SCHEMA_VERSION;
 use std::collections::BTreeMap;
@@ -103,12 +104,14 @@ async fn startup_rejects_older_schema_before_log_recovery() -> Result<()> {
             let config = node_config(root.path())?;
             let path = older_store(&config, fixture, schema)?;
             let before = log_files(&path)?;
-            let error =
-                CiphernodeBuilder::new(e3_test_helpers::derive_shared_rng(1, 1), cipher.clone())
-                    .with_persistence(&config.log_file(), &config.db_file())
-                    .build()
-                    .await
-                    .expect_err("startup must reject unsupported storage");
+            let error = CiphernodeBuilder::bootstrap(
+                e3_test_helpers::derive_shared_rng(1, 1),
+                cipher.clone(),
+            )
+            .with_persistence(&config.log_file(), &config.db_file())
+            .build()
+            .await
+            .expect_err("startup must reject unsupported storage");
             assert_schema_error(&format!("{error:#}"), schema);
             assert_eq!(log_files(&path)?, before);
         }

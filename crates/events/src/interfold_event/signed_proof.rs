@@ -19,7 +19,7 @@ use alloy::sol_types::SolValue;
 use anyhow::{anyhow, ensure, Result};
 use derivative::Derivative;
 use e3_utils::utility_types::ArcBytes;
-use e3_zk_helpers::threshold::rlk_aggregation::RlkAggregationComponent;
+use e3_zk_witness::threshold::rlk_aggregation::RlkAggregationComponent;
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Display};
 
@@ -702,7 +702,7 @@ mod tests {
 
     #[test]
     fn rlk_aggregation_instances_separate_components_of_a_row() {
-        let field = e3_zk_helpers::FIELD_BYTE_LEN;
+        let field = e3_zk_config::FIELD_BYTE_LEN;
         let signals = |row: u8, component: u8| {
             let mut signals = vec![0u8; 10 * field];
             signals[6 * field - 1] = row;

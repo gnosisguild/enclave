@@ -30,7 +30,7 @@ e3-fhe-params = { workspace = true, features = ["abi-encoding"] }
 e3-sortition = { workspace = true }
 e3-trbfv = { workspace = true }
 e3-utils = { workspace = true }
-e3-zk-helpers = { workspace = true }
+
 futures-util = { workspace = true }
 hex = { workspace = true }
 num-bigint = { workspace = true }
@@ -44,8 +44,7 @@ zeroize = { workspace = true }
 alloy = { workspace = true, features = ["json-rpc"] }
 alloy-dyn-abi = { workspace = true }
 bincode = { workspace = true }
-e3-ciphernode-builder = { workspace = true }
-e3-entrypoint = { workspace = true }
+e3-event-system = { workspace = true }
 e3-events = { workspace = true, features = ["test-helpers"] }
 e3-evm = { workspace = true }
 e3-sync.workspace = true

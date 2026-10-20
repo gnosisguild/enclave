@@ -35,12 +35,12 @@ import { arg, connect, hasFlag, networkName } from "../protocol/cli";
 import { BFV_PARAMS, ZERO, proxyAdminInterface } from "../protocol/constants";
 import { deployBfvVerifierRoutes } from "../protocol/deployContracts";
 import {
+  crispDeploymentsPath,
   deploymentPath,
   governanceSafeBuilderPath,
   protocolDir,
   readJson,
   repoRelativePath,
-  repoRoot,
   resolvePath,
   writeJson,
 } from "../protocol/files";
@@ -258,21 +258,11 @@ export function readOpenVmIdentity(file: string): OpenVmGuestIdentity {
 /** The CRISP contracts that the CRISP deployment recorded for `network`. */
 function readCrispRecord(
   network: string,
-  record = arg("crisp-deployments") ??
-    path.join(
-      repoRoot,
-      "examples",
-      "CRISP",
-      "packages",
-      "crisp-contracts",
-      "deployed_contracts.json",
-    ),
+  record?: string,
 ): CrispDeploymentRecord[string] {
-  const file = resolvePath(record);
-  if (!fs.existsSync(file)) {
-    throw new Error(`CRISP deployment file not found: ${file}`);
-  }
-  const deployment = readJson<CrispDeploymentRecord>(file)[network];
+  const deployment = readJson<CrispDeploymentRecord>(
+    crispDeploymentsPath(record),
+  )[network];
   if (!deployment) {
     throw new Error(`No CRISP deployment is recorded for ${network}`);
   }
