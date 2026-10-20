@@ -211,8 +211,8 @@ async fn remove_if_present(path: &Path) -> Result<()> {
 /// Whether the node store holds a schema marker older than this binary's schema.
 ///
 /// Only such a store needs a reset. A missing or damaged store, a store without a marker, and a
-/// newer marker are not older: startup halts on those with its own message. The check creates no
-/// store where none exists.
+/// newer marker are not older, so the command leaves them for startup to handle. The check creates
+/// no store where none exists.
 pub fn stored_schema_is_older(config: &AppConfig) -> Result<bool> {
     let db_file = config.db_file();
     if !matches!(store_presence(&db_file), StorePresence::Present) {
