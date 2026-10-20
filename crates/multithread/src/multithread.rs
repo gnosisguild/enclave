@@ -35,12 +35,9 @@ use e3_events::{
 use e3_events::{PkBfvProofRequest, VerifyShareProofsRequest};
 #[cfg(test)]
 use e3_fhe_params::BfvPreset;
-use e3_trbfv::calculate_decryption_key::calculate_decryption_key;
-use e3_trbfv::calculate_decryption_share::calculate_decryption_share;
-use e3_trbfv::calculate_threshold_decryption::calculate_threshold_decryption;
-use e3_trbfv::gen_esi_sss::gen_esi_sss;
-use e3_trbfv::gen_pk_share_and_sk_sss::gen_pk_share_and_sk_sss;
-use e3_trbfv::{TrBFVError, TrBFVFailure, TrBFVRequest, TrBFVResponse};
+#[cfg(test)]
+use e3_trbfv::TrBFVFailure;
+use e3_trbfv::{TrBFVError, TrBFVRequest};
 use e3_utils::SharedRng;
 use e3_utils::MAILBOX_LIMIT;
 use e3_zk_prover::{execute_zk_request, zk_operation_name, ZkBackend, ZkProver};
@@ -837,34 +834,15 @@ fn pool_error_kind(
         ComputeRequestKind::Zk(_) => ComputeRequestErrorKind::Zk(
             ZkEventError::ProofGenerationFailed(format!("Pool error: {pool_error}")),
         ),
-        ComputeRequestKind::TrBFV(trbfv_request) => {
-            let message = format!("Pool error: {pool_error}");
-            ComputeRequestErrorKind::TrBFV(match trbfv_request {
-                TrBFVRequest::GenPkShareAndSkSss(_) => {
-                    TrBFVError::GenPkShareAndSkSss(message.into())
-                }
-                TrBFVRequest::GenEsiSss(_) => TrBFVError::GenEsiSss(message.into()),
-                TrBFVRequest::CalculateDecryptionKey(_) => {
-                    TrBFVError::CalculateDecryptionKey(message.into())
-                }
-                TrBFVRequest::CalculateDecryptionShare(_) => {
-                    TrBFVError::CalculateDecryptionShare(message.into())
-                }
-                TrBFVRequest::CalculateThresholdDecryption(_) => {
-                    TrBFVError::CalculateThresholdDecryption(message.into())
-                }
-            })
-        }
+        ComputeRequestKind::TrBFV(trbfv_request) => ComputeRequestErrorKind::TrBFV(
+            trbfv_request.failure(format!("Pool error: {pool_error}").into()),
+        ),
     }
 }
 
-fn timefunc<F>(
-    name: &str,
-    id: u8,
-    func: F,
-) -> (Result<ComputeResponse, ComputeRequestError>, Duration)
+fn timefunc<F, T>(name: &str, id: u8, func: F) -> (T, Duration)
 where
-    F: FnOnce() -> Result<ComputeResponse, ComputeRequestError>,
+    F: FnOnce() -> T,
 {
     debug!("STARTING MULTITHREAD `{}({})`", name, id);
     let start = Instant::now();
@@ -886,7 +864,21 @@ fn handle_compute_request(
 
     match &request.request {
         ComputeRequestKind::TrBFV(trbfv_req) => {
-            handle_trbfv_request(rng, cipher, trbfv_req.clone(), request, id)
+            let (result, duration) = timefunc(trbfv_req.operation_name(), id, || {
+                trbfv_req.execute(&rng, &cipher)
+            });
+            let result = match result {
+                Ok(response) => Ok(ComputeResponse::trbfv(
+                    response,
+                    request.correlation_id,
+                    request.e3_id,
+                )),
+                Err(error) => Err(ComputeRequestError::new(
+                    ComputeRequestErrorKind::TrBFV(error),
+                    request,
+                )),
+            };
+            (result, duration)
         }
         ComputeRequestKind::Zk(kind) => {
             let Some(prover) = zk_prover else {
@@ -911,114 +903,5 @@ fn handle_compute_request(
                 })
             })
         }
-    }
-}
-
-fn handle_trbfv_request(
-    rng: SharedRng,
-    cipher: Arc<Cipher>,
-    trbfv_req: TrBFVRequest,
-    request: ComputeRequest,
-    id: u8,
-) -> (Result<ComputeResponse, ComputeRequestError>, Duration) {
-    match trbfv_req {
-        TrBFVRequest::GenPkShareAndSkSss(req) => timefunc("gen_pk_share_and_sk_sss", id, || {
-            let mut rng_guard = match rng.lock() {
-                Ok(guard) => guard,
-                Err(poisoned) => {
-                    warn!("Recovering the shared random generator after a TrBFV worker panic");
-                    poisoned.into_inner()
-                }
-            };
-            match gen_pk_share_and_sk_sss(&mut *rng_guard, &cipher, req) {
-                Ok(o) => Ok(ComputeResponse::trbfv(
-                    TrBFVResponse::GenPkShareAndSkSss(o),
-                    request.correlation_id,
-                    request.e3_id,
-                )),
-                Err(e) => Err(ComputeRequestError::new(
-                    ComputeRequestErrorKind::TrBFV(TrBFVError::GenPkShareAndSkSss(
-                        TrBFVFailure::from_error(&e),
-                    )),
-                    request,
-                )),
-            }
-        }),
-        TrBFVRequest::GenEsiSss(req) => timefunc("gen_esi_sss", id, || {
-            let mut rng_guard = match rng.lock() {
-                Ok(guard) => guard,
-                Err(poisoned) => {
-                    warn!("Recovering the shared random generator after a TrBFV worker panic");
-                    poisoned.into_inner()
-                }
-            };
-            match gen_esi_sss(&mut *rng_guard, &cipher, req) {
-                Ok(o) => Ok(ComputeResponse::trbfv(
-                    TrBFVResponse::GenEsiSss(o),
-                    request.correlation_id,
-                    request.e3_id,
-                )),
-                Err(e) => Err(ComputeRequestError::new(
-                    ComputeRequestErrorKind::TrBFV(TrBFVError::GenEsiSss(
-                        TrBFVFailure::from_error(&e),
-                    )),
-                    request,
-                )),
-            }
-        }),
-        TrBFVRequest::CalculateDecryptionKey(req) => timefunc(
-            "calculate_decryption_key",
-            id,
-            || match calculate_decryption_key(&cipher, req) {
-                Ok(o) => Ok(ComputeResponse::trbfv(
-                    TrBFVResponse::CalculateDecryptionKey(o),
-                    request.correlation_id,
-                    request.e3_id,
-                )),
-                Err(e) => {
-                    error!("Error calculating decryption key: {}", e);
-                    Err(ComputeRequestError::new(
-                        ComputeRequestErrorKind::TrBFV(TrBFVError::CalculateDecryptionKey(
-                            TrBFVFailure::from_error(&e),
-                        )),
-                        request,
-                    ))
-                }
-            },
-        ),
-        TrBFVRequest::CalculateDecryptionShare(req) => timefunc(
-            "calculate_decryption_share",
-            id,
-            || match calculate_decryption_share(&cipher, req) {
-                Ok(o) => Ok(ComputeResponse::trbfv(
-                    TrBFVResponse::CalculateDecryptionShare(o),
-                    request.correlation_id,
-                    request.e3_id,
-                )),
-                Err(e) => Err(ComputeRequestError::new(
-                    ComputeRequestErrorKind::TrBFV(TrBFVError::CalculateDecryptionShare(
-                        TrBFVFailure::from_error(&e),
-                    )),
-                    request,
-                )),
-            },
-        ),
-        TrBFVRequest::CalculateThresholdDecryption(req) => timefunc(
-            "calculate_threshold_decryption",
-            id,
-            || match calculate_threshold_decryption(req) {
-                Ok(o) => Ok(ComputeResponse::trbfv(
-                    TrBFVResponse::CalculateThresholdDecryption(o),
-                    request.correlation_id,
-                    request.e3_id,
-                )),
-                Err(e) => Err(ComputeRequestError::new(
-                    ComputeRequestErrorKind::TrBFV(TrBFVError::CalculateThresholdDecryption(
-                        TrBFVFailure::from_error(&e),
-                    )),
-                    request,
-                )),
-            },
-        ),
     }
 }
