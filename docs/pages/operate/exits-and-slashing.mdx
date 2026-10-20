@@ -203,8 +203,12 @@ A claim reverts in these conditions:
 A deregistered operator stays a member of each committee that was already final. The collateral
 stays in the queue until each of these E3s completes or fails and its committee is released. After
 the E3 is terminal and its accusation window ends, any account can call `releaseCommittee(e3Id)` on
-`CiphernodeRegistry`. `interfold ciphernode status` lists these committees under `Committees`. It
-reads them from the `CommitteeObligationUpdated` events of `BondingRegistry`.
+`CiphernodeRegistry`. `interfold ciphernode status` lists these committees under `Committees`. A
+`BondingRegistry` with the obligation views returns their number in
+`unresolvedCommitteesOf(operator)` and each committee that it tracks in
+`committeeObligationAt(operator, index)`. It does not track the committees requested before the
+upgrade that added these views. For those, and for an older registry, the command reads the
+`CommitteeObligationUpdated` events of `BondingRegistry`.
 
 ## Leave the network
 
