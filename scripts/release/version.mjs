@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { ROOT_DIR, fail, readJson } from './core.mjs'
 import { validateDappnodeVersions } from './dappnode.mjs'
 
-const PACKAGE_FILES = [
+export const PACKAGE_FILES = [
   'package.json',
   'packages/interfold-config/package.json',
   'packages/interfold-contracts/package.json',
@@ -15,6 +15,9 @@ const PACKAGE_FILES = [
   'packages/interfold-react/package.json',
   'packages/interfold-mcp/package.json',
 ]
+
+// Guests are independent Cargo workspaces; all five locks record local release versions.
+export const CARGO_WORKSPACES = ['.', 'templates/default', 'templates/default/guest']
 
 export function normalizeVersion(input) {
   const version = input.replace(/^v/, '')
@@ -60,9 +63,9 @@ export function validateReleaseVersion(versionInput, rootDir = ROOT_DIR) {
   }
 
   requireEqual(
-    readJson(rootDir, 'crates/zk-prover/versions.json').required_circuits_version,
+    readJson(rootDir, 'crates/zk/prover/versions.json').required_circuits_version,
     version,
-    'crates/zk-prover/versions.json required_circuits_version',
+    'crates/zk/prover/versions.json required_circuits_version',
   )
 
   if (version.includes('-')) {

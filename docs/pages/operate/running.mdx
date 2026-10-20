@@ -137,8 +137,11 @@ The node applies these rules when it loads the file:
 - Each contract must have a nonzero `deploy_block` when `rpc_url` is not a local address. Otherwise,
   startup stops with
   `Misconfiguration: Attempted to query historical events from genesis on a non-local node`.
-- A ciphernode needs `interfold`, `ciphernode_registry`, `bonding_registry`, `slashing_manager`, and
-  a `data_availability` entry on each enabled chain. The node refuses to start without them.
+- A ciphernode needs `interfold`, `ciphernode_registry`, `bonding_registry`, and a
+  `data_availability` entry on each enabled chain. The node refuses to start without them.
+- A ciphernode uses the SlashingManager that the `interfold` contract names on each enabled chain.
+  It refuses to start when it cannot read that address. A configured `slashing_manager` that differs
+  only causes a warning.
 - Each `$NAME` or `${NAME}` in the file is replaced with the value of that environment variable. Use
   this to keep an API key out of the file, for example
   `rpc_url: 'wss://example.invalid/v2/${RPC_API_KEY}'`.
@@ -346,9 +349,9 @@ arguments.
 </Callout>
 
 Run the node under a process manager, for example systemd. The node exits with an error when a chain
-gateway or the event storage fails, and when startup takes longer than `startup_timeout_secs`. The
-process manager restarts it. Give the node more than 60 seconds to stop (see
-[Stop and restart](#stop-and-restart)).
+gateway or the event storage fails, when one of its actors panics, and when startup takes longer
+than `startup_timeout_secs`. The process manager restarts it. Give the node more than 60 seconds to
+stop (see [Stop and restart](#stop-and-restart)).
 
   </Tabs.Tab>
   <Tabs.Tab unmount={false}>
