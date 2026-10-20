@@ -92,12 +92,10 @@ jobs:
               - 'Cargo.toml'
               - 'Cargo.lock'
               - 'rust-toolchain.toml'
-              # The OpenVM worker is a workspace of its own, and no cargo build reads the image
-              # files or the frozen image ID. The `openvm_worker` and `docker` filters select their
-              # jobs.
+              # The OpenVM worker is a workspace of its own. The `openvm_worker` and `docker`
+              # filters select their jobs.
               - '!crates/openvm-prover/**'
               - '!crates/Dockerfile'
-              - '!crates/support/**'
               - '!**/*.md'
               - '!**/*.mdx'
             # The OpenVM worker is a cargo workspace of its own, built against the OpenVM SDK.
@@ -133,8 +131,6 @@ jobs:
               # path a hand-edited manifest never runs the drift check and
               # reaches the release assets stale.
               - 'deployments/**'
-              # SecureCrispArtifacts.spec.ts reads the CRISP image ID from this directory.
-              - 'crates/support/contracts/**'
               - '!**/*.md'
               - '!**/*.mdx'
             # `pnpm check:bindings` in rust_unit_tests runs this script.

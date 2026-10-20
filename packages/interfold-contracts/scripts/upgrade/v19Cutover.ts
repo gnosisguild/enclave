@@ -80,7 +80,6 @@ import {
   readContract,
   validateBfvRoutes,
 } from "./bfvRouteChecks";
-import { requiredActiveOperatorsForSecureCrisp } from "./resumeSecureCrisp";
 import {
   deployUpgradeImplementation,
   proxyImplementation,
@@ -122,6 +121,43 @@ type CrispDeploymentRecord = Record<
   string,
   Record<string, { address?: string }>
 >;
+
+type CommitteeThreshold = {
+  size: string;
+  total: string;
+};
+
+/** Selects the operator-capacity gate for a production resume or a named Sepolia rehearsal. */
+export function requiredActiveOperators(
+  thresholds: CommitteeThreshold[],
+  chainId: number,
+  rehearsalCommitteeSize?: string,
+): bigint {
+  if (rehearsalCommitteeSize !== undefined) {
+    if (chainId !== 11155111) {
+      throw new Error(
+        "A reduced committee-capacity gate is available only for a Sepolia rehearsal",
+      );
+    }
+    if (!/^\d+$/.test(rehearsalCommitteeSize)) {
+      throw new Error("The rehearsal committee size must be an integer ID");
+    }
+    const selected = thresholds.find(
+      (threshold) => threshold.size === rehearsalCommitteeSize,
+    );
+    if (!selected) {
+      throw new Error(
+        `Committee size ${rehearsalCommitteeSize} is not configured`,
+      );
+    }
+    return BigInt(selected.total);
+  }
+
+  return thresholds.reduce((maximum, threshold) => {
+    const total = BigInt(threshold.total);
+    return total > maximum ? total : maximum;
+  }, 0n);
+}
 
 function planPath(config: ProtocolConfigFile): string {
   return arg("plan")
@@ -1021,7 +1057,7 @@ export async function prepareV19Resume(): Promise<void> {
     "BondingRegistry",
     deployment.bondingRegistryProxy,
   );
-  const requiredActive = requiredActiveOperatorsForSecureCrisp(
+  const requiredActive = requiredActiveOperators(
     config.interfold.committeeThresholds,
     config.chainId,
     arg("sepolia-committee-size"),
