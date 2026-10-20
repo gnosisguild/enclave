@@ -43,8 +43,8 @@ members = [
   "crates/slashing",
   "crates/sortition",
   "crates/sync",
-  "crates/test-helpers",
   "crates/task-pool",
+  "crates/test-helpers",
   "crates/tests",
   "crates/trbfv",
   "crates/utils",
@@ -84,7 +84,6 @@ description = "E3 — Encrypted Execution Environments"
 repository = "https://github.com/theinterfold/interfold"
 
 [workspace.dependencies]
-e3-task-pool = { version = "0.20.0-dev.2", path = "./crates/task-pool" }
 e3-aggregator = { version = "0.20.0-dev.2", path = "./crates/aggregator" }
 e3-bfv-client = { version = "0.20.0-dev.2", path = "./crates/bfv-client" }
 e3-committee = { version = "0.20.0-dev.2", path = "./crates/committee" }
@@ -125,6 +124,7 @@ e3-polynomial = { version = "0.20.0-dev.2", path = "./crates/polynomial" }
 e3-polynomial-fhe = { version = "0.20.0-dev.2", path = "./crates/polynomial/fhe-adapter" }
 e3-sync = { version = "0.20.0-dev.2", path = "./crates/sync" }
 e3-layout-lock = { version = "0.20.0-dev.2", path = "./crates/layout-lock" }
+e3-task-pool = { version = "0.20.0-dev.2", path = "./crates/task-pool" }
 e3-test-helpers = { version = "0.20.0-dev.2", path = "./crates/test-helpers" }
 e3-tests = { version = "0.20.0-dev.2", path = "./crates/tests" }
 e3-trbfv = { version = "0.20.0-dev.2", path = "./crates/trbfv" }
