@@ -269,6 +269,16 @@ fi
 [ "$(tr '\n' ' ' < "$matching_dir/calls")" = "wallet-get " ] || fail "saved identity read failure re-provisioned credentials"
 [ -e "$matching_dir/secrets/secrets.json" ] || fail "saved identity read failure removed recovery input"
 
+# The Node dashboard is optional: a proxy that cannot start must not stop the node.
+dashboard_dir="$TEST_ROOT/dashboard-unavailable"
+mkdir -p "$dashboard_dir/secrets"
+write_secrets "$dashboard_dir/secrets/secrets.json"
+run_entrypoint "$dashboard_dir" DASHBOARD_ENABLED=true DASHBOARD_PROXY_CONF="$dashboard_dir/nginx.conf" \
+    || fail "an unavailable dashboard proxy stopped the node"
+[ "$(tail -n 1 "$dashboard_dir/calls")" = start ] || fail "the node did not start without the dashboard proxy"
+[ ! -e "$dashboard_dir/nginx.conf" ] || fail "a dashboard proxy that did not start left its configuration"
+assert_contains "$dashboard_dir/output" 'Node dashboard proxy did not start'
+
 # Malformed or absent first-start credentials fail before invoking Interfold.
 malformed_dir="$TEST_ROOT/malformed"
 mkdir -p "$malformed_dir/secrets"
@@ -435,7 +445,10 @@ printf 'password' > "$health_dir/data/password"
 
 printf '%s\n' \
     '#!/bin/sh' \
-    '[ "${SS_READY:-1}" = 1 ] && printf "udp listener\n"' \
+    'case " $* " in' \
+    '  *" -u "*) [ "${SS_READY:-1}" = 1 ] && printf "udp listener\n" ;;' \
+    '  *) [ "${SS_TCP_READY:-0}" = 1 ] && printf "tcp listener\n" ;;' \
+    'esac' \
     > "$health_dir/bin/ss"
 printf '%s\n' \
     '#!/bin/sh' \
@@ -580,5 +593,15 @@ if run_healthcheck; then
     fail "a malformed ingestion expectation was considered healthy"
 fi
 rm "$health_dir/data/ingestion/expected" "$health_dir/data/ingestion/chain-1.heartbeat"
+
+# The dashboard proxy is optional: test its listener only when the entrypoint started it.
+DASHBOARD_ENABLED=true DASHBOARD_PROXY_CONF="$health_dir/no-dashboard-proxy.conf" run_healthcheck \
+    || fail "a dashboard proxy that did not start made the node unhealthy"
+printf 'proxy' > "$health_dir/dashboard-proxy.conf"
+if DASHBOARD_ENABLED=true DASHBOARD_PROXY_CONF="$health_dir/dashboard-proxy.conf" run_healthcheck; then
+    fail "a started dashboard proxy without its listener was considered healthy"
+fi
+DASHBOARD_ENABLED=true DASHBOARD_PROXY_CONF="$health_dir/dashboard-proxy.conf" SS_TCP_READY=1 run_healthcheck \
+    || fail "a listening dashboard proxy was rejected"
 
 printf 'PASS: DAppNode credential and health hardening regressions\n'

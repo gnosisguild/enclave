@@ -20,6 +20,7 @@ INGESTION_STALL_MAX_SECS="${INGESTION_STALL_MAX_SECS:-600}"
 INGESTION_START_GRACE_SECS="${INGESTION_START_GRACE_SECS:-900}"
 QUIC_PORT="${QUIC_PORT:-37173}"
 SS_BIN="${SS_BIN:-ss}"
+DASHBOARD_PROXY_CONF="${DASHBOARD_PROXY_CONF:-/tmp/interfold-nginx.conf}"
 STAT_BIN="${STAT_BIN:-stat}"
 
 case "$QUIC_PORT" in
@@ -49,7 +50,8 @@ case "$password_mode" in 400|600) ;; *) fail "credential-key permissions must be
 
 $SS_BIN -H -u -l -n "sport = :$QUIC_PORT" | grep -q . || fail "QUIC listener is missing; check network startup Logs"
 
-if [ "${DASHBOARD_ENABLED:-false}" = true ]; then
+# The entrypoint keeps the proxy configuration only when the proxy started.
+if [ "${DASHBOARD_ENABLED:-false}" = true ] && [ -s "$DASHBOARD_PROXY_CONF" ]; then
     $SS_BIN -H -t -l -n 'sport = :8081' | grep -q . || fail "dashboard proxy is unavailable; restart the package and check Logs"
 fi
 

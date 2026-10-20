@@ -13,6 +13,8 @@ CURRENT_STATE_DIR="${CURRENT_STATE_DIR:-$CONFIG_DIR/.interfold}"
 # /data/config.yaml to this path for the default node profile.
 PASSWORD_FILE="${PASSWORD_FILE:-$CURRENT_STATE_DIR/config/_default/key}"
 CREDENTIALS_READY_FILE="$(dirname "$PASSWORD_FILE")/credentials.provisioned"
+# The health check tests the dashboard proxy only while this file exists.
+DASHBOARD_PROXY_CONF="${DASHBOARD_PROXY_CONF:-/tmp/interfold-nginx.conf}"
 
 log() { printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$1"; }
 fail() {
@@ -167,17 +169,21 @@ CONFIG_FILE="$SAVED_CONFIG_FILE"
 [ ! -e "$SECRETS_FILE" ] || rm -f "$SECRETS_FILE"
 log "Node address: $NODE_ADDRESS"
 
-if [ "$DASHBOARD_ENABLED" = true ]; then
-    DASHBOARD_HOSTNAME="interfold-ciphernode-${NETWORK}.dappnode"
+start_dashboard_proxy() {
+    local hostname="interfold-ciphernode-${NETWORK}.dappnode"
     # Bind the proxy to the DAppNode VPN interface without publishing a host port.
-    DASHBOARD_BIND_ADDRESS=$(getent ahostsv4 "$DASHBOARD_HOSTNAME" | awk 'NR == 1 {print $1}') \
-        || fail "DAppNode DNS is unavailable; check the package network"
-    [[ "$DASHBOARD_BIND_ADDRESS" =~ ^172\.33\.[0-9]+\.[0-9]+$ ]] \
-        || fail "dashboard DNS must resolve to the DAppNode core network"
+    DASHBOARD_BIND_ADDRESS=$(getent ahostsv4 "$hostname" | awk 'NR == 1 {print $1}') || return 1
+    [[ "$DASHBOARD_BIND_ADDRESS" =~ ^172\.33\.[0-9]+\.[0-9]+$ ]] || return 1
     export DASHBOARD_BIND_ADDRESS
-    envsubst '$DASHBOARD_BIND_ADDRESS' < /opt/nginx.conf.template > /tmp/interfold-nginx.conf
-    nginx -c /tmp/interfold-nginx.conf || fail "dashboard proxy failed to start"
-    log "Dashboard: http://$DASHBOARD_HOSTNAME:8081 (DAppNode VPN network)"
+    envsubst '$DASHBOARD_BIND_ADDRESS' < /opt/nginx.conf.template > "$DASHBOARD_PROXY_CONF" || return 1
+    nginx -c "$DASHBOARD_PROXY_CONF" || return 1
+    log "Dashboard: http://$hostname:8081 (DAppNode VPN network)"
+}
+
+# The dashboard only monitors the node, so a proxy failure must not stop it.
+if [ "$DASHBOARD_ENABLED" = true ] && ! start_dashboard_proxy; then
+    rm -f "$DASHBOARD_PROXY_CONF"
+    log "WARNING: the Node dashboard proxy did not start; check the package network. The node starts without it."
 fi
 
 # Build CLI args without shell evaluation.
