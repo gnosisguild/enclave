@@ -468,6 +468,12 @@ sol! {
         function numActiveOperators() external view returns (uint256);
         function hasExitInProgress(address operator) external view returns (bool);
 
+        function unresolvedCommitteesOf(address operator) external view returns (uint256);
+        function committeeObligationAt(
+            address operator,
+            uint256 index
+        ) external view returns (uint256 e3Id, address registry);
+
         event TicketBalanceUpdated(
             address indexed operator,
             int256 delta,

@@ -110,29 +110,7 @@ back to live protocol windows. Install/register new program and update server/DA
 resume; old servers do not schedule the required separate voting start and cannot make valid new
 rounds.
 
-## Historical secure CRISP activation and dependency replacement
-
-`upgrade:secure-crisp` reads the CRISP deployment record from `--crisp-deployments <path>` (the
-`packages/crisp-contracts/deployed_contracts.json` of the
-[CRISP repository](https://github.com/theinterfold/CRISP)). A missing option or file stops the
-script, unless `--crisp-program`, `--ciphertext-verifier`, and `--data-availability-verifier` give
-the three addresses. The validator and `resume` read the saved plan, not the record.
-
-`upgrade:secure-crisp`/validator read the **RISC Zero** program and frozen ImageID.sol; they cannot
-activate v0.19 OpenVM. Its historical batch upgraded four proxies, replaced SlashingManager while
-preserving operators/policies (including disabled policies), reused the funded VRF subscription with
-a new consumer, registered secure parameter set 2/routes, wired verifiers/CRISP, retired bootstrap
-programs, raised required release, and kept requests paused. Historical "version-7" wording
-describes that procedure, not current compiled protocol policy. Do not use the older partial
-CRISP-only builder on mainnet.
-
-Historical activation validation covers implementations, reciprocal graph, preserved counts/root,
-subscription/consumers, every route/VK, receipt binding, retired programs, and pause/drain. Keep old
-VRF consumer authorized through validation/first successful E3, then remove in a separately
-authorized cleanup. `upgrade:secure-crisp:resume -- --network mainnet --ciphernodes-restarted`
-requires complete refresh and T−1 owner capacity as well as release-ready count. Publish matching
-release source before governance activation. OpenVM needs its own guest/VM/Halo2 identity and
-separate cutover.
+## Dependency replacement
 
 There are **no concurrent registry generations**. Each request validates/snapshots one coherent
 graph; snapshots support drain routing, not early activation of a replacement. Generic replacement

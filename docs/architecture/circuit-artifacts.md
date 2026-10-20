@@ -158,12 +158,9 @@ later-upgraded proxies need separate validation.
 [Voting-power deployment](voting-power.md#bonded-history-and-deployment) covers its required
 checkpoint attachment, resync, adapter and exclusion probes.
 
-`crates/support/contracts/ImageID.sol` is frozen historical RISC Zero identity: producer guest is
-gone, but secureCrisp/validateSecureCrisp still read it. Never regenerate or hand-edit; remove it
-only together with those scripts. Current OpenVM template/CRISP read deployed receipt identity; no
-generated copy of ImageID.sol is tracked. Never commit deployment-local
-executable/key/proof/input/worker-config/benchmark artifacts; put them under target or outside
-source.
+The OpenVM template and CRISP read the deployed receipt identity; no generated Solidity identity
+file is tracked. Never commit deployment-local executable/key/proof/input/worker-config/benchmark
+artifacts; put them under target or outside source.
 
 ## Provenance and checks
 
