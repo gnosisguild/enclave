@@ -16,6 +16,11 @@ use tokio::sync::{watch, Semaphore};
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn, Level};
 
+/// Namespace a caller's cancellation key when several runtimes share a pool.
+pub fn scoped_task_group(scope: &str, key: impl std::fmt::Display) -> String {
+    format!("{scope}:{key}")
+}
+
 /// A bounded executor for CPU-bound tasks backed by a Rayon thread pool.
 #[derive(Debug, Clone)]
 pub struct TaskPool {
@@ -66,7 +71,7 @@ impl TaskPool {
         self.spawn_inner(None, task_name, timed_logs, op).await
     }
 
-    pub(crate) async fn spawn_in_group<OP, T: Debug + Send + 'static>(
+    pub async fn spawn_in_group<OP, T: Debug + Send + 'static>(
         &self,
         group: String,
         task_name: String,
@@ -80,7 +85,7 @@ impl TaskPool {
             .await
     }
 
-    pub(crate) fn cancel_group(&self, group: &str) {
+    pub fn cancel_group(&self, group: &str) {
         let sender = {
             let mut groups = self.task_groups.lock().expect("task group lock poisoned");
             groups
@@ -91,12 +96,8 @@ impl TaskPool {
         sender.send_replace(true);
     }
 
-    /// Wait for a retry delay, unless the E3 becomes terminal first.
-    pub(crate) async fn wait_for_retry(
-        &self,
-        group: &str,
-        delay: Duration,
-    ) -> Result<(), TaskPoolError> {
+    /// Wait for a retry delay, unless the caller cancels the group first.
+    pub async fn wait_for_retry(&self, group: &str, delay: Duration) -> Result<(), TaskPoolError> {
         let mut cancellation = self.subscribe_group(group);
         if *cancellation.borrow() {
             return Err(TaskPoolError::Cancelled(group.to_owned()));
@@ -225,7 +226,7 @@ impl TaskPool {
                 Ok(t) => {
                     if let Err(res) = tx.send(Ok(t)) {
                         error!(
-                            "There was an error sending the result from the multithread actor: result = {:?}",
+                            "There was an error sending the task result: result = {:?}",
                             res
                         );
                     }

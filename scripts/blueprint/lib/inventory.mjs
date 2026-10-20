@@ -59,7 +59,7 @@ export const LAYERS = {
   workflows: ['request', 'sortition', 'keyshare', 'aggregator', 'slashing', 'zk/prover', 'fhe', 'multithread', 'trbfv', 'bfv-client'],
   adapters: ['evm', 'net', 'sync', 'event-system', 'data', 'data-availability', 'logger'],
   vocabulary: ['events', 'config', 'fhe-params', 'zk/config', 'zk/witness', 'committee', 'committee-hash'],
-  foundations: ['crypto', 'polynomial', 'polynomial/fhe-adapter', 'parity-matrix', 'safe', 'hamt', 'utils', 'utils-derive'],
+  foundations: ['crypto', 'polynomial', 'polynomial/fhe-adapter', 'parity-matrix', 'safe', 'hamt', 'utils', 'utils-derive', 'task-pool'],
   validation: ['test-helpers', 'tests', 'layout-lock', 'zk/samples'],
 }
 

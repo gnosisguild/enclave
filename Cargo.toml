@@ -44,6 +44,7 @@ members = [
   "crates/sortition",
   "crates/sync",
   "crates/test-helpers",
+  "crates/task-pool",
   "crates/tests",
   "crates/trbfv",
   "crates/utils",
@@ -83,6 +84,7 @@ description = "E3 — Encrypted Execution Environments"
 repository = "https://github.com/theinterfold/interfold"
 
 [workspace.dependencies]
+e3-task-pool = { version = "0.20.0-dev.2", path = "./crates/task-pool" }
 e3-aggregator = { version = "0.20.0-dev.2", path = "./crates/aggregator" }
 e3-bfv-client = { version = "0.20.0-dev.2", path = "./crates/bfv-client" }
 e3-committee = { version = "0.20.0-dev.2", path = "./crates/committee" }

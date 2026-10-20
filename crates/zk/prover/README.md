@@ -41,10 +41,12 @@ compiled-circuit loading and witness generation (using `noirc_abi::InputMap`) wi
 another circuit parameter table.
 
 Node runtimes use `setup_zk_actors` with `ZkActorRecovery`, canonical committees/keys, signer, and
-repositories. The [builder wiring](../../ciphernode-builder/src/builder/extensions.rs) shows
-hydration before effect-enabled replay. Operators normally use the
-[CLI Noir commands](../../cli/src/noir.rs), not manual actor construction. Slashing implementation
-lives in [e3-slashing](../../slashing/README.md).
+repositories, plus the compute dispatcher's shared `e3_task_pool::TaskPool` and node scope. C0
+verification runs off the actor runtime through that pool, preserving serial response/barrier order.
+These arguments are required: callers must not create an independent production verification pool.
+The [builder wiring](../../ciphernode-builder/src/builder/extensions.rs) shows hydration before
+effect-enabled replay. Operators normally use the [CLI Noir commands](../../cli/src/noir.rs), not
+manual actor construction. Slashing implementation lives in [e3-slashing](../../slashing/README.md).
 
 `Provable::Config` carries each circuit's concrete configuration into preparation. Workers build it
 from their existing BFV parameter owner; C6/C7 reuse it across ciphertext indices. User encryption
@@ -74,6 +76,10 @@ above. Backend tests cover local archives/install rollback; prover tests use fak
 timeout/error classification; witness tests execute the dummy compiled circuit; capability tests
 cover plans, signature admission, correlations, and restart inputs. These have different external
 requirements from the explicitly selected real-proof suites below.
+
+`zk_actor` tests use controlled fake verification processes to cover actor-runtime progress, shared
+pool saturation, serial barriers and node-scoped queued cancellation. They test scheduling and error
+classification, not proof correctness.
 
 ### Real-proof tests
 

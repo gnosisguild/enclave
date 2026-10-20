@@ -42,7 +42,12 @@ impl VerificationHarness {
     async fn new(backend: &ZkBackend, e3_id: &E3id, signer: &PrivateKeySigner) -> Self {
         let bus = test_bus();
         let history = bus.history();
-        let verifier = ZkActor::new(backend).start();
+        let verifier = ZkActor::new(
+            backend,
+            e3_task_pool::TaskPool::new(1, 1),
+            "recovery-test".to_owned(),
+        )
+        .start();
         let observer = PrivateKeySigner::random();
         let mut committee = vec![
             signer.address(),

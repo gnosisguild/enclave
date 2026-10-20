@@ -26,6 +26,7 @@ e3-events.workspace = true
 e3-fhe-params.workspace = true
 e3-request.workspace = true
 e3-slashing.workspace = true
+e3-task-pool.workspace = true
 e3-utils.workspace = true
 e3-zk-config.workspace = true
 e3-zk-witness.workspace = true

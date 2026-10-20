@@ -90,6 +90,7 @@ COPY crates/dashboard/Cargo.toml ./dashboard/Cargo.toml
 COPY crates/daemon-server/Cargo.toml ./daemon-server/Cargo.toml
 COPY crates/sync/Cargo.toml ./sync/Cargo.toml
 COPY crates/test-helpers/Cargo.toml ./test-helpers/Cargo.toml
+COPY crates/task-pool/Cargo.toml ./task-pool/Cargo.toml
 COPY crates/tests/Cargo.toml ./tests/Cargo.toml
 COPY crates/trbfv/Cargo.toml ./trbfv/Cargo.toml
 COPY crates/utils/Cargo.toml ./utils/Cargo.toml

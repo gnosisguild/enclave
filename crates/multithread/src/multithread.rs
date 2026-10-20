@@ -231,7 +231,7 @@ impl Multithread {
 }
 
 fn task_group(scope: &str, e3_id: &E3id) -> String {
-    format!("{scope}:{e3_id}")
+    e3_task_pool::scoped_task_group(scope, e3_id)
 }
 
 /// Accusation re-verification outlives a failed E3, so it runs in its own group. A cancelled
