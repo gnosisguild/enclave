@@ -197,17 +197,17 @@ pnpm test:integration --no-prebuild
 				</a>
 			</td>
 			<td align="center">
-				<a href="https://github.com/Toby1009">
-					<img src="https://avatars.githubusercontent.com/u/69885352?v=4" width="100;" alt="Toby1009"/>
-					<br />
-					<sub><b>Malingshu</b></sub>
-				</a>
-			</td>
-			<td align="center">
 				<a href="https://github.com/neogiacomo">
 					<img src="https://avatars.githubusercontent.com/u/20580910?v=4" width="100;" alt="neogiacomo"/>
 					<br />
 					<sub><b>Giacomo Corrias</b></sub>
+				</a>
+			</td>
+			<td align="center">
+				<a href="https://github.com/Toby1009">
+					<img src="https://avatars.githubusercontent.com/u/69885352?v=4" width="100;" alt="Toby1009"/>
+					<br />
+					<sub><b>Malingshu</b></sub>
 				</a>
 			</td>
 			<td align="center">
