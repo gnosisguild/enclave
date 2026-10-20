@@ -165,6 +165,15 @@ every section.
   struct stays declared in `BondingRegistry`: the upgrade baseline compares type labels, so
   relocating it reads as a type change on an unchanged layout. — `BondingRegistry.sol`; INDEX
   concern #22
+- **The tracked committee set can only miss committees, never hold extra ones.**
+  `BondingSlashingLib` adds an E3 to `unresolvedCommitteeIds` when the request-time registry is
+  assigned and removes it at the final release, the two places where `unresolvedCommitteeCount`
+  changes. The set is appended storage, so it misses the committees requested before the upgrade
+  that added it, and `remove` of such an E3 is a no-op. `committeeObligationAt(operator, index)` can
+  therefore index fewer committees than `unresolvedCommitteesOf(operator)` counts, and the last
+  indexes then revert with `CommitteeObligationNotTracked`; a caller that sees the revert reads the
+  `CommitteeObligationUpdated` events, as `fetch_operator_committees` does. —
+  `BondingSlashingLib.sol`; `crates/evm/src/operator_status.rs`
 - Ticket and ciphernode bond tokens, expected decimals, `ticketPrice`, and `requiredCiphernodeBond`
   change as one configuration. Asset identity changes only after old balances, E3 assignments, slash
   locks, and pending slash routes fully drain. Replacement assets must be deployed contracts, and a
