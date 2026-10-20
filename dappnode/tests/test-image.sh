@@ -150,6 +150,12 @@ chmod a+x "$FIXTURES/bin/interfold"
 start_client() {
     docker run -d --name "$NAME-client" --network "$NAME" --ip "$1" --network-alias "$CLIENT_ALIAS" \
         -v "$FIXTURES:/fixtures:ro" --entrypoint python3 "$MAINNET_IMAGE" /fixtures/client.py "$2" >/dev/null
+    local deadline=$((SECONDS + 30))
+    until docker exec "$NAME-client" python3 -c \
+        'import socket; [socket.create_connection(("127.0.0.1", port), 1).close() for port in (8545, 8546)]' 2>/dev/null; do
+        [ "$SECONDS" -lt "$deadline" ] || fail "the test execution client did not start"
+        sleep 1
+    done
 }
 
 docker network create --subnet 10.231.0.0/24 "$NAME" >/dev/null

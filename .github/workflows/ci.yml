@@ -325,11 +325,28 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: dappnode/package-lock.json
+      # A stable release PR pins a version that only the tagged release publishes. The release
+      # workflow builds the packages after it publishes that image.
+      - name: Check that the pinned ciphernode image is published
+        id: upstream
+        run: |
+          image="$(sed -n 's/^FROM \([^:]*\):.*/\1/p' dappnode/Dockerfile):$(node -p "require('./dappnode/dappnode_package.json').upstreamVersion")"
+          if output=$(docker manifest inspect "$image" 2>&1); then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          elif grep -q 'manifest unknown' <<< "$output"; then
+            echo "::notice::$image is not published yet; skipping the DAppNode image test."
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          else
+            printf '%s\n' "$output"
+            exit 1
+          fi
       - name: Build both DAppNode packages with the release command
+        if: steps.upstream.outputs.published == 'true'
         run: |
           npm ci --ignore-scripts --prefix dappnode
           npm run build --prefix dappnode -- --skip_upload --skip_save
       - name: Test provisioning and the RPC proxy in the built image
+        if: steps.upstream.outputs.published == 'true'
         run: npm run test:image --prefix dappnode
 
   rust_unit_tests:
