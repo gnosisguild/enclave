@@ -297,8 +297,24 @@ mod tests {
     #[tokio::test]
     #[ignore = "secure-16384 key-share generation is a slow cryptographic test"]
     async fn generated_shares_use_the_c1_secret_and_build_all_five_rows() -> Result<()> {
+        check_generated_secure_shares(CiphernodesCommitteeSize::Minimum).await
+    }
+
+    #[tokio::test]
+    #[ignore = "secure-16384 key-share generation is a slow cryptographic test"]
+    async fn generated_micro_shares_build_all_five_rows() -> Result<()> {
+        check_generated_secure_shares(CiphernodesCommitteeSize::Micro).await
+    }
+
+    #[tokio::test]
+    #[ignore = "secure-16384 key-share generation is a slow cryptographic test"]
+    async fn generated_small_shares_build_all_five_rows() -> Result<()> {
+        check_generated_secure_shares(CiphernodesCommitteeSize::Small).await
+    }
+
+    async fn check_generated_secure_shares(committee_size: CiphernodesCommitteeSize) -> Result<()> {
         let preset = BfvPreset::SecureThreshold16384;
-        let committee = CiphernodesCommitteeSize::Minimum.values();
+        let committee = committee_size.values();
         let (params, _) = build_pair_for_preset(preset)?;
         let mut rng = rand::rng();
         let secret_key = SecretKey::random(&params, &mut rng);
@@ -341,7 +357,7 @@ mod tests {
         assert_eq!(response.witness.errors_d0_bytes.len(), 5);
         assert_eq!(response.witness.errors_d2_bytes.len(), 5);
 
-        let config = Configs::new(preset, &params, CiphernodesCommitteeSize::Minimum)?;
+        let config = Configs::new(preset, &params, committee_size)?;
         let pk_adapter = LbfvPkGenerationAdapter::from_config(&config)?;
         let reconstructed = deserialize_c1_secret_key(&c1_secret_poly.to_bytes(), &params)?;
         assert_eq!(reconstructed.coeffs, secret_key.coeffs);
@@ -369,7 +385,7 @@ mod tests {
         let rlk_config = e3_zk_config::threshold::rlk_generation::RlkGenerationConfigs::new(
             preset,
             &params,
-            CiphernodesCommitteeSize::Minimum,
+            committee_size,
         )?;
         let rlk_rows = RlkGenerationAdapter::from_config(&rlk_config)?.all_rows_data(
             committee,

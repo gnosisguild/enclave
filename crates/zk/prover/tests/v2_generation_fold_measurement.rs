@@ -8,8 +8,7 @@ mod common;
 
 use std::{env, fs, path::PathBuf};
 
-use common::find_bb;
-use e3_committee::CiphernodesCommitteeSize;
+use common::{find_bb, secure_lbfv_cache_dir, secure_lbfv_committee};
 use e3_config::BBPath;
 use e3_events::{CircuitName, CircuitVariant, Proof};
 use e3_fhe_params::{build_pair_for_preset, lbfv_crs_seed, lbfv_urs_seed, BfvPreset};
@@ -34,11 +33,10 @@ use fhe::bfv::{CommonRandomPolyVec, SecretKey};
 use fhe::trlbfv::{PublicKeyShare, RelinKeyShare};
 
 const ARTIFACT_ROOT_ENV: &str = "INTERFOLD_SECURE_16384_ARTIFACTS";
-const ARTIFACTS_DIR: &str = "secure-16384/minimum";
 const PROOF_CACHE_ENV: &str = "INTERFOLD_V2_PROOF_CACHE";
 
 fn load_cached_proof(circuit: CircuitName, label: &str) -> Option<Proof> {
-    let directory = env::var_os(PROOF_CACHE_ENV).map(PathBuf::from)?;
+    let directory = secure_lbfv_cache_dir(PROOF_CACHE_ENV)?;
     let data = fs::read(directory.join(format!("{label}.proof"))).ok()?;
     let public_signals = fs::read(directory.join(format!("{label}.public"))).ok()?;
     Some(Proof::new(
@@ -49,7 +47,7 @@ fn load_cached_proof(circuit: CircuitName, label: &str) -> Option<Proof> {
 }
 
 fn store_cached_proof(proof: &Proof, label: &str) {
-    let Some(directory) = env::var_os(PROOF_CACHE_ENV).map(PathBuf::from) else {
+    let Some(directory) = secure_lbfv_cache_dir(PROOF_CACHE_ENV) else {
         return;
     };
     fs::create_dir_all(&directory).expect("proof cache directory");
@@ -79,8 +77,12 @@ async fn secure_generation_fold_kernel_proves_and_verifies() {
         println!("skipping: bb not found");
         return;
     };
+    let preset = BfvPreset::SecureThreshold16384;
+    let committee_size = secure_lbfv_committee();
+    let committee = committee_size.values();
+    let artifacts_dir = preset.artifacts_dir_for_committee(committee_size.as_str());
     let required = artifact_root
-        .join(ARTIFACTS_DIR)
+        .join(&artifacts_dir)
         .join("recursive/threshold/lbfv_pk_generation/lbfv_pk_generation.json");
     if !required.is_file() {
         panic!("secure artifact is missing: {}", required.display());
@@ -89,8 +91,6 @@ async fn secure_generation_fold_kernel_proves_and_verifies() {
     let work = tempfile::tempdir().expect("temporary prover work directory");
     let backend = ZkBackend::new(BBPath::Default(bb), artifact_root, work.path().join("work"));
     let prover = ZkProver::new(&backend);
-    let preset = BfvPreset::SecureThreshold16384;
-    let committee = CiphernodesCommitteeSize::Minimum.values();
 
     let (params, _) = build_pair_for_preset(preset).expect("secure BFV parameters");
     let crp_a = CommonRandomPolyVec::from_seed(
@@ -113,11 +113,8 @@ async fn secure_generation_fold_kernel_proves_and_verifies() {
 
     let domain = sample_lbfv_proof_domain();
     let pk_data = LbfvPkGenerationAdapter::from_config(
-        &e3_zk_config::threshold::pk_generation::Configs::for_preset(
-            preset,
-            e3_committee::CiphernodesCommitteeSize::Minimum,
-        )
-        .unwrap(),
+        &e3_zk_config::threshold::pk_generation::Configs::for_preset(preset, committee_size)
+            .unwrap(),
     )
     .expect("PK adapter")
     .row_data(committee.clone(), domain, 0, 0, &secret_key, &public_key)
@@ -125,7 +122,7 @@ async fn secure_generation_fold_kernel_proves_and_verifies() {
     let rlk_data = RlkGenerationAdapter::from_config(
         &e3_zk_config::threshold::rlk_generation::RlkGenerationConfigs::for_preset(
             preset,
-            e3_committee::CiphernodesCommitteeSize::Minimum,
+            committee_size,
         )
         .unwrap(),
     )
@@ -142,7 +139,7 @@ async fn secure_generation_fold_kernel_proves_and_verifies() {
     .expect("matching RLK row");
 
     let pk_vk = load_vk_artifacts(
-        &prover.circuits_dir(CircuitVariant::Recursive, ARTIFACTS_DIR),
+        &prover.circuits_dir(CircuitVariant::Recursive, &artifacts_dir),
         CircuitName::LbfvPkGeneration,
     )
     .expect("public-key row VK");
@@ -167,7 +164,7 @@ async fn secure_generation_fold_kernel_proves_and_verifies() {
                 .unwrap(),
                 &pk_data,
                 "secure-v2-generation-fold",
-                ARTIFACTS_DIR,
+                &artifacts_dir,
             )
             .expect("PK generation proof");
             store_cached_proof(&proof, &pk_cache_label);
@@ -180,12 +177,12 @@ async fn secure_generation_fold_kernel_proves_and_verifies() {
             "secure-v2-generation-fold",
             0,
             CircuitVariant::Recursive,
-            ARTIFACTS_DIR,
+            &artifacts_dir,
         )
         .expect("PK generation verification"));
 
     let rlk_vk = load_vk_artifacts(
-        &prover.circuits_dir(CircuitVariant::Recursive, ARTIFACTS_DIR),
+        &prover.circuits_dir(CircuitVariant::Recursive, &artifacts_dir),
         CircuitName::RlkGeneration,
     )
     .expect("RLK row VK");
@@ -210,7 +207,7 @@ async fn secure_generation_fold_kernel_proves_and_verifies() {
                 .unwrap(),
                 &rlk_data,
                 "secure-v2-generation-fold",
-                ARTIFACTS_DIR,
+                &artifacts_dir,
             )
             .expect("RLK generation row proof");
             store_cached_proof(&proof, &rlk_cache_label);
@@ -223,7 +220,7 @@ async fn secure_generation_fold_kernel_proves_and_verifies() {
             "secure-v2-generation-fold",
             0,
             CircuitVariant::Recursive,
-            ARTIFACTS_DIR,
+            &artifacts_dir,
         )
         .expect("RLK generation verification"));
 
@@ -234,7 +231,7 @@ async fn secure_generation_fold_kernel_proves_and_verifies() {
         None,
         0,
         "secure-v2-generation-fold",
-        ARTIFACTS_DIR,
+        &artifacts_dir,
     )
     .expect("generation fold kernel proof");
     print_measurement("lbfv_generation_fold_kernel", &generation_fold);
@@ -247,11 +244,11 @@ async fn secure_generation_fold_kernel_proves_and_verifies() {
             &generation_fold,
             "secure-v2-generation-fold",
             0,
-            ARTIFACTS_DIR,
+            &artifacts_dir,
         )
         .expect("generation fold kernel verification"));
 
-    let aggregation_committee = CiphernodesCommitteeSize::Minimum.values();
+    let aggregation_committee = committee_size.values();
     let pk_aggregation_data =
         e3_zk_samples::threshold::lbfv_pk_aggregation::generate_sample_for_row(
             preset,
@@ -274,7 +271,7 @@ async fn secure_generation_fold_kernel_proves_and_verifies() {
         cached
     } else {
         let proof = LbfvPkAggregationCircuit
-            .prove_with_variant(&prover, &e3_zk_config::threshold::lbfv_pk_aggregation::LbfvPkAggregationConfigs::for_preset(preset, e3_committee::CiphernodesCommitteeSize::from_threshold((&pk_aggregation_data).committee.threshold, (&pk_aggregation_data).committee.n).unwrap()).unwrap(), &pk_aggregation_data, "secure-v2-aggregation-fold", CircuitVariant::Recursive, ARTIFACTS_DIR)
+            .prove_with_variant(&prover, &e3_zk_config::threshold::lbfv_pk_aggregation::LbfvPkAggregationConfigs::for_preset(preset, e3_committee::CiphernodesCommitteeSize::from_threshold((&pk_aggregation_data).committee.threshold, (&pk_aggregation_data).committee.n).unwrap()).unwrap(), &pk_aggregation_data, "secure-v2-aggregation-fold", CircuitVariant::Recursive, &artifacts_dir)
             .expect("PK aggregation proof");
         store_cached_proof(&proof, "lbfv_pk_aggregation");
         proof
@@ -287,7 +284,7 @@ async fn secure_generation_fold_kernel_proves_and_verifies() {
             "secure-v2-aggregation-fold",
             0,
             CircuitVariant::Recursive,
-            ARTIFACTS_DIR,
+            &artifacts_dir,
         )
         .expect("PK aggregation verification"));
 
@@ -314,7 +311,7 @@ async fn secure_generation_fold_kernel_proves_and_verifies() {
                     &rlk_aggregation_data,
                     "secure-v2-aggregation-fold",
                     CircuitVariant::Recursive,
-                    ARTIFACTS_DIR,
+                    &artifacts_dir,
                 )
                 .expect("RLK aggregation proof");
             store_cached_proof(&proof, &name);
@@ -328,7 +325,7 @@ async fn secure_generation_fold_kernel_proves_and_verifies() {
                 "secure-v2-aggregation-fold",
                 0,
                 CircuitVariant::Recursive,
-                ARTIFACTS_DIR,
+                &artifacts_dir,
             )
             .expect("RLK aggregation verification"));
         rlk_aggregation_proofs.push(proof);
@@ -341,9 +338,9 @@ async fn secure_generation_fold_kernel_proves_and_verifies() {
         &rlk_aggregation_proofs[1],
         None,
         0,
-        CiphernodesCommitteeSize::Minimum.values().h,
+        committee_size.values().h,
         "secure-v2-aggregation-fold",
-        ARTIFACTS_DIR,
+        &artifacts_dir,
     )
     .expect("aggregation fold kernel proof");
     print_measurement("lbfv_aggregation_fold_kernel", &aggregation_fold);
@@ -356,7 +353,7 @@ async fn secure_generation_fold_kernel_proves_and_verifies() {
             &aggregation_fold,
             "secure-v2-aggregation-fold",
             0,
-            ARTIFACTS_DIR,
+            &artifacts_dir,
         )
         .expect("aggregation fold kernel verification"));
 }

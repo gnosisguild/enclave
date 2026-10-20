@@ -84,6 +84,15 @@ canonical for release/installation and must be a subset of `scripts/circuits/bui
 (tooling test). Both Rust and TypeScript read that build policy. Wildcards preserve its order, not a
 Cartesian product; an unsupported explicit pair fails before tools or writes.
 
+The build policy also generates deployment configuration declarations/testnet routes and Solidity
+pair admission. Network admission is separate and remains secure-8192-only on mainnet.
+Secure-16384/micro uses the existing `(N,T,H) = (9,4,5)` committee and five l-BFV rows; its V2 PK
+layout has 69 public fields; small has 96. The required release matrix includes all three
+secure-16384 committees. Enabling a new pair requires a complete matching artifact build, real-proof
+acceptance, and replacement/installation of the matching PK/decryption router routes before requests
+are admitted. Wrapper generation alone does not qualify the full proof chain or an existing
+deployment.
+
 Default `store:circuits pull` selects newest first-parent artifact commit with matching source hash,
 not necessarily branch tip. Release uses it and `verify-release` checks every pair, stamps,
 manifests, and required artifacts before publication. Non-release CI/full-proof integration can use
@@ -144,8 +153,9 @@ nested layout, and bad gap consumption fail. Creating a baseline is explicit mai
 an automatic fix. Tracked contract artifacts feed CLI `sol!`; after `pnpm evm:build`,
 `pnpm check:bindings` compares fresh ABI and requires regenerated artifacts for changed
 functions/events/errors. Size CI reserves >=128 bytes below EIP-170 for Interfold, BondingRegistry,
-CiphernodeRegistryOwnable, and canonical insecure-minimum aggregator verifiers. **Limit:** every
-variant must fit, but other verifier variants are not measured by that gate. See
+CiphernodeRegistryOwnable, canonical insecure-minimum aggregator verifiers, the secure-16384 minimum
+V2 verifier, and all secure-16384 micro/small aggregator verifiers. **Limit:** every variant must
+fit, but the remaining verifier variants are not measured by that gate. See
 [registration](registration-and-bonding.md) for library links.
 
 Configuration writes in deployInterfold/configureLocalSlashingPolicies use `scripts/utils.ts`'s

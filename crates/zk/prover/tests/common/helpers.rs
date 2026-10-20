@@ -14,6 +14,27 @@ use std::{env, path::PathBuf};
 use tempfile::TempDir;
 use tokio::fs;
 
+/// Explicit committee selection for secure l-BFV proof campaigns; never substitute another pair.
+pub fn secure_lbfv_committee() -> e3_committee::CiphernodesCommitteeSize {
+    match env::var("INTERFOLD_SECURE_16384_COMMITTEE") {
+        Ok(value) => value
+            .parse()
+            .expect("INTERFOLD_SECURE_16384_COMMITTEE must be minimum, micro, or small"),
+        Err(env::VarError::NotPresent) => e3_committee::CiphernodesCommitteeSize::Minimum,
+        Err(error) => panic!("invalid INTERFOLD_SECURE_16384_COMMITTEE: {error}"),
+    }
+}
+
+/// Keep saved proof campaigns for different committees separate, without replacing older runs.
+pub fn secure_lbfv_cache_dir(variable: &str) -> Option<PathBuf> {
+    env::var_os(variable).map(|root| {
+        PathBuf::from(root).join(
+            BfvPreset::SecureThreshold16384
+                .artifacts_dir_for_committee(secure_lbfv_committee().as_str()),
+        )
+    })
+}
+
 /// Root of the compiled circuit artifacts: `{workspace}/circuits/bin/`.
 fn circuits_build_root() -> PathBuf {
     e3_zk_prover::test_utils::workspace_root().join("circuits/bin")

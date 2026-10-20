@@ -9,7 +9,12 @@ import { mock } from "node:test";
 import path from "path";
 
 import {
+  SECURE_16384_MICRO_BFV_CONFIG,
   SECURE_16384_MINIMUM_BFV_CONFIG,
+  SECURE_16384_SMALL_BFV_CONFIG,
+  bfvConfigsForChain,
+  bfvHonkSource,
+  bfvPkV2PublicInputLayout,
   getBfvDecryptionSubCircuitVkHashPaths,
   getBfvPkSubCircuitVkHashPaths,
   getBfvPkVkBindingHashPaths,
@@ -69,5 +74,60 @@ describe("installed-package BFV VK paths", function () {
     expect(() =>
       getBfvV2VkBindingHashPaths(SECURE_16384_MINIMUM_BFV_CONFIG),
     ).to.throw("set INTERFOLD_CIRCUITS_DIR");
+  });
+
+  for (const [config, committee, committeeSize, n, t, h, length] of [
+    [SECURE_16384_MICRO_BFV_CONFIG, "micro", 1, 9, 4, 5, 69],
+    [SECURE_16384_SMALL_BFV_CONFIG, "small", 2, 19, 9, 14, 96],
+  ] as const) {
+    it(`resolves secure ${committee} with ZK C2 finalizers and a ${length}-field V2 layout`, function () {
+      expect(bfvHonkSource(config, "DkgAggregatorV2Verifier")).to.equal(
+        `contracts/verifiers/bfv/honk/secure-16384/${committee}/DkgAggregatorV2Verifier.sol`,
+      );
+      expect(config).to.include({
+        paramSet: 3,
+        committeeSize,
+        n,
+        t,
+        h,
+      });
+      const prefix = path.join(release, `secure-16384/${committee}`) + path.sep;
+      const legacy = getBfvPkVkBindingHashPaths(config);
+      for (const file of [...legacy, ...getBfvV2VkBindingHashPaths(config)]) {
+        expect(file.startsWith(prefix)).to.equal(true);
+      }
+      for (const index of [5, 6]) {
+        expect(legacy[index]).to.include(
+          `${path.sep}recursive${path.sep}recursive_aggregation${path.sep}`,
+        );
+      }
+      expect(bfvPkV2PublicInputLayout(config.h, 5).length).to.equal(length);
+      expect(bfvConfigsForChain(31337)).to.include(config);
+      expect(bfvConfigsForChain(11155111)).to.include(config);
+      expect(
+        bfvConfigsForChain(1).every((route) => route.paramSet === 2),
+      ).to.equal(true);
+    });
+  }
+});
+
+describe("local l-BFV VK variants", function () {
+  it("selects ZK leaf keys and non-ZK fold keys in the local artifact layout", function () {
+    const legacy = getBfvPkVkBindingHashPaths();
+    for (const [index, file] of legacy.entries()) {
+      expect(file).to.match(
+        [1, 5, 6, 8, 9, 11, 12].includes(index)
+          ? /\.vk_noir_hash$/
+          : /\.vk_recursive_hash$/,
+      );
+    }
+    const v2 = getBfvV2VkBindingHashPaths();
+    for (const [index, file] of v2.entries()) {
+      expect(file).to.match(
+        [5, 6, 9, 10].includes(index)
+          ? /\.vk_noir_hash$/
+          : /\.vk_recursive_hash$/,
+      );
+    }
   });
 });

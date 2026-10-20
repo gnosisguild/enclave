@@ -131,6 +131,14 @@ E3 and proof family, not one penalty per row. Retired limb-generation circuits h
 `ProofType`. C1/C5 accusations apply only to trBFV; l-BFV smudging failure belongs to its C2b chunk
 proof.
 
+RLK aggregation encodes `proofInstance = component * rowCount + row` (`d0 = 0`, `d2 = 1`).
+Solidity's attestation envelope admits instances 0–9 for that family (two components × at most five
+rows), 0–4 for the other l-BFV row families, and only zero for singleton proofs. Attestors still
+validate the actual preset's row count; this envelope does not re-verify a ZK proof. Signatures bind
+the instance, while the economic replay key remains per E3/operator/proof family, including across
+different d0/d2 rows. Correcting the former five-instance cap requires redeployment/rotation of the
+non-upgradeable slashing manager; already deployed managers do not acquire this behavior.
+
 Valid policies require at least one nonzero penalty; `!requiresProof` requires `appealWindow > 0`.
 Retained `failureReason` is zero or `InsufficientCommitteeMembers`; it does not choose attribution
 on execution. Both lanes open the same proposal-scoped registry lock and, if expelling, an

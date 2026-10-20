@@ -903,35 +903,41 @@ mod tests {
 
     #[tokio::test]
     async fn download_requires_all_release_configurations() {
-        let temp = TempDir::new().unwrap();
-        let mut backend = test_backend(&temp);
-        let previous_version = seed_installation(&backend).await;
-        let mut manifest = fixture_manifest(b"circuit");
-        let artifacts = fixture_artifacts();
-        let omitted: Vec<&str> = artifacts
-            .iter()
-            .filter(|path| path.starts_with("secure-8192/small/"))
-            .map(String::as_str)
-            .collect();
-        for path in &omitted {
-            manifest.remove(*path);
+        for missing_pair in [
+            "secure-8192/small/",
+            "secure-16384/micro/",
+            "secure-16384/small/",
+        ] {
+            let temp = TempDir::new().unwrap();
+            let mut backend = test_backend(&temp);
+            let previous_version = seed_installation(&backend).await;
+            let mut manifest = fixture_manifest(b"circuit");
+            let artifacts = fixture_artifacts();
+            let omitted: Vec<&str> = artifacts
+                .iter()
+                .filter(|path| path.starts_with(missing_pair))
+                .map(String::as_str)
+                .collect();
+            for path in &omitted {
+                manifest.remove(*path);
+            }
+            let archive = circuit_archive_with_manifest(b"circuit", Some(manifest), &[], &omitted);
+            backend
+                .config
+                .circuits_checksums
+                .insert("candidate".into(), sha256_hex(&archive));
+            let (url, server) = serve_archive(archive).await;
+            backend.config.circuits_download_url = url;
+
+            let result = backend.download_circuits().await;
+            server.await.unwrap();
+
+            assert!(
+                matches!(result, Err(ZkError::CircuitNotFound(ref path)) if path.starts_with(missing_pair)),
+                "{result:?}"
+            );
+            assert_installation_unchanged(&backend, &previous_version);
         }
-        let archive = circuit_archive_with_manifest(b"circuit", Some(manifest), &[], &omitted);
-        backend
-            .config
-            .circuits_checksums
-            .insert("candidate".into(), sha256_hex(&archive));
-        let (url, server) = serve_archive(archive).await;
-        backend.config.circuits_download_url = url;
-
-        let result = backend.download_circuits().await;
-        server.await.unwrap();
-
-        assert!(
-            matches!(result, Err(ZkError::CircuitNotFound(ref path)) if path.starts_with("secure-8192/small/")),
-            "{result:?}"
-        );
-        assert_installation_unchanged(&backend, &previous_version);
     }
 
     #[tokio::test]

@@ -164,14 +164,7 @@ fn build_policy_rejects_disabled_pairs_before_tools_and_filters_all_selectors() 
         for pair in &selected {
             assert!(pairs.contains(pair));
         }
-        assert_eq!(
-            selected.len(),
-            if matches!(options.preset, PresetSelection::All) {
-                1
-            } else {
-                2
-            }
-        );
+        assert_eq!(selected.len(), 2);
         options.validate(temp.path()).unwrap();
     }
 }
@@ -258,6 +251,7 @@ fn current_selection_sync_preserves_bytes_and_mtimes_without_tools() {
     )
     .unwrap();
     for relative in [
+        "scripts/circuits/build-pairs.json",
         "packages/interfold-contracts/scripts/utils.ts",
         "packages/interfold-contracts/contracts/lib/ActiveCryptoConfig.sol",
     ] {
@@ -622,6 +616,7 @@ fn generated_protocol_preserves_network_admission_and_pure_pair_validation() {
             BfvPreset::InsecureThreshold,
             CiphernodesCommitteeSize::Minimum,
             &params,
+            &build_pairs(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..")).unwrap(),
         )
         .unwrap(),
     );
@@ -638,6 +633,60 @@ fn generated_protocol_preserves_network_admission_and_pure_pair_validation() {
         .nth(1)
         .unwrap();
     assert!(pair_validation.starts_with("(uint8paramSet,uint8committeeSize)internalpure{"));
+}
+
+#[test]
+fn deployment_rendering_follows_the_build_policy() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let mut pairs = build_pairs(&repo).unwrap();
+    let params = configuration::OperationParams::both().unwrap();
+    let before =
+        fs::read_to_string(repo.join("packages/interfold-contracts/scripts/utils.ts")).unwrap();
+    let render = |pairs: &[[String; 2]]| {
+        configuration::protocol_utils(
+            &before,
+            BfvPreset::InsecureThreshold,
+            CiphernodesCommitteeSize::Minimum,
+            &params,
+            pairs,
+        )
+        .unwrap()
+    };
+    let complete = render(&pairs);
+    assert!(complete.contains("export const SECURE_16384_MICRO_BFV_CONFIG:"));
+    pairs.retain(|pair| pair != &["secure-16384".to_string(), "micro".to_string()]);
+    let restricted = render(&pairs);
+    assert!(!restricted.contains("SECURE_16384_MICRO_BFV_CONFIG"));
+    assert_eq!(
+        configuration::protocol_utils(
+            &restricted,
+            BfvPreset::InsecureThreshold,
+            CiphernodesCommitteeSize::Minimum,
+            &params,
+            &pairs,
+        )
+        .unwrap(),
+        restricted
+    );
+    let contract = compact(
+        &configuration::protocol_contract(
+            BfvPreset::InsecureThreshold,
+            CiphernodesCommitteeSize::Minimum,
+            &params,
+            &pairs,
+        )
+        .unwrap(),
+    );
+    let secure = contract
+        .split("if(paramSet==SECURE_16384_PARAM_SET){")
+        .nth(1)
+        .unwrap()
+        .split('}')
+        .next()
+        .unwrap();
+    assert!(secure.contains("MINIMUM_COMMITTEE_SIZE"));
+    assert!(secure.contains("SMALL_COMMITTEE_SIZE"));
+    assert!(!secure.contains("MICRO_COMMITTEE_SIZE"));
 }
 
 #[test]
@@ -672,10 +721,13 @@ fn artifact_policy_preserves_lbfv_selection_and_zk_finalizers() {
             .iter()
             .any(|(variant, target, _)| *variant == "recursive" && *target == "noir-recursive"));
     }
-    let mut disabled = request();
-    disabled.preset = PresetSelection::Single(BfvPreset::SecureThreshold16384);
-    disabled.committee = CommitteeSelection::Single(CiphernodesCommitteeSize::Micro);
-    assert!(disabled.selected_pairs(&root).is_err());
+    let mut micro = request();
+    micro.preset = PresetSelection::Single(BfvPreset::SecureThreshold16384);
+    micro.committee = CommitteeSelection::Single(CiphernodesCommitteeSize::Micro);
+    assert_eq!(
+        micro.selected_pairs(&root).unwrap(),
+        vec![["secure-16384".to_string(), "micro".to_string()]]
+    );
     let mut alias = request();
     alias.preset = "insecure-lbfv".parse().unwrap();
     assert_eq!(
@@ -711,6 +763,11 @@ fn shared_operation_material_serves_parity_bounds_and_protocol_renderers() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path();
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    write(
+        root,
+        "scripts/circuits/build-pairs.json",
+        fs::read(repo.join("scripts/circuits/build-pairs.json")).unwrap(),
+    );
     artifacts::copy_tree(
         &repo.join("circuits/lib"),
         &root.join("circuits/lib"),
@@ -741,6 +798,7 @@ fn shared_operation_material_serves_parity_bounds_and_protocol_renderers() {
         BfvPreset::InsecureThreshold,
         CiphernodesCommitteeSize::Minimum,
         &params,
+        &build_pairs(&repo).unwrap(),
     )
     .unwrap();
     assert!(contract.contains(&format!(

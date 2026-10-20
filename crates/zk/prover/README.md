@@ -93,3 +93,31 @@ See [proof statements](../../../docs/architecture/proof-statements.md) and
 acceptance. Witness generation, process success, checksum matching, and verified statements are
 different results. See [AGENTS.md](AGENTS.md) for proof-plan, verification-outcome, and artifact
 change rules.
+
+### Secure l-BFV committee campaigns
+
+The V2 measurement targets accept `INTERFOLD_SECURE_16384_COMMITTEE=minimum|micro|small` (default
+`minimum`) and read that exact pair below `INTERFOLD_SECURE_16384_ARTIFACTS`. Build the complete
+matching pair first; missing artifacts or invalid explicit selections fail rather than substituting
+another committee. Proof caches are namespaced by preset/committee so saved runs for another pair
+are preserved.
+
+```sh
+# Focused row proofs and recursive generation/aggregation folds.
+E3_ZK_PROVER_SKIP_FIXTURE_BUILD=1 \
+INTERFOLD_SECURE_16384_ARTIFACTS="$PWD/dist/circuits" \
+INTERFOLD_SECURE_16384_COMMITTEE=small \
+cargo test --locked -p e3-zk-prover --test v2_generation_fold_measurement -- --nocapture
+
+# Expensive full DKG chain through the EVM-target V2 proof, not a deployed-contract acceptance test.
+E3_ZK_PROVER_SKIP_FIXTURE_BUILD=1 \
+INTERFOLD_SECURE_16384_ARTIFACTS="$PWD/dist/circuits" \
+INTERFOLD_SECURE_16384_COMMITTEE=small INTERFOLD_RUN_V2_FINAL_PROOF=1 \
+cargo test --locked -p e3-zk-prover --test v2_final_proof_measurement -- --nocapture
+```
+
+Run these commands from the repository root. Small's full DKG campaign includes 2,520 C3 proofs
+before recursive folding; it is not routine unit-test preparation. The full target is gated by
+`INTERFOLD_RUN_V2_FINAL_PROOF`; a run without that flag does not execute or qualify the proof chain.
+Neither target alone qualifies the C6/C7 decryption lifecycle, a release archive, or a deployed
+Solidity verifier/router. Keep those acceptance checks separate.

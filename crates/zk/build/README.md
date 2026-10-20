@@ -17,8 +17,13 @@ records the original hash. Release validation remains source-bound.
 
 Artifact labels are `insecure`, `secure-8192`, and `secure-16384`. The degree-128 `insecure`
 archive serves both insecure protocol presets; `--preset insecure-lbfv` aliases that archive.
-Secure-16384 builds the l-BFV path for minimum/small committees, not micro. Its only legacy tree
+Secure-16384 builds the l-BFV path for minimum, micro, and small committees. Its only legacy tree
 anchor is C6; the V2 DKG verifier binds its complete chunk/row VK genealogy separately.
+
+The shared build-pair policy also generates the deployment configuration declarations, testnet
+routes, and Solidity pair admission. Network admission remains separate: mainnet accepts only
+secure-8192. Runtime release requirements live separately in
+`crates/zk/prover/supported-configurations.json`; adding a build pair alone does not ship artifacts.
 
 The unpublished `e3-zk-benchmarks` crate uses this crate through a normal dependency. Normal dependency
 direction stays `build -> witness -> config`; the configuration library does not import build,

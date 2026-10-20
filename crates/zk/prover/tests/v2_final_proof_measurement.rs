@@ -13,7 +13,7 @@ mod node_fold_witness;
 use std::{env, fs, path::PathBuf};
 
 use alloy::primitives::Address;
-use common::find_bb;
+use common::{find_bb, secure_lbfv_cache_dir, secure_lbfv_committee};
 use e3_committee::CiphernodesCommitteeSize;
 use e3_config::BBPath;
 use e3_events::{CircuitName, CircuitVariant, Proof};
@@ -52,7 +52,6 @@ use rand::rng;
 const RUN_ENV: &str = "INTERFOLD_RUN_V2_FINAL_PROOF";
 const ARTIFACT_ROOT_ENV: &str = "INTERFOLD_SECURE_16384_ARTIFACTS";
 const FINAL_CACHE_ENV: &str = "INTERFOLD_V2_FINAL_PROOF_CACHE";
-const ARTIFACTS_DIR: &str = "secure-16384/minimum";
 const LBFV_ROWS: u32 = 5;
 
 struct NodeInputs {
@@ -72,7 +71,7 @@ struct NodeInputs {
 }
 
 fn final_cache_path() -> Option<PathBuf> {
-    env::var_os(FINAL_CACHE_ENV).map(PathBuf::from)
+    secure_lbfv_cache_dir(FINAL_CACHE_ENV)
 }
 
 fn load_final_cache() -> Option<Proof> {
@@ -246,18 +245,17 @@ fn prove_generation_fold(
     artifacts_dir: &str,
     label: &str,
 ) -> Proof {
+    let committee_size = CiphernodesCommitteeSize::from_threshold(committee.threshold, committee.n)
+        .expect("canonical committee");
     let generation_adapter = LbfvPkGenerationAdapter::from_config(
-        &e3_zk_config::threshold::pk_generation::Configs::for_preset(
-            preset,
-            e3_committee::CiphernodesCommitteeSize::Minimum,
-        )
-        .unwrap(),
+        &e3_zk_config::threshold::pk_generation::Configs::for_preset(preset, committee_size)
+            .unwrap(),
     )
     .expect("l-BFV PK adapter");
     let rlk_adapter = RlkGenerationAdapter::from_config(
         &e3_zk_config::threshold::rlk_generation::RlkGenerationConfigs::for_preset(
             preset,
-            e3_committee::CiphernodesCommitteeSize::Minimum,
+            committee_size,
         )
         .unwrap(),
     )
@@ -524,8 +522,12 @@ async fn secure_dkg_aggregator_v2_proves_and_verifies_evm() {
     let Some(bb) = find_bb().await else {
         panic!("bb is required when {RUN_ENV} is set");
     };
+    let preset = BfvPreset::SecureThreshold16384;
+    let committee_size = secure_lbfv_committee();
+    let committee = committee_size.values();
+    let artifacts_dir = preset.artifacts_dir_for_committee(committee_size.as_str());
     let required = artifact_root
-        .join(ARTIFACTS_DIR)
+        .join(&artifacts_dir)
         .join("evm/recursive_aggregation/dkg_aggregator_v2/dkg_aggregator_v2.json");
     assert!(
         required.is_file(),
@@ -536,10 +538,6 @@ async fn secure_dkg_aggregator_v2_proves_and_verifies_evm() {
     let work = tempfile::tempdir().expect("temporary prover work directory");
     let backend = ZkBackend::new(BBPath::Default(bb), artifact_root, work.path().join("work"));
     let prover = ZkProver::new(&backend);
-    let preset = BfvPreset::SecureThreshold16384;
-    let committee = CiphernodesCommitteeSize::Minimum.values();
-    let artifacts_dir =
-        preset.artifacts_dir_for_committee(CiphernodesCommitteeSize::Minimum.as_str());
 
     if let Some(cached) = load_final_cache() {
         print_measurement("dkg_aggregator_v2.cached", &cached);
@@ -549,7 +547,7 @@ async fn secure_dkg_aggregator_v2_proves_and_verifies_evm() {
                 "v2-final-cached",
                 0,
                 CircuitVariant::Evm,
-                ARTIFACTS_DIR
+                &artifacts_dir
             )
             .expect("cached final EVM proof verification"));
         return;
@@ -782,12 +780,10 @@ async fn secure_dkg_aggregator_v2_proves_and_verifies_evm() {
     let aggregation_fold = aggregation_fold.expect("aggregation fold accumulator");
     report_phase("aggregation fold complete");
 
-    let committee_addresses = vec![
-        Address::repeat_byte(0x01),
-        Address::repeat_byte(0x02),
-        Address::repeat_byte(0x03),
-    ];
-    let party_ids = vec![0, 1];
+    let committee_addresses = (1..=committee.n)
+        .map(|slot| Address::repeat_byte(slot as u8))
+        .collect::<Vec<_>>();
+    let party_ids = (0..committee.h as u64).collect::<Vec<_>>();
     let final_proof = prove_dkg_aggregation_v2(
         &prover,
         &nodes_fold_v2,
@@ -796,7 +792,7 @@ async fn secure_dkg_aggregator_v2_proves_and_verifies_evm() {
         &committee_addresses,
         "v2-final-dkg-aggregator",
         preset,
-        CiphernodesCommitteeSize::Minimum,
+        committee_size,
     )
     .expect("DkgAggregatorV2 proof");
     report_phase("DkgAggregatorV2 complete");
@@ -807,7 +803,7 @@ async fn secure_dkg_aggregator_v2_proves_and_verifies_evm() {
             "v2-final-dkg-aggregator-verify",
             0,
             CircuitVariant::Evm,
-            ARTIFACTS_DIR,
+            &artifacts_dir,
         )
         .expect("final EVM proof verification"));
     store_final_cache(&final_proof);

@@ -532,6 +532,7 @@ pub fn protocol_contract(
     preset: BfvPreset,
     committee: CiphernodesCommitteeSize,
     params: &OperationParams,
+    pairs: &[[String; 2]],
 ) -> Result<String> {
     let mut text = include_str!("../templates/active_crypto_config.sol.in")
         .replace(
@@ -571,7 +572,28 @@ pub fn protocol_contract(
             text = text.replace(&format!("@{label}_{suffix}@"), &value.to_string());
         }
     }
-    Ok(text)
+    let mut admission = String::new();
+    for (name, param_sets) in [
+        (
+            "insecure",
+            "paramSet == INSECURE_PARAM_SET || paramSet == INSECURE_LBFV_PARAM_SET",
+        ),
+        ("secure-8192", "paramSet == SECURE_PARAM_SET"),
+        ("secure-16384", "paramSet == SECURE_16384_PARAM_SET"),
+    ] {
+        let committees = pairs
+            .iter()
+            .filter(|pair| pair[0] == name)
+            .map(|pair| format!("committeeSize == {}_COMMITTEE_SIZE", pair[1].to_uppercase()))
+            .collect::<Vec<_>>();
+        if !committees.is_empty() {
+            admission.push_str(&format!(
+                "        if ({param_sets}) {{\n            if (\n                {}\n            ) return;\n        }}\n",
+                committees.join(" ||\n                ")
+            ));
+        }
+    }
+    Ok(text.replace("@PAIR_ADMISSION@", admission.trim_end()))
 }
 
 fn replace_required(text: &str, pattern: &str, replacement: &str) -> Result<String> {
@@ -589,6 +611,7 @@ pub fn protocol_utils(
     preset: BfvPreset,
     committee: CiphernodesCommitteeSize,
     params: &OperationParams,
+    pairs: &[[String; 2]],
 ) -> Result<String> {
     let values = committee.values();
     let size = COMMITTEES
@@ -634,6 +657,61 @@ pub fn protocol_utils(
             )?;
         }
     }
+    // Keep installed-package deployment self-contained: render the shared policy rather than
+    // importing a repository-relative JSON file from the published package.
+    let mut configs = String::from(
+        "// Generated from scripts/circuits/build-pairs.json and canonical committee values.\n",
+    );
+    let mut names = Vec::new();
+    let deployment_pairs = pairs
+        .iter()
+        .filter(|pair| pair[0] == "insecure")
+        .map(|pair| (pair, false))
+        .chain(
+            pairs
+                .iter()
+                .filter(|pair| pair[0] == "insecure")
+                .map(|pair| (pair, true)),
+        )
+        .chain(
+            pairs
+                .iter()
+                .filter(|pair| pair[0] != "insecure")
+                .map(|pair| (pair, false)),
+        );
+    for (pair, lbfv) in deployment_pairs {
+        let prefix = match (pair[0].as_str(), lbfv) {
+            ("insecure", false) => "INSECURE",
+            ("insecure", true) => "INSECURE_LBFV",
+            ("secure-8192", _) => "SECURE",
+            ("secure-16384", _) => "SECURE_16384",
+            _ => bail!("Unsupported deployment preset: {}", pair[0]),
+        };
+        let name = format!("{prefix}_{}_BFV_CONFIG", pair[1].to_uppercase());
+        let values = pair[1].parse::<CiphernodesCommitteeSize>()?.values();
+        let size = COMMITTEES
+            .iter()
+            .position(|name| *name == pair[1])
+            .context("committee index")?;
+        configs.push_str(&format!("export const {name}: ActiveBfvConfig = bfvConfig(\n  \"{}\",\n  \"{}\",\n  {{ committeeSize: {size}, h: {}, t: {}, n: {} }},\n{});\n\n", pair[0], pair[1], values.h, values.threshold, values.n, if lbfv { "  true,\n" } else { "" }));
+        names.push(name);
+    }
+    after = replace_required(
+        &after,
+        r"(?:// Generated from scripts/circuits/build-pairs.json and canonical committee values.\n)?export const INSECURE_MINIMUM_BFV_CONFIG:[\s\S]*?\nexport const PRODUCTION_BFV_CONFIG:",
+        &format!("{configs}export const PRODUCTION_BFV_CONFIG:"),
+    )?;
+    let mut routes =
+        String::from("export const TESTNET_BFV_CONFIGS: readonly ActiveBfvConfig[] = [\n");
+    for name in names {
+        routes.push_str(&format!("  {name},\n"));
+    }
+    routes.push_str("] as const;");
+    after = replace_required(
+        &after,
+        r"export const TESTNET_BFV_CONFIGS:[\s\S]*?\] as const;",
+        &routes,
+    )?;
     let name = committee.to_string();
     let capitalized = format!("{}{}", name[..1].to_uppercase(), &name[1..]);
     let doc = format!("/**\n * <generated-committee-doc>\n * Active {} / {committee} committee layout for BFV aggregator verifiers.\n * Must match `lib::configs::default::{{H, T}}` in compiled circuits.\n * {capitalized} committee: N={}, T={}, H={}.\n * </generated-committee-doc>\n */", preset_name(preset), values.n, values.threshold, values.h);
@@ -663,15 +741,16 @@ fn protocol_updates(
     skip_utils: bool,
     params: &OperationParams,
 ) -> Result<Vec<(PathBuf, String)>> {
+    let pairs = crate::build_pairs(root)?;
     let mut updates = Vec::new();
     let path = root.join("packages/interfold-contracts/scripts/utils.ts");
     if !skip_utils && path.exists() {
         let before = fs::read_to_string(&path)?;
-        let updated = protocol_utils(&before, preset, committee, params)?;
+        let updated = protocol_utils(&before, preset, committee, params, &pairs)?;
         updates.push((path, updated));
     }
     let path = root.join("packages/interfold-contracts/contracts/lib/ActiveCryptoConfig.sol");
-    let contract = protocol_contract(preset, committee, params)?;
+    let contract = protocol_contract(preset, committee, params, &pairs)?;
     updates.push((path, contract));
     Ok(updates)
 }

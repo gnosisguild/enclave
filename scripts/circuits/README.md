@@ -105,8 +105,8 @@ the generator would produce.
 ### Options
 
 - `--preset <name>` - Parameter preset: `insecure` (degree 128, default), `insecure-lbfv` (the same
-  artifact archive), `secure-8192`, `secure-16384`, or `all`. Secure-16384 supports minimum/small
-  only; its build excludes trBFV-only circuits.
+  artifact archive), `secure-8192`, `secure-16384`, or `all`. Secure-16384 supports minimum, micro,
+  and small; its build excludes trBFV-only circuits.
 - `--committee <name>` - Committee size: `minimum` (default), `micro`, `small`
 - `--skip-utils-patch` - Skip rewriting committee values and BFV configuration hashes in
   `packages/interfold-contracts/scripts/utils.ts`
@@ -130,9 +130,10 @@ a failed circuit, removes both anchors from the pair and from `circuits/bin/`. A
 hash a key that no longer matches the compiled circuits. Run a complete build before you deploy the
 BFV verifiers or aggregate proofs.
 
-`sync-config` updates only `scripts/utils.ts` and `ActiveCryptoConfig.sol`. Use it when BFV
-parameter constants change and the prebuilt circuit artifacts already exist. It does not compile
-Noir circuits or regenerate verification keys.
+`sync-config` updates only `scripts/utils.ts` and `ActiveCryptoConfig.sol`, including deployment
+routes and pair admission generated from `build-pairs.json`. Use it when BFV parameter constants
+change and the prebuilt circuit artifacts already exist. It does not compile Noir circuits or
+regenerate verification keys.
 
 ### Prerequisites
 
@@ -157,6 +158,9 @@ pnpm build:circuits --preset insecure --committee small
 pnpm build:circuits --preset secure-8192 --committee minimum
 pnpm build:circuits --preset secure-8192 --committee micro
 pnpm build:circuits --preset secure-8192 --committee small
+pnpm build:circuits --preset secure-16384 --committee minimum
+pnpm build:circuits --preset secure-16384 --committee micro
+pnpm build:circuits --preset secure-16384 --committee small
 pnpm store:circuits push
 
 # Pull circuits from git branch (used by releases)
@@ -221,7 +225,7 @@ The release archive must include:
 
 - `insecure/{minimum,micro,small}` for Sepolia and local rehearsals
 - `secure-8192/{minimum,micro,small}` for Sepolia secure-parameter tests and mainnet committees
-- `secure-16384/{minimum,small}` for the l-BFV V2 verifier routes
+- `secure-16384/{minimum,micro,small}` for the l-BFV V2 configurations
 
 Nodes download one archive and select the artifact directory from the E3's on-chain BFV parameter
 set and committee size.
