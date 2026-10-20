@@ -67,6 +67,9 @@ log "Checking network configuration and RPC access..."
 # DAppNode clients use separate HTTP and WebSocket ports. The upstream signer keeps the WS port.
 if [[ "${RPC_URL:-}" =~ ^ws://(execution\.(mainnet|sepolia)\.dncore\.dappnode):8546/?$ ]]; then
     export RPC_UPSTREAM_HOST="${BASH_REMATCH[1]}"
+    # nginx resolves the client per request, so check the selected client once here.
+    getent ahostsv4 "$RPC_UPSTREAM_HOST" >/dev/null \
+        || fail "the DAppNode execution client does not resolve; check the selected client in Stakers"
     envsubst '$RPC_UPSTREAM_HOST' < /opt/rpc-proxy.conf.template > /tmp/interfold-rpc-proxy.conf
     nginx -c /tmp/interfold-rpc-proxy.conf \
         || fail "execution RPC proxy failed to start; check the selected DAppNode execution client"
