@@ -887,7 +887,7 @@ export function ManagePosition({
           onChange={setUnbondInput}
           placeholder='0.0'
           invalid={unbondInput.trim() !== '' && !unbondValid}
-          hint={`${bond(status.ciphernodeBond)} bonded. A bond below the requirement makes the node inactive.`}
+          hint={`${bond(status.ciphernodeBond)} bonded. A bond below the active-maintenance threshold makes the node inactive.`}
         />
         <button
           className='btn btn--ghost'
@@ -922,12 +922,16 @@ export function ManagePosition({
           <dd className='mono'>
             {tickets(status.pendingTicketExit)} · {bond(status.pendingBondExit)}
           </dd>
-          <dt>Claimable now</dt>
+          <dt>Exit delay ended</dt>
           <dd className='mono'>
             {tickets(status.claimableTicket)} · {bond(status.claimableBond)}
           </dd>
         </dl>
         {status.exitInProgress && <Note>The exit delay of the deregistration has not ended.</Note>}
+        <p className='opmanage__text'>
+          An open slash proposal, or a committee of the operator that is not released yet, still holds a claim. The check before the wallet
+          prompt shows it.
+        </p>
         <div className='opactions'>
           <button
             className='btn btn--primary'
