@@ -2,6 +2,57 @@
   "group": "foundations",
   "units": [
     {
+      "id": "e3-task-pool",
+      "documentation": [{ "title": "Compute admission and cancellation", "path": "docs/architecture/persistence-and-replay.md" }],
+      "kind": "crate",
+      "path": "crates/task-pool",
+      "one_line": "Protocol-independent bounded Rayon execution with shared admission and caller-scoped cancellation groups.",
+      "actors": [],
+      "consumes": [],
+      "emits": [],
+      "state": [
+        {
+          "name": "Shared semaphore, Rayon pool and cancellation groups",
+          "where": "memory",
+          "ref": "crates/task-pool/src/lib.rs@26@pub struct TaskPool {"
+        }
+      ],
+      "key_types": [
+        {
+          "name": "TaskPool",
+          "what": "Cloneable shared CPU admission budget",
+          "ref": "crates/task-pool/src/lib.rs@26@pub struct TaskPool {"
+        },
+        {
+          "name": "TaskPoolError",
+          "what": "Admission, channel, cancellation and panic outcomes",
+          "ref": "crates/task-pool/src/lib.rs@33@pub enum TaskPoolError {"
+        }
+      ],
+      "read_first": [
+        { "why": "Pool state shared by its clones", "ref": "crates/task-pool/src/lib.rs@26@pub struct TaskPool {" },
+        {
+          "why": "Admission, queued cancellation and worker execution",
+          "ref": "crates/task-pool/src/lib.rs@128@async fn spawn_inner<OP, T: Debug + Send + 'static>("
+        }
+      ],
+      "rust_patterns": [
+        {
+          "pattern": "arc-shared",
+          "note": "Clones retain the same cancellation map",
+          "ref": "crates/task-pool/src/lib.rs@29@task_groups: Arc<Mutex<HashMap<String, watch::Sender<bool>>>>,"
+        },
+        {
+          "pattern": "tokio-select",
+          "note": "Admission waits for a permit or cancellation",
+          "ref": "crates/task-pool/src/lib.rs@150@tokio::select! {"
+        }
+      ],
+      "depends_on": [],
+      "tests": "cargo test --locked -p e3-task-pool: cancellation before admission and inside Rayon, retry cancellation and panic classification.",
+      "unverified": ["Already-running closures are not preempted; pool tests do not establish production memory use or proof validity."]
+    },
+    {
       "id": "e3-fhe-params",
       "documentation": [{ "title": "Preset and artifact identity", "path": "docs/architecture/circuit-artifacts.md" }],
       "kind": "crate",

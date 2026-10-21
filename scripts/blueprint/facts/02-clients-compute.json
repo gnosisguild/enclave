@@ -831,7 +831,7 @@
         {
           "name": "task pool: Tokio semaphore, Rayon pool, and a cancellation sender per task group",
           "where": "memory",
-          "ref": "crates/multithread/src/pool.rs@24@task_groups: Arc<Mutex<HashMap<String, watch::Sender<bool>>>>,"
+          "ref": "crates/task-pool/src/lib.rs@29@task_groups: Arc<Mutex<HashMap<String, watch::Sender<bool>>>>,"
         },
         {
           "name": "requests the worker is running, counted per correlation ID",
@@ -848,12 +848,12 @@
         {
           "name": "TaskPool",
           "what": "bounded executor: spawn() takes a Tokio permit, runs the closure on Rayon, and returns its result or a TaskPoolError",
-          "ref": "crates/multithread/src/pool.rs@21@pub struct TaskPool {"
+          "ref": "crates/task-pool/src/lib.rs@26@pub struct TaskPool {"
         },
         {
           "name": "TaskPoolError",
           "what": "pool failures: semaphore, receive, a panic in the closure, or a cancelled group",
-          "ref": "crates/multithread/src/pool.rs@28@pub enum TaskPoolError {"
+          "ref": "crates/task-pool/src/lib.rs@33@pub enum TaskPoolError {"
         },
         {
           "name": "ComputeCapacity",
@@ -881,7 +881,7 @@
         },
         {
           "why": "the pool: semaphore wait, Rayon spawn, and the oneshot result",
-          "ref": "crates/multithread/src/pool.rs@122@async fn spawn_inner<OP, T: Debug + Send + 'static>("
+          "ref": "crates/task-pool/src/lib.rs@128@async fn spawn_inner<OP, T: Debug + Send + 'static>("
         },
         {
           "why": "the worker function that dispatches TrBFV and ZK requests",
@@ -907,17 +907,17 @@
         {
           "pattern": "channel",
           "note": "a oneshot channel carries each Rayon result back to the async caller",
-          "ref": "crates/multithread/src/pool.rs@207@let (tx, rx) = tokio::sync::oneshot::channel();"
+          "ref": "crates/task-pool/src/lib.rs@213@let (tx, rx) = tokio::sync::oneshot::channel();"
         },
         {
           "pattern": "tokio-select",
           "note": "the pool waits for either a group cancellation or a free semaphore permit",
-          "ref": "crates/multithread/src/pool.rs@144@tokio::select! {"
+          "ref": "crates/task-pool/src/lib.rs@150@tokio::select! {"
         },
         {
           "pattern": "tokio-spawn",
           "note": "a warning task logs long jobs and is aborted when the result arrives",
-          "ref": "crates/multithread/src/pool.rs@172@let warning_handle = tokio::spawn(async move {"
+          "ref": "crates/task-pool/src/lib.rs@178@let warning_handle = tokio::spawn(async move {"
         }
       ],
       "depends_on": [
@@ -934,10 +934,11 @@
         "e3-polynomial-fhe",
         "e3-zk-config",
         "e3-zk-witness",
+        "e3-task-pool",
         "e3-utils",
         "e3-zk-prover"
       ],
-      "tests": "cargo test -p e3-multithread. Tests: pool.rs (cfg(test) at line 290: group cancellation, Rayon panics), multithread.rs (from line 273: task-group cancellation, request lifetime, retry delays and warning limits), effect_gate.rs (line 520: replay, dedupe and redrive cases) and memory.rs (line 134: admission arithmetic).",
+      "tests": "cargo test -p e3-multithread covers dispatch, task-group lifetime, retries, replay/redrive and memory admission. Pool cancellation and panic cases live in e3-task-pool and run with cargo test -p e3-task-pool.",
       "unverified": [
         "The ZK prover (ZkProver) lives in crates/zk/prover and was not read; the proof side is described only from the dispatch in multithread.rs.",
         "The memory constants (memory.rs:19 and memory.rs:22) are values in code; their effect on a real host was not measured.",

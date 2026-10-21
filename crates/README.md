@@ -32,6 +32,10 @@ pinned tools. [e3-program-runner](program-runner/README.md) supplies shared deve
 modes. Each generated project's separate `runner/` binary links its own program and calls that
 library; the CLI owns compile/start orchestration.
 
+CPU admission/cancellation primitives live in [e3-task-pool](task-pool/README.md). The ciphernode
+[compute dispatcher](multithread/README.md) owns replay/retry policy and prover-memory sizing rather
+than making those policies part of the executor.
+
 ## Find a component
 
 | Capability                      | Entry points                                                                                                                                                                                                                                                                                                                                               |

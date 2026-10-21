@@ -15,6 +15,7 @@ use e3_events::{
     EncryptionKeyReceived, EventStoreQueryBy, SeqAgg, TypedEvent,
 };
 use e3_request::E3Meta;
+use e3_task_pool::TaskPool;
 use std::collections::{HashMap, HashSet};
 
 use crate::actors::node_proof_aggregator::recovery::NodeProofRecovery;
@@ -121,6 +122,9 @@ impl ZkActorRecovery {
 /// Requires a `ZkBackend` for proof generation/verification and a `PrivateKeySigner` for signing
 /// proofs. `dkg_fold_attestation_contexts_by_chain` is a fallback for synthetic runs that have no
 /// on-chain context event. Live and replayed context events carry each E3's registry and verifier.
+/// `task_pool` and `task_scope` must be shared with the node's compute dispatcher so C0 verification
+/// uses the same admission budget and node-scoped cancellation groups.
+#[allow(clippy::too_many_arguments)]
 pub fn setup_zk_actors(
     bus: &BusHandle,
     backend: &ZkBackend,
@@ -129,8 +133,10 @@ pub fn setup_zk_actors(
     mut recovery: ZkActorRecovery,
     proof_aggregation_enabled: bool,
     repositories: Repositories,
+    task_pool: TaskPool,
+    task_scope: String,
 ) -> ZkActors {
-    let zk_actor = ZkActor::new(backend).start();
+    let zk_actor = ZkActor::new(backend, task_pool, task_scope).start();
     let proof_verification = recovery.setup_proof_verification(bus, zk_actor.clone().recipient());
     let ZkActorRecovery {
         finalized_committees,

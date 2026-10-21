@@ -3641,6 +3641,7 @@ dependencies = [
  "e3-slashing",
  "e3-sortition",
  "e3-sync",
+ "e3-task-pool",
  "e3-test-helpers",
  "e3-utils",
  "e3-zk-prover",
@@ -4216,6 +4217,7 @@ dependencies = [
  "e3-polynomial",
  "e3-polynomial-fhe",
  "e3-request",
+ "e3-task-pool",
  "e3-trbfv",
  "e3-utils",
  "e3-zk-config",
@@ -4228,8 +4230,6 @@ dependencies = [
  "num-bigint 0.5.1",
  "rand 0.9.5",
  "rand_chacha 0.9.0",
- "rayon",
- "thiserror 1.0.69",
  "tokio",
  "tracing",
  "zeroize",
@@ -4465,6 +4465,16 @@ dependencies = [
  "e3-utils",
  "serde",
  "tempfile",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "e3-task-pool"
+version = "0.20.0-dev.2"
+dependencies = [
+ "rayon",
+ "thiserror 1.0.69",
  "tokio",
  "tracing",
 ]
@@ -4737,6 +4747,7 @@ dependencies = [
  "e3-slashing",
  "e3-sortition",
  "e3-sync",
+ "e3-task-pool",
  "e3-test-helpers",
  "e3-trbfv",
  "e3-utils",
