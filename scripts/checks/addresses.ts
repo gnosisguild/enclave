@@ -84,7 +84,9 @@ const ALLOWED: Record<string, string> = {
   // An E3 program belongs to its application, not to the protocol. See the
   // comment on `CONTRACT_KEYS` in packages/interfold-contracts/scripts/genManifest.ts.
   '0xa9894a39061ec33f8550a2b63a66be59fb9fa443': 'CRISPProgram, sepolia',
-  '0x53fcdb21e73a461cfe6c64b19855204384b91ba3': 'CRISPProgram, mainnet',
+  '0x1ea4dbdec0f2f1e9235915847fc59ef4045eee28': 'CRISPProgram, mainnet',
+  // The dashboard still lists the E3s of this earlier mainnet CRISP program.
+  '0x53fcdb21e73a461cfe6c64b19855204384b91ba3': 'CRISPProgram, mainnet, previous deployment',
 
   // Sepolia contracts that the docs list but the manifest does not publish (it publishes only
   // the CONTRACT_KEYS set). Source: packages/interfold-contracts/deploy/protocol/sepolia-protocol.deployment.json
