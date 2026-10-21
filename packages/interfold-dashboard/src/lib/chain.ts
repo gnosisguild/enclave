@@ -94,6 +94,10 @@ export const CONTRACTS = {
   Faucet: faucetAddress() as Address,
 }
 
+// Every CRISP program on the network: the current one, then the earlier deployments. An E3 of any of
+// them is a CRISP poll.
+export const CRISP_PROGRAMS: readonly Address[] = [CONTRACTS.CRISPProgram, ...(NET.previousCrispPrograms as readonly Address[])]
+
 // The chain the dashboard writes to. Reads use `publicClient`; the operator guide
 // refuses to send a transaction unless the wallet is on this chain.
 export const CHAIN = NET.chain

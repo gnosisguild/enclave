@@ -8,9 +8,9 @@
 import { formatUnits, keccak256, numberToHex, toHex } from 'viem'
 import type { HistoryEntry, Poll } from '../data'
 import type { E3FullDetails, E3Summary } from './e3'
-import { failureReasonLabel, failureReasonToUiIdx, isE3Active } from './e3'
+import { failureReasonLabel, failureReasonToUiIdx, isCrispE3, isE3Active } from './e3'
 import { E3Stage, FEE_TOKEN, NETWORK_NAME } from './chain'
-import { compactE3Id, formatE3Id, isCrispProgram, pollMetaFor, programName, shortHash } from './pollMeta'
+import { compactE3Id, formatE3Id, pollMetaFor, programName, shortHash } from './pollMeta'
 
 // Fee token symbol/decimals come from the selected network's deployment profile.
 function fmtFee(v: bigint | undefined): string {
@@ -78,7 +78,7 @@ export function adaptInspectorE3List(list: E3Summary[]) {
   return list.map((s) => ({
     id: formatE3Id(s.id),
     displayId: compactE3Id(s.id),
-    label: isCrispProgram(s.e3Program) ? pollMetaFor(s.id).question.slice(0, 64) : programName(s.e3Program),
+    label: isCrispE3(s.e3Program) ? pollMetaFor(s.id).question.slice(0, 64) : programName(s.e3Program),
   }))
 }
 
@@ -158,7 +158,7 @@ function schemeName(id: string): string {
 
 export function adaptInspectorDetail(detail: E3FullDetails | null): InspectorDetail | null {
   if (!detail) return null
-  const isCrisp = isCrispProgram(detail.e3Program)
+  const isCrisp = isCrispE3(detail.e3Program)
   const meta = pollMetaFor(detail.id)
   const inputsReceived = detail.inputsTracked ? detail.ballotCount.toLocaleString() : '—'
   const rosterThreshold = detail.committeeThreshold[0] || 0

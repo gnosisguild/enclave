@@ -41,7 +41,10 @@ them against `deployments/manifest.json` for the target network.
 - `CRISPProgram` — emits `InputPublished` for every ballot. (Interfold's own `InputPublished` is
   declared but never emitted; inputs live on the program.) A re-vote reuses its Merkle-leaf `index`,
   so the true ballot count is the number of **distinct** indexes. Inputs are only observable for
-  CRISP; other programs report `inputsTracked: false`.
+  CRISP; other programs report `inputsTracked: false`. The CRISP tab lists the E3s of the current
+  CRISP program (`CRISP_PROGRAM_ADDRESS`) and of the earlier deployments in the profile's
+  `previousCrispPrograms`. The dashboard reads the inputs and the tally of each E3 from its own
+  program.
 
 ### Operator guide (write path)
 

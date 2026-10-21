@@ -8,7 +8,7 @@
 // encrypted votes. This map gives each E3 a friendly question/options/context.
 // For unknown E3s we synthesize a generic record from the id.
 
-import { CONTRACTS } from './chain'
+import { isCrispE3 } from './e3'
 
 export type PollMeta = {
   question: string
@@ -68,16 +68,8 @@ export function shortHash(hex: string): string {
   return `${hex.slice(0, 10)}…${hex.slice(-6)}`
 }
 
-// Friendly name for an E3 program contract. Known programs get a label;
-// everything else falls back to a shortened address.
-const KNOWN_PROGRAMS: Record<string, string> = {
-  [CONTRACTS.CRISPProgram.toLowerCase()]: 'CRISP',
-}
-
+// Friendly name for an E3 program contract. A CRISP program gets a label;
+// every other program falls back to a shortened address.
 export function programName(addr: string): string {
-  return KNOWN_PROGRAMS[addr?.toLowerCase()] ?? shortAddr(addr)
-}
-
-export function isCrispProgram(addr: string): boolean {
-  return addr?.toLowerCase() === CONTRACTS.CRISPProgram.toLowerCase()
+  return isCrispE3(addr) ? 'CRISP' : shortAddr(addr)
 }
