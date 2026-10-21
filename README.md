@@ -220,17 +220,17 @@ pnpm test:integration --no-prebuild
 		</tr>
 		<tr>
 			<td align="center">
-				<a href="https://github.com/0xkeygen">
-					<img src="https://avatars.githubusercontent.com/u/211014662?v=4" width="100;" alt="0xkeygen"/>
-					<br />
-					<sub><b>Bryant</b></sub>
-				</a>
-			</td>
-			<td align="center">
 				<a href="https://github.com/zahrajavar">
 					<img src="https://avatars.githubusercontent.com/u/81833289?v=4" width="100;" alt="zahrajavar"/>
 					<br />
 					<sub><b>Zara</b></sub>
+				</a>
+			</td>
+			<td align="center">
+				<a href="https://github.com/0xkeygen">
+					<img src="https://avatars.githubusercontent.com/u/211014662?v=4" width="100;" alt="0xkeygen"/>
+					<br />
+					<sub><b>Bryant</b></sub>
 				</a>
 			</td>
 			<td align="center">
