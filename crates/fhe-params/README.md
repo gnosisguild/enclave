@@ -109,11 +109,11 @@ The search validates four key security equations:
 - **Equation 2**: `2*d*n*B ≤ B_Enc * 2^{-λ}` (encryption noise bound)
 - **Equation 3**: `B_sm = 2^{λ+1} * d * B_C` (smudging noise bound, the same bound that fhe.rs and
   the C1 circuit config use)
-- **Equation 4**: `log2(q) ≤ max_log2_q(d)` (RLWE security). For B = 20 and B_χ = 1,
-  `search::security` holds the largest log2(q) with at least 128 bits of security at each
-  d = 4096 ... 32768. The values come from the lattice-estimator. For other B, B_χ or d, the search
-  uses `d ≥ 37.5*log2(q/B) + 75` and the CLI prints a warning. That formula allows 5 to 9 more bits
-  of q than the estimator. The table assumes that an attacker sees m = 2d LWE samples. With
+- **Equation 4**: `log2(q) ≤ max_log2_q(d)` (RLWE security). For B = 20 and B*χ = 1,
+  `search::security` holds the largest log2(q) with at least 128 bits of security at each d = 4096
+  ... 32768. The values come from the lattice-estimator. For other B, B*χ or d, the search uses
+  `d ≥ 37.5*log2(q/B) + 75` and the CLI prints a warning. That formula allows 5 to 9 more bits of q
+  than the estimator. The table assumes that an attacker sees m = 2d LWE samples. With
   `mult_depth > 0`, the relinearization keys give more samples under the same secret, so estimate
   such a set for its real key exposure before you use it.
 
@@ -130,24 +130,24 @@ The `BfvSearchConfig` struct defines the search constraints:
 - **`min_margin`**: Minimum correctness margin in bits, `log2(Δ) - log2(LHS)`
 - **`d`**: Ring dimension. `None` searches d = 8192, 16384 and 32768
 - **`insecure`**: Skip the security limit (Eq4). Only for insecure test presets
-- **`min_prime_bits`**: Smallest prime bit-length for both parameter sets (10 to 60). For
-  d ≥ 8192 the prime table starts at 50 bits, so a value below 50 has no effect there
+- **`min_prime_bits`**: Smallest prime bit-length for both parameter sets (10 to 60). For d ≥ 8192
+  the prime table starts at 50 bits, so a value below 50 has no effect there
 - **`mult_depth`**: Levels of multiplication and relinearization after the `z` additions. `0` is
   summation only
 - **`verbose`**: Enable detailed search process output
 
 Without `d`, the search tries d = 8192, 16384 and 32768 in that order. For d ≥ 8192 it uses the
-prime table (primes ≡ 1 mod 16384, filtered to ≡ 1 mod 2d). For a smaller d it generates the
-largest NTT-friendly primes of each bit-length with fhe-math.
+prime table (primes ≡ 1 mod 16384, filtered to ≡ 1 mod 2d). For a smaller d it generates the largest
+NTT-friendly primes of each bit-length with fhe-math.
 
 #### Multiplication
 
 The circuit is `z` fresh ciphertexts added together, then `mult_depth` levels of multiplication and
 relinearization. Each level applies the Prop. 20 recursion
-`B_C(i+1) = 2·k·d²·‖sk‖·B_C(i) + B_relin`, with `‖sk‖ = n·B_χ`. The relinearization noise is
-Eq. 30, `d·l·‖sk‖·B_g·B_agg + 2·d²·l²·‖sk‖²·B_g·B_agg`, where `l` is the number of moduli,
-`B_g` is the largest modulus (RNS gadget base), and `B_agg = n·B` because the n ciphernodes make
-the relinearization key together. Additions after a multiplication are not in this model.
+`B_C(i+1) = 2·k·d²·‖sk‖·B_C(i) + B_relin`, with `‖sk‖ = n·B_χ`. The relinearization noise is Eq. 30,
+`d·l·‖sk‖·B_g·B_agg + 2·d²·l²·‖sk‖²·B_g·B_agg`, where `l` is the number of moduli, `B_g` is the
+largest modulus (RNS gadget base), and `B_agg = n·B` because the n ciphernodes make the
+relinearization key together. Additions after a multiplication are not in this model.
 
 ```bash
 # 3 additions, then depth 3: 5 × 59-bit primes at d = 16384
@@ -287,16 +287,16 @@ cargo run --bin search_params --package e3-fhe-params -- \
 The defaults are the search inputs of `SecureThreshold8192` (`constants::search_defaults`).
 
 - `--n <N>`: Number of parties (ciphernodes). Default: `20`
-- `--z <Z>`: Number of fresh ciphertext additions (number of votes). The search uses
-  `max(k, z)` as the plaintext modulus. Default: `100000`
+- `--z <Z>`: Number of fresh ciphertext additions (number of votes). The search uses `max(k, z)` as
+  the plaintext modulus. Default: `100000`
 - `--k <K>`: Plaintext modulus (plaintext space). Default: `17000000`
 - `--lambda <LAMBDA>`: Statistical security parameter λ (negl(λ) = 2^{-λ}). Default: `45`
 - `--b <B>`: Bound on error distribution ψ (e.g., 20 for CBD with σ≈3.2). Default: `20`
 - `--b-chi <B_CHI>`: Bound on distribution χ for secret key generation. Default: `1`
 - `--min-margin <BITS>`: Minimum correctness margin in bits. Default: `2`
 - `--d <D>`: Ring dimension (power of two). Default: try 8192, 16384 and 32768
-- `--insecure <true|false>`: Skip the security limit. Use only for insecure test presets.
-  Default: `false`
+- `--insecure <true|false>`: Skip the security limit. Use only for insecure test presets. Default:
+  `false`
 - `--min-prime-bits <BITS>`: Smallest prime bit-length for both parameter sets. Default: `50`
 - `--mult-depth <D>`: Levels of multiplication after the `z` additions. Default: `0`
 - `--verbose`: Enable verbose output showing detailed search process
@@ -317,8 +317,8 @@ cargo run --bin search_params --package e3-fhe-params
 - Second set: 2 NTT-friendly 62-bit primes, plaintext modulus = largest first-set prime
 - All noise budgets and validation metrics
 
-The insecure presets `InsecureThreshold64` and `InsecureDkg64` come from the insecure search
-inputs (`constants::insecure_search_defaults`, λ = 2) at d = 64:
+The insecure presets `InsecureThreshold64` and `InsecureDkg64` come from the insecure search inputs
+(`constants::insecure_search_defaults`, λ = 2) at d = 64:
 
 ```bash
 cargo run --bin search_params --package e3-fhe-params -- \
