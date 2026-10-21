@@ -253,8 +253,18 @@ price, the minimum ticket count, and the exit delay from `BondingRegistry`. It h
 4. **Register the ciphernode.** The bond owner sends `registerOperatorFor`.
 5. **Buy tickets.** The bond owner approves the ticket collateral and sends `addTicketBalanceFor`.
 
+After setup, **Manage the position** sends the other transactions of the `interfold ciphernode`
+commands: `refreshOperatorStatus` (refresh the status), `removeTicketBalanceFor` (burn tickets),
+`unbondCiphernodeFor` (unbond FOLD), `deregisterOperatorFor` (leave the network), `claimExitsFor`
+(claim exits), `proposeBondOwner`, and `acceptBondOwner`. It shows the collateral in the exit queue
+and the part whose exit delay has ended. An open slash proposal, or a committee of the operator that
+is not released yet, can still hold a claim. The bond owner sends each of them, except that the
+operator key can also deregister, any wallet can refresh the status and claim tickets, and the
+proposed owner accepts a transfer. A node that runs without the CLI, for example a DAppNode package,
+uses these actions.
+
 The guide simulates each transaction before the wallet prompt, so a contract error, for example
-`NotBondOwner`, shows before you sign. The guide sets up the on-chain position only. The ciphernode
+`NotBondOwner`, shows before you sign. The guide manages the on-chain position only. The ciphernode
 must run with the same operator key. See [Registration](/operate/registration) for the CLI
 procedure.
 

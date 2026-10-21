@@ -18,10 +18,10 @@ __pycache__/
 
 # circuit benchmarks
 circuits/benchmarks/results_*/raw/
+circuits/benchmarks/runs/
 
 # Local dependency checkouts are not part of the program source.
 templates/default/lib/
-examples/CRISP/packages/crisp-contracts/lib/
 .vercel
 .vercel-env-backups/
 

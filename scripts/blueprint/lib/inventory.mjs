@@ -41,9 +41,9 @@ function walk(dir, ext, out = []) {
 const rel = (p) => relative(ROOT, p)
 const lines = (p) => readFileSync(p, 'utf8').split('\n')
 
-// The layer of each workspace crate, from agent/CRATES_ARCHITECTURE.md "Dependency layers".
+// Hand-maintained primary responsibilities for the blueprint, not the full Cargo dependency graph.
 export const LAYERS = {
-  entry: ['cli', 'entrypoint', 'ciphernode-builder', 'dashboard', 'daemon-server', 'console', 'init', 'fs', 'interfoldup', 'zk/cli'],
+  entry: ['cli', 'entrypoint', 'ciphernode-builder', 'dashboard', 'daemon-server', 'console', 'init', 'fs', 'zk/build', 'zk/benchmarks'],
   clients: [
     'program-server',
     'program-runner',
@@ -56,11 +56,11 @@ export const LAYERS = {
     'openvm-types',
     'openvm-prover',
   ],
-  workflows: ['request', 'sortition', 'keyshare', 'aggregator', 'slashing', 'zk-prover', 'fhe', 'multithread', 'trbfv', 'bfv-client'],
-  adapters: ['evm', 'net', 'sync', 'data', 'data-availability', 'logger'],
-  vocabulary: ['events', 'config', 'fhe-params', 'zk-helpers', 'committee', 'committee-hash'],
+  workflows: ['request', 'sortition', 'keyshare', 'aggregator', 'slashing', 'zk/prover', 'fhe', 'multithread', 'trbfv', 'bfv-client'],
+  adapters: ['evm', 'net', 'sync', 'event-system', 'data', 'data-availability', 'logger'],
+  vocabulary: ['events', 'config', 'fhe-params', 'zk/config', 'zk/witness', 'committee', 'committee-hash'],
   foundations: ['crypto', 'polynomial', 'polynomial/fhe-adapter', 'parity-matrix', 'safe', 'hamt', 'utils', 'utils-derive'],
-  validation: ['test-helpers', 'tests', 'layout-lock'],
+  validation: ['test-helpers', 'tests', 'layout-lock', 'zk/samples'],
 }
 
 function cargoName(dir) {
@@ -297,14 +297,7 @@ export function apps() {
     const loc = files.reduce((n, f) => n + lines(f).length, 0)
     return { id, kind, path, loc, files: files.length }
   }
-  return [
-    unit('@interfold/sdk', 'package', 'packages/interfold-sdk/src', ['.ts']),
-    unit('CRISP program', 'package', 'examples/CRISP/program', ['.rs']),
-    unit('CRISPProgram contract', 'contract', 'examples/CRISP/packages/crisp-contracts/contracts', ['.sol']),
-    unit('CRISP circuits', 'circuit', 'examples/CRISP/circuits', ['.nr']),
-    unit('CRISP server', 'package', 'examples/CRISP/server', ['.rs']),
-    unit('CRISP crates', 'crate', 'examples/CRISP/crates', ['.rs']),
-  ].filter(Boolean)
+  return [unit('@interfold/sdk', 'package', 'packages/interfold-sdk/src', ['.ts'])].filter(Boolean)
 }
 
 export function inventory({ unmapped = false } = {}) {

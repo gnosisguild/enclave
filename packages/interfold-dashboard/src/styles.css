@@ -2078,6 +2078,30 @@ button {
   margin-top: 18px;
 }
 
+/* Position actions after setup */
+.opmanage__group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rule);
+}
+.opmanage__title {
+  font-size: 14.5px;
+  font-weight: 560;
+  color: var(--ink);
+  margin: 0;
+}
+.opmanage__text {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ink-3);
+  max-width: 700px;
+  margin: 0;
+}
+
 /* Step list */
 .opsteps {
   display: flex;

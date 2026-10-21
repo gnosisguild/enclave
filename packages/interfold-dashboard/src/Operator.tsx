@@ -644,6 +644,18 @@ export default function Operator() {
             </StepCard>
           </div>
 
+          {operator && status && (
+            <ManagePosition
+              config={config}
+              status={status}
+              operator={operator}
+              wallet={connected ? wallet.address : null}
+              busy={busy}
+              send={(key, call) => void run(key, () => write(call))}
+              errFor={errFor}
+            />
+          )}
+
           {lastTx && (
             <div className='optx'>
               Last transaction:{' '}
@@ -673,8 +685,9 @@ export default function Operator() {
               </a>
             </div>
             <p className='opnext__body opnext__body--muted'>
-              Winding down reverses these steps: <code className='mono'>deregisterOperatorFor</code> queues the collateral, and after the{' '}
-              {formatDuration(config.exitDelay)} exit delay <code className='mono'>claimExitsFor</code> returns it to the bond owner.
+              Winding down reverses these steps in <strong>Manage the position</strong>: <code className='mono'>deregisterOperatorFor</code>{' '}
+              queues the collateral, and after the {formatDuration(config.exitDelay)} exit delay <code className='mono'>claimExitsFor</code>{' '}
+              returns it to the bond owner.
             </p>
           </section>
         </>
@@ -740,6 +753,234 @@ function PositionPanel({ config, status, operator }: { config: BondingConfig; st
       {status.active && status.eligible === false && (
         <Note>Active, but not eligible for new committees yet. The admission cooldown or admission policy still applies.</Note>
       )}
+    </section>
+  )
+}
+
+type ContractCall = { address: Address; abi: readonly unknown[]; functionName: string; args: readonly unknown[] }
+
+const MAX_UINT256 = (1n << 256n) - 1n
+
+/** The position transactions that the connected wallet can send. The registry checks the same roles. */
+export function positionActions(status: OperatorStatus, operator: Address, wallet: Address | null) {
+  const isBondOwner = sameAddress(wallet, status.bondOwner)
+  const open = !status.exitInProgress
+  return {
+    refresh: Boolean(wallet) && status.registered,
+    burn: isBondOwner && open && status.registered && status.ticketBalance > 0n,
+    unbond: isBondOwner && open && status.ciphernodeBond > 0n,
+    deregister: (isBondOwner || sameAddress(wallet, operator)) && open && status.registered,
+    // Anyone can claim tickets; only the bond owner can also claim the bond.
+    claimAll: isBondOwner && (status.claimableTicket > 0n || status.claimableBond > 0n),
+    claimTickets: Boolean(wallet) && !isBondOwner && status.claimableTicket > 0n,
+    proposeOwner: isBondOwner,
+    acceptOwner: sameAddress(wallet, status.pendingBondOwner),
+  }
+}
+
+/** Ticket-token amount to burn for a whole number of tickets, or null when the balance does not cover it. */
+export function ticketBurnAmount(input: string, ticketPrice: bigint, ticketBalance: bigint): bigint | null {
+  const trimmed = input.trim()
+  if (!/^\d+$/.test(trimmed)) return null
+  const amount = BigInt(trimmed) * ticketPrice
+  return amount > 0n && amount <= ticketBalance ? amount : null
+}
+
+/**
+ * The CLI's position commands after setup: refresh the status, burn tickets, unbond, deregister,
+ * claim exits, and transfer the bond owner. A node that runs without the CLI, such as a DAppNode
+ * package, has no other way to send them.
+ */
+export function ManagePosition({
+  config,
+  status,
+  operator,
+  wallet,
+  busy,
+  send,
+  errFor,
+}: {
+  config: BondingConfig
+  status: OperatorStatus
+  operator: Address
+  wallet: Address | null
+  busy: string | null
+  send: (key: string, call: ContractCall) => void
+  errFor: (key: string) => ReactNode
+}) {
+  const [ticketsInput, setTicketsInput] = useState('')
+  const [unbondInput, setUnbondInput] = useState('')
+  const [ownerInput, setOwnerInput] = useState('')
+
+  const pending = status.pendingTicketExit > 0n || status.pendingBondExit > 0n
+  if (!status.bondOwner && !status.registered && !pending) return null
+
+  const can = positionActions(status, operator, wallet)
+  const burnAmount = ticketBurnAmount(ticketsInput, config.ticketPrice, status.ticketBalance)
+  const unbondAmount = parseAmount(unbondInput, config.ciphernodeBondDecimals)
+  const unbondValid = unbondAmount !== null && unbondAmount <= status.ciphernodeBond
+  const newOwner = isAddress(ownerInput.trim()) ? (ownerInput.trim() as Address) : null
+  const label = (key: string, idle: string) => (busy === key ? 'Confirming…' : idle)
+  const registry = (functionName: string, args: readonly unknown[]): ContractCall => ({
+    address: CONTRACTS.BondingRegistry,
+    abi: bondingRegistryAbi,
+    functionName,
+    args,
+  })
+  const tickets = (amount: bigint) => fmtToken(amount, config.ticketDecimals, config.ticketSymbol)
+  const bond = (amount: bigint) => fmtToken(amount, config.ciphernodeBondDecimals, config.ciphernodeBondSymbol)
+
+  return (
+    <section className='opposition opmanage'>
+      <div className='section__eyebrow'>Manage the position</div>
+      <p className='opnext__body'>
+        The same transactions as the <code className='mono'>interfold ciphernode</code> commands. Each one is simulated before the wallet
+        prompt.
+      </p>
+      {!wallet && <Note>Connect the bond owner wallet, or the operator key to deregister, to send these transactions.</Note>}
+
+      <div className='opmanage__group'>
+        <h4 className='opmanage__title'>Refresh the status</h4>
+        <p className='opmanage__text'>
+          The registry recomputes the active state when collateral changes. Refresh it after another change, for example a node release that
+          the node acknowledged.
+        </p>
+        <button
+          className='btn btn--ghost'
+          disabled={busy !== null || !can.refresh}
+          onClick={() => send('refresh', registry('refreshOperatorStatus', [operator]))}
+        >
+          {label('refresh', 'Refresh status')}
+        </button>
+        {errFor('refresh')}
+      </div>
+
+      <div className='opmanage__group'>
+        <h4 className='opmanage__title'>Burn tickets</h4>
+        <Field
+          label='Number of tickets to burn'
+          value={ticketsInput}
+          onChange={setTicketsInput}
+          placeholder='0'
+          invalid={ticketsInput.trim() !== '' && burnAmount === null}
+          hint={
+            burnAmount === null
+              ? `${status.availableTickets.toString()} tickets held. The collateral returns after the exit delay.`
+              : `Queues ${tickets(burnAmount)} for exit.`
+          }
+        />
+        <button
+          className='btn btn--ghost'
+          disabled={busy !== null || !can.burn || burnAmount === null}
+          onClick={() => send('burnTickets', registry('removeTicketBalanceFor', [operator, burnAmount!]))}
+        >
+          {label('burnTickets', 'Burn tickets')}
+        </button>
+        {errFor('burnTickets')}
+      </div>
+
+      <div className='opmanage__group'>
+        <h4 className='opmanage__title'>Unbond {config.ciphernodeBondSymbol}</h4>
+        <Field
+          label={`Amount to unbond (${config.ciphernodeBondSymbol})`}
+          value={unbondInput}
+          onChange={setUnbondInput}
+          placeholder='0.0'
+          invalid={unbondInput.trim() !== '' && !unbondValid}
+          hint={`${bond(status.ciphernodeBond)} bonded. A bond below the active-maintenance threshold makes the node inactive.`}
+        />
+        <button
+          className='btn btn--ghost'
+          disabled={busy !== null || !can.unbond || !unbondValid}
+          onClick={() => send('unbond', registry('unbondCiphernodeFor', [operator, unbondAmount!]))}
+        >
+          {label('unbond', `Unbond ${config.ciphernodeBondSymbol}`)}
+        </button>
+        {errFor('unbond')}
+      </div>
+
+      <div className='opmanage__group'>
+        <h4 className='opmanage__title'>Leave the network</h4>
+        <p className='opmanage__text'>
+          Deregistration queues the tickets and the bond for exit. Keep the node running until each E3 of its last committees completes or
+          fails, then claim after the {formatDuration(config.exitDelay)} exit delay.
+        </p>
+        <button
+          className='btn btn--ghost'
+          disabled={busy !== null || !can.deregister}
+          onClick={() => send('deregister', registry('deregisterOperatorFor', [operator]))}
+        >
+          {label('deregister', 'Deregister')}
+        </button>
+        {errFor('deregister')}
+      </div>
+
+      <div className='opmanage__group'>
+        <h4 className='opmanage__title'>Claim exits</h4>
+        <dl className='dl'>
+          <dt>Queued</dt>
+          <dd className='mono'>
+            {tickets(status.pendingTicketExit)} · {bond(status.pendingBondExit)}
+          </dd>
+          <dt>Exit delay ended</dt>
+          <dd className='mono'>
+            {tickets(status.claimableTicket)} · {bond(status.claimableBond)}
+          </dd>
+        </dl>
+        {status.exitInProgress && <Note>The exit delay of the deregistration has not ended.</Note>}
+        <p className='opmanage__text'>
+          An open slash proposal, or a committee of the operator that is not released yet, still holds a claim. The check before the wallet
+          prompt shows it.
+        </p>
+        <div className='opactions'>
+          <button
+            className='btn btn--primary'
+            disabled={busy !== null || !can.claimAll}
+            onClick={() => send('claimAll', registry('claimExitsFor', [operator, MAX_UINT256, MAX_UINT256]))}
+          >
+            {label('claimAll', 'Claim to the bond owner')}
+          </button>
+          <button
+            className='btn btn--ghost'
+            disabled={busy !== null || !can.claimTickets}
+            onClick={() => send('claimTickets', registry('claimExitsFor', [operator, MAX_UINT256, 0n]))}
+          >
+            {label('claimTickets', 'Claim tickets only')}
+          </button>
+        </div>
+        {errFor('claimAll')}
+        {errFor('claimTickets')}
+      </div>
+
+      <div className='opmanage__group'>
+        <h4 className='opmanage__title'>Transfer the bond owner</h4>
+        <Field
+          label='New bond owner'
+          value={ownerInput}
+          onChange={setOwnerInput}
+          placeholder='0x…'
+          invalid={ownerInput.trim() !== '' && !newOwner}
+          hint='The current bond owner proposes. The new wallet or Safe then accepts.'
+        />
+        <div className='opactions'>
+          <button
+            className='btn btn--ghost'
+            disabled={busy !== null || !can.proposeOwner || !newOwner || sameAddress(newOwner, status.bondOwner)}
+            onClick={() => send('proposeOwner', registry('proposeBondOwner', [operator, newOwner!]))}
+          >
+            {label('proposeOwner', 'Propose new owner')}
+          </button>
+          <button
+            className='btn btn--ghost'
+            disabled={busy !== null || !can.acceptOwner}
+            onClick={() => send('acceptOwner', registry('acceptBondOwner', [operator]))}
+          >
+            {label('acceptOwner', 'Accept ownership')}
+          </button>
+        </div>
+        {errFor('proposeOwner')}
+        {errFor('acceptOwner')}
+      </div>
     </section>
   )
 }
