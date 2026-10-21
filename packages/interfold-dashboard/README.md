@@ -67,22 +67,28 @@ Steps 2–4 must come from the bond owner; the page detects the connected wallet
 it cannot send. Every write is simulated first (`simulateAndWrite`) so the registry's typed reverts
 (for example `NotBondOwner`) surface before the wallet prompt.
 
-**Committees and rewards** (`src/lib/rewards.ts`) lists the E3 committees that selected the
-operator. It filters the `RewardRecipientSnapshotted(e3Id, operator, recipient)` events of the
+**E3 rewards** (`src/lib/rewards.ts`) leads the page. It shows the total that the operator's
+recipient can claim, a **Claim rewards** action, and the history of the E3 committees that selected
+the operator. It filters the `RewardRecipientSnapshotted(e3Id, operator, recipient)` events of the
 refund manager that `Interfold.e3RefundManager()` returns by the operator topic. That event gives
-each seat and the wallet that receives its payments. For each seat, the list reads
-`getE3Stage(e3Id)`, then:
+each seat and the wallet that receives its payments. Each seat gets one claim state:
 
-- Completed or running E3: `pendingReward(e3Id, recipient)`. The recipient's row sends
-  `claimReward(e3Id)`, and **Claim all** sends `claimRewards(e3Ids)`.
-- Failed E3: `getRefundDistribution(e3Id)` on the refund manager. Until `calculated` is true, any
-  wallet's row sends `Interfold.processE3Failure(e3Id)`. After that, the compensation is the result
-  of a simulated `claimHonestNodeReward(e3Id, operator)` from the recipient, because the contract
-  has no view for it. A revert (`NotHonestNode`, `AlreadyClaimed`, `RewardPendingExpulsion`,
-  `NoRefundAvailable`) shows 0. The recipient's row sends the claim.
+| State            | Source                                                                                                    |
+| ---------------- | --------------------------------------------------------------------------------------------------------- |
+| In progress      | `getE3Stage(e3Id)` is neither `Complete` nor `Failed`.                                                    |
+| Forfeited        | `rewardStatus(e3Id, operator)` reports an executed expulsion.                                             |
+| On hold          | `rewardStatus` reports an open expulsion proposal. The amount is `operatorHeldRewards(e3Id, operator)`.   |
+| Needs processing | Failed E3, and `getRefundDistribution(e3Id).calculated` is false. Any wallet sends `processE3Failure`.    |
+| Claimable        | Completed E3: `pendingReward(e3Id, recipient)`. Failed E3: a simulated `claimHonestNodeReward`.           |
+| Not eligible     | The simulated `claimHonestNodeReward` reverts with `NotHonestNode`.                                       |
+| Claimed          | `RewardClaimed` (Interfold) or `RefundClaimed` with claim type `HONEST_NODE` (refund manager) records it. |
+| No reward        | None of the above.                                                                                        |
 
-E3s that an earlier refund manager recorded are not listed. The amounts use the `FEE_TOKEN_*`
-display settings.
+The contract has no view for the compensation of a failed E3, so the read simulates
+`claimHonestNodeReward(e3Id, operator)` from the recipient: the result is the amount. **Claim
+rewards** sends `claimRewards(e3Ids)` for the completed E3s of the connected recipient, then one
+`claimHonestNodeReward` for each failed E3. Each transaction waits for the previous one. E3s that an
+earlier refund manager recorded are not listed. The amounts use the `FEE_TOKEN_*` display settings.
 
 Only `VITE_BONDING_REGISTRY_ADDRESS` is configured. The ciphernode bond token, ticket wrapper,
 ticket underlying, bond size, ticket price, minimum tickets, and exit delay are all read back from

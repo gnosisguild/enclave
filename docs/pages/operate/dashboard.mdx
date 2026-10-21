@@ -263,15 +263,16 @@ operator key can also deregister, any wallet can refresh the status and claim ti
 proposed owner accepts a transfer. A node that runs without the CLI, for example a DAppNode package,
 uses these actions.
 
-**Committees and rewards** lists the E3 committees that selected the operator, newest first. Each
-row shows the E3 stage, the recipient, and the amount that the recipient can claim: the reward of a
-completed E3, or the compensation of a failed E3. The recipient is the bond owner of the operator at
-committee finalization, or the operator key when it had no bond owner. Connect the recipient wallet
-to claim. A row sends `claimReward(e3Id)` for a completed E3, or
-`claimHonestNodeReward(e3Id, operator)` for a failed E3. **Claim all** sends `claimRewards(e3Ids)`
-for the completed E3s. A failed E3 marked "not processed" needs `processE3Failure(e3Id)` first. Any
-wallet can send it from the row. An amount that an open expulsion proposal holds shows as 0 until
-the proposal resolves.
+**E3 rewards**, at the top of the page, shows the amount that the operator's recipient can claim and
+a **Claim rewards** action. The recipient is the bond owner of the operator at committee
+finalization, or the operator key when it had no bond owner. Connect the recipient wallet to claim.
+The action sends `claimRewards(e3Ids)` for the completed E3s, then
+`claimHonestNodeReward(e3Id, operator)` for each failed E3. Below it, the committee history shows
+each E3 that selected the operator, with its outcome, its amount, and a claim status: In progress,
+Claimable, Claimed, On hold (an open expulsion proposal holds the payment), Forfeited (an executed
+expulsion), Needs processing, Not eligible (not an honest member of a failed E3), or No reward.
+Point to a status to see its reason. A failed E3 needs `processE3Failure(e3Id)` before its honest
+members can claim. Any connected wallet can send it with **Process** in the history.
 
 The guide simulates each transaction before the wallet prompt, so a contract error, for example
 `NotBondOwner`, shows before you sign. The guide manages the on-chain position only. The ciphernode

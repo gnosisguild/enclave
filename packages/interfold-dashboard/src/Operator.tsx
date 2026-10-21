@@ -29,13 +29,13 @@ import {
 import { LINKS, explorerAddress, explorerTx } from './lib/links'
 import { compactE3Id } from './lib/pollMeta'
 import {
-  claimableE3s,
+  CLAIM_STATES,
+  claimPlan,
   fetchCommitteeSeats,
   fetchSeatStatuses,
-  seatAction,
   seatStageLabel,
+  summarizeRewards,
   type CommitteeSeat,
-  type SeatAction,
   type SeatStatus,
 } from './lib/rewards'
 import { ZERO_ADDRESS, simulateAndWrite, useBonding, type BondingConfig, type OperatorStatus } from './lib/bonding'
@@ -247,7 +247,13 @@ export default function Operator() {
           operator={operator}
           wallet={connected ? wallet.address : null}
           busy={busy}
-          send={(key, call) => void run(key, () => write(call))}
+          // Each claim waits for the previous one, so its simulation sees the state after it.
+          send={(key, calls) =>
+            void run(key, async () => {
+              for (const call of calls.slice(0, -1)) await confirmTx(await write(call))
+              return write(calls[calls.length - 1])
+            })
+          }
           errFor={errFor}
         />
       )}
@@ -1016,8 +1022,8 @@ export function ManagePosition({
 }
 
 /**
- * The committees that selected the operator, with the reward of each seat. Loads the seats once per
- * operator, and reads the stages and rewards again after each transaction.
+ * The rewards of the committees that selected the operator. Loads the seats once per operator, and
+ * reads the claim states again after each transaction.
  */
 function CommitteeRewards({
   operator,
@@ -1029,7 +1035,7 @@ function CommitteeRewards({
   operator: Address
   wallet: Address | null
   busy: string | null
-  send: (key: string, call: ContractCall) => void
+  send: (key: string, calls: ContractCall[]) => void
   errFor: (key: string) => ReactNode
 }) {
   const [reload, setReload] = useState(0)
@@ -1054,7 +1060,7 @@ function CommitteeRewards({
     }
   }, [operator, reload])
 
-  // `busy` changes when a transaction settles, so a claim shows the drained reward.
+  // `busy` changes when a transaction settles, so a claim shows its new state.
   useEffect(() => {
     if (!seats) return
     let cancelled = false
@@ -1075,7 +1081,7 @@ function CommitteeRewards({
   return (
     <CommitteeRewardsView
       seats={current}
-      statuses={current && statuses?.seats === current ? statuses.byE3 : new Map()}
+      statuses={current && statuses?.seats === current ? statuses.byE3 : null}
       loadFailed={failedFor === operator}
       wallet={wallet}
       busy={busy}
@@ -1089,7 +1095,15 @@ function CommitteeRewards({
   )
 }
 
-/** Committee seats and rewards. `seats` is null while the seats load. */
+const CLAIM_KEY = 'claimRewards'
+// One transaction key per E3, so each row shows its own spinner and error.
+const processKey = (e3Id: bigint) => `process:${e3Id}`
+const fee = (value: bigint) => fmtToken(value, FEE_TOKEN.decimals, FEE_TOKEN.symbol)
+
+/**
+ * The claimable total and its claim action, then the history of each committee seat. `seats` is null
+ * while the seats load, and `statuses` while their claim states load.
+ */
 export function CommitteeRewardsView({
   seats,
   statuses,
@@ -1101,33 +1115,23 @@ export function CommitteeRewardsView({
   errFor,
 }: {
   seats: CommitteeSeat[] | null
-  statuses: Map<bigint, SeatStatus>
+  statuses: Map<bigint, SeatStatus> | null
   loadFailed: boolean
   wallet: Address | null
   busy: string | null
   onReload: () => void
-  send: (key: string, call: ContractCall) => void
+  send: (key: string, calls: ContractCall[]) => void
   errFor: (key: string) => ReactNode
 }) {
-  const claimable = seats ? claimableE3s(seats, statuses, wallet) : []
-  const otherRecipient = (seats ?? []).some(
-    ({ e3Id, recipient }) => (statuses.get(e3Id)?.pending ?? 0n) > 0n && !sameAddress(recipient, wallet),
-  )
-  // One transaction key per E3, so each row shows its own spinner and error.
-  const rowKey = (e3Id: bigint) => `seat:${e3Id}`
-
   return (
-    <section className='opposition opmanage'>
-      <div className='section__eyebrow'>Committees and rewards</div>
-      <p className='opnext__body'>
-        The E3 committees that selected this operator, newest first. A completed E3 pays each member a reward. A failed E3 can pay its
-        honest members compensation. The recipient is the bond owner of the operator when the committee was finalized, or the operator key
-        if it had no bond owner. Only the recipient can claim.
-      </p>
+    <section className='opposition oprewards'>
+      <div className='section__eyebrow'>Ciphernode / Rewards</div>
+      <h3 className='oprewards__title'>E3 rewards</h3>
+      <p className='opnext__body'>Rewards earned through this ciphernode's E3 committee participation.</p>
 
       {loadFailed ? (
         <>
-          <Note kind='warn'>Could not read the committees of this operator.</Note>
+          <Note kind='warn'>Could not read the rewards of this operator.</Note>
           <button className='btn btn--ghost' onClick={onReload}>
             Try again
           </button>
@@ -1138,43 +1142,61 @@ export function CommitteeRewardsView({
         <p className='opmanage__text'>No committee has selected this operator yet.</p>
       ) : (
         <>
+          <RewardsSummary seats={seats} statuses={statuses} wallet={wallet} busy={busy} send={send} />
+          {errFor(CLAIM_KEY)}
+
+          <h4 className='opmanage__title oprewards__history'>Committee history</h4>
           <div className='evlog-wrap'>
             <table className='evlog'>
               <thead>
                 <tr>
                   <th>E3</th>
-                  <th>Status</th>
-                  <th>Recipient</th>
-                  <th className='evlog__num'>Claimable</th>
-                  <th />
+                  <th>Outcome</th>
+                  <th className='evlog__num'>Reward</th>
+                  <th>Claim status</th>
                 </tr>
               </thead>
               <tbody>
                 {seats.map((seat) => {
-                  const status = statuses.get(seat.e3Id)
-                  const action = seatAction(seat, status, wallet)
+                  const status = statuses?.get(seat.e3Id)
+                  const state = status && CLAIM_STATES[status.state]
                   return (
                     <tr key={seat.e3Id.toString()}>
                       <td className='mono' title={seat.e3Id.toString()}>
                         {compactE3Id(seat.e3Id)}
                       </td>
+                      <td>{status ? seatStageLabel(status.stage) : '…'}</td>
+                      <td className='evlog__num mono'>{status ? (status.amount === null ? '—' : fee(status.amount)) : '…'}</td>
                       <td>
-                        {status ? seatStageLabel(status.stage) : '…'}
-                        {status?.failureProcessed === false && <span className='dl__muted'> · not processed</span>}
-                      </td>
-                      <td>
-                        <AddrLink address={seat.recipient} />
-                      </td>
-                      <td className='evlog__num mono'>{status ? fmtToken(status.pending, FEE_TOKEN.decimals, FEE_TOKEN.symbol) : '…'}</td>
-                      <td>
-                        {action && (
-                          <button
-                            className='btn btn--sm btn--ghost'
-                            disabled={busy !== null}
-                            onClick={() => send(rowKey(seat.e3Id), seatCall(action, seat))}
-                          >
-                            {busy === rowKey(seat.e3Id) ? 'Confirming…' : action === 'processFailure' ? 'Process failure' : 'Claim'}
-                          </button>
+                        {status && state ? (
+                          <span className='oprewards__status'>
+                            <span
+                              className={`oprewards__state oprewards__state--${status.state}`}
+                              title={`${state.reason} Recipient: ${seat.recipient}.`}
+                            >
+                              {state.label}
+                            </span>
+                            {status.state === 'needsProcessing' && wallet && (
+                              <button
+                                className='btn btn--sm btn--ghost'
+                                disabled={busy !== null}
+                                onClick={() =>
+                                  send(processKey(seat.e3Id), [
+                                    {
+                                      address: CONTRACTS.Interfold,
+                                      abi: interfoldAbi,
+                                      functionName: 'processE3Failure',
+                                      args: [seat.e3Id],
+                                    },
+                                  ])
+                                }
+                              >
+                                {busy === processKey(seat.e3Id) ? 'Confirming…' : 'Process'}
+                              </button>
+                            )}
+                          </span>
+                        ) : (
+                          '…'
                         )}
                       </td>
                     </tr>
@@ -1183,45 +1205,117 @@ export function CommitteeRewardsView({
               </tbody>
             </table>
           </div>
-          {claimable.length > 1 && (
-            <button
-              className='btn btn--primary'
-              disabled={busy !== null}
-              onClick={() =>
-                send('claimRewards', { address: CONTRACTS.Interfold, abi: interfoldAbi, functionName: 'claimRewards', args: [claimable] })
-              }
-            >
-              {busy === 'claimRewards' ? 'Confirming…' : `Claim all (${claimable.length})`}
-            </button>
-          )}
-          {otherRecipient && (
-            <Note>{wallet ? 'Another wallet receives some of these payments.' : 'Connect the recipient wallet to claim.'}</Note>
-          )}
-          <p className='opmanage__text'>
-            A completed E3 shows no claimable reward after the claim, and while an open expulsion proposal against the operator holds it. A
-            failed E3 pays compensation only to honest members, and only when its refund sets an amount for them. Process the failure first:
-            any wallet can do that.
-          </p>
-          {errFor('claimRewards')}
           {seats.map(({ e3Id }) => (
-            <div key={e3Id.toString()}>{errFor(rowKey(e3Id))}</div>
+            <div key={e3Id.toString()}>{errFor(processKey(e3Id))}</div>
           ))}
+
+          <details className='oprewards__about'>
+            <summary>
+              Rewards are assigned to the eligible recipient when each committee is finalized. Only that recipient can claim.
+            </summary>
+            <p>
+              The recipient is the bond owner of the operator when the committee was finalized, or the operator key if it had no bond owner.
+              A completed E3 pays each committee member a reward. A failed E3 pays its honest members compensation, after any wallet
+              processes the failure. An open expulsion proposal against the operator holds its payment until the proposal resolves. An
+              executed expulsion gives the share to the other members.
+            </p>
+            <p>Point to a claim status to see why it shows. The history covers the E3s of the current refund manager.</p>
+          </details>
         </>
       )}
     </section>
   )
 }
 
-/** The contract call behind a seat action. */
-function seatCall(action: SeatAction, { e3Id, operator, refundManager }: CommitteeSeat): ContractCall {
-  switch (action) {
-    case 'claimReward':
-      return { address: CONTRACTS.Interfold, abi: interfoldAbi, functionName: 'claimReward', args: [e3Id] }
-    case 'claimCompensation':
-      return { address: refundManager, abi: e3RefundManagerAbi, functionName: 'claimHonestNodeReward', args: [e3Id, operator] }
-    case 'processFailure':
-      return { address: CONTRACTS.Interfold, abi: interfoldAbi, functionName: 'processE3Failure', args: [e3Id] }
-  }
+/** The claimable total, the claim action, and what stops a claim. */
+function RewardsSummary({
+  seats,
+  statuses,
+  wallet,
+  busy,
+  send,
+}: {
+  seats: CommitteeSeat[]
+  statuses: Map<bigint, SeatStatus> | null
+  wallet: Address | null
+  busy: string | null
+  send: (key: string, calls: ContractCall[]) => void
+}) {
+  const summary = statuses && summarizeRewards(statuses.values())
+  const plan = statuses ? claimPlan(seats, statuses, wallet) : { rewards: [], compensation: [] }
+  const calls: ContractCall[] = [
+    ...(plan.rewards.length > 0
+      ? [{ address: CONTRACTS.Interfold, abi: interfoldAbi, functionName: 'claimRewards', args: [plan.rewards] }]
+      : []),
+    ...plan.compensation.map(({ e3Id, operator, refundManager }) => ({
+      address: refundManager,
+      abi: e3RefundManagerAbi,
+      functionName: 'claimHonestNodeReward',
+      args: [e3Id, operator],
+    })),
+  ]
+  const recipients = [...new Set(seats.map(({ recipient }) => recipient.toLowerCase()))]
+  // The wallets that can claim what the connected wallet cannot.
+  const claimers = [
+    ...new Set(
+      seats
+        .filter(({ e3Id, recipient }) => statuses?.get(e3Id)?.state === 'claimable' && !sameAddress(recipient, wallet))
+        .map(({ recipient }) => recipient),
+    ),
+  ]
+  const extra = summary && [
+    summary.claimed > 0n && `${fee(summary.claimed)} claimed`,
+    summary.onHold > 0n && `${fee(summary.onHold)} on hold`,
+  ]
+
+  return (
+    <>
+      <div className='oprewards__summary'>
+        <div>
+          <div className='insp-stat__label'>Available to claim</div>
+          <div className='oprewards__amount'>
+            <span className='mono'>{summary ? fmtToken(summary.claimable, FEE_TOKEN.decimals) : '…'}</span>
+            <span className='oprewards__unit'>{FEE_TOKEN.symbol}</span>
+          </div>
+          <div className='insp-stat__sub'>
+            {summary
+              ? [`${summary.claimableCount} ${summary.claimableCount === 1 ? 'reward' : 'rewards'} available`, ...(extra ?? [])]
+                  .filter(Boolean)
+                  .join(' · ')
+              : 'Reading rewards…'}
+          </div>
+          <div className='insp-stat__sub oprewards__recipient'>
+            Paid to {recipients.length === 1 ? <AddrLink address={seats[0].recipient} /> : `${recipients.length} wallets`}
+          </div>
+        </div>
+        <div className='oprewards__claim'>
+          <button className='btn btn--primary' disabled={busy !== null || calls.length === 0} onClick={() => send(CLAIM_KEY, calls)}>
+            {busy === CLAIM_KEY ? 'Confirming…' : 'Claim rewards'}
+          </button>
+          {calls.length > 1 && <span className='insp-stat__sub'>{calls.length} transactions</span>}
+        </div>
+      </div>
+      {claimers.length > 0 && (
+        <Note>
+          {claimers.length === 1 ? (
+            <>
+              Only <AddrLink address={claimers[0]} /> can claim {calls.length > 0 ? 'the other rewards' : 'these rewards'}.{' '}
+              {wallet ? 'Connect that wallet.' : 'Connect it to claim.'}
+            </>
+          ) : (
+            'Other wallets receive some of these rewards. Point to a claim status to see its recipient.'
+          )}
+        </Note>
+      )}
+      {summary && summary.needsProcessing > 0 && (
+        <Note kind='warn'>
+          {summary.needsProcessing === 1
+            ? 'A failed E3 needs processing before its honest members can claim compensation. Any connected wallet can process it from the history.'
+            : `${summary.needsProcessing} failed E3s need processing before their honest members can claim compensation. Any connected wallet can process them from the history.`}
+        </Note>
+      )}
+    </>
+  )
 }
 
 const bigMax = (a: bigint, b: bigint): bigint => (a > b ? a : b)

@@ -11,7 +11,7 @@ import type { Address } from 'viem'
 import { CommitteeRewardsView, ManagePosition, positionActions, ticketBurnAmount } from './Operator'
 import { CONTRACTS, E3Stage, FEE_TOKEN } from './lib/chain'
 import type { BondingConfig, OperatorStatus } from './lib/bonding'
-import { claimableE3s, seatAction, type CommitteeSeat, type SeatStatus } from './lib/rewards'
+import { claimPlan, summarizeRewards, type CommitteeSeat, type SeatStatus } from './lib/rewards'
 
 const OPERATOR = '0x1111111111111111111111111111111111111111' as Address
 const OWNER = '0x2222222222222222222222222222222222222222' as Address
@@ -111,47 +111,60 @@ test('shows queued and claimable exits, and nothing for an operator without a po
   assert.equal(renderToStaticMarkup(<ManagePosition {...props} status={empty} />), '')
 })
 
-test('only the recipient claims an amount above zero, and any wallet processes a failed E3', () => {
+test('the claim covers the claimable seats of the connected recipient, and the summary splits every amount by state', () => {
   const e3 = (sequence: bigint) => (BigInt(CONTRACTS.Interfold) << 96n) | sequence
   const seat = (sequence: bigint, recipient: Address): CommitteeSeat => ({
     e3Id: e3(sequence),
     operator: OPERATOR,
     recipient,
     refundManager: PROPOSED,
+    block: 1n,
   })
   const fee = 10n ** BigInt(FEE_TOKEN.decimals)
-  const seats = [seat(6n, OWNER), seat(5n, OWNER), seat(4n, OWNER), seat(3n, OTHER), seat(2n, OWNER), seat(1n, OWNER)]
+  const seats = [8n, 7n, 6n, 5n, 4n, 3n, 2n, 1n].map((n) => seat(n, n === 3n ? OTHER : OWNER))
   const statuses = new Map<bigint, SeatStatus>([
-    [e3(6n), { stage: E3Stage.Failed, pending: 4n * fee, failureProcessed: true }],
-    [e3(5n), { stage: E3Stage.Failed, pending: 0n, failureProcessed: false }],
-    [e3(4n), { stage: E3Stage.KeyPublished, pending: 0n, failureProcessed: null }],
-    [e3(3n), { stage: E3Stage.Complete, pending: 2n * fee, failureProcessed: null }],
-    [e3(2n), { stage: E3Stage.Complete, pending: 3n * fee, failureProcessed: null }],
-    [e3(1n), { stage: E3Stage.Complete, pending: 5n * fee, failureProcessed: null }],
+    [e3(8n), { stage: E3Stage.Complete, state: 'onHold', amount: 6n * fee }],
+    [e3(7n), { stage: E3Stage.Complete, state: 'claimed', amount: 1n * fee }],
+    [e3(6n), { stage: E3Stage.Failed, state: 'claimable', amount: 4n * fee }],
+    [e3(5n), { stage: E3Stage.Failed, state: 'needsProcessing', amount: null }],
+    [e3(4n), { stage: E3Stage.KeyPublished, state: 'inProgress', amount: null }],
+    [e3(3n), { stage: E3Stage.Complete, state: 'claimable', amount: 2n * fee }],
+    [e3(2n), { stage: E3Stage.Complete, state: 'claimable', amount: 3n * fee }],
+    [e3(1n), { stage: E3Stage.Complete, state: 'claimable', amount: 5n * fee }],
   ])
-  const actions = (wallet: Address | null) => seats.map((s) => seatAction(s, statuses.get(s.e3Id), wallet))
 
-  assert.deepEqual(actions(OWNER), ['claimCompensation', 'processFailure', null, null, 'claimReward', 'claimReward'])
-  assert.deepEqual(actions(OTHER), [null, 'processFailure', null, 'claimReward', null, null])
-  assert.deepEqual(actions(OPERATOR), [null, 'processFailure', null, null, null, null])
-  assert.deepEqual(actions(null), [null, null, null, null, null, null])
-  // Claim all covers completed E3s only; compensation is a separate claim on the refund manager.
-  assert.deepEqual(claimableE3s(seats, statuses, OWNER), [e3(2n), e3(1n)])
+  // Completed E3s share one claimRewards call; each failed E3 is its own claim on the refund manager.
+  assert.deepEqual(claimPlan(seats, statuses, OWNER), { rewards: [e3(2n), e3(1n)], compensation: [seats[2]] })
+  assert.deepEqual(claimPlan(seats, statuses, OTHER), { rewards: [e3(3n)], compensation: [] })
+  assert.deepEqual(claimPlan(seats, statuses, OPERATOR), { rewards: [], compensation: [] })
+  assert.deepEqual(claimPlan(seats, statuses, null), { rewards: [], compensation: [] })
+
+  assert.deepEqual(summarizeRewards(statuses.values()), {
+    claimable: 14n * fee,
+    claimableCount: 4,
+    claimed: 1n * fee,
+    onHold: 6n * fee,
+    needsProcessing: 1,
+  })
 
   const props = { seats, statuses, loadFailed: false, busy: null, onReload: () => {}, send: () => {}, errFor: () => null }
   const owner = renderToStaticMarkup(<CommitteeRewardsView {...props} wallet={OWNER} />)
-  assert.match(owner, /E3-4/)
-  assert.match(owner, /Accepting inputs/)
-  assert.match(owner, /not processed/)
-  assert.match(owner, /Process failure/)
-  assert.match(owner, new RegExp(`4 ${FEE_TOKEN.symbol}`))
-  assert.match(owner, /Claim all \(2\)/)
-  assert.match(owner, /Another wallet receives some of these payments/)
+  assert.match(owner, /<span class="mono">14<\/span>/)
+  assert.match(owner, /4 rewards available/)
+  assert.match(owner, /<button class="btn btn--primary">Claim rewards/)
+  assert.match(owner, /2 transactions/)
+  assert.match(owner, /can claim the other rewards/)
+  assert.match(owner, /A failed E3 needs processing/)
+  for (const label of ['On hold', 'Claimed', 'Claimable', 'Needs processing', 'In progress']) assert.match(owner, new RegExp(`>${label}<`))
+  assert.match(owner, />Process</)
 
+  // The operator key is not a recipient: it cannot claim, but it can process the failed E3.
   const operatorKey = renderToStaticMarkup(<CommitteeRewardsView {...props} wallet={OPERATOR} />)
-  assert.doesNotMatch(operatorKey, />Claim</)
-  assert.doesNotMatch(operatorKey, /Claim all/)
-  assert.match(operatorKey, /Process failure/)
+  assert.match(operatorKey, /<button class="btn btn--primary" disabled="">Claim rewards/)
+  assert.match(operatorKey, />Process</)
 
+  const disconnected = renderToStaticMarkup(<CommitteeRewardsView {...props} wallet={null} />)
+  assert.doesNotMatch(disconnected, />Process</)
+  assert.match(renderToStaticMarkup(<CommitteeRewardsView {...props} statuses={null} wallet={OWNER} />), /Reading rewards/)
   assert.match(renderToStaticMarkup(<CommitteeRewardsView {...props} seats={[]} wallet={OWNER} />), /No committee has selected/)
 })
