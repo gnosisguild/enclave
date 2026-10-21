@@ -242,6 +242,16 @@ export default function Operator() {
 
   return (
     <div className='opguide'>
+      {operator && (
+        <CommitteeRewards
+          operator={operator}
+          wallet={connected ? wallet.address : null}
+          busy={busy}
+          send={(key, call) => void run(key, () => write(call))}
+          errFor={errFor}
+        />
+      )}
+
       <header className='opguide__head'>
         <div className='section__eyebrow'>Ciphernode operators</div>
         <h1 className='opguide__title'>Run a ciphernode on Interfold.</h1>
@@ -668,16 +678,6 @@ export default function Operator() {
             <ManagePosition
               config={config}
               status={status}
-              operator={operator}
-              wallet={connected ? wallet.address : null}
-              busy={busy}
-              send={(key, call) => void run(key, () => write(call))}
-              errFor={errFor}
-            />
-          )}
-
-          {operator && (
-            <CommitteeRewards
               operator={operator}
               wallet={connected ? wallet.address : null}
               busy={busy}
