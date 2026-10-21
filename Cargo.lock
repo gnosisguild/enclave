@@ -4077,6 +4077,7 @@ dependencies = [
  "rand 0.9.5",
  "rand_chacha 0.9.0",
  "serde",
+ "serde_json",
  "thiserror 1.0.69",
 ]
 
