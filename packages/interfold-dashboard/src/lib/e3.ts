@@ -56,16 +56,6 @@ const CRISP_INPUT_PUBLISHED = {
   ],
 } as const
 
-// Minimal CRISPProgram view. The program decodes the tallies of its own rounds, so the
-// dashboard holds no copy of the ballot layout.
-const CRISP_DECODE_TALLY = {
-  type: 'function',
-  name: 'decodeTally',
-  stateMutability: 'view',
-  inputs: [{ name: 'e3Id', type: 'uint256' }],
-  outputs: [{ name: 'votes', type: 'uint256[]' }],
-} as const
-
 // Public RPCs cap getLogs range. 9_500 keeps us safely under common 10k limits.
 const LOG_CHUNK = 9_500n
 
@@ -220,9 +210,6 @@ export type E3FullDetails = E3Summary & {
   committeePublicKey: `0x${string}`
   ciphertextOutput: `0x${string}`
   plaintextOutput: `0x${string}`
-  // Per-option totals of a CRISP round, decoded by CRISPProgram. Undefined or empty
-  // when the round has no decodable output.
-  tally?: readonly bigint[]
   requestedAt?: number // unix seconds (block.timestamp of the request)
   // Block number of the E3Requested log (distinct from `requestBlock` which on
   // this contract version is actually a Unix timestamp, not a block number).
@@ -421,17 +408,6 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
     }).catch(() => FailureReason.None) as Promise<number>,
   ])
 
-  // A round that the program cannot decode reverts, so its tally stays undefined.
-  const tally: readonly bigint[] | undefined =
-    isCrispE3(e3.e3Program) && e3.plaintextOutput !== '0x'
-      ? await (publicClient.readContract as any)({
-          address: e3.e3Program,
-          abi: [CRISP_DECODE_TALLY],
-          functionName: 'decodeTally',
-          args: [e3Id],
-        }).catch(() => undefined)
-      : undefined
-
   // `e3.requestBlock` is misnamed: on this contract version it stores
   // `block.timestamp` (EIP-6372 timestamp clock), not a block number. Using it
   // as fromBlock would push the scan range past chain head and silently miss
@@ -596,7 +572,6 @@ export async function fetchE3Details(e3Id: bigint, toBlock?: bigint): Promise<E3
     committeePublicKey: e3.committeePublicKey,
     ciphertextOutput: e3.ciphertextOutput,
     plaintextOutput: e3.plaintextOutput,
-    tally,
     committeeThreshold: threshold,
     committeeDecryptionThreshold: committeeDecryptionThreshold(threshold),
     committeeMembers: members,

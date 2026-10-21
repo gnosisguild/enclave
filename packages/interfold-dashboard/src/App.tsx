@@ -20,7 +20,7 @@ import { adaptHistoryEntries, adaptInspectorDetail, adaptInspectorE3List, adaptP
 import { formatE3Id } from './lib/pollMeta'
 import { LINKS, explorerAddress } from './lib/links'
 import { CONTRACTS, NETWORK_NAME } from './lib/chain'
-import { isE3Active, solidityStageToUiIdx, type E3FullDetails, type E3Summary } from './lib/e3'
+import { isE3Active, solidityStageToUiIdx, type E3Summary } from './lib/e3'
 
 function Header({ density, view, onNav }: { density: string; view: string; onNav: (id: string) => void }) {
   const link = (id: string, label: string) => (
@@ -182,13 +182,6 @@ export default function App() {
   }, [allE3s.data, inspectorIdStr])
   const inspectorDetail = useE3Details(selectedInspectorId)
 
-  // Detail cache for history verdicts (the inspector-selected E3, if any).
-  const detailsCache = useMemo(() => {
-    const m = new Map<string, E3FullDetails>()
-    if (inspectorDetail.data) m.set(inspectorDetail.data.id.toString(), inspectorDetail.data)
-    return m
-  }, [inspectorDetail.data])
-
   // CRISP tab state: split into currently-active polls (featured) and the rest
   // (archived). Card data comes straight from the list summary — no per-poll fetch.
   const crispReady = crispPolls.status === 'ready'
@@ -204,7 +197,7 @@ export default function App() {
     () => polls.filter((p) => !isE3Active(p.stage, p.inputWindow[1], { e3Program: p.e3Program, ballotCount: p.ballotCount, nowMs })),
     [polls, nowMs],
   )
-  const liveHistory = useMemo(() => adaptHistoryEntries(pastPolls, detailsCache), [pastPolls, detailsCache])
+  const liveHistory = useMemo(() => adaptHistoryEntries(pastPolls), [pastPolls])
 
   // Inspector tab state.
   const inspectorReady = allE3s.status === 'ready'

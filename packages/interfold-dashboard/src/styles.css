@@ -859,11 +859,6 @@ button {
   background: #fcebea;
   color: #b23a36;
 }
-.hist-row__verdict-pct {
-  font-size: 12px;
-  font-weight: 500;
-  opacity: 0.75;
-}
 .hist-row__ballots {
   font-size: 11.5px;
   color: var(--ink-4);

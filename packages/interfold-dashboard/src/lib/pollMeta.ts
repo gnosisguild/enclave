@@ -13,7 +13,6 @@ import { isCrispE3 } from './e3'
 export type PollMeta = {
   question: string
   context: string
-  options: Array<{ id: string; label: string }>
   programLabel?: string
 }
 
@@ -28,11 +27,6 @@ export function pollMetaFor(e3Id: bigint): PollMeta {
   return {
     question: `Encrypted poll ${compactE3Id(e3Id)}`,
     context: "On-chain encrypted execution. Ballots are sealed on each voter's device; only the aggregate result is decrypted.",
-    options: [
-      { id: '0', label: 'Option 0' },
-      { id: '1', label: 'Option 1' },
-      { id: '2', label: 'Option 2' },
-    ],
     programLabel: 'CRISP',
   }
 }
