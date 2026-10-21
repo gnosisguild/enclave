@@ -279,7 +279,7 @@ async function blockTimestamps(blocks: bigint[]): Promise<Map<string, number>> {
   return new Map(entries)
 }
 
-async function getLogsChunked<T>(
+export async function getLogsChunked<T>(
   args: Omit<Parameters<typeof publicClient.getLogs>[0], 'fromBlock' | 'toBlock'>,
   from: bigint,
   to: bigint,

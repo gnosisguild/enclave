@@ -6,9 +6,9 @@ Interfold / CRISP public observation dashboard. Three tabs:
   Observational only (no vote CTA).
 - **E3 inspector** — deep technical record of one E3: request, committee, keygen rounds, input
   window, compute, decryption, publication, failure, fees, and on-chain event log.
-- **Run a ciphernode** — interactive operator guide. The only writing page: it connects a wallet and
+- **Run a ciphernode** — interactive operator guide. The only writing page: it connects a wallet,
   walks the on-chain setup (authorize bond owner → bond the ciphernode bond → register → buy
-  tickets).
+  tickets), and claims E3 rewards.
 
 ## Run
 
@@ -31,8 +31,8 @@ Addresses are **not** repeated here — they go stale. The live values are the n
 them against `deployments/manifest.json` for the target network.
 
 - `Interfold` proxy — `E3Requested`, `E3Failed`, `PlaintextOutputPublished`, and
-  `RewardsDistributed`, plus the `getE3`, `getE3Stage`, `getFailureReason`, and `e3Payments` view
-  functions.
+  `RewardsDistributed`, plus the `getE3`, `getE3Stage`, `getFailureReason`, `e3Payments`, and
+  `pendingReward` view functions. The operator guide sends `claimReward`.
 - `CiphernodeRegistryOwnable` — `CommitteeRequested` (threshold + seed), `CommitteeFinalized`
   (members), `CommitteePublished` (joint PK).
 - `BondingRegistry` — operator collateral and the write path behind the operator guide (see below).
@@ -45,9 +45,9 @@ them against `deployments/manifest.json` for the target network.
 
 ### Operator guide (write path)
 
-`src/Operator.tsx` is the only page that sends transactions. It talks to `BondingRegistry` through a
-minimal injected-wallet connector (`src/lib/wallet.ts`) — no wagmi/rainbowkit dependency, since the
-guide needs one provider, one chain, and five writes.
+`src/Operator.tsx` is the only page that sends transactions. It talks to `BondingRegistry` and the
+Interfold contract through a minimal injected-wallet connector (`src/lib/wallet.ts`) — no
+wagmi/rainbowkit dependency, since the guide needs one provider, one chain, and a few writes.
 
 The operator key and the bond owner are separate addresses. The operator key is the hot key the node
 signs with; the bond owner is the wallet that funds and controls the collateral. They may be the
@@ -63,6 +63,23 @@ same wallet. The sequence the guide enforces is:
 Steps 2–4 must come from the bond owner; the page detects the connected wallet and disables actions
 it cannot send. Every write is simulated first (`simulateAndWrite`) so the registry's typed reverts
 (for example `NotBondOwner`) surface before the wallet prompt.
+
+**Committees and rewards** (`src/lib/rewards.ts`) lists the E3 committees that selected the
+operator. It filters the `RewardRecipientSnapshotted(e3Id, operator, recipient)` events of the
+refund manager that `Interfold.e3RefundManager()` returns by the operator topic. That event gives
+each seat and the wallet that receives its payments. For each seat, the list reads
+`getE3Stage(e3Id)`, then:
+
+- Completed or running E3: `pendingReward(e3Id, recipient)`. The recipient's row sends
+  `claimReward(e3Id)`, and **Claim all** sends `claimRewards(e3Ids)`.
+- Failed E3: `getRefundDistribution(e3Id)` on the refund manager. Until `calculated` is true, any
+  wallet's row sends `Interfold.processE3Failure(e3Id)`. After that, the compensation is the result
+  of a simulated `claimHonestNodeReward(e3Id, operator)` from the recipient, because the contract
+  has no view for it. A revert (`NotHonestNode`, `AlreadyClaimed`, `RewardPendingExpulsion`,
+  `NoRefundAvailable`) shows 0. The recipient's row sends the claim.
+
+E3s that an earlier refund manager recorded are not listed. The amounts use the `FEE_TOKEN_*`
+display settings.
 
 Only `VITE_BONDING_REGISTRY_ADDRESS` is configured. The ciphernode bond token, ticket wrapper,
 ticket underlying, bond size, ticket price, minimum tickets, and exit delay are all read back from

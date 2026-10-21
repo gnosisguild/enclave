@@ -13,6 +13,7 @@ import { createPublicClient, http, type Address } from 'viem'
 import {
   BondingRegistry__factory,
   CiphernodeRegistryOwnable__factory,
+  E3RefundManager__factory,
   Faucet__factory,
   Interfold__factory,
   InterfoldTicketToken__factory,
@@ -127,6 +128,7 @@ export const TIMEOUTS = {
 
 export const interfoldAbi = Interfold__factory.abi
 export const ciphernodeRegistryAbi = CiphernodeRegistryOwnable__factory.abi
+export const e3RefundManagerAbi = E3RefundManager__factory.abi
 export const bondingRegistryAbi = BondingRegistry__factory.abi
 export const ticketTokenAbi = InterfoldTicketToken__factory.abi
 export const ciphernodeBondTokenAbi = InterfoldToken__factory.abi

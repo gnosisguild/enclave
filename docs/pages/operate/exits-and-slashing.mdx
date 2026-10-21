@@ -39,7 +39,10 @@ Rewards are pull payments. The recipient must claim them:
 | Claim a failed-E3 reward | `E3RefundManager`  | `claimHonestNodeReward(e3Id, operator)` | The reward recipient     |
 | Claim slashed funds      | `E3RefundManager`  | `claimSlashedFunds(e3Id, token)`        | The account with a share |
 
-The CLI has no reward command. Use a wallet or `cast`, for example:
+The CLI has no reward command. Use **Committees and rewards** in the
+[hosted operator guide](https://dashboard.theinterfold.com/#operator), a wallet, or `cast`. The
+guide lists the committees of the operator and claims completed-E3 rewards and failed-E3
+compensation. For example:
 
 ```bash
 cast call <Interfold> "pendingReward(uint256,address)(uint256)" <e3Id> 0xBOND_OWNER \

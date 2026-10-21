@@ -8,8 +8,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { Address } from 'viem'
-import { ManagePosition, positionActions, ticketBurnAmount } from './Operator'
+import { CommitteeRewardsView, ManagePosition, positionActions, ticketBurnAmount } from './Operator'
+import { CONTRACTS, E3Stage, FEE_TOKEN } from './lib/chain'
 import type { BondingConfig, OperatorStatus } from './lib/bonding'
+import { claimableE3s, seatAction, type CommitteeSeat, type SeatStatus } from './lib/rewards'
 
 const OPERATOR = '0x1111111111111111111111111111111111111111' as Address
 const OWNER = '0x2222222222222222222222222222222222222222' as Address
@@ -107,4 +109,49 @@ test('shows queued and claimable exits, and nothing for an operator without a po
 
   const empty = position({ bondOwner: null, registered: false, ciphernodeBond: 0n, ticketBalance: 0n, availableTickets: 0n })
   assert.equal(renderToStaticMarkup(<ManagePosition {...props} status={empty} />), '')
+})
+
+test('only the recipient claims an amount above zero, and any wallet processes a failed E3', () => {
+  const e3 = (sequence: bigint) => (BigInt(CONTRACTS.Interfold) << 96n) | sequence
+  const seat = (sequence: bigint, recipient: Address): CommitteeSeat => ({
+    e3Id: e3(sequence),
+    operator: OPERATOR,
+    recipient,
+    refundManager: PROPOSED,
+  })
+  const fee = 10n ** BigInt(FEE_TOKEN.decimals)
+  const seats = [seat(6n, OWNER), seat(5n, OWNER), seat(4n, OWNER), seat(3n, OTHER), seat(2n, OWNER), seat(1n, OWNER)]
+  const statuses = new Map<bigint, SeatStatus>([
+    [e3(6n), { stage: E3Stage.Failed, pending: 4n * fee, failureProcessed: true }],
+    [e3(5n), { stage: E3Stage.Failed, pending: 0n, failureProcessed: false }],
+    [e3(4n), { stage: E3Stage.KeyPublished, pending: 0n, failureProcessed: null }],
+    [e3(3n), { stage: E3Stage.Complete, pending: 2n * fee, failureProcessed: null }],
+    [e3(2n), { stage: E3Stage.Complete, pending: 3n * fee, failureProcessed: null }],
+    [e3(1n), { stage: E3Stage.Complete, pending: 5n * fee, failureProcessed: null }],
+  ])
+  const actions = (wallet: Address | null) => seats.map((s) => seatAction(s, statuses.get(s.e3Id), wallet))
+
+  assert.deepEqual(actions(OWNER), ['claimCompensation', 'processFailure', null, null, 'claimReward', 'claimReward'])
+  assert.deepEqual(actions(OTHER), [null, 'processFailure', null, 'claimReward', null, null])
+  assert.deepEqual(actions(OPERATOR), [null, 'processFailure', null, null, null, null])
+  assert.deepEqual(actions(null), [null, null, null, null, null, null])
+  // Claim all covers completed E3s only; compensation is a separate claim on the refund manager.
+  assert.deepEqual(claimableE3s(seats, statuses, OWNER), [e3(2n), e3(1n)])
+
+  const props = { seats, statuses, loadFailed: false, busy: null, onReload: () => {}, send: () => {}, errFor: () => null }
+  const owner = renderToStaticMarkup(<CommitteeRewardsView {...props} wallet={OWNER} />)
+  assert.match(owner, /E3-4/)
+  assert.match(owner, /Accepting inputs/)
+  assert.match(owner, /not processed/)
+  assert.match(owner, /Process failure/)
+  assert.match(owner, new RegExp(`4 ${FEE_TOKEN.symbol}`))
+  assert.match(owner, /Claim all \(2\)/)
+  assert.match(owner, /Another wallet receives some of these payments/)
+
+  const operatorKey = renderToStaticMarkup(<CommitteeRewardsView {...props} wallet={OPERATOR} />)
+  assert.doesNotMatch(operatorKey, />Claim</)
+  assert.doesNotMatch(operatorKey, /Claim all/)
+  assert.match(operatorKey, /Process failure/)
+
+  assert.match(renderToStaticMarkup(<CommitteeRewardsView {...props} seats={[]} wallet={OWNER} />), /No committee has selected/)
 })

@@ -16,8 +16,28 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { erc20Abi, formatUnits, isAddress, parseUnits, type Address, type Hash } from 'viem'
 import Loader from './Loader'
-import { CONTRACTS, IS_TESTNET, NETWORK_NAME, bondingRegistryAbi, faucetAbi } from './lib/chain'
+import {
+  CONTRACTS,
+  FEE_TOKEN,
+  IS_TESTNET,
+  NETWORK_NAME,
+  bondingRegistryAbi,
+  e3RefundManagerAbi,
+  faucetAbi,
+  interfoldAbi,
+} from './lib/chain'
 import { LINKS, explorerAddress, explorerTx } from './lib/links'
+import { compactE3Id } from './lib/pollMeta'
+import {
+  claimableE3s,
+  fetchCommitteeSeats,
+  fetchSeatStatuses,
+  seatAction,
+  seatStageLabel,
+  type CommitteeSeat,
+  type SeatAction,
+  type SeatStatus,
+} from './lib/rewards'
 import { ZERO_ADDRESS, simulateAndWrite, useBonding, type BondingConfig, type OperatorStatus } from './lib/bonding'
 import { confirmTx, useWallet, walletErrorMessage } from './lib/wallet'
 
@@ -656,6 +676,16 @@ export default function Operator() {
             />
           )}
 
+          {operator && (
+            <CommitteeRewards
+              operator={operator}
+              wallet={connected ? wallet.address : null}
+              busy={busy}
+              send={(key, call) => void run(key, () => write(call))}
+              errFor={errFor}
+            />
+          )}
+
           {lastTx && (
             <div className='optx'>
               Last transaction:{' '}
@@ -983,6 +1013,215 @@ export function ManagePosition({
       </div>
     </section>
   )
+}
+
+/**
+ * The committees that selected the operator, with the reward of each seat. Loads the seats once per
+ * operator, and reads the stages and rewards again after each transaction.
+ */
+function CommitteeRewards({
+  operator,
+  wallet,
+  busy,
+  send,
+  errFor,
+}: {
+  operator: Address
+  wallet: Address | null
+  busy: string | null
+  send: (key: string, call: ContractCall) => void
+  errFor: (key: string) => ReactNode
+}) {
+  const [reload, setReload] = useState(0)
+  const [seats, setSeats] = useState<{ operator: Address; list: CommitteeSeat[] } | null>(null)
+  // The operator whose read failed, so a failure never shows for another operator.
+  const [failedFor, setFailedFor] = useState<Address | null>(null)
+  // Kept with the seat list that it was read for, so another operator never shows these values.
+  const [statuses, setStatuses] = useState<{ seats: CommitteeSeat[]; byE3: Map<bigint, SeatStatus> } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchCommitteeSeats(operator).then(
+      (list) => {
+        if (!cancelled) setSeats({ operator, list })
+      },
+      () => {
+        if (!cancelled) setFailedFor(operator)
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [operator, reload])
+
+  // `busy` changes when a transaction settles, so a claim shows the drained reward.
+  useEffect(() => {
+    if (!seats) return
+    let cancelled = false
+    fetchSeatStatuses(seats.list).then(
+      (next) => {
+        if (!cancelled) setStatuses({ seats: seats.list, byE3: next })
+      },
+      () => {
+        if (!cancelled) setFailedFor(seats.operator)
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [seats, busy])
+
+  const current = seats?.operator === operator ? seats.list : null
+  return (
+    <CommitteeRewardsView
+      seats={current}
+      statuses={current && statuses?.seats === current ? statuses.byE3 : new Map()}
+      loadFailed={failedFor === operator}
+      wallet={wallet}
+      busy={busy}
+      onReload={() => {
+        setFailedFor(null)
+        setReload((n) => n + 1)
+      }}
+      send={send}
+      errFor={errFor}
+    />
+  )
+}
+
+/** Committee seats and rewards. `seats` is null while the seats load. */
+export function CommitteeRewardsView({
+  seats,
+  statuses,
+  loadFailed,
+  wallet,
+  busy,
+  onReload,
+  send,
+  errFor,
+}: {
+  seats: CommitteeSeat[] | null
+  statuses: Map<bigint, SeatStatus>
+  loadFailed: boolean
+  wallet: Address | null
+  busy: string | null
+  onReload: () => void
+  send: (key: string, call: ContractCall) => void
+  errFor: (key: string) => ReactNode
+}) {
+  const claimable = seats ? claimableE3s(seats, statuses, wallet) : []
+  const otherRecipient = (seats ?? []).some(
+    ({ e3Id, recipient }) => (statuses.get(e3Id)?.pending ?? 0n) > 0n && !sameAddress(recipient, wallet),
+  )
+  // One transaction key per E3, so each row shows its own spinner and error.
+  const rowKey = (e3Id: bigint) => `seat:${e3Id}`
+
+  return (
+    <section className='opposition opmanage'>
+      <div className='section__eyebrow'>Committees and rewards</div>
+      <p className='opnext__body'>
+        The E3 committees that selected this operator, newest first. A completed E3 pays each member a reward. A failed E3 can pay its
+        honest members compensation. The recipient is the bond owner of the operator when the committee was finalized, or the operator key
+        if it had no bond owner. Only the recipient can claim.
+      </p>
+
+      {loadFailed ? (
+        <>
+          <Note kind='warn'>Could not read the committees of this operator.</Note>
+          <button className='btn btn--ghost' onClick={onReload}>
+            Try again
+          </button>
+        </>
+      ) : seats === null ? (
+        <p className='opmanage__text'>Loading committees…</p>
+      ) : seats.length === 0 ? (
+        <p className='opmanage__text'>No committee has selected this operator yet.</p>
+      ) : (
+        <>
+          <div className='evlog-wrap'>
+            <table className='evlog'>
+              <thead>
+                <tr>
+                  <th>E3</th>
+                  <th>Status</th>
+                  <th>Recipient</th>
+                  <th className='evlog__num'>Claimable</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {seats.map((seat) => {
+                  const status = statuses.get(seat.e3Id)
+                  const action = seatAction(seat, status, wallet)
+                  return (
+                    <tr key={seat.e3Id.toString()}>
+                      <td className='mono' title={seat.e3Id.toString()}>
+                        {compactE3Id(seat.e3Id)}
+                      </td>
+                      <td>
+                        {status ? seatStageLabel(status.stage) : '…'}
+                        {status?.failureProcessed === false && <span className='dl__muted'> · not processed</span>}
+                      </td>
+                      <td>
+                        <AddrLink address={seat.recipient} />
+                      </td>
+                      <td className='evlog__num mono'>{status ? fmtToken(status.pending, FEE_TOKEN.decimals, FEE_TOKEN.symbol) : '…'}</td>
+                      <td>
+                        {action && (
+                          <button
+                            className='btn btn--sm btn--ghost'
+                            disabled={busy !== null}
+                            onClick={() => send(rowKey(seat.e3Id), seatCall(action, seat))}
+                          >
+                            {busy === rowKey(seat.e3Id) ? 'Confirming…' : action === 'processFailure' ? 'Process failure' : 'Claim'}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          {claimable.length > 1 && (
+            <button
+              className='btn btn--primary'
+              disabled={busy !== null}
+              onClick={() =>
+                send('claimRewards', { address: CONTRACTS.Interfold, abi: interfoldAbi, functionName: 'claimRewards', args: [claimable] })
+              }
+            >
+              {busy === 'claimRewards' ? 'Confirming…' : `Claim all (${claimable.length})`}
+            </button>
+          )}
+          {otherRecipient && (
+            <Note>{wallet ? 'Another wallet receives some of these payments.' : 'Connect the recipient wallet to claim.'}</Note>
+          )}
+          <p className='opmanage__text'>
+            A completed E3 shows no claimable reward after the claim, and while an open expulsion proposal against the operator holds it. A
+            failed E3 pays compensation only to honest members, and only when its refund sets an amount for them. Process the failure first:
+            any wallet can do that.
+          </p>
+          {errFor('claimRewards')}
+          {seats.map(({ e3Id }) => (
+            <div key={e3Id.toString()}>{errFor(rowKey(e3Id))}</div>
+          ))}
+        </>
+      )}
+    </section>
+  )
+}
+
+/** The contract call behind a seat action. */
+function seatCall(action: SeatAction, { e3Id, operator, refundManager }: CommitteeSeat): ContractCall {
+  switch (action) {
+    case 'claimReward':
+      return { address: CONTRACTS.Interfold, abi: interfoldAbi, functionName: 'claimReward', args: [e3Id] }
+    case 'claimCompensation':
+      return { address: refundManager, abi: e3RefundManagerAbi, functionName: 'claimHonestNodeReward', args: [e3Id, operator] }
+    case 'processFailure':
+      return { address: CONTRACTS.Interfold, abi: interfoldAbi, functionName: 'processE3Failure', args: [e3Id] }
+  }
 }
 
 const bigMax = (a: bigint, b: bigint): bigint => (a > b ? a : b)
