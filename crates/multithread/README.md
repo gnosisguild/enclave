@@ -37,23 +37,27 @@ outcomes. Cancellation retires pending C0 verification without retry or invalid-
 
 ### Ownership boundary
 
+Selected compute-owner dependencies (Cargo manifests contain the full graph):
+
 ```text
 ciphernode-builder -> multithread, zk/prover, task-pool
 multithread        -> task-pool, zk/prover, trbfv
-zk/prover          -> task-pool
+zk/prover          -> task-pool, zk/witness, zk/config, trbfv
 task-pool          -> Rayon, Tokio (no protocol dependencies)
 ```
 
 Circuit-request adaptation and ZK execution belong to
 [`zk/prover`](../zk/prover/src/request_execution.rs); deterministic preparation remains in
 `zk/witness`. This dispatcher owns admission, replay gates, retry policy, correlation, timing
-publication and terminal filtering. TrBFV arithmetic belongs to `trbfv`; the dispatcher currently
-adapts its typed requests and responses. The memory-only gate is not a transactional outbox.
+publication and terminal filtering. Native request execution, RNG access and typed calculation
+failures belong to `trbfv`. The dispatcher only wraps native results with their E3/correlation
+identity; it contains no circuit or threshold calculation. The memory-only gate is not a
+transactional outbox.
 
 The extraction preserves the existing pool-type re-exports and changes no persisted/event/wire
 encoding or cryptographic statement. `setup_zk_actors` and `ZkActor::new` now require the shared
-pool and node scope, so direct Rust callers must update their construction code. No protocol/schema
-or node-generation counter change is proposed for this slice.
+pool and node scope, so direct Rust callers must supply them when constructing the runtime. No
+protocol/schema or node-generation counter change is proposed for this ownership split.
 
 For production sizing, `ComputeCapacity::detect(requested_jobs, cpu_jobs)` applies CPU and detected
 host/cgroup-memory limits. [CiphernodeBuilder](../ciphernode-builder/README.md) exposes

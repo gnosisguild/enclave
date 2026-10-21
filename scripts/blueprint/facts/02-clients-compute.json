@@ -780,7 +780,7 @@
         {
           "name": "Multithread",
           "role": "runs compute requests off the event path and publishes their responses",
-          "ref": "crates/multithread/src/multithread.rs@53@pub struct Multithread {"
+          "ref": "crates/multithread/src/multithread.rs@50@pub struct Multithread {"
         },
         {
           "name": "ComputeEffectGate",
@@ -807,19 +807,19 @@
         {
           "name": "E3Failed, E3StageChanged and E3RequestComplete, which cancel the E3's task groups",
           "by": "Multithread",
-          "ref": "crates/multithread/src/multithread.rs@179@EventType::E3Failed,"
+          "ref": "crates/multithread/src/multithread.rs@176@EventType::E3Failed,"
         }
       ],
       "emits": [
         {
           "name": "ComputeResponse",
           "by": "Multithread",
-          "ref": "crates/multithread/src/multithread.rs@669@bus.publish(value, ctx)?;"
+          "ref": "crates/multithread/src/multithread.rs@666@bus.publish(value, ctx)?;"
         },
         {
           "name": "ComputeRequestError, for failures that are not retried",
           "by": "Multithread",
-          "ref": "crates/multithread/src/multithread.rs@649@bus.publish(ComputeRequestError::new(error_kind, request_snapshot), ctx)?;"
+          "ref": "crates/multithread/src/multithread.rs@646@bus.publish(ComputeRequestError::new(error_kind, request_snapshot), ctx)?;"
         },
         {
           "name": "stored outcomes sent to the other request IDs waiting on the same work",
@@ -869,7 +869,7 @@
       "read_first": [
         {
           "why": "wiring: attach creates the actor, subscribes it to the bus, and starts the gate",
-          "ref": "crates/multithread/src/multithread.rs@104@pub fn attach("
+          "ref": "crates/multithread/src/multithread.rs@101@pub fn attach("
         },
         {
           "why": "the gate: when a request goes to the worker, and when a stored result is reused",
@@ -877,7 +877,7 @@
         },
         {
           "why": "the actor's request handler and its retry loop",
-          "ref": "crates/multithread/src/multithread.rs@553@async fn handle_compute_request_event("
+          "ref": "crates/multithread/src/multithread.rs@550@async fn handle_compute_request_event("
         },
         {
           "why": "the pool: semaphore wait, Rayon spawn, and the oneshot result",
@@ -885,24 +885,24 @@
         },
         {
           "why": "the worker function that dispatches TrBFV and ZK requests",
-          "ref": "crates/multithread/src/multithread.rs@878@fn handle_compute_request("
+          "ref": "crates/multithread/src/multithread.rs@856@fn handle_compute_request("
         }
       ],
       "rust_patterns": [
         {
           "pattern": "actix-actor",
           "note": "Multithread implements Actor and sets its mailbox capacity from MAILBOX_LIMIT on start",
-          "ref": "crates/multithread/src/multithread.rs@508@impl Actor for Multithread {"
+          "ref": "crates/multithread/src/multithread.rs@505@impl Actor for Multithread {"
         },
         {
           "pattern": "actix-handler",
           "note": "the actor handles bus events by queuing compute requests to itself as typed messages",
-          "ref": "crates/multithread/src/multithread.rs@515@impl Handler<InterfoldEvent> for Multithread {"
+          "ref": "crates/multithread/src/multithread.rs@512@impl Handler<InterfoldEvent> for Multithread {"
         },
         {
           "pattern": "actix-recipient",
           "note": "the gate receives the actor as a Recipient, so it sends events without naming the actor type",
-          "ref": "crates/multithread/src/multithread.rs@128@addr.clone().recipient(),"
+          "ref": "crates/multithread/src/multithread.rs@125@addr.clone().recipient(),"
         },
         {
           "pattern": "channel",
@@ -953,12 +953,12 @@
       "emits": [
         {
           "name": "TrBFVResponse variants",
-          "by": "the gen_* and calculate_* functions",
+          "by": "TrBFVRequest::execute",
           "ref": "crates/trbfv/src/trbfv_request.rs@37@pub enum TrBFVResponse {"
         },
         {
           "name": "TrBFVError, carrying a TrBFVFailure",
-          "by": "the gen_* and calculate_* functions",
+          "by": "TrBFVRequest::execute and failure",
           "ref": "crates/trbfv/src/trbfv_request.rs@46@pub enum TrBFVError {"
         }
       ],
@@ -987,8 +987,8 @@
       ],
       "read_first": [
         {
-          "why": "the request and response enums that the worker dispatches",
-          "ref": "crates/trbfv/src/trbfv_request.rs@27@pub enum TrBFVRequest {"
+          "why": "the native execution boundary over typed requests, caller RNG and cipher",
+          "ref": "crates/trbfv/src/request_execution.rs@45@pub fn execute(&self, rng: &SharedRng, cipher: &Cipher) -> Result<TrBFVResponse, TrBFVError> {"
         },
         {
           "why": "DKG: the public-key share and the secret Shamir shares",
@@ -1036,7 +1036,7 @@
         {
           "pattern": "async-test",
           "note": "the integration test runs under tokio",
-          "ref": "crates/trbfv/tests/integration.rs@29@#[tokio::test]"
+          "ref": "crates/trbfv/tests/integration.rs@27@#[tokio::test]"
         }
       ],
       "depends_on": ["e3-bfv-client", "e3-fhe-params", "e3-crypto", "e3-utils"],
