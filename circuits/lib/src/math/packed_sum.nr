@@ -14,7 +14,7 @@
 //! commitments (collision resistance makes them the creator's carriers, whose digits the creating
 //! circuit bounded), added carrier-wise, and only the sum is unpacked.
 
-use crate::math::helpers::assert_in_range;
+use crate::math::helpers::assert_in_residue_range;
 
 /// Values per carrier. Every caller's width rounds to a 48-60-bit nibble, which packs four.
 pub global PACKED_SLOTS: u32 = 4;
@@ -102,7 +102,7 @@ pub fn reduce_packed_sum<let N4: u32, let H: u32, let BIT: u32, let BIT_Q: u32, 
         let mut carry_weight = 0;
         for i in 0..PACKED_SLOTS {
             (carries[i] + carry_shift).assert_max_bit_size::<((BIT + 3) / 4) * 4 + 4 - BIT_Q>();
-            assert_in_range::<BIT_Q>(centred[i] + half, q);
+            assert_in_residue_range::<BIT_Q>(centred[i] + half, q);
             recombined += weights[i] * (carries[i] * q + centred[i]);
             carry_weight += weights[i] * carries[i];
         }
@@ -173,4 +173,20 @@ fn test_signed_packed_sum_centres_each_slot() {
     let out = reduce_packed_sum::<1, 3, 50, 51, _>(|p, g| parties[p][g], 101, true);
     // -150 -> -150 + 202 = 52 -> 52 - 101 = -49; 0 -> 0; 150 -> 49; -7 -> -7.
     assert(out[0] == pack4(-49, 0, 49, -7));
+}
+
+#[test]
+fn packed_sum_at_a_secure_modulus_with_fourteen_senders() {
+    // A 51-bit modulus takes the windowed residue check, with values at both window ends.
+    let q: Field = 1125899917262849;
+    let half: Field = 562949958631424;
+    let unsigned = crate::math::helpers::pack::<4, 51>([q - 1, half, half + 1, 0]);
+    let unsigned_expected = crate::math::helpers::pack::<4, 51>([-14, -7, 7, 0]);
+    let unsigned_out = reduce_packed_sum::<1, 14, 51, 51, _>(|_, _| unsigned[0], q, false);
+    assert(unsigned_out[0] == unsigned_expected[0]);
+
+    let signed = crate::math::helpers::pack::<4, 50>([half, -half, 1, -1]);
+    let signed_expected = crate::math::helpers::pack::<4, 50>([-7, 7, 14, -14]);
+    let signed_out = reduce_packed_sum::<1, 14, 50, 51, _>(|_, _| signed[0], q, true);
+    assert(signed_out[0] == signed_expected[0]);
 }

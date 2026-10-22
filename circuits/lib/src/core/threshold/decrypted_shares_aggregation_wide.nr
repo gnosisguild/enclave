@@ -22,7 +22,7 @@ use crate::core::threshold::decrypted_shares_aggregation::{
     assert_decoded_coefficient, Configs, lagrange_coefficients,
 };
 use crate::math::commitments::compute_threshold_decryption_share_commitment;
-use crate::math::helpers::assert_in_range;
+use crate::math::helpers::assert_in_residue_range;
 use crate::math::modulo::U128::{inv_mod_bounded, reduce_mod_bounded};
 use crate::math::polynomial::Polynomial;
 use ::bignum::BigNum;
@@ -80,7 +80,7 @@ impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let N_PARTIES: u3
             // the bound makes the plain packing injective, so the opening is unique.
             for l in 0..L {
                 for j in 0..MAX_MSG_NON_ZERO_COEFFS {
-                    assert_in_range::<BIT_Q>(
+                    assert_in_residue_range::<BIT_Q>(
                         self.decryption_shares[party_idx][l].coefficients[j],
                         self.configs.qis[l],
                     );
