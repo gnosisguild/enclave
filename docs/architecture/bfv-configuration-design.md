@@ -4,11 +4,6 @@ Status: proposed design for [#2197](https://github.com/theinterfold/interfold/is
 document specifies intended changes, not implemented guarantees. No parameter change, deployment,
 publication, or release-counter change is part of the consolidation.
 
-Implementation is in progress. The parameter crate owns the scheme/version constants and identity
-APIs; the builder, node admission, and indexer use them. Shared language bindings, structured
-metadata, circuit-identity manifests, mandatory matrix checks, and the CRISP companion remain
-planned.
-
 Reviewed Interfold `origin/main`: `354af6bef3b1cdd8fa23c53093feede923125d55`. Reviewed CRISP HEAD:
 `735ce8208ecfff425fc22cea2960f6e1b655ef43`.
 
