@@ -1108,6 +1108,9 @@ jobs:
       - name: Build circuits
         run: pnpm build:circuits
 
+      - name: Check compiled decryption layout
+        run: pnpm check:decryption-layout
+
       - name: Check generated circuit sources are committed
         run: |
           git diff --exit-code -- \
