@@ -66,13 +66,9 @@ pub struct NodeDkgFoldRequest {
     pub c0_proof: Proof,
     pub c1_proof: Proof,
     pub c2a_proof: Proof,
-    pub c2b_proof: Proof,
     pub c3a_inner_proofs: Vec<Proof>,
-    pub c3b_inner_proofs: Vec<Proof>,
     pub c4a_proof: Proof,
-    pub c4b_proof: Proof,
     pub c3_slot_indices_a: Vec<u32>,
-    pub c3_slot_indices_b: Vec<u32>,
     pub c3_total_slots: usize,
     pub party_id: u64,
     pub params_preset: BfvPreset,
@@ -154,6 +150,8 @@ pub struct ShareComputationProofRequest {
     pub params_preset: BfvPreset,
     /// The size of the committee.
     pub committee_size: CiphernodesCommitteeSize,
+    /// Outgoing PRF keys, one per recipient. Empty selects the zero key.
+    pub prf_keys: Vec<SensitiveBytes>,
 }
 
 /// Request to generate a proof for share encryption (C3a or C3b).
@@ -186,6 +184,8 @@ pub struct ShareEncryptionProofRequest {
     pub row_index: usize,
     /// ESI index (for C3b only; 0 for C3a). Disambiguates proofs across multiple ESI entries.
     pub esi_index: usize,
+    /// Outgoing PRF key packed into this ciphertext. Empty bytes select the zero key.
+    pub prf_key: SensitiveBytes,
 }
 
 impl ShareEncryptionProofRequest {
@@ -194,8 +194,31 @@ impl ShareEncryptionProofRequest {
     /// This is a protocol invariant shared between the proof-request producer and the C3 fold
     /// driver; it is defined here (next to the request type) so all callers reference one
     /// formula.
-    pub fn c3_slot_index(&self, n_moduli: usize) -> u32 {
-        (self.recipient_party_id as u32) * (n_moduli as u32) + (self.row_index as u32)
+    pub fn c3_slot_index(&self, n_moduli: usize) -> Option<u32> {
+        checked_c3_slot_index(self.recipient_party_id, n_moduli, self.row_index)
+    }
+}
+
+fn checked_c3_slot_index(
+    recipient_party_id: usize,
+    n_moduli: usize,
+    row_index: usize,
+) -> Option<u32> {
+    let slot = recipient_party_id
+        .checked_mul(n_moduli)?
+        .checked_add(row_index)?;
+    u32::try_from(slot).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::checked_c3_slot_index;
+
+    #[test]
+    fn c3_slot_index_rejects_unrepresentable_values() {
+        assert_eq!(checked_c3_slot_index(3, 2, 1), Some(7));
+        assert_eq!(checked_c3_slot_index(usize::MAX, 2, 0), None);
+        assert_eq!(checked_c3_slot_index(u32::MAX as usize, 2, 0), None);
     }
 }
 
@@ -220,7 +243,11 @@ pub struct DkgShareDecryptionProofRequest {
     /// Number of CRT moduli (L).
     pub num_moduli: usize,
     /// Own party's row in the selected order, if the party contributed to the key.
+    /// Position of the own party within the H ascending-party_id ordering. The prover
+    /// splices `own_share_raw` into this slot when assembling C4 inputs.
     pub own_plaintext_idx: Option<usize>,
+    /// Zero-based recipient party ID whose share row each C4 proof decrypts.
+    pub recipient_party_id: u64,
     /// Own plaintext share, present only when `own_plaintext_idx` is present.
     /// The encrypted witness contains a bincode `Vec<Vec<u64>>` of shape `[L][N]`.
     pub own_share_raw: Option<SensitiveBytes>,
@@ -230,6 +257,8 @@ pub struct DkgShareDecryptionProofRequest {
     pub params_preset: BfvPreset,
     /// Committee size for circuit artifact resolution.
     pub committee_size: CiphernodesCommitteeSize,
+    /// One PRF key per honest slot. Empty selects the zero key.
+    pub prf_keys: Vec<SensitiveBytes>,
 }
 
 /// Request to generate a proof for BFV public key generation (C0).
@@ -254,8 +283,6 @@ pub struct PkGenerationProofRequest {
     pub sk: SensitiveBytes,
     /// Raw error polynomial bytes (witness — encrypted at rest).
     pub eek: SensitiveBytes,
-    /// Raw smudging noise polynomial bytes (witness — encrypted at rest).
-    pub e_sm: SensitiveBytes,
     /// BFV preset for parameter resolution.
     pub params_preset: BfvPreset,
     /// The size of the committee
@@ -281,7 +308,6 @@ impl PkGenerationProofRequest {
         pk0_share: impl Into<ArcBytes>,
         sk: SensitiveBytes,
         eek: SensitiveBytes,
-        e_sm: SensitiveBytes,
         params_preset: BfvPreset,
         committee_size: CiphernodesCommitteeSize,
     ) -> Self {
@@ -290,7 +316,6 @@ impl PkGenerationProofRequest {
             sk,
             eek,
             params_preset,
-            e_sm,
             committee_size,
         }
     }
@@ -370,8 +395,10 @@ pub struct ThresholdShareDecryptionProofRequest {
     pub aggregated_pk_bytes: ArcBytes,
     /// Aggregated secret key polynomial (encrypted at rest).
     pub sk_poly_sum: SensitiveBytes,
-    /// Aggregated smudging error polynomials (encrypted at rest), one per output index.
-    pub es_poly_sum: Vec<SensitiveBytes>,
+    /// Fresh noise polynomials used in the partial shares, one per output index.
+    pub e_fresh: Vec<SensitiveBytes>,
+    /// Signed coefficients of each fresh-noise polynomial, low degree first.
+    pub e_signed: Vec<SensitiveBytes>,
     /// Computed decryption share polynomials, one per output index.
     pub d_share_bytes: Vec<ArcBytes>,
     /// Stable E3 context cryptographically bound into every C6 proof.
@@ -380,6 +407,14 @@ pub struct ThresholdShareDecryptionProofRequest {
     pub params_preset: BfvPreset,
     /// Committee size for per-committee circuit artifact resolution.
     pub committee_size: CiphernodesCommitteeSize,
+    /// Zero-based index of the party that produces this decryption share.
+    pub party_idx: u32,
+    /// Strictly increasing 1-based decryptor ids. Empty selects `1..=H`.
+    pub decryptors: Vec<u32>,
+    /// Outgoing PRF keys indexed by recipient. Empty selects the zero key.
+    pub outgoing_prf_keys: Vec<SensitiveBytes>,
+    /// Incoming PRF keys indexed by sender. Empty selects the zero key.
+    pub incoming_prf_keys: Vec<SensitiveBytes>,
 }
 
 /// Response containing generated proofs for threshold share decryption (C6).
@@ -518,10 +553,8 @@ pub struct VerifyShareDecryptionProofsRequest {
 pub struct PartyShareDecryptionProofsToVerify {
     /// The party that generated these proofs.
     pub sender_party_id: u64,
-    /// Signed C4a proof (SecretKey decryption).
+    /// Signed C4a proof.
     pub signed_sk_decryption_proof: SignedProofPayload,
-    /// Signed C4b proofs (SmudgingNoise decryption), one per smudging noise index.
-    pub signed_e_sm_decryption_proofs: Vec<SignedProofPayload>,
 }
 
 /// Batch verification results for C4 proofs.
@@ -537,6 +570,8 @@ pub struct VerifyShareDecryptionProofsResponse {
 #[derive(Derivative, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derivative(Debug)]
 pub struct DecryptedSharesAggregationProofRequest {
+    /// Exact ciphertext bytes, one per output index, for the c0 prefix binding.
+    pub ciphertext_bytes: Vec<ArcBytes>,
     /// Decryption shares per party: (party_id, shares_per_ct_index).
     pub d_share_polys: Vec<(u64, Vec<ArcBytes>)>,
     /// Decoded plaintext per ciphertext index.

@@ -64,6 +64,15 @@ struct BenchmarkParams {
     plaintext_flow_timeout: Duration,
 }
 
+/// Release a held compute slot even when a history assertion returns early.
+struct ComputeSlotRelease(std::sync::mpsc::Sender<()>);
+
+impl Drop for ComputeSlotRelease {
+    fn drop(&mut self) {
+        let _ = self.0.send(());
+    }
+}
+
 fn select_benchmark_params() -> BenchmarkParams {
     let benchmark_mode = std::env::var("BENCHMARK_MODE").unwrap_or_else(|_| "insecure".to_string());
     let is_secure_mode = benchmark_mode == "secure";
@@ -1422,7 +1431,8 @@ async fn test_trbfv_actor() -> Result<()> {
         params_raw.clone(),
         threshold_n,
         threshold_m,
-        lambda,
+        0,
+        lambda.value(),
     )?));
 
     // Cipher
@@ -1495,6 +1505,16 @@ async fn test_trbfv_actor() -> Result<()> {
         std::env::var("BENCHMARK_RESTART_DURING_DKG").is_ok_and(|value| value == "1");
     let restart_during_decryption =
         std::env::var("BENCHMARK_RESTART_DURING_DECRYPTION").is_ok_and(|value| value == "1");
+    let replace_decryptor =
+        std::env::var("BENCHMARK_REPLACE_DECRYPTOR").is_ok_and(|value| value == "1");
+    anyhow::ensure!(
+        !replace_decryptor
+            || (proof_aggregation_enabled
+                && concurrent_jobs == 1
+                && committee_h > threshold_m + 1
+                && restart_storage.is_none()),
+        "decryptor replacement requires recursive proofs, one compute slot, an H-roster standby, and no restart injection"
+    );
     anyhow::ensure!(
         !restart_during_decryption || (restart_storage.is_some() && !restart_during_dkg),
         "decryption restart requires BENCHMARK_RESTART_PARTY_ID and excludes the DKG restart"
@@ -2309,6 +2329,172 @@ async fn test_trbfv_actor() -> Result<()> {
         ciphertext_commitment: [0u8; 32],
     };
 
+    let mut replaced_decryption_round = None;
+    if replace_decryptor {
+        // Hold the only compute slot, not actor mailboxes: both round requests become durable
+        // before any old share calculation can finish. This avoids proof-speed timing races.
+        let (release, held) = std::sync::mpsc::channel();
+        let release = ComputeSlotRelease(release);
+        let (entered, started) = tokio::sync::oneshot::channel();
+        let held_pool = task_pool.clone();
+        let holding = tokio::spawn(async move {
+            held_pool
+                .spawn(
+                    "hold_decryption_round_replacement".into(),
+                    [(60, tracing::Level::WARN)],
+                    move || {
+                        let _ = entered.send(());
+                        let _ = held.recv();
+                    },
+                )
+                .await
+        });
+        tokio::time::timeout(plaintext_flow_timeout, started)
+            .await
+            .context("compute barrier admission timed out")??;
+        bus.publish_without_context(ciphertext_published_event.clone())?;
+
+        let excluded_party = accepted_rosters[0]
+            .iter()
+            .take(threshold_m + 1)
+            .copied()
+            .find(|&party| committee[party as usize] != active_aggregator_addr)
+            .context("initial decryptor set has no non-aggregator exclusion target")?;
+        let excluded_address = committee[excluded_party as usize].clone();
+        let excluded_index = find_node_index_by_address(&nodes, &excluded_address)?;
+        let old_history = wait_for_history_match(
+            &nodes,
+            excluded_index,
+            0,
+            "old-round share calculation",
+            plaintext_flow_timeout,
+            |data| {
+                matches!(data, InterfoldEventData::ComputeRequest(request)
+                if request.e3_id == e3_id && matches!(&request.request,
+                    ComputeRequestKind::TrBFV(TrBFVRequest::CalculateDecryptionShare(share))
+                    if share.party_idx as u64 == excluded_party))
+            },
+        )
+        .await?;
+        let old_request = old_history
+            .iter()
+            .rev()
+            .find_map(|event| match event.get_data() {
+                InterfoldEventData::ComputeRequest(request) if request.e3_id == e3_id => {
+                    match &request.request {
+                        ComputeRequestKind::TrBFV(TrBFVRequest::CalculateDecryptionShare(
+                            share,
+                        )) if share.party_idx as u64 == excluded_party => {
+                            Some((request.correlation_id, share.decryptors.clone()))
+                        }
+                        _ => None,
+                    }
+                }
+                _ => None,
+            })
+            .context("missing old-round compute request")?;
+        let (old_correlation, old_ids) = old_request;
+        let continuing_id = *old_ids
+            .iter()
+            .find(|&&id| u64::from(id) != excluded_party + 1)
+            .context("old round has no continuing decryptor")?;
+        let continuing_index =
+            find_node_index_by_address(&nodes, &committee[continuing_id as usize - 1])?;
+
+        // Inject the quorum-confirmed domain fact through every node's durable pipeline. This
+        // models exclusion delivery, not accusation consensus or an on-chain slashing transaction.
+        bus.publish_without_context(e3_events::CommitteeMemberExcluded {
+            e3_id: e3_id.clone(),
+            node: excluded_address.parse()?,
+            proof_type: ProofType::C6ThresholdShareDecryption,
+            party_id: Some(excluded_party),
+        })?;
+        let new_history = wait_for_history_match(
+            &nodes,
+            continuing_index,
+            0,
+            "replacement-round share calculation",
+            plaintext_flow_timeout,
+            |data| {
+                matches!(data, InterfoldEventData::ComputeRequest(request)
+                if request.e3_id == e3_id && matches!(&request.request,
+                    ComputeRequestKind::TrBFV(TrBFVRequest::CalculateDecryptionShare(share))
+                    if share.decryptors != old_ids))
+            },
+        )
+        .await?;
+        let replacement = new_history
+            .iter()
+            .rev()
+            .find_map(|event| match event.get_data() {
+                InterfoldEventData::ComputeRequest(request) if request.e3_id == e3_id => {
+                    match &request.request {
+                        ComputeRequestKind::TrBFV(TrBFVRequest::CalculateDecryptionShare(
+                            share,
+                        )) if share.decryptors != old_ids => Some(share.decryptors.clone()),
+                        _ => None,
+                    }
+                }
+                _ => None,
+            })
+            .context("missing replacement-round compute request")?;
+        anyhow::ensure!(
+            replacement.len() == threshold_m + 1
+                && !replacement
+                    .iter()
+                    .any(|&id| u64::from(id) == excluded_party + 1)
+                && old_ids
+                    .iter()
+                    .filter(|&&id| u64::from(id) != excluded_party + 1)
+                    .all(|id| replacement.contains(id)),
+            "replacement did not retain the surviving designated set"
+        );
+        for &id in &replacement {
+            let index = find_node_index_by_address(&nodes, &committee[id as usize - 1])?;
+            wait_for_history_match(
+                &nodes,
+                index,
+                0,
+                "converged replacement round",
+                plaintext_flow_timeout,
+                |data| {
+                    matches!(data, InterfoldEventData::ComputeRequest(request)
+                    if request.e3_id == e3_id && matches!(&request.request,
+                        ComputeRequestKind::TrBFV(TrBFVRequest::CalculateDecryptionShare(share))
+                        if share.decryptors == replacement))
+                },
+            )
+            .await?;
+        }
+        wait_for_history_match(
+            &nodes,
+            excluded_index,
+            0,
+            "excluded node received the replacement boundary",
+            plaintext_flow_timeout,
+            |data| {
+                matches!(data, InterfoldEventData::CommitteeMemberExcluded(event)
+                if event.e3_id == e3_id && event.party_id == Some(excluded_party))
+            },
+        )
+        .await?;
+        drop(release);
+        holding.await??;
+        wait_for_history_match(
+            &nodes,
+            excluded_index,
+            0,
+            "retired calculation response",
+            plaintext_flow_timeout,
+            |data| {
+                matches!(data, InterfoldEventData::ComputeResponse(response)
+                if response.e3_id == e3_id && response.correlation_id == old_correlation)
+            },
+        )
+        .await?;
+        replaced_decryption_round = Some((replacement, excluded_index, excluded_party));
+    }
+
     if restart_during_decryption {
         bus.publish_without_context(ciphertext_published_event.clone())?;
     }
@@ -2405,7 +2591,7 @@ async fn test_trbfv_actor() -> Result<()> {
         println!("Restarted committee party {restart_party_id} at node index {node_index}");
     }
 
-    if !restart_during_decryption {
+    if !restart_during_decryption && !replace_decryptor {
         bus.publish_without_context(ciphertext_published_event.clone())?;
     }
 
@@ -2432,6 +2618,27 @@ async fn test_trbfv_actor() -> Result<()> {
         })?;
 
     let observer_history = nodes.get_history(0).await?;
+    if let Some((replacement, excluded_index, excluded_party)) = &replaced_decryption_round {
+        let excluded_history = nodes.get_history(*excluded_index).await?;
+        anyhow::ensure!(
+            !excluded_history
+                .iter()
+                .any(|event| matches!(event.get_data(),
+            InterfoldEventData::ShareDecryptionProofPending(pending)
+                if pending.e3_id == e3_id && pending.party_id == *excluded_party)),
+            "retired share calculation initiated a C6 proof"
+        );
+        for event in observer_history.iter() {
+            if let InterfoldEventData::DecryptionshareCreated(share) = event.get_data() {
+                if share.e3_id == e3_id {
+                    anyhow::ensure!(
+                        share.decryptors == *replacement && share.party_id != *excluded_party,
+                        "retired designated set published a signed share"
+                    );
+                }
+            }
+        }
+    }
     let actual_types = project_history(&observer_history, |data| match data {
         InterfoldEventData::CiphertextOutputPublished(event) if event.e3_id == e3_id => {
             Some("CiphertextOutputPublished")

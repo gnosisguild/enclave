@@ -22,6 +22,8 @@ use serde::Deserialize;
 use serde::Serialize;
 
 pub struct ShareComputationCircuitData {
+    /// Directed pairwise keys indexed by recipient, before packing into limb zero.
+    pub prf_keys: Vec<Vec<u8>>,
     /// Which secret type this data is for (determines which branch to use in data).
     pub dkg_input_type: DkgInputType,
     pub secret: CrtPolynomial,
@@ -35,6 +37,7 @@ pub struct ShareComputationCircuitData {
 /// ensuring the circuit's secret consistency (y[i][j][0] == e_sm_secret[j][i]), range check, and parity check pass.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Inputs {
+    pub prf_keys: Vec<Vec<u8>>,
     /// Secret polynomial in CRT form (SK or smudging noise). Coefficients in [0, zkp_modulus) for serialization.
     pub secret_crt: CrtPolynomial,
     /// y[coeff_idx][mod_idx][0] = secret at (mod_idx, coeff_idx); y[coeff_idx][mod_idx][1 + party] = share for party. Values in [0, zkp_modulus).
@@ -55,6 +58,12 @@ impl Inputs {
         let degree = threshold_params.degree();
         let num_moduli = moduli.len();
         let committee = config.committee.values();
+        let preset = e3_fhe_params::BfvPreset::from_threshold_parameters(
+            threshold_params.degree(),
+            threshold_params.plaintext(),
+            moduli,
+        )
+        .ok_or_else(|| WitnessError::Other("unsupported threshold parameters".into()))?;
         crate::validation::crt("secret", &data.secret, threshold_params)?;
         if data.secret_sss.len() != num_moduli
             || data
@@ -67,6 +76,16 @@ impl Inputs {
             ));
         }
         let n_parties = committee.n;
+        if data.prf_keys.len() != committee.n
+            || data
+                .prf_keys
+                .iter()
+                .any(|key| key.len() * 8 != e3_fhe_params::prf_key_bit_len(preset))
+        {
+            return Err(WitnessError::Other(
+                "PRF keys do not match the preset and committee".into(),
+            ));
+        }
 
         let mut secret_crt = data.secret.clone();
         let sss = &data.secret_sss;
@@ -128,6 +147,7 @@ impl Inputs {
         };
 
         Ok(Inputs {
+            prf_keys: data.prf_keys.clone(),
             secret_crt,
             y,
             expected_secret_commitment,
@@ -149,6 +169,8 @@ impl Inputs {
         };
 
         let mut json = serde_json::json!({
+            "prf_keys": self.prf_keys.iter().map(|key| e3_fhe_params::prf_key_bits(key)).collect::<Vec<_>>(),
+            "prf_key_commitments": self.prf_keys.iter().enumerate().map(|(recipient, key)| crate::prf::key_commitment(recipient as u32, key).to_string()).collect::<Vec<_>>(),
             "y": bigint_3d_to_json_values(&self.y),
             "expected_secret_commitment": self.expected_secret_commitment.to_string(),
         });

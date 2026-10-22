@@ -213,6 +213,9 @@ contract CiphernodeRegistryOwnable is
 
     /// @dev Removed tree slots that can be assigned to future registrations.
     uint40[] private _freeCiphernodeTreeIndices;
+    /// @dev Appended storage: old ESM anchors remain reserved, never reinterpreted as PRF data.
+    mapping(uint256 e3Id => bytes32[] commitments)
+        internal dkgPrfKeyCommitments;
 
     ////////////////////////////////////////////////////////////
     //                                                        //
@@ -446,30 +449,15 @@ contract CiphernodeRegistryOwnable is
         bytes calldata proof,
         bytes calldata dkgAttestationBundle
     ) internal {
-        require(dkgAttestationBundle.length > 0, FoldAttestationsRequired());
-        IDkgFoldAttestationVerifier verifier = _dkgFoldAttestationVerifierFor(
-            e3Id
+        RegistrySortitionLib.recordDkgAnchors(
+            dkgPartyIds,
+            dkgSkAggCommits,
+            dkgPrfKeyCommitments,
+            e3Id,
+            _dkgFoldAttestationVerifierFor(e3Id),
+            proof,
+            dkgAttestationBundle
         );
-        require(
-            address(verifier) != address(0),
-            FoldAttestationVerifierNotSet()
-        );
-
-        (
-            uint256[] memory partyIds,
-            bytes32[] memory skAgg,
-            bytes32[] memory esmAgg
-        ) = verifier.verify(
-                address(this),
-                block.chainid,
-                e3Id,
-                proof,
-                dkgAttestationBundle
-            );
-
-        dkgPartyIds[e3Id] = partyIds;
-        dkgSkAggCommits[e3Id] = skAgg;
-        dkgEsmAggCommits[e3Id] = esmAgg;
     }
 
     /// @notice Propose a new DKG fold-attestation verifier. The change becomes active
@@ -1119,6 +1107,13 @@ contract CiphernodeRegistryOwnable is
             );
     }
 
+    /// @inheritdoc ICiphernodeRegistry
+    function getDkgPrfKeyCommitments(
+        uint256 e3Id
+    ) external view returns (bytes32[] memory) {
+        return dkgPrfKeyCommitments[e3Id];
+    }
+
     /// @notice Returns the current size of the ciphernode IMT
     /// @return Size of the IMT
     function treeSize() external view returns (uint256) {
@@ -1328,5 +1323,5 @@ contract CiphernodeRegistryOwnable is
 
     /// @dev Reserved storage slots for future upgrades.
     // solhint-disable-next-line var-name-mixedcase
-    uint256[44] private __gap;
+    uint256[43] private __gap;
 }

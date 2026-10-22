@@ -84,26 +84,56 @@ impl ThresholdPlaintextAggregation {
         rejected: BTreeSet<u64>,
     ) -> ThresholdPlaintextAggregatorState {
         current.rejected_parties.extend(rejected);
-        for (party_id, queued) in current.queued_shares {
-            current.shares.entry(party_id).or_insert(queued.share);
-            current.c6_proofs.entry(party_id).or_insert(queued.proofs);
-        }
-        current
-            .shares
-            .retain(|party, _| !current.rejected_parties.contains(party));
-        current
-            .c6_proofs
-            .retain(|party, _| !current.rejected_parties.contains(party));
-        Self::start_verification_if_ready(Collecting {
-            shares: current.shares,
-            c6_proofs: current.c6_proofs,
+        // Every stored share used the previous decryptor set. Drop the batch and collect again.
+        ThresholdPlaintextAggregatorState::Collecting(Collecting {
+            shares: BTreeMap::new(),
+            c6_proofs: BTreeMap::new(),
             ciphertext_output: current.ciphertext_output,
             threshold_m: current.threshold_m,
             threshold_n: current.threshold_n,
             params: current.params,
             seed: current.seed,
             rejected_parties: current.rejected_parties,
+            expected_decryptors: Vec::new(),
         })
+    }
+
+    /// Pick the first `threshold + 1` honest, non-rejected committee members as 1-based
+    /// decryptor ids for a fresh synchronized-decryption round.
+    pub(crate) fn fresh_decryptor_ids(
+        committee: &[alloy::primitives::Address],
+        honest: &[alloy::primitives::Address],
+        rejected: &BTreeSet<u64>,
+        threshold_m: u64,
+    ) -> Result<Vec<u32>> {
+        let Ok(threshold) = usize::try_from(threshold_m) else {
+            bail!("threshold does not fit usize");
+        };
+        let reconstruction = threshold + 1;
+        let mut decryptors = Vec::with_capacity(reconstruction);
+        for (index, address) in committee.iter().enumerate() {
+            let party = index as u64;
+            if rejected.contains(&party) || !honest.contains(address) {
+                continue;
+            }
+            let Ok(party) = u32::try_from(party) else {
+                bail!("party id does not fit u32");
+            };
+            let Some(id) = party.checked_add(1) else {
+                bail!("party id cannot become a 1-based decryptor id");
+            };
+            decryptors.push(id);
+            if decryptors.len() == reconstruction {
+                break;
+            }
+        }
+        if decryptors.len() != reconstruction {
+            bail!(
+                "honest parties left {} and a fresh round needs {reconstruction}",
+                decryptors.len()
+            );
+        }
+        Ok(decryptors)
     }
 
     /// Apply a committee-member expulsion to a `Collecting` state, removing the party's share

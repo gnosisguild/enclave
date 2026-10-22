@@ -212,14 +212,17 @@ mod tests {
         );
 
         assert_eq!(dkg.degree(), 8192);
-        assert_eq!(dkg.plaintext(), 576460752317792257);
-        assert_eq!(dkg.moduli(), &[0x2000000000104001, 0x200000000013c001]);
-        assert_eq!(dkg_q.to_string(), "5316911983145103662415181469253369857");
+        assert_eq!(dkg.plaintext(), 1152921504635584514);
+        assert_eq!(dkg.moduli(), &[0x24c2230d75cdc001, 0x260dfc1463740001]);
+        assert_eq!(dkg_q.to_string(), "7263115810589791777907646370601353217");
         assert_eq!(
             (&dkg_q / dkg.plaintext()).to_string(),
-            "9223372036634312696"
+            "6299748752527187686"
         );
-        assert_eq!(&dkg_q % dkg.plaintext(), BigUint::from(3169161947774985u64));
+        assert_eq!(
+            &dkg_q % dkg.plaintext(),
+            BigUint::from(877147769408258613u64)
+        );
         assert_eq!(BfvPreset::SecureThreshold8192.metadata().lambda, 45);
         assert_eq!(BfvPreset::SecureDkg8192.metadata().lambda, 45);
 

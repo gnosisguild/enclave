@@ -28,6 +28,16 @@ pub async fn setup_compiled_circuit_for_committee(
     circuit_name: &str,
     committee: &str,
 ) {
+    setup_compiled_circuit_for_preset(backend, group, circuit_name, "insecure-64", committee).await;
+}
+
+pub async fn setup_compiled_circuit_for_preset(
+    backend: &ZkBackend,
+    group: &str,
+    circuit_name: &str,
+    preset: &str,
+    committee: &str,
+) {
     let target_dir = circuits_build_root().join(group).join("target");
     let json_path = target_dir.join(format!("{circuit_name}.json"));
     let vk_evm_path = target_dir.join(format!("{circuit_name}.vk"));
@@ -48,8 +58,7 @@ pub async fn setup_compiled_circuit_for_committee(
         vk_evm_path.display()
     );
 
-    // Tests use insecure params — fixtures go under insecure-64/{committee}/
-    let preset_dir = backend.circuits_dir.join("insecure-64").join(committee);
+    let preset_dir = backend.circuits_dir.join(preset).join(committee);
 
     // Set up the evm variant directory (keccak VK + hash)
     let evm_dir = preset_dir.join("evm").join(group).join(circuit_name);
@@ -210,7 +219,9 @@ pub async fn setup_test_prover(bb: &PathBuf) -> (ZkBackend, TempDir) {
 
     let temp_path = temp.path();
     let noir_dir = temp_path.join("noir");
-    let bb_binary = BBPath::check(noir_dir.join("bin").join("bb")).unwrap();
+    // The caller already resolved the real binary. The symlink destination must stay inside
+    // this fixture even when E3_CUSTOM_BB is set, rather than point back at that existing binary.
+    let bb_binary = BBPath::Default(noir_dir.join("bin").join("bb"));
     let circuits_dir = noir_dir.join("circuits");
     let work_dir = noir_dir.join("work").join("test_node");
     let backend = ZkBackend::new(bb_binary.clone(), circuits_dir.clone(), work_dir.clone());

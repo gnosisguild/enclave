@@ -76,10 +76,11 @@ impl CircuitOutputLayout {
 /// C6 — Threshold share decryption public inputs.
 pub const THRESHOLD_SHARE_DECRYPTION_INPUTS: &[OutputField] = &[
     f("expected_sk_commitment"),
-    f("expected_e_sm_commitment"),
     f("ct_commitment"),
+    f("c0_commitment"),
     f("domain_hi"),
     f("domain_lo"),
+    f("party_idx"),
 ];
 
 /// C3 — Share encryption public return (`-> pub Field`).
@@ -95,8 +96,7 @@ const fn f(name: &'static str) -> OutputField {
 pub const PK_BFV_OUTPUTS: &[OutputField] = &[f("pk_commitment")];
 
 /// C1 — Threshold public key generation.
-pub const PK_GENERATION_OUTPUTS: &[OutputField] =
-    &[f("sk_commitment"), f("pk_commitment"), f("e_sm_commitment")];
+pub const PK_GENERATION_OUTPUTS: &[OutputField] = &[f("sk_commitment"), f("pk_commitment")];
 
 /// C4 — DKG share decryption.
 pub const DKG_SHARE_DECRYPTION_OUTPUTS: &[OutputField] = &[f("commitment")];
@@ -113,6 +113,9 @@ pub const THRESHOLD_SHARE_DECRYPTION_OUTPUTS: &[OutputField] = &[f("d_commitment
 pub const SHARE_ENCRYPTION_INPUTS: &[OutputField] = &[
     f("expected_pk_commitment"),
     f("expected_message_commitment"),
+    f("recipient_party_idx"),
+    f("row_idx"),
+    f("prf_key_commitment"),
 ];
 
 /// Describes the public input layout of a circuit.
@@ -171,15 +174,14 @@ mod tests {
     }
 
     #[test]
-    fn extract_c1_pk_commitment_from_middle() {
+    fn extract_c1_pk_commitment() {
         let layout = CircuitOutputLayout::Fixed {
             fields: PK_GENERATION_OUTPUTS,
         };
-        // C1 has no pub inputs, only 3 outputs = 96 bytes total
-        let mut signals = vec![0u8; 96];
+        // Fresh noise no longer belongs to key generation: C1 has two outputs.
+        let mut signals = vec![0u8; 64];
         signals[0..32].copy_from_slice(&[0x11; 32]); // sk_commitment
         signals[32..64].copy_from_slice(&[0x22; 32]); // pk_commitment
-        signals[64..96].copy_from_slice(&[0x33; 32]); // e_sm_commitment
 
         assert_eq!(
             layout.extract_field(&signals, "sk_commitment").unwrap(),
@@ -189,10 +191,7 @@ mod tests {
             layout.extract_field(&signals, "pk_commitment").unwrap(),
             &[0x22; 32]
         );
-        assert_eq!(
-            layout.extract_field(&signals, "e_sm_commitment").unwrap(),
-            &[0x33; 32]
-        );
+        assert!(layout.extract_field(&signals, "e_sm_commitment").is_none());
     }
 
     #[test]
@@ -235,8 +234,8 @@ mod tests {
         let layout = CircuitOutputLayout::Fixed {
             fields: PK_GENERATION_OUTPUTS,
         };
-        // Need 96 bytes for 3 outputs, only 64 available
-        let signals = vec![0u8; 64];
+        // Need 64 bytes for two outputs, only 32 available.
+        let signals = vec![0u8; 32];
         assert!(layout.extract_field(&signals, "pk_commitment").is_none());
     }
 
@@ -247,7 +246,7 @@ mod tests {
                 fields: PK_GENERATION_OUTPUTS
             }
             .field_count(),
-            Some(3)
+            Some(2)
         );
         assert_eq!(CircuitOutputLayout::None.field_count(), Some(0));
         assert_eq!(CircuitOutputLayout::Dynamic.field_count(), None);
@@ -317,13 +316,11 @@ mod tests {
             &[0x11; 32]
         );
         assert_eq!(
-            layout
-                .extract_field(&signals, "expected_e_sm_commitment")
-                .unwrap(),
+            layout.extract_field(&signals, "ct_commitment").unwrap(),
             &[0x22; 32]
         );
         assert_eq!(
-            layout.extract_field(&signals, "ct_commitment").unwrap(),
+            layout.extract_field(&signals, "c0_commitment").unwrap(),
             &[0x33; 32]
         );
         assert_eq!(
@@ -341,7 +338,7 @@ mod tests {
         let layout = CircuitInputLayout::Fixed {
             fields: THRESHOLD_SHARE_DECRYPTION_INPUTS,
         };
-        assert!(layout.extract_field(&[0u8; 64], "ct_commitment").is_none());
+        assert!(layout.extract_field(&[0u8; 32], "ct_commitment").is_none());
     }
 
     #[test]
@@ -378,7 +375,7 @@ mod tests {
                 fields: SHARE_ENCRYPTION_INPUTS
             }
             .field_count(),
-            Some(2)
+            Some(5)
         );
         assert_eq!(CircuitInputLayout::None.field_count(), Some(0));
     }

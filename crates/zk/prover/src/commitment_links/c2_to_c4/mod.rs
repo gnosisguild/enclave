@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-//! C2a/C2b (ShareComputation) → C4a/C4b (ShareDecryption)
+//! C2a (ShareComputation) → C4a (ShareDecryption)
 //! share-commitment consistency links.
 //!
 //! ## Purpose
@@ -26,13 +26,14 @@
 //!
 //! ```text
 //! [expected_secret_commitment (32 B, skip)]
+//! [outgoing_key_commitments[N] (skip)]
 //! [party_0_mod_0 (32 B)] [party_0_mod_1] ... [party_0_mod_{L-1}]
 //! [party_1_mod_0] ...
 //! [party_{N-1}_mod_{L-1}]
 //! ```
 //!
 //! The first field is the `expected_secret_commitment` public input and is
-//! skipped. The remaining N_PARTIES × L fields are share commitments output
+//! skipped together with the N outgoing-key fields. The remaining N_PARTIES × L fields are share commitments output
 //! by `commit_to_party_shares`, indexed in row-major order (party first, then
 //! modulus).
 //!
@@ -42,6 +43,7 @@
 //! [expected_commitments[0][0] (32 B)] ... [expected_commitments[0][L-1]]
 //! [expected_commitments[1][0]] ...
 //! [expected_commitments[H-1][L-1]]
+//! [recipient index] [incoming key commitments[H]]
 //! [commitment (32 B, TAIL aggregated output)]
 //! ```
 //!
@@ -92,7 +94,14 @@ impl CommitmentLink for C2aToC4aShareCommitmentLink {
     }
 
     fn extract_source_values(&self, public_signals: &[u8]) -> Vec<FieldValue> {
-        extract_share_commitments(public_signals)
+        super::share_computation_messages(public_signals, self.l)
+            .map(|messages| {
+                messages
+                    .chunks_exact(FIELD_BYTE_LEN)
+                    .map(|word| word.try_into().unwrap())
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     fn check_consistency(
@@ -110,76 +119,6 @@ impl CommitmentLink for C2aToC4aShareCommitmentLink {
             self.l,
         )
     }
-}
-
-/// C2b (ESmShareComputation) → C4b (ESmShareDecryption) commitment link.
-pub struct C2bToC4bShareCommitmentLink {
-    /// Number of threshold CRT moduli (L).
-    pub l: usize,
-}
-
-impl CommitmentLink for C2bToC4bShareCommitmentLink {
-    fn name(&self) -> &'static str {
-        "C2b->C4b share commitments"
-    }
-
-    fn source_proof_type(&self) -> ProofType {
-        ProofType::C2bESmShareComputation
-    }
-
-    fn target_proof_type(&self) -> ProofType {
-        ProofType::C4bESmShareDecryption
-    }
-
-    fn scope(&self) -> LinkScope {
-        LinkScope::SourceMustExistInTargets
-    }
-
-    fn extract_source_values(&self, public_signals: &[u8]) -> Vec<FieldValue> {
-        extract_share_commitments(public_signals)
-    }
-
-    fn check_consistency(
-        &self,
-        source_values: &[FieldValue],
-        target_public_signals: &[u8],
-        src_party_id: u64,
-        tgt_party_id: u64,
-    ) -> bool {
-        check_exact_l_commitments(
-            source_values,
-            target_public_signals,
-            src_party_id,
-            tgt_party_id,
-            self.l,
-        )
-    }
-}
-
-/// Extract all share commitments from C2's public signals.
-///
-/// C2 inner-circuit public signals:
-///   - field 0: `expected_secret_commitment` (skipped)
-///   - fields 1..: `commit_to_party_shares[party_idx][mod_idx]` outputs,
-///     row-major (party first, modulus second)
-///
-/// Returns every 32-byte chunk after the first field.
-fn extract_share_commitments(public_signals: &[u8]) -> Vec<FieldValue> {
-    if public_signals.len() < 2 * FIELD_BYTE_LEN {
-        return vec![];
-    }
-    public_signals[FIELD_BYTE_LEN..]
-        .chunks(FIELD_BYTE_LEN)
-        .filter_map(|chunk| {
-            if chunk.len() == FIELD_BYTE_LEN {
-                let mut value = [0u8; FIELD_BYTE_LEN];
-                value.copy_from_slice(chunk);
-                Some(value)
-            } else {
-                None
-            }
-        })
-        .collect()
 }
 
 /// Precise L-way check: verifies that the L share commitments C2_X computed

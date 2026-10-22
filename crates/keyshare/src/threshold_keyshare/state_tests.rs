@@ -56,7 +56,7 @@ fn full_happy_path_transitions_in_order() {
         KeyshareState::ReadyForDecryption(rfd()),
         KeyshareState::Decrypting(decrypting()),
         KeyshareState::GeneratingDecryptionProof(gdp()),
-        KeyshareState::Completed,
+        KeyshareState::Completed(completed()),
     ];
     for pair in order.windows(2) {
         assert!(
@@ -79,8 +79,16 @@ fn skipping_a_phase_is_rejected() {
 
 #[test]
 fn backwards_transition_is_rejected() {
-    let completed = KeyshareState::Completed;
+    let completed = KeyshareState::Completed(completed());
     assert!(completed.next(KeyshareState::Init).is_err());
+}
+
+#[test]
+fn a_signed_share_can_decrypt_for_a_new_round() {
+    let completed = KeyshareState::Completed(completed());
+    assert!(completed
+        .next(KeyshareState::Decrypting(decrypting()))
+        .is_ok());
 }
 
 #[test]
@@ -101,7 +109,7 @@ fn failure_is_terminal_and_reachable_from_active_dkg() {
         })
         .is_err());
     assert!(failed.next(KeyshareState::Init).is_err());
-    assert!(KeyshareState::Completed
+    assert!(KeyshareState::Completed(completed())
         .next(KeyshareState::Failed {
             failed_at_stage: E3Stage::CommitteeFinalized,
             reason: FailureReason::DKGTimeout,
@@ -110,9 +118,23 @@ fn failure_is_terminal_and_reachable_from_active_dkg() {
 }
 
 #[test]
+fn new_state_preserves_metadata_and_advances_phase() {
+    let s = base_state(KeyshareState::Init);
+    let next = s
+        .clone()
+        .new_state(KeyshareState::CollectingEncryptionKeys(cek()))
+        .expect("valid transition");
+    assert_eq!(next.variant_name(), "CollectingEncryptionKeys");
+    assert_eq!(next.e3_id, s.e3_id);
+    assert_eq!(next.party_id, s.party_id);
+    assert_eq!(next.threshold_m, s.threshold_m);
+    assert_eq!(next.threshold_n, s.threshold_n);
+}
+
+#[test]
 fn new_state_rejects_illegal_transition() {
     let s = base_state(KeyshareState::Init);
-    assert!(s.new_state(KeyshareState::Completed).is_err());
+    assert!(s.new_state(KeyshareState::Completed(completed())).is_err());
 }
 
 // ---- builders for phase data (minimal, transition logic ignores contents) ----
@@ -133,8 +155,6 @@ fn gts() -> GeneratingThresholdShareData {
     GeneratingThresholdShareData {
         pk_share: None,
         sk_sss: None,
-        esi_sss: None,
-        e_sm_raw: None,
         sk_bfv: sens(),
         pk_bfv: arc(b"pk"),
         collected_encryption_keys: Vec::new(),
@@ -148,12 +168,10 @@ fn adk() -> AggregatingDecryptionKey {
         pk_share: arc(b"pk"),
         sk_bfv: sens(),
         own_sk_share_raw: sens(),
-        own_esi_shares_raw: Vec::new(),
         signed_pk_generation_proof: None,
         signed_sk_share_computation_proof: None,
-        signed_e_sm_share_computation_proof: None,
         signed_sk_share_encryption_proofs: Vec::new(),
-        signed_e_sm_share_encryption_proofs: Vec::new(),
+        outgoing_prf_keys: Vec::new(),
     }
 }
 
@@ -161,12 +179,11 @@ fn rfd() -> ReadyForDecryption {
     ReadyForDecryption {
         pk_share: arc(b"pk"),
         sk_poly_sum: sens(),
-        es_poly_sum: Vec::new(),
         signed_pk_generation_proof: None,
         signed_sk_share_computation_proof: None,
-        signed_e_sm_share_computation_proof: None,
         signed_sk_share_encryption_proofs: Vec::new(),
-        signed_e_sm_share_encryption_proofs: Vec::new(),
+        outgoing_prf_keys: Vec::new(),
+        incoming_prf_keys: Vec::new(),
     }
 }
 
@@ -174,13 +191,27 @@ fn decrypting() -> Decrypting {
     Decrypting {
         pk_share: arc(b"pk"),
         sk_poly_sum: sens(),
-        es_poly_sum: Vec::new(),
         ciphertext_output: Vec::new(),
         signed_pk_generation_proof: None,
         signed_sk_share_computation_proof: None,
-        signed_e_sm_share_computation_proof: None,
         signed_sk_share_encryption_proofs: Vec::new(),
-        signed_e_sm_share_encryption_proofs: Vec::new(),
+        outgoing_prf_keys: Vec::new(),
+        incoming_prf_keys: Vec::new(),
+        decryptors: Vec::new(),
+    }
+}
+
+fn completed() -> Completed {
+    Completed {
+        pk_share: arc(b"pk"),
+        ciphertext_output: Vec::new(),
+        sk_poly_sum: sens(),
+        signed_pk_generation_proof: None,
+        signed_sk_share_computation_proof: None,
+        signed_sk_share_encryption_proofs: Vec::new(),
+        outgoing_prf_keys: Vec::new(),
+        incoming_prf_keys: Vec::new(),
+        decryptors: Vec::new(),
     }
 }
 
@@ -190,8 +221,11 @@ fn gdp() -> GeneratingDecryptionProof {
         decryption_share: Vec::new(),
         signed_pk_generation_proof: None,
         signed_sk_share_computation_proof: None,
-        signed_e_sm_share_computation_proof: None,
         signed_sk_share_encryption_proofs: Vec::new(),
-        signed_e_sm_share_encryption_proofs: Vec::new(),
+        ciphertext_output: Vec::new(),
+        sk_poly_sum: sens(),
+        outgoing_prf_keys: Vec::new(),
+        incoming_prf_keys: Vec::new(),
+        decryptors: Vec::new(),
     }
 }

@@ -86,14 +86,24 @@ async fn published_key_keeps_decryption(active: bool, restart: bool) -> Result<(
         .take(10)
         .enumerate()
         .map(|(party, signer_id)| {
-            let (decryption_share, signed_decryption_proofs) =
-                share_with_matching_commitment(&e3_id, *signer_id, &test_ciphertexts()[..1]);
+            let (decryption_share, mut signed_decryption_proofs) =
+                share_with_matching_commitment_in_set(
+                    &e3_id,
+                    party as u64,
+                    &test_ciphertexts()[..1],
+                    &(1..=10).collect::<Vec<_>>(),
+                );
+            for proof in &mut signed_decryption_proofs {
+                *proof = SignedProofPayload::sign(proof.payload.clone(), &test_signer(*signer_id))
+                    .unwrap();
+            }
             DecryptionshareCreated {
                 e3_id: e3_id.clone(),
                 party_id: party as u64,
                 node: committee[party].to_string(),
                 decryption_share,
                 signed_decryption_proofs,
+                decryptors: (1..=10).collect(),
             }
         })
         .collect();

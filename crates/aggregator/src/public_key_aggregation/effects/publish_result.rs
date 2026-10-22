@@ -96,15 +96,15 @@ impl PublicKeyAggregator {
                 // Mock registry observations need the final proof's roster and key fields.
                 // The C5 proof bytes remain invalid for a production DKG verifier.
                 let h = honest_party_ids.len();
-                let mut inputs = vec![[0u8; 32]; 6 + 3 * h];
+                let mut inputs = vec![[0u8; 32]; 6 + 2 * h + h * committee_addresses.len()];
                 for (slot, party) in honest_party_ids.iter().enumerate() {
                     inputs[2 + slot] = alloy::primitives::U256::from(*party).to_be_bytes();
                 }
                 let hash =
                     e3_committee_hash::committee_hash_limbs_from_addresses(&committee_addresses);
-                inputs[3 + h] = hash.hi.0;
-                inputs[4 + h] = hash.lo.0;
-                inputs[5 + 3 * h] = pk_commitment;
+                inputs[2 + h] = hash.hi.0;
+                inputs[3 + h] = hash.lo.0;
+                inputs[5 + 2 * h] = pk_commitment;
                 Proof::new(
                     e3_events::CircuitName::DkgAggregator,
                     c5_proof.data.clone(),

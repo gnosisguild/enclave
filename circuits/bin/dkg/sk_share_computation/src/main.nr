@@ -5,8 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use lib::configs::default::dkg::{
-    L_THRESHOLD, N, PARITY_MATRIX, SHARE_COMPUTATION_BIT_SHARE, SHARE_COMPUTATION_SK_BIT_SECRET,
-    SHARE_COMPUTATION_SK_CONFIGS,
+    L_THRESHOLD, N, PARITY_MATRIX, SHARE_COMPUTATION_BIT_SHARE, SHARE_COMPUTATION_PRF_KEY_BITS,
+    SHARE_COMPUTATION_SK_BIT_SECRET, SHARE_COMPUTATION_SK_CONFIGS,
 };
 use lib::configs::default::{N_PARTIES, T};
 use lib::core::dkg::share_computation::SecretKeyShareComputation;
@@ -14,8 +14,10 @@ use lib::math::polynomial::Polynomial;
 
 fn main(
     expected_secret_commitment: pub Field,
+    prf_key_commitments: pub [Field; N_PARTIES],
     sk_secret: Polynomial<N>,
     y: [[[Field; N_PARTIES + 1]; L_THRESHOLD]; N],
+    prf_keys: [[bool; SHARE_COMPUTATION_PRF_KEY_BITS]; N_PARTIES],
 ) -> pub [[Field; L_THRESHOLD]; N_PARTIES] {
     let sk_share_computation: SecretKeyShareComputation<N, L_THRESHOLD, N_PARTIES, T, SHARE_COMPUTATION_SK_BIT_SECRET, SHARE_COMPUTATION_BIT_SHARE> = SecretKeyShareComputation::new(
         SHARE_COMPUTATION_SK_CONFIGS,
@@ -25,5 +27,7 @@ fn main(
         PARITY_MATRIX,
     );
 
-    sk_share_computation.execute()
+    let (messages, keys) = sk_share_computation.execute_with_prf(prf_keys);
+    assert(keys == prf_key_commitments, "PRF key commitment mismatch");
+    messages
 }

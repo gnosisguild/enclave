@@ -13,9 +13,9 @@
 //! **C7 (DecryptedSharesAggregation)** `main` has (in order) `expected_d_commitments`,
 //! `party_ids`, and `message` as public inputs; there are no public return values. So
 //! `public_signals` are:
-//! `[d_commitments (T+1)] [party_ids (T+1)] [message coefficients (MAX_MSG_NON_ZERO_COEFFS)]`.
+//! `[d_commitments (T+1)] [party_ids (T+1)] [message coefficients (MAX_MSG_NON_ZERO_COEFFS)] [c0]`.
 //!
-//! We recover `T+1` as `(total_fields - MAX_MSG_NON_ZERO_COEFFS) / 2`; see **Caveat** below and
+//! We recover `T+1` as `(total_fields - MAX_MSG_NON_ZERO_COEFFS - 1) / 2`; see **Caveat** below and
 //! `circuits/bin/threshold/decrypted_shares_aggregation/src/main.nr`.
 //!
 //! ## Check
@@ -30,7 +30,7 @@
 //! C7 Noir circuit (same value as `Polynomial<MAX_MSG_NON_ZERO_COEFFS>` /
 //! `lib::configs::default::MAX_MSG_NON_ZERO_COEFFS` for that artifact). If you ever ship multiple C7
 //! builds with different message widths, verifying or linking against the wrong artifact will make
-//! `(total_fields - MAX_MSG_NON_ZERO_COEFFS) / 2` wrong and this check will mis-parse
+//! `(total_fields - MAX_MSG_NON_ZERO_COEFFS - 1) / 2` wrong and this check will mis-parse
 //! `public_signals` (false negatives/positives relative to the intended circuit).
 
 use super::{CommitmentLink, FieldValue, LinkScope};
@@ -68,6 +68,28 @@ impl CommitmentLink for C6ToC7DCommitmentLink {
         vec![value]
     }
 
+    fn applies_to(&self, source: &[u8], target: &[u8]) -> bool {
+        let source = super::c2_to_c3::deduplicate(source);
+        let target = super::c2_to_c3::deduplicate(target);
+        if !target.len().is_multiple_of(FIELD_BYTE_LEN) {
+            return false;
+        }
+        let Some(count) = (target.len() / FIELD_BYTE_LEN).checked_sub(MAX_MSG_NON_ZERO_COEFFS + 1)
+        else {
+            return false;
+        };
+        if count == 0 || !count.is_multiple_of(2) {
+            return false;
+        }
+        let s = count / 2;
+        let n = 2 * s - 1;
+        source.len() == (7 + s + 2 * n) * FIELD_BYTE_LEN
+            && source[6 * FIELD_BYTE_LEN..(6 + s) * FIELD_BYTE_LEN]
+                == target[s * FIELD_BYTE_LEN..2 * s * FIELD_BYTE_LEN]
+            && source[2 * FIELD_BYTE_LEN..3 * FIELD_BYTE_LEN]
+                == target[target.len() - FIELD_BYTE_LEN..]
+    }
+
     fn check_signals(&self, source_values: &[FieldValue], target_public_signals: &[u8]) -> bool {
         if source_values.is_empty() {
             return false;
@@ -80,7 +102,7 @@ impl CommitmentLink for C6ToC7DCommitmentLink {
         // C7: `circuits/.../decrypted_shares_aggregation/src/main.nr` — public inputs in order:
         // (T+1) d commitments, (T+1) party IDs, `MAX_MSG_NON_ZERO_COEFFS` message coefficients.
         let total_fields = target_public_signals.len() / FIELD_BYTE_LEN;
-        let rem = total_fields.checked_sub(MAX_MSG_NON_ZERO_COEFFS);
+        let rem = total_fields.checked_sub(MAX_MSG_NON_ZERO_COEFFS + 1);
         let Some(rem) = rem else {
             return false;
         };
@@ -132,6 +154,7 @@ mod tests {
         for _ in 0..MAX_MSG_NON_ZERO_COEFFS {
             v.extend_from_slice(&make_field(0));
         }
+        v.extend_from_slice(&make_field(0)); // c0-prefix commitment
         v
     }
 
@@ -199,5 +222,27 @@ mod tests {
     fn short_target_signals_treated_as_inconsistent() {
         let link = C6ToC7DCommitmentLink;
         assert!(!link.check_signals(&[make_field(1)], &[0u8; 16]));
+    }
+
+    #[test]
+    fn replaced_sets_and_other_ciphertexts_are_not_comparable() {
+        let link = C6ToC7DCommitmentLink;
+        let ids = [make_field(1), make_field(3)];
+        let mut target = c7_public_signals(&[make_field(10), make_field(20)], &ids);
+        let mut source = vec![0; 15 * FIELD_BYTE_LEN];
+        source[6 * FIELD_BYTE_LEN..8 * FIELD_BYTE_LEN].copy_from_slice(&ids.concat());
+        assert!(link.applies_to(&source, &target));
+        target[3 * FIELD_BYTE_LEN + 31] = 2;
+        assert!(
+            !link.applies_to(&source, &target),
+            "a later set cannot accuse an earlier share"
+        );
+        target[3 * FIELD_BYTE_LEN + 31] = 3;
+        let last = target.len() - 1;
+        target[last] = 1;
+        assert!(
+            !link.applies_to(&source, &target),
+            "another ciphertext is not a negative lookup"
+        );
     }
 }

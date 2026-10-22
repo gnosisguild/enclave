@@ -24,11 +24,13 @@ pub(crate) fn c7_proofs_match_batch(
         .enumerate()
         .all(|(index, (proof, message))| {
             if proof.circuit != CircuitName::DecryptedSharesAggregation
-                || proof.public_signals.len() != (2 * slots + MAX_MSG_NON_ZERO_COEFFS) * 32
+                || proof.public_signals.len() != (2 * slots + MAX_MSG_NON_ZERO_COEFFS + 1) * 32
             {
                 return false;
             }
             let fields: Vec<_> = proof.public_signals.chunks_exact(32).collect();
+            let c0_commitment = fields[2 * slots + MAX_MSG_NON_ZERO_COEFFS];
+            let c6_inputs = CircuitName::ThresholdShareDecryption.input_layout();
             for (slot, (party, shares)) in c6.iter().take(slots).enumerate() {
                 let Some(commitment) = shares
                     .get(index)
@@ -37,6 +39,9 @@ pub(crate) fn c7_proofs_match_batch(
                     return false;
                 };
                 if fields[slot] != commitment
+                    || shares.get(index).and_then(|share| {
+                        c6_inputs.extract_field(&share.public_signals, "c0_commitment")
+                    }) != Some(c0_commitment)
                     || fields[slots + slot]
                         != (U256::from(*party) + U256::from(1)).to_be_bytes::<32>()
                 {
@@ -47,7 +52,7 @@ pub(crate) fn c7_proofs_match_batch(
                 return false;
             };
             message.resize(MAX_MSG_NON_ZERO_COEFFS, 0);
-            fields[2 * slots..]
+            fields[2 * slots..2 * slots + MAX_MSG_NON_ZERO_COEFFS]
                 .iter()
                 .zip(message)
                 .all(|(field, value)| *field == U256::from(value).to_be_bytes::<32>())

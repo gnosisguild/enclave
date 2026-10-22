@@ -33,27 +33,20 @@ fn field_from_file(path: &Path) -> Result<Fr> {
 
 pub fn hashes(root: &Path) -> Result<[(&'static str, [u8; 32]); 2]> {
     let fold = |name| load(root, "default", "recursive_aggregation", name);
-    let c2 = compute_vk_hash(vec![
-        load(root, "recursive", "dkg", "sk_share_computation")?,
-        load(root, "recursive", "dkg", "e_sm_share_computation")?,
-    ]);
+    let c2 = load(root, "recursive", "dkg", "sk_share_computation")?;
     let c3_chain = compute_vk_hash(vec![
         fold("c3_fold")?,
         fold("c3_fold_kernel")?,
         load(root, "recursive", "dkg", "share_encryption")?,
     ]);
-    let c3 = compute_vk_hash(vec![c3_chain, c3_chain]);
     let c4_key = load(root, "recursive", "dkg", "share_decryption")?;
-    let c4 = compute_vk_hash(vec![c4_key, c4_key]);
     let node = compute_vk_hash(vec![
         load(root, "recursive", "dkg", "pk")?,
         load(root, "recursive", "threshold", "pk_generation")?,
-        fold("c2ab_fold")?,
         c2,
-        fold("c3ab_fold")?,
-        c3,
-        fold("c4ab_fold")?,
-        c4,
+        fold("c3_fold")?,
+        c3_chain,
+        c4_key,
     ]);
     let nodes = compute_vk_hash(vec![
         fold("nodes_fold")?,

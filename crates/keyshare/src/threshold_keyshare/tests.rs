@@ -31,14 +31,15 @@ use e3_events::{
     Remove, Sequencer, SignedProofPayload, StoreEventRequested, StoreEventResponse, TakeEvents,
     TestEvent, Unsequenced, VerificationKind,
 };
-use e3_fhe_params::{encode_bfv_params, BfvParamSet, BfvPreset, DEFAULT_BFV_PRESET};
+use e3_fhe_params::{encode_bfv_params, BfvParamSet, BfvPreset, LambdaConfig, DEFAULT_BFV_PRESET};
 use e3_request::{
     ContextRepositoryFactory, E3Context, E3ContextParams, E3ContextSnapshot, E3Extension,
     E3LifecycleCoordinator, E3LifecycleRepositoryFactory, E3Meta, RouterRepositoryFactory,
     META_KEY,
 };
 use e3_trbfv::{
-    gen_esi_sss::GenEsiSssRequest, TrBFVConfig, TrBFVError, TrBFVFailure, TrBFVRequest,
+    gen_pk_share_and_sk_sss::GenPkShareAndSkSssRequest, TrBFVConfig, TrBFVError, TrBFVFailure,
+    TrBFVRequest,
 };
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -503,8 +504,6 @@ async fn a_rebuilt_share_collector_does_not_wait_for_an_expelled_party() -> Resu
         KeyshareState::GeneratingThresholdShare(GeneratingThresholdShareData {
             pk_share: None,
             sk_sss: None,
-            esi_sss: None,
-            e_sm_raw: None,
             sk_bfv: SensitiveBytes::from_encrypted(&[1]),
             pk_bfv: ArcBytes::from_bytes(&[2]),
             collected_encryption_keys: [0, 1, 2]
@@ -1484,23 +1483,17 @@ fn peer_key(e3_id: &E3id, party_id: u64) -> EncryptionKeyCreated {
 
 fn peer_share(e3_id: &E3id, party_id: u64) -> ThresholdShareCreated {
     ThresholdShareCreated {
-        signature: Default::default(),
         e3_id: e3_id.clone(),
         share: Arc::new(ThresholdShare {
             party_id,
             pk_share: ArcBytes::from_bytes(&[party_id as u8]),
             sk_sss: Default::default(),
-            esi_sss: Vec::new(),
         }),
         target_party_id: 0,
         external: true,
         signed_c2a_proof: None,
-        signed_c2b_proof: None,
         signed_c3a_proofs: Vec::new(),
-        signed_c3b_proofs: Vec::new(),
     }
-    .sign(&dealer_signer(party_id))
-    .unwrap()
 }
 
 async fn wait_for_keyshare_state(
@@ -1723,26 +1716,12 @@ fn gen_pk_response(cipher: &Cipher, e3_id: &E3id, seq: u64) -> Result<TypedEvent
                 pk0_share_raw: ArcBytes::from_bytes(&[4]),
                 sk_raw: SensitiveBytes::new([5], cipher)?,
                 eek_raw: SensitiveBytes::new([6], cipher)?,
-                e_sm_raw: SensitiveBytes::new([7], cipher)?,
             }),
             CorrelationId::new(),
             e3_id.clone(),
         ),
         test_ec(seq),
     ))
-}
-
-fn gen_esi_response(e3_id: &E3id, seq: u64) -> TypedEvent<ComputeResponse> {
-    TypedEvent::new(
-        ComputeResponse::trbfv(
-            TrBFVResponse::GenEsiSss(GenEsiSssResponse {
-                esi_sss: Vec::new(),
-            }),
-            CorrelationId::new(),
-            e3_id.clone(),
-        ),
-        test_ec(seq),
-    )
 }
 
 #[actix::test]
@@ -1766,18 +1745,12 @@ async fn replayed_dkg_outputs_wait_for_their_prerequisites() -> Result<()> {
     });
 
     let pk_response = gen_pk_response(&cipher, &e3_id, 2)?;
-    let esi_response = gen_esi_response(&e3_id, 3);
     actor.handle_gen_pk_share_and_sk_sss_response(pk_response.clone())?;
-    actor.handle_gen_esi_sss_response(esi_response.clone())?;
     let (mut repeated_pk, repeated_pk_ec) = pk_response.clone().into_components();
     repeated_pk.correlation_id = CorrelationId::new();
     actor.handle_gen_pk_share_and_sk_sss_response(TypedEvent::new(repeated_pk, repeated_pk_ec))?;
-    let (mut repeated_esi, repeated_esi_ec) = esi_response.clone().into_components();
-    repeated_esi.correlation_id = CorrelationId::new();
-    actor.handle_gen_esi_sss_response(TypedEvent::new(repeated_esi, repeated_esi_ec))?;
 
     assert_eq!(actor.pending.gen_pk_response, Some(pk_response));
-    assert_eq!(actor.pending.gen_esi_response, Some(esi_response));
     assert!(matches!(
         actor.state.try_get()?.state,
         KeyshareState::CollectingEncryptionKeys(_)
@@ -1787,7 +1760,7 @@ async fn replayed_dkg_outputs_wait_for_their_prerequisites() -> Result<()> {
 
 #[actix::test]
 async fn recovered_encryption_keys_reuse_the_replayed_key_output() -> Result<()> {
-    let (bus, history) = test_bus();
+    let (bus, _) = test_bus();
     let e3_id = E3id::new("replay-output", 1);
     let cipher = Arc::new(Cipher::from_password("test-password").await?);
     let (state, _) = test_state(&e3_id, collecting_encryption_keys_state(&e3_id));
@@ -1796,7 +1769,7 @@ async fn recovered_encryption_keys_reuse_the_replayed_key_output() -> Result<()>
         bus,
         cipher: cipher.clone(),
         state,
-        share_enc_preset: DEFAULT_BFV_PRESET,
+        share_enc_preset: BfvPreset::InsecureDkg64,
         interfold_address: Address::ZERO,
         signer: alloy::signers::local::PrivateKeySigner::random(),
         effects_enabled: false,
@@ -1806,28 +1779,29 @@ async fn recovered_encryption_keys_reuse_the_replayed_key_output() -> Result<()>
     });
 
     actor.handle_gen_pk_share_and_sk_sss_response(gen_pk_response(&cipher, &e3_id, 2)?)?;
-    actor.handle_all_encryption_keys_collected(TypedEvent::new(
-        AllEncryptionKeysCollected {
-            keys: vec![own_key(&e3_id).key, peer_key(&e3_id, 1).key],
-        },
-        test_ec(1),
-    ))?;
+    // The own key plus a key outside the committee N pass the H-key gate but cannot
+    // build the share plan, so the replayed output is stored without publishing it.
+    let out_of_committee = own_key(&e3_id);
+    let mut out_of_committee_key = out_of_committee.key.as_ref().clone();
+    out_of_committee_key.party_id = 3;
+    let error = actor
+        .handle_all_encryption_keys_collected(TypedEvent::new(
+            AllEncryptionKeysCollected {
+                keys: vec![out_of_committee.key, Arc::new(out_of_committee_key)],
+            },
+            test_ec(1),
+        ))
+        .expect_err("an out-of-committee key cannot build the share plan");
+    assert!(error
+        .to_string()
+        .contains("Failed to deserialize BFV public key"));
 
     let state = actor.state.try_get()?;
     let KeyshareState::GeneratingThresholdShare(data) = state.state else {
-        panic!("expected threshold-share generation state");
+        panic!("expected the replayed pk output to be stored");
     };
     assert_eq!(data.pk_share, Some(ArcBytes::from_bytes(&[3])));
     assert!(actor.pending.gen_pk_response.is_none());
-
-    let event = next_event(&history).await?;
-    assert!(matches!(
-        event.into_data(),
-        InterfoldEventData::ComputeRequest(ComputeRequest {
-            request: ComputeRequestKind::TrBFV(TrBFVRequest::GenEsiSss(_)),
-            ..
-        })
-    ));
     Ok(())
 }
 
@@ -1862,8 +1836,6 @@ async fn early_threshold_share_batch_is_verified_after_own_shares_exist() -> Res
         KeyshareState::GeneratingThresholdShare(GeneratingThresholdShareData {
             pk_share: Some(ArcBytes::from_bytes(&[3])),
             sk_sss: Some(e3_trbfv::shares::Encrypted::new(secret.clone(), &cipher)?),
-            esi_sss: None,
-            e_sm_raw: Some(SensitiveBytes::new([7], &cipher)?),
             sk_bfv: SensitiveBytes::from_encrypted(&[1]),
             pk_bfv: pk_bfv.clone(),
             collected_encryption_keys: keys.to_vec(),
@@ -1896,25 +1868,19 @@ async fn early_threshold_share_batch_is_verified_after_own_shares_exist() -> Res
     actor.record_encryption_key(&TypedEvent::new(own_c0, test_ec(1)))?;
     let proofs = ReceivedShareProofs {
         signed_c2a_proof: Some(proof.clone()),
-        signed_c2b_proof: Some(proof.clone()),
-        signed_c3a_proofs: vec![proof.clone(); l],
-        signed_c3b_proofs: vec![proof; l],
+        signed_c3a_proofs: vec![proof; l],
     };
     let peer = ThresholdShareCreated {
-        signature: Default::default(),
         e3_id: e3_id.clone(),
         share: Arc::new(ThresholdShare {
             party_id: 1,
             pk_share: ArcBytes::from_bytes(&[8]),
             sk_sss: Default::default(),
-            esi_sss: vec![Default::default()],
         }),
         target_party_id: 0,
         external: true,
         signed_c2a_proof: proofs.signed_c2a_proof.clone(),
-        signed_c2b_proof: proofs.signed_c2b_proof.clone(),
         signed_c3a_proofs: proofs.signed_c3a_proofs.clone(),
-        signed_c3b_proofs: proofs.signed_c3b_proofs.clone(),
     };
     actor.record_threshold_share(&TypedEvent::new(peer.clone(), test_ec(2)))?;
 
@@ -1928,16 +1894,7 @@ async fn early_threshold_share_batch_is_verified_after_own_shares_exist() -> Res
     );
     assert!(actor.record_collected_threshold_shares(&batch)?);
     actor.handle_all_threshold_shares_collected(batch)?;
-    actor.handle_gen_esi_sss_response(TypedEvent::new(
-        ComputeResponse::trbfv(
-            TrBFVResponse::GenEsiSss(GenEsiSssResponse {
-                esi_sss: vec![e3_trbfv::shares::Encrypted::new(secret, &cipher)?],
-            }),
-            CorrelationId::new(),
-            e3_id,
-        ),
-        test_ec(4),
-    ))?;
+    actor.publish_generated_threshold_shares(test_ec(4))?;
 
     let events = next_events(&history, 2).await?;
     assert!(events.into_iter().any(|event| matches!(
@@ -1953,12 +1910,10 @@ fn aggregating_decryption_key_for_roster_test() -> AggregatingDecryptionKey {
         pk_share: ArcBytes::from_bytes(&[1]),
         sk_bfv: SensitiveBytes::from_encrypted(&[2]),
         own_sk_share_raw: SensitiveBytes::from_encrypted(&[3]),
-        own_esi_shares_raw: vec![SensitiveBytes::from_encrypted(&[4])],
         signed_pk_generation_proof: None,
         signed_sk_share_computation_proof: None,
-        signed_e_sm_share_computation_proof: None,
         signed_sk_share_encryption_proofs: Vec::new(),
-        signed_e_sm_share_encryption_proofs: Vec::new(),
+        outgoing_prf_keys: Vec::new(),
     }
 }
 
@@ -2144,11 +2099,10 @@ async fn committee_with_two_shares(
 ) -> Result<CommitteeActor> {
     let signers = three_signers();
     let cipher = Arc::new(Cipher::from_password("test-password").await?);
-    // One row per own share: each peer needs one C3a and one C3b proof and one ESI share.
+    // One row per own share: each peer needs one C3a proof.
     let rows = bincode::serialize(&vec![vec![1u64]])?;
     let current = AggregatingDecryptionKey {
-        own_sk_share_raw: SensitiveBytes::new(rows.clone(), &cipher)?,
-        own_esi_shares_raw: vec![SensitiveBytes::new(rows, &cipher)?],
+        own_sk_share_raw: SensitiveBytes::new(rows, &cipher)?,
         ..aggregating_decryption_key_for_roster_test()
     };
     // C0 output and C3 recipient-key input share one 32-byte field.
@@ -2184,12 +2138,9 @@ async fn committee_with_two_shares(
                     party_id,
                     pk_share: ArcBytes::from_bytes(&[party_id as u8]),
                     sk_sss: Default::default(),
-                    esi_sss: vec![Default::default()],
                 }),
                 signed_c2a_proof: Some(proof.clone()),
-                signed_c2b_proof: Some(proof.clone()),
                 signed_c3a_proofs: vec![proof.clone()],
-                signed_c3b_proofs: vec![proof.clone()],
                 ..peer_share(e3_id, party_id)
             },
             test_ec(party_id + 1),
@@ -2390,9 +2341,7 @@ async fn a_queued_share_collection_cannot_reopen_a_retired_batch() -> Result<()>
             1,
             ReceivedShareProofs {
                 signed_c2a_proof: None,
-                signed_c2b_proof: None,
                 signed_c3a_proofs: Vec::new(),
-                signed_c3b_proofs: Vec::new(),
             },
         )]),
     );
@@ -2864,7 +2813,6 @@ async fn an_expelled_dealer_does_not_restart_a_verified_batch() -> Result<()> {
                 party_id,
                 pk_share: ArcBytes::from_bytes(&[party_id as u8]),
                 sk_sss: Default::default(),
-                esi_sss: vec![Default::default()],
             }),
         )
     });
@@ -3130,11 +3078,6 @@ async fn own_ready_grows_past_an_expelled_dealer() -> Result<()> {
             ProofType::C2aSkShareComputation,
             0,
         )),
-        signed_e_sm_share_computation_proof: Some(c2_proof(
-            &e3_id,
-            ProofType::C2bESmShareComputation,
-            0,
-        )),
         ..aggregating_decryption_key_for_roster_test()
     };
     let CommitteeActor { mut actor, .. } =
@@ -3149,11 +3092,6 @@ async fn own_ready_grows_past_an_expelled_dealer() -> Result<()> {
                 signed_c2a_proof: Some(c2_proof(
                     &e3_id,
                     ProofType::C2aSkShareComputation,
-                    party_id,
-                )),
-                signed_c2b_proof: Some(c2_proof(
-                    &e3_id,
-                    ProofType::C2bESmShareComputation,
                     party_id,
                 )),
                 ..peer_share(&e3_id, party_id)
@@ -4085,13 +4023,16 @@ async fn start_actor() -> Result<(
 async fn local_trbfv_error_does_not_fail_the_shared_e3() -> Result<()> {
     let (actor, history, e3_id, repo) = start_actor().await?;
     let error = ComputeRequestError::new(
-        ComputeRequestErrorKind::TrBFV(TrBFVError::GenEsiSss(TrBFVFailure::from(
+        ComputeRequestErrorKind::TrBFV(TrBFVError::GenPkShareAndSkSss(TrBFVFailure::from(
             "local worker failure",
         ))),
         ComputeRequest::trbfv(
-            TrBFVRequest::GenEsiSss(GenEsiSssRequest {
+            TrBFVRequest::GenPkShareAndSkSss(GenPkShareAndSkSssRequest {
                 trbfv_config: TrBFVConfig::new(ArcBytes::from_bytes(b"params"), 3, 1),
-                e_sm_raw: SensitiveBytes::from_encrypted(&[1]),
+                crp: ArcBytes::from_bytes(&[1]),
+                lambda: LambdaConfig::Insecure(2),
+                num_ciphertexts: 1,
+                mult_depth: 0,
             }),
             CorrelationId::new(),
             e3_id,
@@ -4298,17 +4239,14 @@ async fn stale_threshold_share_deadline_preserves_decryption(decrypting: bool) -
         num_honest_parties: 2,
         num_moduli: 1,
         own_plaintext_idx: Some(0),
+        recipient_party_id: 0,
         own_share_raw: Some(current.own_sk_share_raw),
         dkg_input_type: e3_zk_config::DkgInputType::SecretKey,
         params_preset: BfvPreset::InsecureDkg64,
         committee_size: actor.state.try_get()?.committee_size()?,
+        prf_keys: Vec::new(),
     };
-    let esm_request = DkgShareDecryptionProofRequest {
-        dkg_input_type: e3_zk_config::DkgInputType::SmudgingNoise,
-        own_share_raw: Some(current.own_esi_shares_raw[0].clone()),
-        ..sk_request.clone()
-    };
-    actor.pending.share_decryption_data = Some((sk_request, vec![esm_request]));
+    actor.pending.share_decryption_data = Some(sk_request);
     let cipher = actor.cipher.clone();
     let signer = actor.signer.clone();
     let mut collector = None;
@@ -4333,7 +4271,6 @@ async fn stale_threshold_share_deadline_preserves_decryption(decrypting: bool) -
             ComputeResponse::trbfv(
                 TrBFVResponse::CalculateDecryptionKey(CalculateDecryptionKeyResponse {
                     sk_poly_sum: SensitiveBytes::from_encrypted(&[2]),
-                    es_poly_sum: vec![SensitiveBytes::from_encrypted(&[3])],
                 }),
                 CorrelationId::new(),
                 e3_id.clone(),
@@ -4433,8 +4370,6 @@ fn generating_threshold_share_state(e3_id: &E3id) -> KeyshareState {
     KeyshareState::GeneratingThresholdShare(GeneratingThresholdShareData {
         pk_share: None,
         sk_sss: None,
-        esi_sss: None,
-        e_sm_raw: None,
         sk_bfv: current.sk_bfv,
         pk_bfv: current.pk_bfv,
         collected_encryption_keys: Vec::new(),
@@ -4590,13 +4525,13 @@ async fn collector_failures_ignore_superseded_phases() -> Result<()> {
     let decrypting = KeyshareState::Decrypting(Decrypting {
         pk_share: ready.pk_share,
         sk_poly_sum: ready.sk_poly_sum,
-        es_poly_sum: ready.es_poly_sum,
         ciphertext_output: vec![ArcBytes::from_bytes(&[4])],
         signed_pk_generation_proof: ready.signed_pk_generation_proof,
         signed_sk_share_computation_proof: ready.signed_sk_share_computation_proof,
-        signed_e_sm_share_computation_proof: ready.signed_e_sm_share_computation_proof,
         signed_sk_share_encryption_proofs: ready.signed_sk_share_encryption_proofs,
-        signed_e_sm_share_encryption_proofs: ready.signed_e_sm_share_encryption_proofs,
+        outgoing_prf_keys: ready.outgoing_prf_keys,
+        incoming_prf_keys: ready.incoming_prf_keys,
+        decryptors: vec![1, 2],
     });
     for phase in [
         DkgTimeoutPhase::EncryptionKeyCollection,
@@ -4630,7 +4565,15 @@ async fn collector_failures_ignore_superseded_phases() -> Result<()> {
                 true,
             ),
             (decrypting.clone(), false, false, false),
-            (KeyshareState::Completed, false, false, false),
+            (
+                KeyshareState::Completed(completed_decryption_test(
+                    ArcBytes::from_bytes(&[1]),
+                    SensitiveBytes::from_encrypted(&[2]),
+                )),
+                false,
+                false,
+                false,
+            ),
             (
                 KeyshareState::Failed {
                     failed_at_stage: E3Stage::CiphertextReady,
@@ -5211,13 +5154,13 @@ async fn restart_redrives_a_decryption_share_compute_request() -> Result<()> {
     let decrypting = Decrypting {
         pk_share: ArcBytes::from_bytes(&[1]),
         sk_poly_sum: SensitiveBytes::from_encrypted(&[2]),
-        es_poly_sum: vec![SensitiveBytes::from_encrypted(&[3])],
         ciphertext_output: vec![ArcBytes::from_bytes(&[4])],
         signed_pk_generation_proof: None,
         signed_sk_share_computation_proof: None,
-        signed_e_sm_share_computation_proof: None,
         signed_sk_share_encryption_proofs: Vec::new(),
-        signed_e_sm_share_encryption_proofs: Vec::new(),
+        outgoing_prf_keys: Vec::new(),
+        incoming_prf_keys: Vec::new(),
+        decryptors: vec![1, 2],
     };
     let (actor, history, e3_id, _) =
         start_actor_with_state(KeyshareState::Decrypting(decrypting)).await?;
@@ -5303,13 +5246,13 @@ impl RedeliveryActor {
             KeyshareState::Decrypting(Decrypting {
                 pk_share: ready.pk_share.clone(),
                 sk_poly_sum: ready.sk_poly_sum.clone(),
-                es_poly_sum: ready.es_poly_sum.clone(),
                 ciphertext_output: vec![ArcBytes::from_bytes(&[5])],
                 signed_pk_generation_proof: None,
                 signed_sk_share_computation_proof: None,
-                signed_e_sm_share_computation_proof: None,
                 signed_sk_share_encryption_proofs: vec![],
-                signed_e_sm_share_encryption_proofs: vec![],
+                outgoing_prf_keys: vec![],
+                incoming_prf_keys: vec![],
+                decryptors: vec![1, 2],
             }),
         );
         state.try_mutate_without_context(|mut state| {
@@ -5347,11 +5290,19 @@ impl RedeliveryActor {
     }
 
     async fn answer_share_request(&self, correlation_id: CorrelationId) -> Result<()> {
+        let ciphertext = vec![ArcBytes::from_bytes(&[5])];
+        let context_digest = e3_trbfv::calculate_threshold_decryption::decryption_context_digest(
+            &[1, 2],
+            &ciphertext,
+        );
         self.actor
             .send(keyshare_event(
                 ComputeResponse::trbfv(
                     TrBFVResponse::CalculateDecryptionShare(CalculateDecryptionShareResponse {
                         d_share_poly: vec![ArcBytes::from_bytes(&[4])],
+                        e_fresh: vec![SensitiveBytes::from_encrypted(&[6])],
+                        e_signed: vec![SensitiveBytes::from_encrypted(&[7])],
+                        context_digest,
                     }),
                     correlation_id,
                     self.id.clone(),
@@ -5436,9 +5387,12 @@ async fn a_terminal_event_stops_decryption_redelivery_while_its_cleanup_retries(
         decryption_share: vec![ArcBytes::from_bytes(&[4])],
         signed_pk_generation_proof: None,
         signed_sk_share_computation_proof: None,
-        signed_e_sm_share_computation_proof: None,
         signed_sk_share_encryption_proofs: Vec::new(),
-        signed_e_sm_share_encryption_proofs: Vec::new(),
+        ciphertext_output: vec![ArcBytes::from_bytes(&[5])],
+        sk_poly_sum: ready.sk_poly_sum.clone(),
+        outgoing_prf_keys: Vec::new(),
+        incoming_prf_keys: Vec::new(),
+        decryptors: vec![1, 2],
     };
     let (state, _) = test_state(&e3_id, KeyshareState::GeneratingDecryptionProof(generating));
     let pending = ShareDecryptionProofPending {
@@ -5450,13 +5404,19 @@ async fn a_terminal_event_stops_decryption_redelivery_while_its_cleanup_retries(
             ciphertext_bytes: vec![ArcBytes::from_bytes(&[5])],
             aggregated_pk_bytes: ArcBytes::from_bytes(&[7]),
             sk_poly_sum: ready.sk_poly_sum,
-            es_poly_sum: ready.es_poly_sum,
+            e_fresh: vec![SensitiveBytes::from_encrypted(&[8])],
+            e_signed: vec![SensitiveBytes::from_encrypted(&[9])],
             d_share_bytes: vec![ArcBytes::from_bytes(&[4])],
             decryption_domain: canonical.domain(Address::ZERO),
             params_preset: canonical.params_preset,
             committee_size: canonical.committee_size,
+            party_idx: 0,
+            decryptors: vec![1, 2],
+            outgoing_prf_keys: Vec::new(),
+            incoming_prf_keys: Vec::new(),
         },
         redelivery: 0,
+        decryptors: vec![1, 2],
     };
     // Every write fails, so the terminal cleanup retries later.
     let mut keyshare = ThresholdKeyshare::new(ThresholdKeyshareParams {
@@ -5512,9 +5472,12 @@ async fn a_replayed_decryption_share_response_does_not_fault_after_the_state_adv
         decryption_share: vec![ArcBytes::from_bytes(&[2])],
         signed_pk_generation_proof: None,
         signed_sk_share_computation_proof: None,
-        signed_e_sm_share_computation_proof: None,
         signed_sk_share_encryption_proofs: Vec::new(),
-        signed_e_sm_share_encryption_proofs: Vec::new(),
+        ciphertext_output: vec![ArcBytes::from_bytes(&[3])],
+        sk_poly_sum: SensitiveBytes::from_encrypted(&[4]),
+        outgoing_prf_keys: Vec::new(),
+        incoming_prf_keys: Vec::new(),
+        decryptors: vec![1, 2],
     };
     let (actor, history, e3_id, repo) =
         start_actor_with_state(KeyshareState::GeneratingDecryptionProof(generating)).await?;
@@ -5533,6 +5496,9 @@ async fn a_replayed_decryption_share_response_does_not_fault_after_the_state_adv
             ComputeResponse::trbfv(
                 TrBFVResponse::CalculateDecryptionShare(CalculateDecryptionShareResponse {
                     d_share_poly: vec![ArcBytes::from_bytes(&[3])],
+                    e_fresh: vec![SensitiveBytes::from_encrypted(&[4])],
+                    e_signed: vec![SensitiveBytes::from_encrypted(&[5])],
+                    context_digest: [0; 32],
                 }),
                 CorrelationId::new(),
                 e3_id,
@@ -5762,13 +5728,39 @@ fn ready_for_c4_test() -> ReadyForDecryption {
     ReadyForDecryption {
         pk_share: ArcBytes::from_bytes(&[1]),
         sk_poly_sum: SensitiveBytes::from_encrypted(&[2]),
-        es_poly_sum: vec![SensitiveBytes::from_encrypted(&[3])],
         signed_pk_generation_proof: None,
         signed_sk_share_computation_proof: None,
-        signed_e_sm_share_computation_proof: None,
         signed_sk_share_encryption_proofs: Vec::new(),
-        signed_e_sm_share_encryption_proofs: Vec::new(),
+        outgoing_prf_keys: Vec::new(),
+        incoming_prf_keys: Vec::new(),
     }
+}
+
+/// A `Completed` phase whose inputs allow another decryption round.
+fn completed_decryption_test(pk_share: ArcBytes, sk_poly_sum: SensitiveBytes) -> Completed {
+    Completed {
+        pk_share,
+        ciphertext_output: vec![ArcBytes::from_bytes(&[5])],
+        sk_poly_sum,
+        signed_pk_generation_proof: None,
+        signed_sk_share_computation_proof: None,
+        signed_sk_share_encryption_proofs: Vec::new(),
+        outgoing_prf_keys: Vec::new(),
+        incoming_prf_keys: Vec::new(),
+        decryptors: vec![1, 2],
+    }
+}
+
+/// `count` zero PRF keys, as a compute worker expects for one committee slot each.
+fn zero_prf_key_set(count: usize, cipher: &Cipher) -> Result<Vec<SensitiveBytes>> {
+    (0..count)
+        .map(|_| {
+            SensitiveBytes::new(
+                e3_fhe_params::zero_prf_key(BfvPreset::InsecureThreshold64),
+                cipher,
+            )
+        })
+        .collect()
 }
 
 fn peer_c4_event(e3_id: &E3id, seq: u64) -> InterfoldEvent {
@@ -5784,24 +5776,14 @@ fn peer_c4_event(e3_id: &E3id, seq: u64) -> InterfoldEvent {
         },
         signature: ArcBytes::from_bytes(&[]),
     };
-    let mut esm_proof = proof.clone();
-    esm_proof.payload.proof_type = ProofType::C4bESmShareDecryption;
     let share = DecryptionKeyShared {
-        signature: Default::default(),
         e3_id: e3_id.clone(),
         party_id: 1,
         node: dealer_signer(1).address().to_string(),
         signed_sk_decryption_proof: SignedProofPayload::sign(proof.payload, &dealer_signer(1))
             .unwrap(),
-        signed_e_sm_decryption_proofs: vec![SignedProofPayload::sign(
-            esm_proof.payload,
-            &dealer_signer(1),
-        )
-        .unwrap()],
         external: true,
-    }
-    .sign(&dealer_signer(1))
-    .unwrap();
+    };
     InterfoldEvent::<Unsequenced>::new_with_timestamp(
         share.into(),
         None,
@@ -5846,9 +5828,9 @@ async fn canonical_key_fixture(
         Address::repeat_byte(3),
     ];
     let honest_committee = vec![committee[0], committee[2]];
-    let mut inputs = vec![B256::ZERO; 12];
+    let mut inputs = vec![B256::ZERO; 16];
     inputs[3] = B256::from(U256::from(2).to_be_bytes::<32>());
-    inputs[11] = pk_commitment.into();
+    inputs[9] = pk_commitment.into();
     let raw = e3_evm::ICiphernodeRegistry::CommitteeProofPublished {
         e3Id: id.clone().try_into()?,
         nodes: committee.clone(),
@@ -5941,7 +5923,11 @@ async fn keyshare_keeps_chain_key_when_network_publication_conflicts() -> Result
     let id = E3id::new("73", 1);
     let (keys, publication) = canonical_key_fixture(&id).await?;
     let (bus, history) = test_bus();
-    let (state, repo) = test_state(&id, KeyshareState::ReadyForDecryption(ready_for_c4_test()));
+    let (mut state, repo) = test_state(&id, KeyshareState::ReadyForDecryption(ready_for_c4_test()));
+    state.try_mutate_without_context(|mut state| {
+        state.honest_parties = Some(BTreeSet::from([0, 1]));
+        Ok(state)
+    })?;
     let actor = ThresholdKeyshare::new(ThresholdKeyshareParams {
         bfv_key: test_bfv_key(),
         bus,
@@ -6005,6 +5991,12 @@ async fn keyshare_keeps_chain_key_when_network_publication_conflicts() -> Result
     let response = ComputeResponse::trbfv(
         TrBFVResponse::CalculateDecryptionShare(CalculateDecryptionShareResponse {
             d_share_poly: vec![ArcBytes::from_bytes(&[3])],
+            e_fresh: vec![SensitiveBytes::from_encrypted(&[4])],
+            e_signed: vec![SensitiveBytes::from_encrypted(&[5])],
+            context_digest: e3_trbfv::calculate_threshold_decryption::decryption_context_digest(
+                &[1, 2],
+                &[ArcBytes::from_bytes(&[8])],
+            ),
         }),
         CorrelationId::new(),
         id.clone(),
@@ -6041,6 +6033,7 @@ async fn keyshare_restart_revalidates_snapshot_public_key_context() -> Result<()
             test_state(&id, KeyshareState::ReadyForDecryption(ready_for_c4_test()));
         state.try_mutate_without_context(|mut state| {
             state.keyshare_published = true;
+            state.honest_parties = Some(BTreeSet::from([0, 1]));
             state.aggregated_pk = Some(if valid_key {
                 publication.pubkey.clone()
             } else {
@@ -6133,25 +6126,31 @@ async fn retained_c6_work_recovers_key_bytes_in_every_decryption_phase() -> Resu
                     ciphertext_bytes: vec![ArcBytes::from_bytes(&[5])],
                     aggregated_pk_bytes: ArcBytes::from_bytes(&[7]),
                     sk_poly_sum: ready.sk_poly_sum.clone(),
-                    es_poly_sum: ready.es_poly_sum.clone(),
+                    e_fresh: vec![SensitiveBytes::from_encrypted(&[8])],
+                    e_signed: vec![SensitiveBytes::from_encrypted(&[9])],
                     d_share_bytes: vec![ArcBytes::from_bytes(&[4])],
                     decryption_domain: canonical.domain(Address::ZERO),
                     params_preset: canonical.params_preset,
                     committee_size: canonical.committee_size,
+                    party_idx: 0,
+                    decryptors: vec![1, 2],
+                    outgoing_prf_keys: Vec::new(),
+                    incoming_prf_keys: Vec::new(),
                 },
                 redelivery: 0,
+                decryptors: vec![1, 2],
             };
             let state_kind = match phase {
                 "Decrypting" => KeyshareState::Decrypting(Decrypting {
                     pk_share: ready.pk_share.clone(),
                     sk_poly_sum: ready.sk_poly_sum.clone(),
-                    es_poly_sum: ready.es_poly_sum.clone(),
                     ciphertext_output: pending.proof_request.ciphertext_bytes.clone(),
                     signed_pk_generation_proof: None,
                     signed_sk_share_computation_proof: None,
-                    signed_e_sm_share_computation_proof: None,
                     signed_sk_share_encryption_proofs: vec![],
-                    signed_e_sm_share_encryption_proofs: vec![],
+                    outgoing_prf_keys: vec![],
+                    incoming_prf_keys: vec![],
+                    decryptors: vec![1, 2],
                 }),
                 "GeneratingDecryptionProof" => {
                     KeyshareState::GeneratingDecryptionProof(GeneratingDecryptionProof {
@@ -6159,12 +6158,18 @@ async fn retained_c6_work_recovers_key_bytes_in_every_decryption_phase() -> Resu
                         decryption_share: pending.decryption_share.clone(),
                         signed_pk_generation_proof: None,
                         signed_sk_share_computation_proof: None,
-                        signed_e_sm_share_computation_proof: None,
                         signed_sk_share_encryption_proofs: vec![],
-                        signed_e_sm_share_encryption_proofs: vec![],
+                        ciphertext_output: vec![ArcBytes::from_bytes(&[5])],
+                        sk_poly_sum: ready.sk_poly_sum.clone(),
+                        outgoing_prf_keys: vec![],
+                        incoming_prf_keys: vec![],
+                        decryptors: vec![1, 2],
                     })
                 }
-                _ => KeyshareState::Completed,
+                _ => KeyshareState::Completed(completed_decryption_test(
+                    ready.pk_share.clone(),
+                    ready.sk_poly_sum.clone(),
+                )),
             };
             let (mut state, repo) = test_state(&id, state_kind);
             state.try_mutate_without_context(|mut state| {
@@ -6304,6 +6309,109 @@ fn start_decryption_actor(
     .start()
 }
 
+#[actix::test]
+async fn confirmed_exclusions_replace_the_same_round_on_each_node_without_peer_controls(
+) -> Result<()> {
+    let id = E3id::new("round-replacement", 1);
+    let cipher = Arc::new(Cipher::from_password("test-password").await?);
+    let old: Vec<u32> = (1..=10).collect();
+    let replacement: Vec<u32> = (2..=11).collect();
+    // An excluded participant, a continuing participant and a newly designated standby.
+    for party in [0, 8, 10] {
+        let (bus, history) = test_bus();
+        let ready = ready_for_c4_test();
+        let mut completed = completed_decryption_test(ready.pk_share, ready.sk_poly_sum);
+        completed.decryptors = old.clone();
+        let (mut state, _) = test_state(&id, KeyshareState::Completed(completed));
+        state.try_mutate_without_context(|mut state| {
+            state.party_id = party;
+            state.threshold_m = 9;
+            state.threshold_n = 19;
+            state.honest_parties = Some((0..14).collect());
+            Ok(state)
+        })?;
+        let mut actor = ThresholdKeyshare::new(ThresholdKeyshareParams {
+            bfv_key: test_bfv_key(),
+            bus,
+            cipher: cipher.clone(),
+            state,
+            share_enc_preset: BfvPreset::InsecureDkg64,
+            interfold_address: Address::ZERO,
+            signer: dealer_signer(party),
+            effects_enabled: false,
+            recovery: test_recovery(),
+            recovery_payloads: test_recovery_payloads(),
+            dkg_timing_reader: Arc::new(|_| Box::pin(async { Ok((8_200, 7_200)) })),
+        });
+        let control = e3_events::FreshDecryptionRound {
+            e3_id: id.clone(),
+            decryptors: replacement.clone(),
+        };
+        // Even local requests cannot choose a different set before an authenticated exclusion.
+        actor.handle_fresh_decryption_round(TypedEvent::new(control.clone(), test_ec(1)))?;
+        assert!(matches!(
+            actor.state.try_get()?.state,
+            KeyshareState::Completed(_)
+        ));
+        actor.handle_fresh_decryption_round(TypedEvent::new(
+            control.clone(),
+            test_ec(2).with_source(EventSource::Net),
+        ))?;
+        assert!(matches!(
+            actor.state.try_get()?.state,
+            KeyshareState::Completed(_)
+        ));
+        actor.handle_committee_member_excluded(
+            CommitteeMemberExcluded {
+                e3_id: id.clone(),
+                node: dealer_signer(0).address(),
+                proof_type: ProofType::C6ThresholdShareDecryption,
+                party_id: Some(0),
+            },
+            test_ec(3),
+        )?;
+        let KeyshareState::Decrypting(round) = actor.state.try_get()?.state else {
+            bail!("expected replacement round")
+        };
+        assert_eq!(round.decryptors, replacement);
+        let issued = std::time::Instant::now();
+        actor.pending.decryption_share_request = Some(IssuedDecryptionWork {
+            ec: test_ec(3),
+            last_sent: issued,
+            redeliveries: 2,
+        });
+        // Replayed/duplicate controls must not clear the replacement's issued-work slot.
+        actor.handle_fresh_decryption_round(TypedEvent::new(control, test_ec(4)))?;
+        assert_eq!(
+            actor
+                .pending
+                .decryption_share_request
+                .as_ref()
+                .unwrap()
+                .redeliveries,
+            2
+        );
+        // A restored full DKG roster cannot reintroduce the excluded decryptor.
+        actor.state.try_mutate_without_context(|mut state| {
+            state.honest_parties = Some((0..14).collect());
+            Ok(state)
+        })?;
+        actor.resume_decryption_work(test_ec(5))?;
+        let KeyshareState::Decrypting(round) = actor.state.try_get()?.state else {
+            bail!("expected decrypting")
+        };
+        assert_eq!(round.decryptors, replacement);
+        assert!(
+            history
+                .send(GetEvents::<InterfoldEvent>::new())
+                .await?
+                .is_empty(),
+            "replay must not emit effects"
+        );
+    }
+    Ok(())
+}
+
 fn decryption_bus(id: &E3id) -> Result<BusHandle> {
     use e3_events::{AggregateConfig, AggregateId};
     use std::time::Duration;
@@ -6348,7 +6456,10 @@ async fn matching_key_publications_keep_one_pending_decryption_request() -> Resu
     zero -= &poly;
     let ready = ReadyForDecryption {
         sk_poly_sum: SensitiveBytes::new(zero.to_bytes(), &cipher)?,
-        es_poly_sum: vec![SensitiveBytes::new(zero.to_bytes(), &cipher)?],
+        // The compute worker requires one PRF key per committee slot; the zero key
+        // keeps the fixture deterministic.
+        outgoing_prf_keys: zero_prf_key_set(3, &cipher)?,
+        incoming_prf_keys: zero_prf_key_set(3, &cipher)?,
         ..ready_for_c4_test()
     };
     let output = CiphertextOutputPublished {
@@ -6379,18 +6490,21 @@ async fn matching_key_publications_keep_one_pending_decryption_request() -> Resu
             KeyshareState::Decrypting(Decrypting {
                 pk_share: ready.pk_share.clone(),
                 sk_poly_sum: ready.sk_poly_sum.clone(),
-                es_poly_sum: ready.es_poly_sum.clone(),
                 ciphertext_output: output.ciphertext_output.clone(),
                 signed_pk_generation_proof: None,
                 signed_sk_share_computation_proof: None,
-                signed_e_sm_share_computation_proof: None,
                 signed_sk_share_encryption_proofs: vec![],
-                signed_e_sm_share_encryption_proofs: vec![],
+                // The compute worker requires one PRF key per committee slot; the
+                // zero key keeps the fixture deterministic.
+                outgoing_prf_keys: zero_prf_key_set(3, &cipher)?,
+                incoming_prf_keys: zero_prf_key_set(3, &cipher)?,
+                decryptors: vec![1, 2],
             })
         };
         let (mut state, repo) = test_state(&id, state_kind);
         state.try_mutate_without_context(|mut state| {
             state.params = ArcBytes::from_bytes(&encode_bfv_params(&params));
+            state.honest_parties = Some(BTreeSet::from([0, 1]));
             if matches!(resume, "restart" | "retained key") {
                 state.aggregated_pk = Some(publication.pubkey.clone());
                 state.decryption_domain = Some(canonical.domain(Address::repeat_byte(9)));
@@ -6592,14 +6706,20 @@ async fn decryption_proof_recovery_coalesces_repeated_resume_triggers() -> Resul
         proof_request: ThresholdShareDecryptionProofRequest {
             ciphertext_bytes: vec![ArcBytes::from_bytes(&[5])],
             aggregated_pk_bytes: publication.pubkey.clone(),
-            sk_poly_sum: ready.sk_poly_sum,
-            es_poly_sum: ready.es_poly_sum,
+            sk_poly_sum: ready.sk_poly_sum.clone(),
+            e_fresh: vec![SensitiveBytes::from_encrypted(&[8])],
+            e_signed: vec![SensitiveBytes::from_encrypted(&[9])],
             d_share_bytes: vec![ArcBytes::from_bytes(&[4])],
             decryption_domain: canonical.domain(Address::repeat_byte(9)),
             params_preset: canonical.params_preset,
             committee_size: canonical.committee_size,
+            party_idx: 0,
+            decryptors: vec![1, 2],
+            outgoing_prf_keys: Vec::new(),
+            incoming_prf_keys: Vec::new(),
         },
         redelivery: 0,
+        decryptors: vec![1, 2],
     };
     for phase in ["Decrypting", "GeneratingDecryptionProof", "Completed"] {
         for late_authority in [false, true] {
@@ -6615,13 +6735,13 @@ async fn decryption_proof_recovery_coalesces_repeated_resume_triggers() -> Resul
                 "Decrypting" => KeyshareState::Decrypting(Decrypting {
                     pk_share: ready.pk_share.clone(),
                     sk_poly_sum: pending.proof_request.sk_poly_sum.clone(),
-                    es_poly_sum: pending.proof_request.es_poly_sum.clone(),
                     ciphertext_output: pending.proof_request.ciphertext_bytes.clone(),
                     signed_pk_generation_proof: None,
                     signed_sk_share_computation_proof: None,
-                    signed_e_sm_share_computation_proof: None,
                     signed_sk_share_encryption_proofs: vec![],
-                    signed_e_sm_share_encryption_proofs: vec![],
+                    outgoing_prf_keys: vec![],
+                    incoming_prf_keys: vec![],
+                    decryptors: vec![1, 2],
                 }),
                 "GeneratingDecryptionProof" => {
                     KeyshareState::GeneratingDecryptionProof(GeneratingDecryptionProof {
@@ -6629,12 +6749,18 @@ async fn decryption_proof_recovery_coalesces_repeated_resume_triggers() -> Resul
                         decryption_share: pending.decryption_share.clone(),
                         signed_pk_generation_proof: None,
                         signed_sk_share_computation_proof: None,
-                        signed_e_sm_share_computation_proof: None,
                         signed_sk_share_encryption_proofs: vec![],
-                        signed_e_sm_share_encryption_proofs: vec![],
+                        ciphertext_output: pending.proof_request.ciphertext_bytes.clone(),
+                        sk_poly_sum: pending.proof_request.sk_poly_sum.clone(),
+                        outgoing_prf_keys: vec![],
+                        incoming_prf_keys: vec![],
+                        decryptors: vec![1, 2],
                     })
                 }
-                _ => KeyshareState::Completed,
+                _ => KeyshareState::Completed(completed_decryption_test(
+                    ready.pk_share.clone(),
+                    pending.proof_request.sk_poly_sum.clone(),
+                )),
             };
             let (mut state, repo) = test_state(&id, state_kind);
             state.try_mutate_without_context(|mut state| {
@@ -6692,6 +6818,13 @@ async fn decryption_proof_recovery_coalesces_repeated_resume_triggers() -> Resul
                             TrBFVResponse::CalculateDecryptionShare(
                                 CalculateDecryptionShareResponse {
                                     d_share_poly: pending.decryption_share.clone(),
+                                    e_fresh: pending.proof_request.e_fresh.clone(),
+                                    e_signed: pending.proof_request.e_signed.clone(),
+                                    context_digest:
+                                        e3_trbfv::calculate_threshold_decryption::decryption_context_digest(
+                                            &pending.decryptors,
+                                            &pending.proof_request.ciphertext_bytes,
+                                        ),
                                 },
                             ),
                             correlation,

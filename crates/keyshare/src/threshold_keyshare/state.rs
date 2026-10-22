@@ -47,8 +47,6 @@ pub struct ProofRequestData {
 pub struct GeneratingThresholdShareData {
     pub(crate) pk_share: Option<ArcBytes>,
     pub(crate) sk_sss: Option<Encrypted<SharedSecret>>,
-    pub(crate) esi_sss: Option<Vec<Encrypted<SharedSecret>>>,
-    pub(crate) e_sm_raw: Option<SensitiveBytes>,
     pub(crate) sk_bfv: SensitiveBytes,
     pub(crate) pk_bfv: ArcBytes,
     pub(crate) collected_encryption_keys: Vec<Arc<EncryptionKey>>,
@@ -63,39 +61,41 @@ pub struct AggregatingDecryptionKey {
     /// Bincode-serialised `Vec<Vec<u64>>` of shape `[L][N]` — own party's plaintext sk
     /// share row per modulus. Used by C4a in lieu of self-encryption.
     pub(crate) own_sk_share_raw: SensitiveBytes,
-    /// One bincode-serialised `Vec<Vec<u64>>` per smudging-noise (esi). Used by C4b.
-    pub(crate) own_esi_shares_raw: Vec<SensitiveBytes>,
     pub(crate) signed_pk_generation_proof: Option<SignedProofPayload>,
     pub(crate) signed_sk_share_computation_proof: Option<SignedProofPayload>,
-    pub(crate) signed_e_sm_share_computation_proof: Option<SignedProofPayload>,
     pub(crate) signed_sk_share_encryption_proofs: Vec<SignedProofPayload>,
-    pub(crate) signed_e_sm_share_encryption_proofs: Vec<SignedProofPayload>,
+    /// Outgoing PRF keys, one per recipient, encrypted at rest.
+    pub(crate) outgoing_prf_keys: Vec<SensitiveBytes>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ReadyForDecryption {
     pub(crate) pk_share: ArcBytes,
     pub(crate) sk_poly_sum: SensitiveBytes,
-    pub(crate) es_poly_sum: Vec<SensitiveBytes>,
     pub(crate) signed_pk_generation_proof: Option<SignedProofPayload>,
     pub(crate) signed_sk_share_computation_proof: Option<SignedProofPayload>,
-    pub(crate) signed_e_sm_share_computation_proof: Option<SignedProofPayload>,
     pub(crate) signed_sk_share_encryption_proofs: Vec<SignedProofPayload>,
-    pub(crate) signed_e_sm_share_encryption_proofs: Vec<SignedProofPayload>,
+    /// Outgoing PRF keys, one per recipient, encrypted at rest.
+    pub(crate) outgoing_prf_keys: Vec<SensitiveBytes>,
+    /// Incoming PRF keys indexed by sender. Empty selects the zero key.
+    pub(crate) incoming_prf_keys: Vec<SensitiveBytes>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Decrypting {
     pub(crate) pk_share: ArcBytes,
     pub(crate) sk_poly_sum: SensitiveBytes,
-    pub(crate) es_poly_sum: Vec<SensitiveBytes>,
     /// Ciphertext bytes from CiphertextOutputPublished, needed for C6 proof generation.
     pub(crate) ciphertext_output: Vec<ArcBytes>,
     pub(crate) signed_pk_generation_proof: Option<SignedProofPayload>,
     pub(crate) signed_sk_share_computation_proof: Option<SignedProofPayload>,
-    pub(crate) signed_e_sm_share_computation_proof: Option<SignedProofPayload>,
     pub(crate) signed_sk_share_encryption_proofs: Vec<SignedProofPayload>,
-    pub(crate) signed_e_sm_share_encryption_proofs: Vec<SignedProofPayload>,
+    /// Outgoing PRF keys, one per recipient, encrypted at rest.
+    pub(crate) outgoing_prf_keys: Vec<SensitiveBytes>,
+    /// Incoming PRF keys indexed by sender. Empty selects the zero key.
+    pub(crate) incoming_prf_keys: Vec<SensitiveBytes>,
+    /// 1-based decryptor ids for the active share round.
+    pub(crate) decryptors: Vec<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -104,9 +104,29 @@ pub struct GeneratingDecryptionProof {
     pub(crate) decryption_share: Vec<ArcBytes>,
     pub(crate) signed_pk_generation_proof: Option<SignedProofPayload>,
     pub(crate) signed_sk_share_computation_proof: Option<SignedProofPayload>,
-    pub(crate) signed_e_sm_share_computation_proof: Option<SignedProofPayload>,
     pub(crate) signed_sk_share_encryption_proofs: Vec<SignedProofPayload>,
-    pub(crate) signed_e_sm_share_encryption_proofs: Vec<SignedProofPayload>,
+    /// Ciphertext and key material kept so a fresh decryptor set can be recomputed.
+    pub(crate) ciphertext_output: Vec<ArcBytes>,
+    pub(crate) sk_poly_sum: SensitiveBytes,
+    pub(crate) outgoing_prf_keys: Vec<SensitiveBytes>,
+    pub(crate) incoming_prf_keys: Vec<SensitiveBytes>,
+    /// 1-based decryptor ids for the share that is being proved.
+    pub(crate) decryptors: Vec<u32>,
+}
+
+/// A signed share. The inputs stay so a later decryptor set can be recomputed.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Completed {
+    pub(crate) pk_share: ArcBytes,
+    pub(crate) ciphertext_output: Vec<ArcBytes>,
+    pub(crate) sk_poly_sum: SensitiveBytes,
+    pub(crate) signed_pk_generation_proof: Option<SignedProofPayload>,
+    pub(crate) signed_sk_share_computation_proof: Option<SignedProofPayload>,
+    pub(crate) signed_sk_share_encryption_proofs: Vec<SignedProofPayload>,
+    pub(crate) outgoing_prf_keys: Vec<SensitiveBytes>,
+    pub(crate) incoming_prf_keys: Vec<SensitiveBytes>,
+    /// 1-based decryptor ids for the share that was signed.
+    pub(crate) decryptors: Vec<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -125,8 +145,8 @@ pub enum KeyshareState {
     Decrypting(Decrypting),
     // Generating C6 proof of correct decryption
     GeneratingDecryptionProof(GeneratingDecryptionProof),
-    // Finished
-    Completed,
+    // Finished for the current decryptor set. Inputs remain for a later round.
+    Completed(Completed),
     // This terminal state preserves the failure across a restart.
     Failed {
         failed_at_stage: E3Stage,
@@ -158,7 +178,7 @@ impl KeyshareState {
             } else if mem::discriminant(self) == mem::discriminant(&new_state) {
                 true
             } else if matches!(&new_state, K::Failed { .. }) {
-                !matches!(self, K::Completed)
+                !matches!(self, K::Completed(_))
             } else {
                 matches!(
                     (self, &new_state),
@@ -174,7 +194,9 @@ impl KeyshareState {
                         | (K::AggregatingDecryptionKey(_), K::ReadyForDecryption(_))
                         | (K::ReadyForDecryption(_), K::Decrypting(_))
                         | (K::Decrypting(_), K::GeneratingDecryptionProof(_))
-                        | (K::GeneratingDecryptionProof(_), K::Completed)
+                        | (K::GeneratingDecryptionProof(_), K::Decrypting(_))
+                        | (K::GeneratingDecryptionProof(_), K::Completed(_))
+                        | (K::Completed(_), K::Decrypting(_))
                 )
             }
         };
@@ -198,7 +220,7 @@ impl KeyshareState {
             Self::ReadyForDecryption(_) => "ReadyForDecryption",
             Self::Decrypting(_) => "Decrypting",
             Self::GeneratingDecryptionProof(_) => "GeneratingDecryptionProof",
-            Self::Completed => "Completed",
+            Self::Completed(_) => "Completed",
             Self::Failed { .. } => "Failed",
         }
     }

@@ -11,6 +11,8 @@ enum Forgery {
     WrongCircuit,
     WrongProofType,
     WrongCiphertext,
+    WrongPublicOwner,
+    WrongPublicSet,
 }
 
 #[actix::test]
@@ -23,6 +25,8 @@ async fn forged_share_cannot_reserve_an_honest_partys_slot() -> Result<()> {
         Forgery::WrongCircuit,
         Forgery::WrongProofType,
         Forgery::WrongCiphertext,
+        Forgery::WrongPublicOwner,
+        Forgery::WrongPublicSet,
     ] {
         let (mut aggregator, _, e3_id) =
             build_plaintext_aggregator(collecting_state(), true).await?;
@@ -46,15 +50,27 @@ async fn forged_share_cannot_reserve_an_honest_partys_slot() -> Result<()> {
             Forgery::WrongCiphertext => {
                 (_, proofs) = share_with_matching_commitment(&e3_id, 0, &test_ciphertexts()[1..]);
             }
+            Forgery::WrongPublicOwner | Forgery::WrongPublicSet => {
+                let mut fields = proofs[0].payload.proof.public_signals.to_vec();
+                let index = if matches!(forgery, Forgery::WrongPublicOwner) {
+                    5
+                } else {
+                    7
+                };
+                fields[index * 32..(index + 1) * 32]
+                    .copy_from_slice(&alloy::primitives::U256::from(3).to_be_bytes::<32>());
+                proofs[0].payload.proof.public_signals = ArcBytes::from_bytes(&fields);
+                proofs[0] = SignedProofPayload::sign(proofs[0].payload.clone(), &test_signer(0))?;
+            }
         }
         let ec = test_ctx(EffectsEnabled::new());
-        aggregator.add_share(0, shares, proofs, &ec)?;
+        aggregator.add_share(0, shares, proofs, &[1, 2], &ec)?;
         let state = Collecting::try_from(aggregator.state.try_get()?)?;
         assert!(state.shares.is_empty(), "{forgery:?} reserved a slot");
         assert!(state.rejected_parties.is_empty());
         for party in 0..2 {
             let (shares, proofs) = share_with_matching_commitment(&e3_id, party, ciphertexts);
-            aggregator.add_share(party, shares, proofs, &ec)?;
+            aggregator.add_share(party, shares, proofs, &[1, 2], &ec)?;
         }
         assert!(matches!(
             aggregator.state.get(),
@@ -79,11 +95,11 @@ async fn valid_proofs_cannot_be_reordered_between_ciphertexts() -> Result<()> {
     shares.swap(0, 1);
     proofs.swap(0, 1);
     let ec = test_ctx(EffectsEnabled::new());
-    aggregator.add_share(0, shares, proofs, &ec)?;
+    aggregator.add_share(0, shares, proofs, &[1, 2], &ec)?;
     let state = Collecting::try_from(aggregator.state.try_get()?)?;
     assert!(state.shares.is_empty());
     let (shares, proofs) = share_with_matching_commitment(&e3_id, 0, &ciphertexts);
-    aggregator.add_share(0, shares, proofs, &ec)?;
+    aggregator.add_share(0, shares, proofs, &[1, 2], &ec)?;
     let state = Collecting::try_from(aggregator.state.try_get()?)?;
     assert!(state.shares.contains_key(&0));
     Ok(())

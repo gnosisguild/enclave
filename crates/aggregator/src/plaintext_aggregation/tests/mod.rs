@@ -114,7 +114,10 @@ fn computing_state() -> ThresholdPlaintextAggregatorState {
     ThresholdPlaintextAggregatorState::Computing(Computing {
         threshold_m: 1,
         threshold_n: 2,
-        shares: vec![(0, vec![ArcBytes::from_bytes(&[7])])],
+        shares: vec![
+            (0, vec![ArcBytes::from_bytes(&[7])]),
+            (1, vec![ArcBytes::from_bytes(&[6])]),
+        ],
         ciphertext_output: vec![ArcBytes::from_bytes(&[8])],
         params: test_params(),
     })
@@ -139,6 +142,7 @@ fn verifying_c6_state() -> ThresholdPlaintextAggregatorState {
 
 fn generating_c7_state() -> ThresholdPlaintextAggregatorState {
     ThresholdPlaintextAggregatorState::GeneratingC7Proof(GeneratingC7Proof {
+        ciphertext_output: test_ciphertexts(),
         threshold_m: 1,
         threshold_n: 2,
         shares: vec![(0, vec![ArcBytes::from_bytes(&[7])])],
@@ -152,6 +156,7 @@ fn collecting_state() -> ThresholdPlaintextAggregatorState {
         threshold_n: 2,
         shares: BTreeMap::new(),
         c6_proofs: BTreeMap::new(),
+        expected_decryptors: Vec::new(),
         seed: Seed([0u8; 32]),
         ciphertext_output: test_ciphertexts()[..1].to_vec(),
         params: test_params(),
@@ -239,6 +244,16 @@ fn share_with_matching_commitment(
     party: u64,
     ciphertexts: &[ArcBytes],
 ) -> (Vec<ArcBytes>, Vec<SignedProofPayload>) {
+    share_with_matching_commitment_in_set(e3_id, party, ciphertexts, &[1, 2])
+}
+
+fn share_with_matching_commitment_in_set(
+    e3_id: &E3id,
+    party: u64,
+    ciphertexts: &[ArcBytes],
+    ids: &[u32],
+) -> (Vec<ArcBytes>, Vec<SignedProofPayload>) {
+    let ids = if ids.is_empty() { &[1u32, 2][..] } else { ids };
     use e3_polynomial_fhe::FromFhePolynomial as _;
     use e3_zk_config::{threshold::share_decryption::Configs, MAX_MSG_NON_ZERO_COEFFS};
     use e3_zk_witness::compute_threshold_decryption_share_commitment;
@@ -259,9 +274,17 @@ fn share_with_matching_commitment(
     let proofs = ciphertexts
         .iter()
         .map(|ciphertext| {
-            let mut signals = [0u8; 192];
-            signals[192 - bytes.len()..].copy_from_slice(&bytes);
-            signals[64..96].copy_from_slice(
+            let count = 7 + ids.len() + 2 * (2 * ids.len() - 1);
+            let mut signals = vec![0u8; count * 32];
+            let end = signals.len();
+            signals[end - bytes.len()..].copy_from_slice(&bytes);
+            signals[5 * 32..6 * 32]
+                .copy_from_slice(&alloy::primitives::U256::from(party).to_be_bytes::<32>());
+            for (i, id) in ids.iter().enumerate() {
+                signals[(6 + i) * 32..(7 + i) * 32]
+                    .copy_from_slice(&alloy::primitives::U256::from(*id).to_be_bytes::<32>());
+            }
+            signals[32..64].copy_from_slice(
                 &e3_bfv_client::compute_ct_commitment_with_params(ciphertext, &params).unwrap(),
             );
             let domain = e3_committee_hash::decryption_domain_limbs(
@@ -399,7 +422,7 @@ async fn standby_persists_and_resumes_plaintext_work() -> Result<()> {
     for party in 0..2 {
         let (shares, proofs) =
             share_with_matching_commitment(&e3_id, party, &test_ciphertexts()[..1]);
-        aggregator.add_share(party, shares, proofs, &ec)?;
+        aggregator.add_share(party, shares, proofs, &[1, 2], &ec)?;
     }
     aggregator.publish_inputs_ready(ec)?;
 
@@ -490,6 +513,7 @@ async fn decryption_share_after_collection_closed_is_ignored() -> Result<()> {
         0,
         vec![ArcBytes::from_bytes(&[7])],
         vec![dummy_signed_c6_proof(&e3_id)],
+        &[],
         &test_ctx(EffectsEnabled::new()),
     )?;
 

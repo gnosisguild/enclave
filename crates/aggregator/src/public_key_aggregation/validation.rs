@@ -159,7 +159,7 @@ mod tests {
             party_id: 3,
             agg_commits: DkgFoldAggCommits {
                 sk_agg_commit: [1; 32],
-                esm_agg_commit: [2; 32],
+                prf_key_commits_hash: [2; 32],
             },
         };
         (

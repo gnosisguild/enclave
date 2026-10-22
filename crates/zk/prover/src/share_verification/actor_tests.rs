@@ -172,13 +172,7 @@ async fn restored_committee_authorizes_c6_without_replayed_finalization_event() 
 
 #[actix::test]
 async fn unauthenticated_share_proofs_do_not_emit_accusations() {
-    for forgery in [
-        "first signature",
-        "later signature",
-        "wrong signer",
-        "wrong E3",
-        "circuit",
-    ] {
+    for forgery in ["first signature", "wrong signer", "wrong E3", "circuit"] {
         let bus = test_bus();
         let history = bus.history();
         bus.event_bus().send(EventBusBarrier).await.unwrap();
@@ -206,15 +200,11 @@ async fn unauthenticated_share_proofs_do_not_emit_accusations() {
         let good = e3_events::PartyShareDecryptionProofsToVerify {
             sender_party_id: 0,
             signed_sk_decryption_proof: make(ProofType::C4aSkShareDecryption),
-            signed_e_sm_decryption_proofs: vec![make(ProofType::C4bESmShareDecryption)],
         };
         let mut bad = good.clone();
         match forgery {
             "first signature" => {
                 bad.signed_sk_decryption_proof.signature = ArcBytes::from_bytes(&[0; 65])
-            }
-            "later signature" => {
-                bad.signed_e_sm_decryption_proofs[0].signature = ArcBytes::from_bytes(&[0; 65])
             }
             "wrong signer" => {
                 bad.signed_sk_decryption_proof =

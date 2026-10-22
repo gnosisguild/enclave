@@ -17,12 +17,11 @@ use e3_utils::utility_types::ArcBytes;
 use fhe::{
     bfv::SecretKey,
     mbfv::{CommonRandomPoly, PublicKeyShare},
-    trbfv::{ShareManager, TRBFV},
+    trbfv::ShareManager,
 };
 use fhe_traits::Serialize as FheSerialize;
 use rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
 use tracing::info;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -36,6 +35,8 @@ pub struct GenPkShareAndSkSssRequest {
     pub lambda: LambdaConfig,
     /// Number of ciphertexts (z) for smudging noise generation.
     pub num_ciphertexts: usize,
+    /// Multiplicative depth for l-BFV smudging noise computation.
+    pub mult_depth: u32,
 }
 
 struct InnerRequest {
@@ -43,6 +44,7 @@ struct InnerRequest {
     pub crp: CommonRandomPoly,
     pub lambda: LambdaConfig,
     pub num_ciphertexts: usize,
+    pub mult_depth: u32,
 }
 
 impl TryFrom<GenPkShareAndSkSssRequest> for InnerRequest {
@@ -55,6 +57,7 @@ impl TryFrom<GenPkShareAndSkSssRequest> for InnerRequest {
             crp,
             lambda: value.lambda,
             num_ciphertexts: value.num_ciphertexts,
+            mult_depth: value.mult_depth,
         })
     }
 }
@@ -71,8 +74,6 @@ pub struct GenPkShareAndSkSssResponse {
     pub sk_raw: SensitiveBytes,
     /// Raw error polynomial from key generation (RNS form) for ZK proof generation (C1) — encrypted at rest.
     pub eek_raw: SensitiveBytes,
-    /// Raw smudging noise polynomial (RNS form) for ZK proof generation (C1) — encrypted at rest.
-    pub e_sm_raw: SensitiveBytes,
 }
 
 impl TryFrom<(InnerResponse, &Cipher)> for GenPkShareAndSkSssResponse {
@@ -88,7 +89,6 @@ impl TryFrom<(InnerResponse, &Cipher)> for GenPkShareAndSkSssResponse {
             pk0_share_raw: value.pk0_share_raw,
             sk_raw: SensitiveBytes::new(value.sk_raw.to_vec(), cipher)?,
             eek_raw: SensitiveBytes::new(value.eek_raw.to_vec(), cipher)?,
-            e_sm_raw: SensitiveBytes::new(value.e_sm_raw.to_vec(), cipher)?,
         })
     }
 }
@@ -104,8 +104,6 @@ struct InnerResponse {
     pub sk_raw: ArcBytes,
     /// Raw error polynomial bytes for ZK proof.
     pub eek_raw: ArcBytes,
-    /// Raw smudging noise polynomial bytes for ZK proof.
-    pub e_sm_raw: ArcBytes,
 }
 
 pub fn gen_pk_share_and_sk_sss<R: RngCore + CryptoRng>(
@@ -128,17 +126,9 @@ pub fn gen_pk_share_and_sk_sss<R: RngCore + CryptoRng>(
     let sk_share = SecretKey::random(&params, rng);
     let (pk_share, intermediates) =
         PublicKeyShare::new_with_intermediates(&sk_share, crp.clone(), rng)?;
+    let _ = (req.lambda, req.num_ciphertexts, req.mult_depth);
 
-    // Generate smudging noise
-    let trbfv = TRBFV::new(num_ciphernodes as usize, threshold as usize, params.clone())?;
-    let share_manager_for_esm =
-        ShareManager::new(num_ciphernodes as usize, threshold as usize, params.clone())?;
-    let lambda = req.lambda.into_lambda()?;
-    let esi_coeffs = trbfv.generate_smudging_error(req.num_ciphertexts, 0, lambda, rng)?;
-    let e_sm_rns = share_manager_for_esm.bigints_to_poly(&esi_coeffs)?;
-    let e_sm_raw = ArcBytes::from_bytes(&e_sm_rns.deref().to_bytes());
-
-    let pk0_share_raw = ArcBytes::from_bytes(&pk_share.to_bytes());
+    let pk0_share_raw = ArcBytes::from_bytes(&pk_share.p0_share().to_bytes());
     let eek_raw = ArcBytes::from_bytes(&intermediates.error().to_bytes());
 
     let mut share_manager =
@@ -157,7 +147,6 @@ pub fn gen_pk_share_and_sk_sss<R: RngCore + CryptoRng>(
             pk0_share_raw,
             sk_raw,
             eek_raw,
-            e_sm_raw,
         },
         cipher,
     )

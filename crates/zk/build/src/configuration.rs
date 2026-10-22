@@ -195,11 +195,29 @@ pub fn replace_declarations(
             continue;
         }
         count += 1;
+        if !strict
+            && Regex::new(&format!(r"\bas\s+{name}\b"))
+                .unwrap()
+                .is_match(original)
+        {
+            // A renamed re-export already has a canonical owner. Do not shadow it with a global.
+            if let Some(current) = old.get(name) {
+                updated = updated.replacen(current, "", 1);
+            }
+            continue;
+        }
         match old.get(name) {
             Some(current) if compact(current) != compact(declaration) => {
                 updated = updated.replacen(current, declaration, 1)
             }
             None if strict => bail!("Missing {name} in committed circuit configuration"),
+            None => {
+                // Synchronization installs new owner-generated declarations; read-only checks
+                // above remain strict and never repair their inputs.
+                updated.push('\n');
+                updated.push_str(declaration);
+                updated.push('\n');
+            }
             _ => {}
         }
     }

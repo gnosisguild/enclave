@@ -5,9 +5,8 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
 use lib::configs::default::threshold::{
-    CRP, L, N, PK_GENERATION_BIT_E_SM, PK_GENERATION_BIT_E_SM_LIFTED,
-    PK_GENERATION_BIT_E_SM_QUOTIENT, PK_GENERATION_BIT_EEK, PK_GENERATION_BIT_PK,
-    PK_GENERATION_BIT_R, PK_GENERATION_BIT_SK, PK_GENERATION_CONFIGS,
+    CRP, L, N, PK_GENERATION_BIT_EEK, PK_GENERATION_BIT_PK, PK_GENERATION_BIT_R,
+    PK_GENERATION_BIT_SK, PK_GENERATION_CONFIGS,
 };
 use lib::core::threshold::pk_generation::PkGeneration;
 use lib::math::polynomial::Polynomial;
@@ -15,22 +14,10 @@ use lib::math::polynomial::Polynomial;
 fn main(
     eek: Polynomial<N>,
     sk: Polynomial<N>,
-    e_sm: [Polynomial<N>; L],
-    e_sm_lifted: Polynomial<N>,
-    e_sm_quotients: [Polynomial<N>; L],
     ris: [Polynomial<N>; L],
     pk0is: [Polynomial<N>; L],
-) -> pub (Field, Field, Field) {
-    let pk_generation: PkGeneration<N, L, PK_GENERATION_BIT_EEK, PK_GENERATION_BIT_SK, PK_GENERATION_BIT_E_SM, PK_GENERATION_BIT_E_SM_LIFTED, PK_GENERATION_BIT_E_SM_QUOTIENT, PK_GENERATION_BIT_R, PK_GENERATION_BIT_PK> = PkGeneration::new(
-        PK_GENERATION_CONFIGS,
-        CRP,
-        eek,
-        sk,
-        e_sm,
-        e_sm_lifted,
-        e_sm_quotients,
-        ris,
-        pk0is,
-    );
+) -> pub (Field, Field) {
+    let pk_generation: PkGeneration<N, L, PK_GENERATION_BIT_EEK, PK_GENERATION_BIT_SK, PK_GENERATION_BIT_R, PK_GENERATION_BIT_PK> =
+        PkGeneration::new(PK_GENERATION_CONFIGS, CRP, eek, sk, ris, pk0is);
     pk_generation.execute()
 }

@@ -22,7 +22,8 @@ pub struct CanonicalPublicKey {
     pub committee_size: CiphernodesCommitteeSize,
     pub interfold_address: Address,
     pub sk_agg_commits: Vec<[u8; 32]>,
-    pub esm_agg_commits: Vec<[u8; 32]>,
+    /// Selected-dealer rows, each indexed by the full committee's recipients.
+    pub prf_key_commits: Vec<[u8; 32]>,
 }
 
 impl CanonicalPublicKey {

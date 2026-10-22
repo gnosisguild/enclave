@@ -24,9 +24,7 @@ use lib::math::recursive_vk::sequential_fold_vk_hash;
 
 /// Must match `c6_fold::C6_FOLD_PUBLIC_LEN`: pub params, common domain limbs,
 /// and flattened `(out_sk, out_esm, out_ct, out_d)`.
-pub global C6_FOLD_PUBLIC_LEN: u32 = 7 + (4 * (T + 1));
-
-pub global C6_FOLD_PREFIX_LEN: u32 = C6_FOLD_PUBLIC_LEN - (4 * (T + 1));
+use lib::configs::recursive::{C6_FOLD_PUBLIC_LEN, C6_FOLD_PREFIX_LEN, C6_KEY_SLOTS, C7_PUBLIC_LEN};
 
 /// Column offsets inside the `c6_fold` flattened tail (after `C6_FOLD_PREFIX_LEN`):
 /// `(out_sk, out_esm, out_ct, out_d)`, each `C6_FOLD_COL_WIDTH = T + 1` long.
@@ -40,8 +38,6 @@ pub global C6_FOLD_D_COL_OFFSET: u32 = 3 * C6_FOLD_COL_WIDTH;
 pub global C7_D_COMMITMENT_OFFSET: u32 = 0;
 pub global C7_PARTY_ID_OFFSET: u32 = T + 1;
 pub global C7_MESSAGE_OFFSET: u32 = 2 * (T + 1);
-
-pub global C7_PUBLIC_LEN: u32 = (2 * (T + 1)) + MAX_MSG_NON_ZERO_COEFFS;
 
 /// Validates a single circuit-side `party_id`: must be a 1-indexed Shamir x-coordinate
 /// in `[1, N_PARTIES]`. `x=0` is reserved for the secret itself (see DKG
@@ -81,7 +77,7 @@ fn main(
     domain_hi: pub Field,
     domain_lo: pub Field,
     ciphertext_commitment: pub Field,
-) -> pub (Field, [Field; T + 1], [Field; T + 1], [Field; T + 1], [Field; MAX_MSG_NON_ZERO_COEFFS]) {
+    ) -> pub (Field, [Field; T + 1], [Field; T + 1], [Field; T + 1], [Field; MAX_MSG_NON_ZERO_COEFFS], [Field; C6_KEY_SLOTS], [Field; C6_KEY_SLOTS]) {
     let (expected_hi, expected_lo) = committee_hash_limbs(committee_members);
     assert(expected_hi == committee_hash_hi);
     assert(expected_lo == committee_hash_lo);
@@ -106,6 +102,11 @@ fn main(
         assert(
             c6_fold_public[C6_FOLD_PREFIX_LEN + C6_FOLD_CT_COL_OFFSET + i] == ciphertext_commitment,
         );
+        assert(
+            c6_fold_public[C6_FOLD_PREFIX_LEN + C6_FOLD_ESM_COL_OFFSET + i]
+                == c7_public[C7_PUBLIC_LEN - 1],
+            "c0 prefix mismatch",
+        );
     }
 
     // Cross-circuit C6 to C7: each folded `d_commitment` column entry must match `c7_public[i]`
@@ -122,12 +123,16 @@ fn main(
 
     let mut party_ids: [Field; T + 1] = [0; T + 1];
     let mut expected_sk: [Field; T + 1] = [0; T + 1];
-    let mut expected_esm: [Field; T + 1] = [0; T + 1];
+    let mut expected_c0: [Field; T + 1] = [0; T + 1];
     let mut prev_party_id: u32 = 0;
     for i in 0..(T + 1) {
         party_ids[i] = c7_public[C7_PARTY_ID_OFFSET + i];
         expected_sk[i] = c6_fold_public[C6_FOLD_PREFIX_LEN + C6_FOLD_SK_COL_OFFSET + i];
-        expected_esm[i] = c6_fold_public[C6_FOLD_PREFIX_LEN + C6_FOLD_ESM_COL_OFFSET + i];
+        expected_c0[i] = c6_fold_public[C6_FOLD_PREFIX_LEN + C6_FOLD_ESM_COL_OFFSET + i];
+        assert(
+            c6_fold_public[C6_FOLD_PREFIX_LEN + 4 * (T + 1) + 2 * C6_KEY_SLOTS + i] == party_ids[i],
+            "C6/C7 designated set mismatch",
+        );
 
         // `committee_members` and `topNodes` are 0-indexed; a future per-party
         // signer/identity check must index them with `committee_members[party_ids[i] - 1]`,
@@ -145,7 +150,14 @@ fn main(
         message[k] = c7_public[C7_MESSAGE_OFFSET + k];
     }
 
-    (key_hash, party_ids, expected_sk, expected_esm, message)
+    let mut outgoing = [0; C6_KEY_SLOTS];
+    let mut incoming = [0; C6_KEY_SLOTS];
+    let base = C6_FOLD_PREFIX_LEN + 4 * (T + 1);
+    for i in 0..C6_KEY_SLOTS {
+        outgoing[i] = c6_fold_public[base + i];
+        incoming[i] = c6_fold_public[base + C6_KEY_SLOTS + i];
+    }
+    (key_hash, party_ids, expected_sk, expected_c0, message, outgoing, incoming)
 }
 
 // ------------------------------ TESTS ------------------------------

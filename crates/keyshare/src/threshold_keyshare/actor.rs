@@ -32,7 +32,6 @@ use e3_trbfv::{
     calculate_decryption_share::{
         CalculateDecryptionShareRequest, CalculateDecryptionShareResponse,
     },
-    gen_esi_sss::{GenEsiSssRequest, GenEsiSssResponse},
     gen_pk_share_and_sk_sss::{GenPkShareAndSkSssRequest, GenPkShareAndSkSssResponse},
     shares::SharedSecret,
     TrBFVConfig, TrBFVRequest, TrBFVResponse,
@@ -66,7 +65,7 @@ use crate::domain::timeout_policy::{
 use crate::domain::{
     batch_grows, build_decryption_key_plan, build_shares_generated_plan, dealer_identity,
     dispatch_verifies_batch, generate_bfv_keypair, select_ready_roster, AggregatingDecryptionKey,
-    BfvKeypairMaterial, CollectingEncryptionKeysData, Decrypting, DecryptionKeyPlan,
+    BfvKeypairMaterial, CollectingEncryptionKeysData, Completed, Decrypting, DecryptionKeyPlan,
     GeneratingDecryptionProof, GeneratingThresholdShareData, KeyshareState, ProofRequestData,
     ReadyForDecryption, ReadySummaryGate, ReceivedShareProofs, ThresholdKeyshareState,
 };
@@ -86,13 +85,6 @@ mod validation;
 #[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[rtype(result = "()")]
 pub struct GenPkShareAndSkSss(CiphernodeSelected);
-
-#[derive(Message, Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[rtype(result = "()")]
-pub struct GenEsiSss {
-    pub ciphernode_selected: CiphernodeSelected,
-    pub e_sm_raw: SensitiveBytes,
-}
 
 #[derive(Message)]
 #[rtype(result = "()")]
@@ -116,9 +108,7 @@ impl AllThresholdSharesCollected {
             .map(|pid| {
                 proofs.get(pid).cloned().unwrap_or(ReceivedShareProofs {
                     signed_c2a_proof: None,
-                    signed_c2b_proof: None,
                     signed_c3a_proofs: Vec::new(),
-                    signed_c3b_proofs: Vec::new(),
                 })
             })
             .collect();
@@ -152,23 +142,22 @@ pub type DkgTimingReader = Arc<dyn Fn(E3id) -> DkgTimingFuture + Send + Sync>;
 struct PendingKeyshareWork {
     /// Replayed key-generation output waiting for encryption-key recovery.
     gen_pk_response: Option<TypedEvent<ComputeResponse>>,
-    /// Replayed ESI output waiting for key-generation recovery.
-    gen_esi_response: Option<TypedEvent<ComputeResponse>>,
     /// Shares awaiting the C2/C3 verification result.
     shares: Vec<Arc<ThresholdShare>>,
     /// C2/C3 results of dispatches that this process has not sent for the current batch, by
     /// dispatch ID. A result applies when this actor sends a dispatch with its ID. There is at
     /// most one entry for each distinct dispatch payload of the E3.
     parked_share_verdicts: HashMap<EventId, TypedEvent<ShareVerificationComplete>>,
-    /// C4 requests awaiting the threshold-decryption-key result.
-    share_decryption_data: Option<(
-        DkgShareDecryptionProofRequest,
-        Vec<DkgShareDecryptionProofRequest>,
-    )>,
+    /// C4 request awaiting the threshold-decryption-key result.
+    share_decryption_data: Option<DkgShareDecryptionProofRequest>,
     /// Peer C4 artifacts awaiting verification.
     c4_verification_shares: Option<HashMap<u64, DecryptionKeyShared>>,
     /// Own plaintext DKG shares awaiting the aggregation transition.
-    own_dkg_shares: Option<(SensitiveBytes, Vec<SensitiveBytes>)>,
+    own_dkg_shares: Option<SensitiveBytes>,
+    /// Outgoing PRF keys awaiting the aggregation transition.
+    outgoing_prf_keys: Vec<SensitiveBytes>,
+    /// Incoming PRF keys learned while decrypting honest shares.
+    incoming_prf_keys: Vec<SensitiveBytes>,
     /// C4 completed before the signed C1 artifact became available.
     keyshare_publish: bool,
     /// This node's BFV keypair whose record failed. The selection records the same keypair again.
@@ -260,7 +249,7 @@ impl ThresholdKeyshare {
         let share_decryption_data = recovered
             .decryption_share_proofs_pending
             .as_ref()
-            .map(|event| (event.sk_request.clone(), event.esm_requests.clone()));
+            .map(|event| event.sk_request.clone());
         let c4_verification_shares = (!recovered.decryption_key_shares.is_empty()).then(|| {
             recovered
                 .decryption_key_shares

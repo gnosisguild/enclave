@@ -20,6 +20,11 @@ impl Handler<InterfoldEvent> for ThresholdKeyshare {
                 }
                 self.notify_sync(ctx, TypedEvent::new(data, ec))
             }
+            InterfoldEventData::FreshDecryptionRound(data) => {
+                if let Err(error) = self.handle_fresh_decryption_round(TypedEvent::new(data, ec)) {
+                    warn!("Could not start a fresh decryption round: {error}");
+                }
+            }
             InterfoldEventData::PublicKeyAggregated(data) => {
                 trap(EType::KeyGeneration, &self.bus.with_ec(&ec), || {
                     self.handle_public_key_aggregated(data, &ec)

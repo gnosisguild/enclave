@@ -84,7 +84,13 @@ impl E3RequestedWithChainId {
             .map_err(|e| anyhow::anyhow!("Failed to build lambda for preset: {}", e))?;
         let lambda_value = lambda.value();
 
-        let error_size = match calculate_error_size(params_arc, threshold_n, threshold_m, lambda) {
+        let error_size = match calculate_error_size(
+            params_arc,
+            threshold_n,
+            threshold_m,
+            0,
+            lambda_value,
+        ) {
             Ok(size) => {
                 let size_bytes = size.to_bytes_be();
                 info!(

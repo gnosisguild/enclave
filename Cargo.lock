@@ -4571,6 +4571,7 @@ dependencies = [
  "e3-fhe-params",
  "e3-test-helpers",
  "e3-utils",
+ "e3-zk-witness",
  "fhe",
  "fhe-math",
  "fhe-traits",
@@ -4580,6 +4581,7 @@ dependencies = [
  "rand 0.9.5",
  "rand_chacha 0.9.0",
  "serde",
+ "sha2 0.10.9",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -5119,11 +5121,13 @@ dependencies = [
 
 [[package]]
 name = "fhe"
-version = "0.4.1"
-source = "git+https://github.com/gnosisguild/fhe.rs?tag=v0.4.2#873dc69c07eae251f88c4b5cacf6c4453e2c365a"
+version = "0.5.0"
+source = "git+https://github.com/gnosisguild/fhe.rs?tag=v0.5.1#d5a488715839acdfb9e6f8be9fbb3f2f054eaddb"
 dependencies = [
+ "ark-ff 0.5.0",
  "bincode",
  "doc-comment",
+ "e3-safe",
  "fhe-math",
  "fhe-traits",
  "fhe-util",
@@ -5145,8 +5149,8 @@ dependencies = [
 
 [[package]]
 name = "fhe-math"
-version = "0.4.1"
-source = "git+https://github.com/gnosisguild/fhe.rs?tag=v0.4.2#873dc69c07eae251f88c4b5cacf6c4453e2c365a"
+version = "0.5.0"
+source = "git+https://github.com/gnosisguild/fhe.rs?tag=v0.5.1#d5a488715839acdfb9e6f8be9fbb3f2f054eaddb"
 dependencies = [
  "ethnum",
  "fhe-traits",
@@ -5169,16 +5173,16 @@ dependencies = [
 
 [[package]]
 name = "fhe-traits"
-version = "0.4.1"
-source = "git+https://github.com/gnosisguild/fhe.rs?tag=v0.4.2#873dc69c07eae251f88c4b5cacf6c4453e2c365a"
+version = "0.5.0"
+source = "git+https://github.com/gnosisguild/fhe.rs?tag=v0.5.1#d5a488715839acdfb9e6f8be9fbb3f2f054eaddb"
 dependencies = [
  "rand 0.9.5",
 ]
 
 [[package]]
 name = "fhe-util"
-version = "0.4.1"
-source = "git+https://github.com/gnosisguild/fhe.rs?tag=v0.4.2#873dc69c07eae251f88c4b5cacf6c4453e2c365a"
+version = "0.5.0"
+source = "git+https://github.com/gnosisguild/fhe.rs?tag=v0.5.1#d5a488715839acdfb9e6f8be9fbb3f2f054eaddb"
 dependencies = [
  "num-bigint-dig",
  "num-traits",

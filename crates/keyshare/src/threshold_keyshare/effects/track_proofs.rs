@@ -29,7 +29,7 @@ impl ThresholdKeyshare {
         Ok(())
     }
 
-    /// Handle DkgProofSigned - stores the signed proof in state based on proof type (C2a, C2b, C3a or C3b)
+    /// Handle DkgProofSigned - stores the signed proof in state based on proof type (C2a or C3a)
     pub fn handle_share_computation_proof_signed(
         &mut self,
         msg: TypedEvent<DkgProofSigned>,
@@ -65,10 +65,6 @@ impl ThresholdKeyshare {
                     signed_sk_share_computation_proof: Some(msg.signed_proof),
                     ..current
                 },
-                ProofType::C2bESmShareComputation => AggregatingDecryptionKey {
-                    signed_e_sm_share_computation_proof: Some(msg.signed_proof),
-                    ..current
-                },
                 ProofType::C3aSkShareEncryption => {
                     let mut updated = current;
                     if !updated
@@ -77,18 +73,6 @@ impl ThresholdKeyshare {
                     {
                         updated
                             .signed_sk_share_encryption_proofs
-                            .push(msg.signed_proof);
-                    }
-                    updated
-                }
-                ProofType::C3bESmShareEncryption => {
-                    let mut updated = current;
-                    if !updated
-                        .signed_e_sm_share_encryption_proofs
-                        .contains(&msg.signed_proof)
-                    {
-                        updated
-                            .signed_e_sm_share_encryption_proofs
                             .push(msg.signed_proof);
                     }
                     updated
@@ -113,7 +97,6 @@ impl ThresholdKeyshare {
     ) -> Result<()> {
         match &msg.response {
             ComputeResponseKind::TrBFV(trbfv) => match trbfv {
-                TrBFVResponse::GenEsiSss(_) => self.handle_gen_esi_sss_response(msg),
                 TrBFVResponse::GenPkShareAndSkSss(_) => {
                     self.handle_gen_pk_share_and_sk_sss_response(msg)
                 }

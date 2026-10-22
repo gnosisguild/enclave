@@ -12,7 +12,9 @@ pub mod crp;
 #[cfg(feature = "abi-encoding")]
 pub mod encoding;
 pub mod presets;
+pub mod prf_key;
 pub mod search;
+pub mod smudging;
 pub mod utils;
 
 pub use builder::{
@@ -25,4 +27,12 @@ pub use encoding::{decode_bfv_params, decode_bfv_params_arc, encode_bfv_params, 
 pub use presets::{
     default_param_set, BfvParamSet, BfvPreset, LambdaConfig, ParameterType, PresetError,
     PresetMetadata, PresetSearchDefaults, SecurityTier, DEFAULT_BFV_PRESET,
+};
+pub use prf_key::{
+    pack_prf_key, pack_share_coefficient, prf_key_bit_len, prf_key_bits, prf_key_limb_index,
+    prf_key_modulus, unpack_prf_key, unpack_share_coefficient, zero_prf_key, PrfKeyPackError,
+};
+pub use smudging::{
+    calculate_smudging_bound, fresh_smudging_inputs, generate_smudging_error,
+    sample_fresh_smudging_error, smudging_noise_from_signed_coefficients, FreshSmudgingInputs,
 };

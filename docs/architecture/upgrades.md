@@ -7,6 +7,33 @@ Owners: [release configuration](../../crates/config/protocol-release.toml),
 [Protocol compatibility](../../CONTRIBUTING.md#protocol-compatibility) for human rollout approval.
 This is reference policy, not authorization to perform a release.
 
+## Synchronized-decryption development boundary
+
+The unfinished synchronized-decryption branch declares protocol **9**, generation **2**, disk schema
+9, gossip wire 6, and sync wire 5. The protocol-counter change and drained fresh-deployment/history
+boundary were approved for this development branch; that is not approval to merge or deploy.
+Schema-8 stores, protocol-8 peers, old wire envelopes and deployed pre-migration verifiers are not
+compatible; there is no in-place state converter. Secure-preset artifacts, deployment sequencing and
+the final production review remain outstanding under the
+[migration status](threshold-decryption.md#synchronized-decryption-migration-status).
+
+Do not treat these guards as a rolling-upgrade path. Drain outstanding work using matching old
+software before any coordinated reset/redeployment. A rollback needs the matching old binary and
+verifier/artifact set plus a pre-upgrade store backup, not schema-9 data.
+
+The current proposal requires a fresh registry/deployment history boundary. Resetting node storage
+alone on the old registry is insufficient: confirmed old `CommitteeProofPublished` logs use the
+retired layout and the new canonical-key projection rejects them. No historical dual-layout reader
+or same-address cutover block is implemented. Local storage-layout validation does not establish
+semantic replay or verifier compatibility.
+
+Keep the matching old binary, artifact/verifier set and a pre-upgrade backup for recovery planning.
+Do not downgrade required counters, feed schema-9 stores to old software, or reuse the new stack's
+history with old readers. If a cutover has activated, rollback requires a paused/drained,
+higher-protocol-version recovery plan with matching restored behavior; it is not a return from
+protocol 9 to 8 on the same release registry. Execution and the concrete rollback runbook still
+require human approval.
+
 ## Independent version boundaries
 
 | Value                                                               | Meaning                                                                          |
@@ -63,18 +90,19 @@ fork). This compensates estimation timing, not a substitute for receipt validati
 
 ## v0.19 protocol/crypto cutover
 
-The current source declares protocol **8**, generation **2**, circuit domain `interfold-bfv-v5`. The
-signed DKG layouts require storage schema 8, threshold-keyshare recovery schema 8, gossip major 5,
-sync major 4. ThresholdShareCreated/DecryptionKeyShared bundle signatures change log/recovery/DHT
-bytes; there is no unsigned-layout migration. Drain-and-resync, rebuild all six artifact pairs, and
-replace immutable wrappers/routers before serving requests. A historical 0.19 test build reporting
-protocol 7 does not satisfy this cutover; the source's compiled values are explicit, not inferred
-from SemVer.
+The pre-synchronized-decryption v0.19 baseline declared protocol **8**, generation **2**, circuit
+domain `interfold-bfv-v5`. Its signed DKG layouts require storage schema 8, threshold-keyshare
+recovery schema 8, gossip major 5, sync major 4. ThresholdShareCreated/DecryptionKeyShared bundle
+signatures change log/recovery/DHT bytes; there is no unsigned-layout migration. Drain-and-resync,
+rebuild all six artifact pairs, and replace immutable wrappers/routers before serving requests. A
+historical 0.19 test build reporting protocol 7 does not satisfy this cutover; the source's compiled
+values are explicit, not inferred from SemVer.
 
 Sampler/smudging/BFV validation and non-centered C3/user-encryption/CRISP k1 scale change witnesses
-and bounds. Workspace fhe.rs pin is v0.4.2. Node, client configuration IDs, circuit archives, and
-OpenVM guest/receipt identity must match; v1–v4 requests cannot be treated as v5. Runtime/SDK
-tooling reject old configuration IDs for new requests.
+and bounds. That baseline pinned fhe.rs v0.4.2; this branch's synchronized integration pins v0.5.1.
+Node, client configuration IDs, circuit archives, and OpenVM guest/receipt identity must match;
+v1–v4 requests cannot be treated as v5. Runtime/SDK tooling reject old configuration IDs for new
+requests.
 
 **Mainnet parameter-set index 1 remains the previous secure tuple.** Register the new secure tuple
 at index **2** in the paused/drained governance batch; never overwrite/reinterpret old E3 records.

@@ -37,10 +37,7 @@ fn packing_layout<let BIT: u32>() -> (u32, u32) {
 
     // Maximum limbs that fit in one BN254 element without wrap.
     let group = 254 / (nibble_bits + 4);
-    // `group == 1` packs one value per carrier: it saves no sponge absorptions at all while still
-    // charging the range checks that make packing injective, so it is always a loss. Measured at
-    // BIT=143: +82% gates against absorbing directly. Reject it rather than pay for nothing.
-    assert(group >= 2);
+    assert(group >= 1);
     (nibble_bits, group)
 }
 
@@ -70,6 +67,9 @@ fn packing_layout<let BIT: u32>() -> (u32, u32) {
 /// opened with `pack_checked` agree. Adoption is per circuit and needs no commitment change.
 pub fn pack_checked<let A: u32, let BIT: u32>(values: [Field; A]) -> [Field] {
     let (nibble_bits, group) = packing_layout::<BIT>();
+    // Checked single-carrier packing saves no absorptions and adds redundant range checks.
+    // Already-bounded wide values (C6 quotients) use plain pack with the same shifted encoding.
+    assert(group >= 2);
 
     let base = 2.pow_32(nibble_bits as Field);
     let radix = 2.pow_32((nibble_bits + 4) as Field);
@@ -446,4 +446,19 @@ fn test_pack_checked_matches_pack_partial_chunk() {
     for i in 0..plain.len() {
         assert(plain[i] == checked[i]);
     }
+}
+
+#[test]
+fn plain_packing_keeps_the_wide_single_carrier_encoding() {
+    let values: [Field; 5] = [0, 1, -1, 2.pow_32(128), -2.pow_32(128)];
+    let packed = pack::<5, 129>(values);
+    assert(packed.len() == values.len());
+    for i in 0..5 {
+        assert(packed[i] == values[i] + 2.pow_32(132));
+    }
+}
+
+#[test(should_fail)]
+fn checked_packing_still_rejects_single_carrier_layouts() {
+    let _ = pack_checked::<1, 129>([0]);
 }

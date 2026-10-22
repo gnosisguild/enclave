@@ -11,6 +11,11 @@ Owners: [keyshare](../../crates/keyshare/src/threshold_keyshare/),
 [Proof statements](proof-statements.md) owns arithmetic and recursive trust;
 [threshold decryption](threshold-decryption.md) owns C6/C7.
 
+This branch replaces shared ESM transport with directed PRF keys. The interface below describes the
+synchronized protocol, not compatibility with deployed pre-migration verifiers. See the
+[migration status](threshold-decryption.md#synchronized-decryption-migration-status) and
+[cutover limits](upgrades.md#synchronized-decryption-development-boundary).
+
 ## Identities and dimensions
 
 - Normalize the finalized committee by ascending parsed EVM address. Runtime, DKG circuit, and
@@ -23,30 +28,34 @@ Owners: [keyshare](../../crates/keyshare/src/threshold_keyshare/),
 - N-wide C3 recipient-key and C2 share slots use the recipient's full-committee party ID. H-wide C4
   sender slots use the sender's position in the selected fold rows. A non-prefix H-roster makes
   these indices different.
-- C2a/C2b are singleton proof bundles for each recipient; C3a/C3b use the configured Shamir
-  multiplicities. Derive witness dimensions from the active preset, not incidental vector lengths.
+- C2a is a singleton proof bundle for each recipient; C3a uses the configured Shamir multiplicities.
+  Derive witness dimensions from the active preset, not incidental vector lengths.
 
 ## Exchange and verification boundaries
 
-Recipient bundles contain one C2a and one C2b plus C3a/C3b per **threshold Shamir row**, not per
+Recipient bundles contain one C2a plus C3a per **threshold Shamir row**, not per
 share-encryption/DKG CRT limb. Shape validation normalizes a DKG preset to its threshold counterpart
-before reading row count. Current TrBFV generates one smudging set (Z=1); extending C3b to multiple
-sets needs coordinated producer, validator, NodeFold, wire, and circuit changes, not inferred vector
-sizes. [Shape tests](../../crates/zk/prover/src/share_verification/workflow_tests/shape.rs) pin that
+before reading row count. Shared ESM proof chains are retired; their old event discriminants remain
+reserved rather than being renumbered.
+[Shape tests](../../crates/zk/prover/src/share_verification/workflow_tests/shape.rs) pin that
 distinction for both presets.
 
 Both insecure-64 and secure-8192 use three threshold Shamir rows. Each recipient bundle therefore
-contains one C2a, one C2b, three C3a, and three C3b proofs.
+contains one C2a and three C3a proofs. Each dealer's outgoing PRF row has N recipient entries; key
+bits are packed in the first threshold share limb using the paired DKG plaintext modulus `t=2q`. C2
+commits to the key row and packed messages. C3 binds recipient, limb and key commitment. C4 opens
+the messages, strips the key bits, sums the normalized SK shares, and commits to incoming keys in
+selected-H dealer order. The runtime retains incoming keys indexed by full-N sender IDs.
 
 | Boundary                                             | Requirement and reason                                                                                                                                                                                                                                                             |
 | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `CiphernodeSelected` → initialization                | Read `getDeadlines` and the request-frozen timeout configuration at `CommitteeFinalized`. Retry unavailable RPC; do not substitute a local window. Record the encrypted BFV keypair with flushed `DurableIntent` before using or publishing it.                                    |
 | `EncryptionKeyPending` → C0 → `EncryptionKeyCreated` | Sign the proof. Publish own `DKGInnerProofReady` sequence 0 before the created key, so leaving key collection cannot lose C0. C0 intake checks canonical party ownership, signature, key commitment, and request-specific artifacts before verification.                           |
 | Key collection → TrBFV generation                    | Keep the first authenticated key per party. Seed rebuilt collectors with expulsions before inputs. Require at least H remaining keys, including this node's key. Early keys in `Init` are recorded and replayed into the collector after timing is known.                          |
-| `ThresholdSharePending` → `ThresholdShareCreated`    | Finish and sign C1, C2a, C2b, and every C3a/C3b before any share is published. Each recipient gets its encrypted shares and complete proof bundle. C4–C7 are later phases.                                                                                                         |
+| `ThresholdSharePending` → `ThresholdShareCreated`    | Finish and sign C1, C2a, and every C3a before any share is published. Each recipient gets its encrypted shares and complete proof bundle. C4–C7 are later phases.                                                                                                                  |
 | Threshold-share intake                               | Authenticate the complete message before saving it or reserving the claimed dealer's slot. Check E3, dealer, recipient, share bytes, and ordered proof bundle. Rejection leaves the slot free and cannot accuse the claimed dealer.                                                |
 | Share verification → signed Ready                    | Validate proof signatures, E3, circuit names, and party ownership; check cross-proof commitments; then run ZK verification. Save verified dealer IDs and exact contribution hashes. Fewer than H locally verified dealers waits outside C4 rather than immediately failing the E3. |
-| Accepted roster → C4                                 | Use the saved canonical H-roster, never the lowest H local cache entries. C4 proves decrypted SK/ESM shares match C2 commitments and produces the summed decryption anchors.                                                                                                       |
+| Accepted roster → C4                                 | Use the saved canonical H-roster, never the lowest H local cache entries. C4 proves packed SK/key messages match C2 commitments and produces the normalized SK and incoming-key anchors.                                                                                           |
 | `DecryptionKeyShared` → `KeyshareCreated`            | Authenticate the complete C4 message, collect the selected peers, verify C4, and only then authorize keyshare publication.                                                                                                                                                         |
 
 The N-slot C3 fan-out proves every non-own slot. A recipient without a collected C0 key gets a
@@ -149,6 +158,12 @@ cannot turn a committee timeout into requester-paid compute failure.
 The on-chain fold verifier requires strictly increasing proof party IDs, binding party IDs, and
 attestation party IDs. Each attestation must match its binding and the finalized address-sorted
 committee slot. Runtime sorting alone does not replace these contract checks.
+
+The synchronized attestation uses EIP-712 version `2` and binds the SK commitment plus
+`prfKeyCommitsHash = keccak256(concat(bytes32 outgoingKeys[N]))`. The final DKG proof exposes the
+selected-H by full-N outgoing-key grid, which the attestation verifier authenticates and the
+registry stores separately from its reserved legacy ESM mapping. The decryption wrapper anchors both
+directions of each selected peer pair to that grid; H-row positions are never recipient IDs.
 
 Committee hash is Keccak over ordered raw **20-byte** addresses, not padded
 `abi.encodePacked(address[])`. Solidity's `CommitteeHashLib`, Rust's `committee-hash`, and Noir must

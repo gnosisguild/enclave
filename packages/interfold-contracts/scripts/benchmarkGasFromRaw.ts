@@ -317,12 +317,13 @@ function hexToBytes32Array(hex: string): string[] {
 function plaintextHashFromPublicInputs(
   publicInputs: string[],
   ethersLib: any,
+  threshold: number,
 ): string {
   const messageCoeffsCount = 50;
   if (publicInputs.length < messageCoeffsCount) {
     throw new Error(`Not enough public inputs: ${publicInputs.length}`);
   }
-  const offset = publicInputs.length - messageCoeffsCount;
+  const offset = bfvDecPartyColOffsets(threshold).message;
   const plaintext = new Uint8Array(messageCoeffsCount * 8);
   for (let i = 0; i < messageCoeffsCount; i++) {
     const coeff = BigInt(publicInputs[offset + i]);
@@ -497,7 +498,7 @@ async function main() {
     dkgPublicInputs,
     bfvDkgCommitteeHashIndices(benchmarkConfig.h).lo + 1,
   );
-  const pkCommitment = dkgPublicInputs[dkgPublicInputs.length - 1];
+  const pkCommitment = dkgPublicInputs[5 + 2 * benchmarkConfig.h];
   const dkgCommitteeHashIndices = bfvDkgCommitteeHashIndices(benchmarkConfig.h);
   const dkgCommitteeHash = committeeHashFromLimbs(
     dkgPublicInputs[dkgCommitteeHashIndices.hi],
@@ -541,29 +542,28 @@ async function main() {
   );
   await bfvDec.waitForDeployment();
 
-  const partyOffsets = bfvDecPartyColOffsets(benchmarkConfig.t);
-  const registryPartyIds: bigint[] = [];
-  const skCommits: string[] = [];
-  const esmCommits: string[] = [];
-  for (let i = 0; i < benchmarkConfig.t + 1; i++) {
-    registryPartyIds.push(
-      BigInt(decPublicInputs[partyOffsets.partyId + i]) - 1n,
-    );
-    skCommits.push(decPublicInputs[partyOffsets.sk + i]);
-    esmCommits.push(decPublicInputs[partyOffsets.esm + i]);
-  }
-  await registry.setDkgAnchors(
+  const registryPartyIds = dkgPublicInputs
+    .slice(2, 2 + benchmarkConfig.h)
+    .map(BigInt);
+  const skCommits = dkgPublicInputs.slice(
+    5 + benchmarkConfig.h,
+    5 + 2 * benchmarkConfig.h,
+  );
+  await registry.setDkgAnchors(benchmarkE3Id, registryPartyIds, skCommits, []);
+  await registry.setDkgPrfKeyCommitments(
     benchmarkE3Id,
-    registryPartyIds,
-    skCommits,
-    esmCommits,
+    dkgPublicInputs.slice(6 + 2 * benchmarkConfig.h),
   );
 
   const decEncodedProof = abiCoder.encode(
     ["bytes", "bytes32[]"],
     [decProofHex, decPublicInputs],
   );
-  const plaintextHash = plaintextHashFromPublicInputs(decPublicInputs, ethers);
+  const plaintextHash = plaintextHashFromPublicInputs(
+    decPublicInputs,
+    ethers,
+    benchmarkConfig.t,
+  );
   requirePublicInputLen(
     "decryption_aggregator committee_hash",
     decPublicInputs,

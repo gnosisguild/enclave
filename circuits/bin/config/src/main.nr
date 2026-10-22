@@ -485,28 +485,29 @@ fn verify_e_sm_bound() {
 
 /// Verifies share_decryption bounds (Circuit C6).
 ///
-/// Checks quotient bounds r1, r2 used in the threshold decryption share equation.
+/// Checks the reduced-ring quotient after local Lagrange weighting and PRF masking.
 fn verify_share_decryption_bounds() {
     let n: u128 = THRESHOLD_N as u128;
 
     for i in 0..THRESHOLD_L {
+        THRESHOLD_QIS[i].assert_max_bit_size::<62>();
         let qi: u128 = THRESHOLD_QIS[i] as u128;
         let qi_bound: u128 = (qi - 1) / 2;
 
-        // The identity is checked reduced modulo X^N + 1, so the cyclotomic quotient's term is
-        // identically zero and there is no r2 bound left to derive.
-        //
-        // r_bounds[i] = (((q_i-1)/2)^2 * n + 4 * (q_i-1)/2) / q_i, from bounding the other terms of
-        // d = ct0 + (ct1 * sk mod X^N + 1) + e_sm + q * r: the negacyclic product of n terms with
-        // both operands centered, plus d, ct0 and e_sm. Same expression the unreduced r1 bound used,
-        // so the reduced quotient is no wider.
-        //
-        // `qi_bound^2 * n` overflows u128 for 60-bit moduli, so the square is divided by q_i first.
-        // With qi_bound^2 = a * q_i + b, the bound is n * a + (n * b + 4 * qi_bound) / q_i exactly.
+        // Each product coefficient has n centered ct/sk terms, then a centered lambda factor:
+        // floor((n * qi_bound^3 + 4 * qi_bound) / qi). Decompose the cube before multiplying
+        // by n: its products fit u128 for qi<2^62, but the final secure quotient needs 129 bits.
+        // If qi_bound^2=a*qi+b and b*qi_bound=c*qi+d, then the result is
+        // n*(a*qi_bound+c) + floor((n*d+4*qi_bound)/qi), with the final sum in Field.
         let square: u128 = qi_bound * qi_bound;
-        let expected_r: u128 = n * (square / qi) + (n * (square % qi) + 4 * qi_bound) / qi;
+        let mixed: u128 = (square % qi) * qi_bound;
+        let cube_quotient: u128 = (square / qi) * qi_bound + mixed / qi;
+        let cube_remainder: u128 = mixed % qi;
+        // n is u32 and cube_quotient<2^122, so this Field multiplication cannot wrap.
+        let expected_r = (n as Field) * (cube_quotient as Field)
+            + ((n * cube_remainder + 4 * qi_bound) / qi) as Field;
         assert(
-            THRESHOLD_SHARE_DECRYPTION_R_BOUNDS[i] as u128 == expected_r,
+            THRESHOLD_SHARE_DECRYPTION_R_BOUNDS[i] == expected_r,
             "SHARE_DECRYPTION_R_BOUNDS mismatch",
         );
     }

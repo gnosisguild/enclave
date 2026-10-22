@@ -18,7 +18,7 @@ alloy::sol! {
     struct DkgFoldAttestationSol {
         uint256 partyId;
         bytes32 skAggCommit;
-        bytes32 esmAggCommit;
+        bytes32 prfKeyCommitsHash;
         bytes signature;
     }
 
@@ -65,7 +65,7 @@ pub fn encode_dkg_attestation_bundle(
         attestation_sols.push(DkgFoldAttestationSol {
             partyId: U256::from(att.payload.party_id),
             skAggCommit: B256::from(att.payload.agg_commits.sk_agg_commit),
-            esmAggCommit: B256::from(att.payload.agg_commits.esm_agg_commit),
+            prfKeyCommitsHash: B256::from(att.payload.agg_commits.prf_key_commits_hash),
             signature: att.signature.extract_bytes().into(),
         });
     }
@@ -95,10 +95,17 @@ mod tests {
             party_id: 2,
             agg_commits: DkgFoldAggCommits {
                 sk_agg_commit: [1u8; 32],
-                esm_agg_commit: [2u8; 32],
+                prf_key_commits_hash: [2u8; 32],
             },
         };
         let signed = e3_events::SignedDkgFoldAttestation::sign(payload.clone(), &signer).unwrap();
+        // Independent ethers v6 TypedDataEncoder/Wallet vector for the v2 Solidity preimage.
+        assert_eq!(
+            hex::encode(payload.digest().unwrap()),
+            "9b30a1433903f4385ebe778ab3f7ab2389306b4ee79564e0515239649d496e29"
+        );
+        assert_eq!(hex::encode(&signed.signature[..]),
+            "61df7355caeda7507c12807d11ed19ed9425ead59bb6236a6ed9f0e4b63b82f650c0baa64a011ec80da623d283e50c9779a30caac1acbeba5706ff14d6de65451b");
 
         let mut honest = BTreeSet::new();
         honest.insert(2);
@@ -111,7 +118,7 @@ mod tests {
         assert!(!encoded.is_empty());
 
         let typehash = keccak256(
-            "DkgFoldAttestation(address registry,uint256 e3Id,uint256 partyId,bytes32 skAggCommit,bytes32 esmAggCommit)",
+            "DkgFoldAttestation(address registry,uint256 e3Id,uint256 partyId,bytes32 skAggCommit,bytes32 prfKeyCommitsHash)",
         );
         assert_eq!(
             <[u8; 32]>::from(typehash),
@@ -124,7 +131,7 @@ mod tests {
                 U256::from(31337),
                 U256::from(payload.party_id),
                 payload.agg_commits.sk_agg_commit,
-                payload.agg_commits.esm_agg_commit,
+                payload.agg_commits.prf_key_commits_hash,
             )
                 .abi_encode(),
         );

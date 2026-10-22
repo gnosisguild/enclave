@@ -14,10 +14,16 @@ impl ThresholdPlaintextAggregator {
         threshold_n: u64,
         ec: EventContext<Sequenced>,
     ) -> Result<()> {
+        let ciphertext_bytes = match self.state.try_get()? {
+            ThresholdPlaintextAggregatorState::Computing(state) => state.ciphertext_output,
+            ThresholdPlaintextAggregatorState::GeneratingC7Proof(state) => state.ciphertext_output,
+            _ => bail!("C7 requires retained ciphertext bytes"),
+        };
         self.bus.publish(
             AggregationProofPending {
                 e3_id: self.e3_id.clone(),
                 proof_request: DecryptedSharesAggregationProofRequest {
+                    ciphertext_bytes,
                     d_share_polys: shares.clone(),
                     plaintext: plaintext.clone(),
                     params_preset: self.params_preset,
@@ -278,6 +284,7 @@ impl ThresholdPlaintextAggregator {
                 self.state.try_mutate(&ec, |_| {
                     Ok(ThresholdPlaintextAggregatorState::GeneratingC7Proof(
                         GeneratingC7Proof {
+                            ciphertext_output: state.ciphertext_output,
                             threshold_m,
                             threshold_n,
                             shares,

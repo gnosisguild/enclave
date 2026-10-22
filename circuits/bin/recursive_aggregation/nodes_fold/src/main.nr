@@ -22,7 +22,7 @@ pub global C4_PUBLIC_LEN: u32 = (H * L_THRESHOLD) + 1;
 pub global C4AB_FOLD_PUBLIC_LEN: u32 = 3 + (2 * C4_PUBLIC_LEN);
 
 /// Must match `node_fold::NODE_FOLD_PUBLIC_LEN`.
-pub global NODE_FOLD_PUBLIC_LEN: u32 = 11 + N_PARTIES + (2 * (N_PARTIES + H) * L_THRESHOLD);
+pub global NODE_FOLD_PUBLIC_LEN: u32 = 10 + 2 * N_PARTIES + H + (N_PARTIES + H) * L_THRESHOLD;
 
 /// Five public parameters and `H` complete `node_fold` public rows.
 pub global NODES_FOLD_PUBLIC_LEN: u32 = 5 + (H * NODE_FOLD_PUBLIC_LEN);

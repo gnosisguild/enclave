@@ -25,14 +25,11 @@ pub struct CalculateDecryptionKeyRequest {
     pub trbfv_config: TrBFVConfig,
     /// All collected secret key shamir shares where SensitiveBytes is Vec<Array2<u64>>
     pub sk_sss_collected: Vec<Encrypted<ShamirShare>>,
-    /// All collected smudging noise shamir shares where SensitiveBytes is Vec<Array2<u64>>
-    pub esi_sss_collected: Vec<Vec<Encrypted<ShamirShare>>>,
 }
 
 struct InnerRequest {
     pub trbfv_config: TrBFVConfig,
     pub sk_sss_collected: Vec<ShamirShare>,
-    pub esi_sss_collected: Vec<Vec<ShamirShare>>,
 }
 
 impl TryFrom<(&Cipher, CalculateDecryptionKeyRequest)> for InnerRequest {
@@ -46,15 +43,9 @@ impl TryFrom<(&Cipher, CalculateDecryptionKeyRequest)> for InnerRequest {
 
         // convert to collected
         let sk_sss_collected = req.sk_sss_collected.decrypt(cipher)?;
-        let esi_sss_collected = req
-            .esi_sss_collected
-            .into_iter()
-            .map(|item| item.decrypt(cipher))
-            .collect::<Result<_>>()?;
 
         Ok(InnerRequest {
             sk_sss_collected,
-            esi_sss_collected,
             trbfv_config: req.trbfv_config,
         })
     }
@@ -64,33 +55,20 @@ impl TryFrom<(&Cipher, CalculateDecryptionKeyRequest)> for InnerRequest {
 pub struct CalculateDecryptionKeyResponse {
     /// A single summed polynomial for this nodes secret key.
     pub sk_poly_sum: SensitiveBytes,
-    /// A single summed polynomial for this partys smudging noise
-    pub es_poly_sum: Vec<SensitiveBytes>,
 }
 
 struct InnerResponse {
     pub sk_poly_sum: Poly<PowerBasis>,
-    pub es_poly_sum: Vec<Poly<PowerBasis>>,
 }
 
 impl TryFrom<(&Cipher, InnerResponse)> for CalculateDecryptionKeyResponse {
     type Error = anyhow::Error;
     fn try_from(value: (&Cipher, InnerResponse)) -> std::result::Result<Self, Self::Error> {
-        let InnerResponse {
-            sk_poly_sum,
-            es_poly_sum,
-        } = value.1;
+        let InnerResponse { sk_poly_sum } = value.1;
 
         let cipher = value.0;
 
         Ok(CalculateDecryptionKeyResponse {
-            es_poly_sum: SensitiveBytes::try_from_vec(
-                es_poly_sum
-                    .into_iter()
-                    .map(|s| s.to_bytes())
-                    .collect::<Vec<_>>(),
-                cipher,
-            )?,
             sk_poly_sum: SensitiveBytes::new(sk_poly_sum.to_bytes(), cipher)?,
         })
     }
@@ -118,29 +96,18 @@ pub fn calculate_decryption_key(
     let share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone())?;
 
     info!("Calculating sk_poly_sum...");
-    let sk_poly_sum =
-        share_manager.aggregate_collected_shares(&req.sk_sss_collected.to_array_data())?;
-
-    info!("Calculating es_poly_sum...");
-    let es_poly_sum = req
-        .esi_sss_collected
-        .into_iter()
-        .map(|shares| -> Result<_> {
-            let share_manager = ShareManager::new(num_ciphernodes, threshold, params.clone())?;
-            share_manager
-                .aggregate_collected_shares(&shares.to_array_data())
-                .context("Failed to aggregate es_sss")
-        })
-        .collect::<Result<Vec<_>>>()?;
+    let sk_poly_sum = aggregate_secret_key_to_poly(&share_manager, &req.sk_sss_collected)?;
 
     info!("Returning successful result! Encrypting for transit...");
 
-    (
-        cipher,
-        InnerResponse {
-            sk_poly_sum,
-            es_poly_sum,
-        },
-    )
-        .try_into()
+    (cipher, InnerResponse { sk_poly_sum }).try_into()
+}
+
+/// Sum the collected secret-key shares into this party's decryption polynomial.
+fn aggregate_secret_key_to_poly(
+    manager: &ShareManager,
+    shares: &[ShamirShare],
+) -> Result<Poly<PowerBasis>> {
+    let transport = shares.to_array_data();
+    Ok(manager.aggregate_collected_shares(&transport)?)
 }

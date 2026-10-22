@@ -17,7 +17,9 @@
 // those checkpoints from source timestamps.
 // Schema 7 also adds durable decryption backup shares and batch-bound C6 results.
 // Schema 8 authenticates complete DKG share and C4 bundles before slot admission.
-pub const SCHEMA_VERSION: u32 = 8;
+// Schema 9 replaces shared ESM payloads with PRF-key transport and set-bound fresh decryption.
+// The bincode event and snapshot layouts are incompatible with schema 8.
+pub const SCHEMA_VERSION: u32 = 9;
 
 /// The action a node should take after reading the persisted schema version.
 #[derive(Debug, Clone, PartialEq, Eq)]

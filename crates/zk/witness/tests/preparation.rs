@@ -54,22 +54,14 @@ fn malformed_c1_c2_c5_shapes_return_errors_before_computation() {
     let sample = e3_zk_samples::threshold::pk_generation::generate(&c1).unwrap();
     assert!(threshold::pk_generation::Inputs::compute(&c1, &sample).is_ok());
     for extra in [false, true] {
-        for field in ["pk0_share", "sk", "eek", "e_sm", "e_sm_lifted"] {
+        for field in ["pk0_share", "sk", "eek"] {
             let mut bad = sample.clone();
-            if field == "e_sm_lifted" {
-                let mut coefficients = bad.e_sm_lifted.coefficients().to_vec();
-                if extra {
-                    coefficients.push(BigInt::zero());
-                } else {
-                    coefficients.pop();
-                }
-                bad.e_sm_lifted = Polynomial::new(coefficients);
-            } else {
+            {
                 let crt = match field {
                     "pk0_share" => &mut bad.pk0_share,
                     "sk" => &mut bad.sk,
                     "eek" => &mut bad.eek,
-                    _ => &mut bad.e_sm,
+                    _ => unreachable!(),
                 };
                 if extra {
                     crt.limbs.push(crt.limbs[0].clone());
@@ -79,13 +71,13 @@ fn malformed_c1_c2_c5_shapes_return_errors_before_computation() {
             }
             let error = threshold::pk_generation::Inputs::compute(&c1, &bad).unwrap_err();
             assert!(error.to_string().contains(field), "{field}: {error}");
-            if field != "e_sm_lifted" && !extra {
+            if !extra {
                 let mut bad = sample.clone();
                 let crt = match field {
                     "pk0_share" => &mut bad.pk0_share,
                     "sk" => &mut bad.sk,
                     "eek" => &mut bad.eek,
-                    _ => &mut bad.e_sm,
+                    _ => unreachable!(),
                 };
                 crt.limbs[0] = Polynomial::new(vec![BigInt::zero(); c1.params.degree() - 1]);
                 assert!(threshold::pk_generation::Inputs::compute(&c1, &bad)
@@ -169,9 +161,7 @@ fn zero_products_prepare_full_circuit_shapes_without_changing_polynomial_zero() 
     let input = threshold::pk_generation::PkGenerationCircuitData {
         pk0_share: crt.clone(),
         eek: crt.clone(),
-        e_sm: crt.clone(),
         sk: crt.clone(),
-        e_sm_lifted: zero,
     };
     let witness = threshold::pk_generation::Inputs::compute(&c1, &input).unwrap();
     assert!(witness
@@ -182,14 +172,25 @@ fn zero_products_prepare_full_circuit_shapes_without_changing_polynomial_zero() 
 
     let c6 = config::share_decryption::Configs::new(&c1.params).unwrap();
     let poly = Poly::<PowerBasis>::zero(c6.params.context_at_level(0).unwrap());
+    let committee = CiphernodesCommitteeSize::Minimum.values();
     let mut input = threshold::share_decryption::ShareDecryptionCircuitData {
         ciphertext: Ciphertext::new(vec![poly.clone().into_ntt(), poly.into_ntt()], &c6.params)
             .unwrap(),
+        public_key: fhe::bfv::PublicKey::new(
+            &fhe::bfv::SecretKey::random(&c6.params, &mut rand::rng()),
+            &mut rand::rng(),
+        ),
         s: crt.clone(),
         e: crt.clone(),
+        e_signed: vec![BigInt::zero(); c6.params.degree()],
         d_share: crt,
         domain_hi: 0,
         domain_lo: 0,
+        committee: committee.clone(),
+        party_idx: 0,
+        decryptors: (1..=committee.threshold as u32 + 1).collect(),
+        outgoing_prf_keys: vec![vec![1; 32]; committee.n],
+        incoming_prf_keys: vec![vec![1; 32]; committee.n],
     };
     let witness = threshold::share_decryption::Inputs::compute(&c6, &input).unwrap();
     assert!(witness
@@ -249,33 +250,13 @@ fn c6_c7_native_prefix_commitments_agree_and_c7_pads_short_messages() {
     let mut c7 =
         config::decrypted_shares_aggregation::Configs::for_preset(preset, committee).unwrap();
     let mut c6 = config::share_decryption::Configs::new(&c7.params).unwrap();
-    let sample =
-        e3_zk_samples::threshold::decrypted_shares_aggregation::generate(&c7, preset).unwrap();
+    let (sample, mut c6_samples) =
+        e3_zk_samples::threshold::decrypted_shares_aggregation::generate_correlated(&c7, preset)
+            .unwrap();
     assert_eq!(sample.d_share_polys.len(), 10);
     assert_eq!(committee.values().h, 14);
     let native = CrtPolynomial::from_fhe_polynomial(&sample.d_share_polys[0]);
-    let zero = CrtPolynomial::new(vec![
-        Polynomial::new(vec![
-            BigInt::zero();
-            c6.params.degree()
-        ]);
-        c6.params.moduli().len()
-    ]);
-    let c6_data = threshold::share_decryption::ShareDecryptionCircuitData {
-        ciphertext: Ciphertext::new(
-            vec![
-                sample.d_share_polys[0].clone().into_ntt(),
-                Poly::<PowerBasis>::zero(c6.params.context_at_level(0).unwrap()).into_ntt(),
-            ],
-            &c6.params,
-        )
-        .unwrap(),
-        s: zero.clone(),
-        e: zero,
-        d_share: native.clone(),
-        domain_hi: 0,
-        domain_lo: 0,
-    };
+    let c6_data = c6_samples.remove(0);
     let mut prior_commitment = None;
     for width in [c7.max_msg_non_zero_coeffs, 7] {
         c6.max_msg_non_zero_coeffs = width;

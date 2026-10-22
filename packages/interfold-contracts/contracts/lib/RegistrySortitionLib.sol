@@ -9,6 +9,9 @@ pragma solidity 0.8.28;
 import { IBondingRegistry } from "../interfaces/IBondingRegistry.sol";
 import { IBondOwnerHistory } from "../interfaces/IBondOwnerHistory.sol";
 import { ICiphernodeRegistry } from "../interfaces/ICiphernodeRegistry.sol";
+import {
+    IDkgFoldAttestationVerifier
+} from "../interfaces/IDkgFoldAttestationVerifier.sol";
 import { IInterfold } from "../interfaces/IInterfold.sol";
 import { IRandomnessProvider } from "../interfaces/IRandomnessProvider.sol";
 import { ISlashingManager } from "../interfaces/ISlashingManager.sol";
@@ -431,6 +434,34 @@ library RegistrySortitionLib {
                 outputIndex++;
             }
         }
+    }
+
+    /// @notice Verifies the frozen fold attestations and stores their DKG anchors atomically.
+    function recordDkgAnchors(
+        mapping(uint256 => uint256[]) storage partyIdsByE3,
+        mapping(uint256 => bytes32[]) storage skByE3,
+        mapping(uint256 => bytes32[]) storage prfByE3,
+        uint256 e3Id,
+        IDkgFoldAttestationVerifier verifier,
+        bytes calldata proof,
+        bytes calldata bundle
+    ) external {
+        require(
+            bundle.length > 0,
+            ICiphernodeRegistry.FoldAttestationsRequired()
+        );
+        require(
+            address(verifier) != address(0),
+            ICiphernodeRegistry.FoldAttestationVerifierNotSet()
+        );
+        (
+            uint256[] memory ids,
+            bytes32[] memory sk,
+            bytes32[] memory prf
+        ) = verifier.verify(address(this), block.chainid, e3Id, proof, bundle);
+        partyIdsByE3[e3Id] = ids;
+        skByE3[e3Id] = sk;
+        prfByE3[e3Id] = prf;
     }
 
     /// @notice Returns DKG anchors after publication.

@@ -21,7 +21,7 @@ interface IDkgFoldAttestationVerifier {
     ///        `(Attestation[] attestations, PartySlotBinding[] bindings)`; bindings sorted by ascending `partyId`.
     /// @return partyIds Honest party ids (proof slot order)
     /// @return skAggCommits Per-party sk aggregate commitments
-    /// @return esmAggCommits Per-party esm aggregate commitments
+    /// @return prfKeyCommits Selected-dealer outgoing rows, indexed by all N recipients
     function verify(
         address registry,
         uint256 chainId,
@@ -34,6 +34,6 @@ interface IDkgFoldAttestationVerifier {
         returns (
             uint256[] memory partyIds,
             bytes32[] memory skAggCommits,
-            bytes32[] memory esmAggCommits
+            bytes32[] memory prfKeyCommits
         );
 }

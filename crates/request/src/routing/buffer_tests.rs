@@ -136,6 +136,7 @@ fn share(id: &E3id, sequence: u64) -> InterfoldEvent {
             node: "member".into(),
             decryption_share: vec![ArcBytes::from_bytes(&[0; 512])],
             signed_decryption_proofs: Vec::new(),
+            decryptors: vec![],
         })
         .seq(sequence)
         .build()

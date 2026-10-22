@@ -847,7 +847,7 @@ mod tests {
                 committee_size: CiphernodesCommitteeSize::Minimum,
                 interfold_address: contract,
                 sk_agg_commits: vec![],
-                esm_agg_commits: vec![],
+                prf_key_commits: vec![],
             };
             let ciphertext = vec![ArcBytes::from_bytes(&[3])];
             keys.insert(id.clone(), key.clone())?;

@@ -47,6 +47,12 @@ pub trait CommitmentLink: Send + Sync {
     /// Extract the commitment value(s) from the source proof's public signals.
     fn extract_source_values(&self, public_signals: &[u8]) -> Vec<FieldValue>;
 
+    /// Whether these proofs describe the same operation/round. Missing comparable targets
+    /// are not evidence of a consistency fault (e.g. a replaced decryption set).
+    fn applies_to(&self, _source_public_signals: &[u8], _target_public_signals: &[u8]) -> bool {
+        true
+    }
+
     /// Return `true` when `source_values` are consistent with
     /// `target_public_signals`, without party context.
     ///

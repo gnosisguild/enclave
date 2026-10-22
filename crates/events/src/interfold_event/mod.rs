@@ -382,6 +382,7 @@ pub enum InterfoldEventData {
     EligibilityConfigurationVersionUpdatedAt(EligibilityConfigurationVersionUpdatedAt),
     BondingAssetConfigUpdated(BondingAssetConfigUpdated),
     BondingAssetConfigUpdatedAt(BondingAssetConfigUpdatedAt),
+    FreshDecryptionRound(FreshDecryptionRound),
 }
 
 impl InterfoldEventData {
@@ -848,6 +849,7 @@ impl InterfoldEventData {
             InterfoldEventData::AggregationProofPending(ref data) => Some(data.e3_id.clone()),
             InterfoldEventData::AggregationProofSigned(ref data) => Some(data.e3_id.clone()),
             InterfoldEventData::PlaintextVerificationResumed(ref data) => Some(data.e3_id.clone()),
+            InterfoldEventData::FreshDecryptionRound(ref data) => Some(data.e3_id.clone()),
             InterfoldEventData::DKGRecursiveAggregationComplete(ref data) => {
                 Some(data.e3_id.clone())
             }
@@ -1009,7 +1011,8 @@ impl_event_types!(
     EligibilityConfigurationVersionUpdated,
     EligibilityConfigurationVersionUpdatedAt,
     BondingAssetConfigUpdated,
-    BondingAssetConfigUpdatedAt
+    BondingAssetConfigUpdatedAt,
+    FreshDecryptionRound
 );
 
 impl TryFrom<&InterfoldEvent<Sequenced>> for InterfoldError {

@@ -69,9 +69,8 @@ impl ProofRequestActor {
         }
 
         let sk_enc_count = msg.sk_share_encryption_requests.len();
-        let e_sm_enc_count = msg.e_sm_share_encryption_requests.len();
 
-        let total_expected = total_expected_for(sk_enc_count, e_sm_enc_count);
+        let total_expected = total_expected_for(sk_enc_count);
         self.node_agg_meta.insert(
             e3_id.clone(),
             NodeAggregationMeta {
@@ -88,7 +87,6 @@ impl ProofRequestActor {
             msg.full_share.clone(),
             ec.clone(),
             sk_enc_count,
-            e_sm_enc_count,
             msg.recipient_party_ids,
         );
 
@@ -102,9 +100,7 @@ impl ProofRequestActor {
         let dispatch = plan_threshold_dispatch(
             msg.proof_request,
             msg.sk_share_computation_request,
-            msg.e_sm_share_computation_request,
             msg.sk_share_encryption_requests,
-            msg.e_sm_share_encryption_requests,
         );
         for item in &dispatch {
             if let Some(proof) = recovered.get(&item.seq) {

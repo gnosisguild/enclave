@@ -27,6 +27,9 @@ use std::borrow::Cow;
 /// Data for the share-decryption circuit: secret key, ciphertexts from external honest
 /// parties, and the own party's plaintext share row.
 pub struct ShareDecryptionCircuitData {
+    pub recipient_party_idx: u32,
+    /// One incoming key per selected dealer, in honest-roster order.
+    pub prf_keys: Vec<Vec<u8>>,
     /// DKG secret key used to decrypt external ciphertexts (private input).
     pub secret_key: SecretKey,
     /// Per-honest-party ciphertexts, length H, indexed by ascending honest party_id.
@@ -46,6 +49,8 @@ pub struct ShareDecryptionCircuitData {
 /// that decrypted shares match the expected commitments from the share-encryption circuit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Inputs {
+    pub recipient_party_idx: u32,
+    pub prf_keys: Vec<Vec<u8>>,
     /// Expected message commitments from share-encryption (CIRCUIT 3) for H honest parties: [party_idx][mod_idx].
     pub expected_commitments: Vec<Vec<BigInt>>, // [H][L]
     /// Decrypted share coefficients per party and modulus: [party_idx][mod_idx][coeff_idx].
@@ -59,6 +64,17 @@ impl Inputs {
     ) -> Result<Self, WitnessError> {
         let threshold_params = &config.threshold_params;
         let threshold_l = threshold_params.moduli().len();
+        let preset = e3_fhe_params::BfvPreset::from_threshold_parameters(
+            threshold_params.degree(),
+            threshold_params.plaintext(),
+            threshold_params.moduli(),
+        )
+        .ok_or_else(|| WitnessError::Other("unsupported threshold parameters".into()))?;
+        if data.prf_keys.len() != data.honest_ciphertexts.len() {
+            return Err(WitnessError::Other(
+                "incoming PRF key count does not match the selected dealers".into(),
+            ));
+        }
 
         let mut expected_commitments: Vec<Vec<BigInt>> = Vec::new();
         let mut decrypted_shares: Vec<Vec<Vec<BigInt>>> = Vec::new();
@@ -92,7 +108,7 @@ impl Inputs {
 
         // Iterate H slots in ascending honest-party order: external slots BFV-decrypt and
         // commit; the own slot uses the supplied plaintext directly.
-        for slot in data.honest_ciphertexts.iter() {
+        for (slot_idx, slot) in data.honest_ciphertexts.iter().enumerate() {
             let mut party_commitments = Vec::with_capacity(threshold_l);
             let mut party_shares = Vec::with_capacity(threshold_l);
 
@@ -118,6 +134,15 @@ impl Inputs {
                         })?;
                         Cow::Owned(Vec::<u64>::try_decode(&decrypted_pt, Encoding::poly())?)
                     }
+                    None if mod_idx == 0 => Cow::Owned(
+                        e3_fhe_params::pack_prf_key(
+                            preset,
+                            &data.own_plaintext_share[mod_idx],
+                            &data.prf_keys[slot_idx],
+                            threshold_params.moduli()[0],
+                        )
+                        .map_err(|e| WitnessError::Other(e.to_string()))?,
+                    ),
                     None => Cow::Borrowed(&data.own_plaintext_share[mod_idx]),
                 };
                 // Reverse to match C3's commitment convention; keep native shares ascending.
@@ -140,6 +165,8 @@ impl Inputs {
         }
 
         Ok(Inputs {
+            recipient_party_idx: data.recipient_party_idx,
+            prf_keys: data.prf_keys.clone(),
             expected_commitments,
             decrypted_shares,
         })
@@ -161,6 +188,9 @@ impl Inputs {
             .collect::<Vec<_>>();
 
         serde_json::json!({
+            "recipient_party_idx": self.recipient_party_idx,
+            "prf_keys": self.prf_keys.iter().map(|key| e3_fhe_params::prf_key_bits(key)).collect::<Vec<_>>(),
+            "prf_key_commitments": self.prf_keys.iter().map(|key| crate::prf::key_commitment(self.recipient_party_idx, key).to_string()).collect::<Vec<_>>(),
             "expected_commitments": bigint_2d_to_json_values(&self.expected_commitments),
             "decrypted_shares": decrypted_shares,
         })

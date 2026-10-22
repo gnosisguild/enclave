@@ -303,7 +303,8 @@ impl CanonicalKeyProjection {
         let h = committee_size.values().h;
         let (_, inputs) = <(Bytes, Vec<B256>)>::abi_decode_params(proof)?;
         ensure!(
-            inputs.len() == 6 + 3 * h && inputs.last() == Some(&B256::from(commitment)),
+            inputs.len() == 6 + 2 * h + request.threshold_n * h
+                && inputs.get(5 + 2 * h) == Some(&B256::from(commitment)),
             "registry proof does not match the key commitment or committee size"
         );
         ensure!(
@@ -332,7 +333,7 @@ impl CanonicalKeyProjection {
                 committee_size,
                 interfold_address: self.interfold_addresses[&id.chain_id()],
                 sk_agg_commits: inputs[5 + h..5 + 2 * h].iter().map(|v| v.0).collect(),
-                esm_agg_commits: inputs[5 + 2 * h..5 + 3 * h].iter().map(|v| v.0).collect(),
+                prf_key_commits: inputs[6 + 2 * h..].iter().map(|v| v.0).collect(),
             },
         )
     }

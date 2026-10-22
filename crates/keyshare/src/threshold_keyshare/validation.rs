@@ -14,7 +14,7 @@ use e3_events::CommitteePublished;
 /// Why a peer `DecryptionKeyShared` is not admitted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum DecryptionKeyShareRejection {
-    /// The finalized committee member of the dealer slot did not sign the message.
+    /// The message's node address does not match the finalized committee member of the dealer slot.
     UnsignedDealer,
     /// The dealer was expelled.
     ExpelledDealer,
@@ -37,9 +37,7 @@ pub(crate) fn admit_peer_decryption_key_share(
 ) -> Result<(), DecryptionKeyShareRejection> {
     use DecryptionKeyShareRejection as Rejection;
     match dealer {
-        Some(address)
-            if share.recover_address().ok() == Some(address)
-                && share.node.parse::<Address>().ok() == Some(address) => {}
+        Some(address) if share.node.parse::<Address>().ok() == Some(address) => {}
         _ => return Err(Rejection::UnsignedDealer),
     }
     if state.expelled_parties.contains(&share.party_id) {

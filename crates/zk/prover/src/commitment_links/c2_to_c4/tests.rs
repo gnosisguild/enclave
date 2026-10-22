@@ -13,13 +13,20 @@ fn make_field(val: u8) -> [u8; 32] {
 }
 
 /// C2 inner signals: [expected_secret_commitment] + share commitments (row-major: party, mod).
-fn c2_signals(share_commits: &[[u8; 32]]) -> Vec<u8> {
+fn c2_signals_for_l(share_commits: &[[u8; 32]], l: usize) -> Vec<u8> {
     let mut v = Vec::new();
     v.extend_from_slice(&make_field(0xFF)); // expected_secret_commitment (skipped)
+    for _ in 0..share_commits.len() / l {
+        v.extend_from_slice(&make_field(0xFE));
+    }
     for c in share_commits {
         v.extend_from_slice(c);
     }
     v
+}
+
+fn c2_signals(commits: &[[u8; 32]]) -> Vec<u8> {
+    c2_signals_for_l(commits, 2)
 }
 
 /// C4 signals: [expected_commitments row-major (party, mod)..., aggregated_commitment].
@@ -53,6 +60,10 @@ fn extract_skips_secret_commitment() {
     let values = link.extract_source_values(&c2);
     assert_eq!(values.len(), 2);
     assert!(!values.contains(&make_field(0xFF)));
+    assert!(
+        !values.contains(&make_field(0xFE)),
+        "PRF keys are not packed messages"
+    );
 }
 
 /// 3 parties (N=3), 2 moduli (L=2), 2 honest parties (H=2).
@@ -142,7 +153,7 @@ fn consistency_does_not_match_aggregated_output() {
     let link = C2aToC4aShareCommitmentLink { l };
 
     // C2: 1 party × 1 modulus = commit 99
-    let c2 = c2_signals(&[make_field(99)]);
+    let c2 = c2_signals_for_l(&[make_field(99)], l);
     let source_values = link.extract_source_values(&c2);
 
     // C4: row 0 = [5], aggregated output = 99
@@ -158,18 +169,4 @@ fn short_or_empty_signals() {
     assert!(link.extract_source_values(&[0u8; 32]).is_empty());
     assert!(!link.check_consistency(&[], &[0u8; 256], 0, 0));
     assert!(!link.check_consistency(&[make_field(1)], &[0u8; 16], 0, 0));
-}
-
-#[test]
-fn c2b_to_c4b_variant() {
-    let l = 2;
-    let link = C2bToC4bShareCommitmentLink { l };
-    let c2 = c2_signals(&[make_field(7), make_field(8)]);
-    let source_values = link.extract_source_values(&c2);
-
-    let c4 = c4_signals(&[vec![make_field(7), make_field(8)]], make_field(0));
-    assert!(link.check_consistency(&source_values, &c4, 0, 0));
-
-    let c4_wrong = c4_signals(&[vec![make_field(7), make_field(9)]], make_field(0));
-    assert!(!link.check_consistency(&source_values, &c4_wrong, 0, 0));
 }

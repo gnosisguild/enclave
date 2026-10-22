@@ -83,7 +83,6 @@ mod tests {
         create_deterministic_crp_from_default_seed, encode_bfv_params, BfvParamSet, BfvPreset,
     };
     use e3_utils::ArcBytes;
-    use fhe_traits::Serialize;
     use rand::SeedableRng;
     use std::sync::{Arc, Mutex};
 
@@ -109,6 +108,7 @@ mod tests {
             crp: ArcBytes::from_bytes(&crp.to_bytes()),
             lambda: preset.lambda_config(),
             num_ciphertexts: 1,
+            mult_depth: 0,
         });
         let TrBFVResponse::GenPkShareAndSkSss(material) = request.execute(&rng, &cipher).unwrap()
         else {
@@ -116,9 +116,29 @@ mod tests {
         };
         assert!(!material.sk_raw.access(&cipher).unwrap().is_empty());
         assert!(!material.eek_raw.access(&cipher).unwrap().is_empty());
+        // The pre-generated smudging polynomial no longer rides the C1 response; draw one
+        // from the FHE parameter owner to exercise the ESI share generation path.
+        let lambda = preset.metadata().lambda;
+        let e_sm_coeffs = e3_fhe_params::generate_smudging_error(
+            params.clone(),
+            config.num_parties() as usize,
+            1,
+            0,
+            lambda,
+            &mut rand::rng(),
+        )
+        .unwrap();
+        let share_manager = fhe::trbfv::ShareManager::new(
+            config.num_parties() as usize,
+            config.threshold() as usize,
+            params.clone(),
+        )
+        .unwrap();
+        let e_sm_poly = share_manager.bigints_to_poly(&e_sm_coeffs).unwrap();
+        use fhe_traits::Serialize as _;
         let request = TrBFVRequest::GenEsiSss(GenEsiSssRequest {
             trbfv_config: config,
-            e_sm_raw: material.e_sm_raw,
+            e_sm_raw: SensitiveBytes::new(e_sm_poly.to_bytes(), &cipher).unwrap(),
         });
         let TrBFVResponse::GenEsiSss(material) = request.execute(&rng, &cipher).unwrap() else {
             panic!("wrong response variant")

@@ -13,15 +13,15 @@
 //! The signed C2 proof is the **inner** circuit proof (SkShareComputation /
 //! ESmShareComputation, `CircuitVariant::Recursive`). Its public signals layout:
 //!   - field 0: `expected_secret_commitment` (public input, skip)
-//!   - fields 1..(N_PARTIES × L_THRESHOLD): share commitments from `commit_to_party_shares`
+//!   - fields 1..(1+N_PARTIES): outgoing PRF-key commitments (not messages)
+//!   - remaining N_PARTIES × L_THRESHOLD fields: packed-message commitments
 //!
 //! Source is C3 (the claimant — it declares what commitment it encrypts).
 //! Target is C2 (the provider — it produced the actual share commitments).
 //! Fault is attributed to C3 when its `expected_message_commitment` does not
 //! appear anywhere in C2's share commitment section.
 //!
-//! C2a/C3a and C2b/C3b use the same Noir circuits (`ShareComputation` /
-//! `ShareEncryption`) but different [`ProofType`] values, so we register two links.
+//! Only the SK chain is registered; ESM proof-type discriminants remain reserved.
 
 use super::{CommitmentLink, FieldValue, LinkScope};
 use e3_events::{CircuitName, ProofType};
@@ -29,7 +29,9 @@ use e3_zk_config::FIELD_BYTE_LEN;
 
 /// C3a → C2a: SK share encryption `expected_message_commitment` vs SK share
 /// computation per-party share commitment outputs.
-pub struct C3aToC2aShareEncryptionLink;
+pub struct C3aToC2aShareEncryptionLink {
+    pub l: usize,
+}
 
 impl CommitmentLink for C3aToC2aShareEncryptionLink {
     fn name(&self) -> &'static str {
@@ -53,37 +55,15 @@ impl CommitmentLink for C3aToC2aShareEncryptionLink {
     }
 
     fn check_signals(&self, source_values: &[FieldValue], target_public_signals: &[u8]) -> bool {
-        commitment_in_c2_outputs(source_values, target_public_signals)
-    }
-}
-
-/// C3b → C2b: E_SM share encryption `expected_message_commitment` vs E_SM share
-/// computation per-party share commitment outputs.
-pub struct C3bToC2bShareEncryptionLink;
-
-impl CommitmentLink for C3bToC2bShareEncryptionLink {
-    fn name(&self) -> &'static str {
-        "C3b->C2b expected_message_commitment"
-    }
-
-    fn source_proof_type(&self) -> ProofType {
-        ProofType::C3bESmShareEncryption
-    }
-
-    fn target_proof_type(&self) -> ProofType {
-        ProofType::C2bESmShareComputation
-    }
-
-    fn scope(&self) -> LinkScope {
-        LinkScope::SameParty
-    }
-
-    fn extract_source_values(&self, public_signals: &[u8]) -> Vec<FieldValue> {
-        extract_message_commitment(public_signals)
-    }
-
-    fn check_signals(&self, source_values: &[FieldValue], target_public_signals: &[u8]) -> bool {
-        commitment_in_c2_outputs(source_values, target_public_signals)
+        let Some(messages) = super::share_computation_messages(target_public_signals, self.l)
+        else {
+            return false;
+        };
+        source_values.first().is_some_and(|expected| {
+            messages
+                .chunks_exact(FIELD_BYTE_LEN)
+                .any(|word| word == expected.as_slice())
+        })
     }
 }
 
@@ -102,34 +82,9 @@ fn extract_message_commitment(public_signals: &[u8]) -> Vec<FieldValue> {
     vec![value]
 }
 
-/// Check whether `source_values[0]` (from a C3 proof) appears in the share
-/// commitment section of a C2 inner proof's public signals.
-///
-/// C2 inner circuit public signals layout:
-///   - field 0:       `expected_secret_commitment` (public input, skipped)
-///   - fields 1..:    `commit_to_party_shares[party_idx][mod_idx]` outputs
-///
-/// Barretenberg's `noir-recursive` variant sometimes doubles the signal
-/// buffer (448 = 2×224 bytes for a 7-field circuit).  We detect and
-/// deduplicate this before scanning.
-fn commitment_in_c2_outputs(source_values: &[FieldValue], target_public_signals: &[u8]) -> bool {
-    if source_values.is_empty() {
-        return false;
-    }
-    let expected = &source_values[0];
-    let signals = deduplicate(target_public_signals);
-    // Skip first field (expected_secret_commitment public input).
-    if signals.len() < 2 * FIELD_BYTE_LEN {
-        return false;
-    }
-    signals[FIELD_BYTE_LEN..]
-        .chunks(FIELD_BYTE_LEN)
-        .any(|chunk| chunk == expected.as_slice())
-}
-
 /// If the signal buffer is a perfect duplication of its first half, return the
 /// first half.  Otherwise return the original slice unchanged.
-fn deduplicate(signals: &[u8]) -> &[u8] {
+pub(super) fn deduplicate(signals: &[u8]) -> &[u8] {
     if signals.len() >= 2 * FIELD_BYTE_LEN && signals.len().is_multiple_of(2 * FIELD_BYTE_LEN) {
         let half = signals.len() / 2;
         if signals[..half] == signals[half..] {
@@ -159,17 +114,21 @@ mod tests {
 
     /// C2 inner signals: [expected_secret_commitment] + N share commitments.
     fn c2_signals(commitments: &[[u8; 32]]) -> Vec<u8> {
-        let mut v = vec![0u8; 32 + commitments.len() * 32];
+        let mut v = vec![0u8; 32 + 2 * commitments.len() * 32];
         v[0..32].copy_from_slice(&make_field(0xFF)); // expected_secret_commitment
+        for i in 0..commitments.len() {
+            v[32 + i * 32..64 + i * 32].copy_from_slice(&make_field(0xFE));
+        }
         for (i, c) in commitments.iter().enumerate() {
-            v[32 + i * 32..32 + (i + 1) * 32].copy_from_slice(c);
+            let start = (1 + commitments.len() + i) * 32;
+            v[start..start + 32].copy_from_slice(c);
         }
         v
     }
 
     #[test]
     fn extract_message_commitment_from_c3() {
-        let link = C3aToC2aShareEncryptionLink;
+        let link = C3aToC2aShareEncryptionLink { l: 1 };
         let msg = make_field(42);
         let vals = link.extract_source_values(&c3_signals(make_field(99), msg));
         assert_eq!(vals.len(), 1);
@@ -178,7 +137,7 @@ mod tests {
 
     #[test]
     fn consistency_passes_when_commitment_found_in_c2() {
-        let link = C3aToC2aShareEncryptionLink;
+        let link = C3aToC2aShareEncryptionLink { l: 1 };
         let msg = make_field(42);
         let c2 = c2_signals(&[make_field(1), make_field(2), msg, make_field(4)]);
         assert!(link.check_signals(&[msg], &c2));
@@ -186,7 +145,7 @@ mod tests {
 
     #[test]
     fn consistency_fails_when_commitment_absent() {
-        let link = C3aToC2aShareEncryptionLink;
+        let link = C3aToC2aShareEncryptionLink { l: 1 };
         let msg = make_field(42);
         let c2 = c2_signals(&[make_field(1), make_field(2), make_field(3)]);
         assert!(!link.check_signals(&[msg], &c2));
@@ -195,7 +154,7 @@ mod tests {
     #[test]
     fn consistency_ignores_first_field_secret_commitment() {
         // The first field is expected_secret_commitment and must not be matched.
-        let link = C3aToC2aShareEncryptionLink;
+        let link = C3aToC2aShareEncryptionLink { l: 1 };
         let msg = make_field(0xFF); // same value as the secret_commitment placeholder
         let c2 = c2_signals(&[make_field(1)]); // share commitments don't include 0xFF
         assert!(!link.check_signals(&[msg], &c2));
@@ -203,7 +162,7 @@ mod tests {
 
     #[test]
     fn consistency_handles_bb_duplicated_buffer() {
-        let link = C3aToC2aShareEncryptionLink;
+        let link = C3aToC2aShareEncryptionLink { l: 1 };
         let msg = make_field(42);
         let half = c2_signals(&[make_field(1), msg, make_field(3)]);
         // Simulate BB doubling the buffer.
@@ -213,7 +172,7 @@ mod tests {
 
     #[test]
     fn short_or_empty_signals() {
-        let link = C3aToC2aShareEncryptionLink;
+        let link = C3aToC2aShareEncryptionLink { l: 1 };
         assert!(link.extract_source_values(&[]).is_empty());
         assert!(link.extract_source_values(&[0u8; 31]).is_empty());
         assert!(!link.check_signals(&[], &c2_signals(&[make_field(1)])));
@@ -222,11 +181,8 @@ mod tests {
     }
 
     #[test]
-    fn c3b_link_works_same_as_c3a() {
-        let link = C3bToC2bShareEncryptionLink;
-        let msg = make_field(7);
-        let c2 = c2_signals(&[make_field(1), msg]);
-        assert!(link.check_signals(&[msg], &c2));
-        assert!(!link.check_signals(&[make_field(8)], &c2));
+    fn outgoing_key_commitment_is_not_a_message_commitment() {
+        let link = C3aToC2aShareEncryptionLink { l: 1 };
+        assert!(!link.check_signals(&[make_field(0xFE)], &c2_signals(&[make_field(1)])));
     }
 }

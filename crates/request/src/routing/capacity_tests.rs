@@ -46,14 +46,12 @@ fn threshold_share(party_id: u64, targets: &[usize]) -> Arc<ThresholdShare> {
         party_id,
         pk_share: bytes(THRESHOLD_POLY),
         sk_sss: encrypted_shares(targets),
-        esi_sss: vec![encrypted_shares(targets)],
     })
 }
 
 fn c1() -> PkGenerationProofRequest {
     PkGenerationProofRequest::new(
         bytes(THRESHOLD_POLY),
-        sensitive(THRESHOLD_POLY),
         sensitive(THRESHOLD_POLY),
         sensitive(THRESHOLD_POLY),
         PRESET,
@@ -68,6 +66,7 @@ fn c2(dkg_input_type: DkgInputType) -> ShareComputationProofRequest {
         dkg_input_type,
         params_preset: PRESET,
         committee_size: COMMITTEE,
+        prf_keys: vec![],
     }
 }
 
@@ -85,6 +84,7 @@ fn c3(kind: DkgInputType, party: usize, row: usize) -> ShareEncryptionProofReque
         recipient_party_id: party,
         row_index: row,
         esi_index: 0,
+        prf_key: sensitive(32),
     }
 }
 
@@ -101,10 +101,12 @@ fn c4(kind: DkgInputType) -> DkgShareDecryptionProofRequest {
         num_honest_parties: H,
         num_moduli: LIMBS,
         own_plaintext_idx: None,
+        recipient_party_id: 0,
         own_share_raw: None,
         dkg_input_type: kind,
         params_preset: PRESET,
         committee_size: COMMITTEE,
+        prf_keys: vec![],
     }
 }
 
@@ -144,11 +146,6 @@ fn peer_share(id: &E3id, party: usize, external: bool) -> ThresholdShareCreated 
             ProofType::C2aSkShareComputation,
             CircuitName::SkShareComputation,
         )),
-        signed_c2b_proof: Some(signed(
-            id,
-            ProofType::C2bESmShareComputation,
-            CircuitName::ESmShareComputation,
-        )),
         signed_c3a_proofs: (0..LIMBS)
             .map(|_| {
                 signed(
@@ -158,16 +155,6 @@ fn peer_share(id: &E3id, party: usize, external: bool) -> ThresholdShareCreated 
                 )
             })
             .collect(),
-        signed_c3b_proofs: (0..LIMBS)
-            .map(|_| {
-                signed(
-                    id,
-                    ProofType::C3bESmShareEncryption,
-                    CircuitName::ShareEncryption,
-                )
-            })
-            .collect(),
-        signature: ArcBytes::from_bytes(&[0x5a; 65]),
     }
 }
 
@@ -268,9 +255,7 @@ async fn secure_history(router: &Addr<E3Router>, id: &E3id) -> Result<()> {
             full_share: threshold_share(0, &(1..N).collect::<Vec<_>>()),
             proof_request: c1(),
             sk_share_computation_request: c2(SecretKey),
-            e_sm_share_computation_request: c2(SmudgingNoise),
             sk_share_encryption_requests: c3_batch(SecretKey),
-            e_sm_share_encryption_requests: c3_batch(SmudgingNoise),
             recipient_party_ids: (0..N as u64).collect(),
         },
     )
@@ -313,7 +298,6 @@ async fn secure_history(router: &Addr<E3Router>, id: &E3id) -> Result<()> {
             party_id: 0,
             node: format!("0x{:040x}", 0),
             sk_request: c4(SecretKey),
-            esm_requests: vec![c4(SmudgingNoise)],
         },
     )
     .await;
@@ -340,6 +324,7 @@ async fn secure_history(router: &Addr<E3Router>, id: &E3id) -> Result<()> {
                     ProofType::C6ThresholdShareDecryption,
                     CircuitName::ThresholdShareDecryption,
                 )],
+                decryptors: vec![],
             },
             true,
         )
@@ -457,6 +442,7 @@ async fn allocated_histories_fit_and_default_bytes_isolate_overflow() -> Result<
                             node: "member".into(),
                             decryption_share: vec![bytes(16 * MIB)],
                             signed_decryption_proofs: vec![],
+                            decryptors: vec![],
                         })
                         .seq(sequence)
                         .build(),
@@ -491,6 +477,7 @@ async fn allocated_histories_fit_and_default_bytes_isolate_overflow() -> Result<
                         node: "member".into(),
                         decryption_share: vec![bytes(16 * MIB)],
                         signed_decryption_proofs: vec![],
+                        decryptors: vec![],
                     })
                     .seq(entries + 2 + extra)
                     .build(),
@@ -530,6 +517,7 @@ async fn allocated_histories_fit_and_default_bytes_isolate_overflow() -> Result<
                 node: "member".into(),
                 decryption_share: (0..131_072).map(|_| ArcBytes::from_bytes(&[])).collect(),
                 signed_decryption_proofs: vec![],
+                decryptors: vec![],
             })
             .seq(sequence)
             .build();
@@ -573,13 +561,19 @@ async fn deferred_share_collections_release_spare_capacity() -> Result<()> {
         type Result = ();
 
         fn handle(&mut self, event: InterfoldEvent, _: &mut Self::Context) {
-            let share = match event.get_data() {
-                InterfoldEventData::ThresholdShareCreated(data) => &data.share,
-                InterfoldEventData::ThresholdSharePending(data) => &data.full_share,
+            let (len, capacity) = match event.get_data() {
+                InterfoldEventData::ThresholdShareCreated(data) => (
+                    data.signed_c3a_proofs.len(),
+                    data.signed_c3a_proofs.capacity(),
+                ),
+                InterfoldEventData::ThresholdSharePending(data) => (
+                    data.sk_share_encryption_requests.len(),
+                    data.sk_share_encryption_requests.capacity(),
+                ),
                 _ => return,
             };
-            assert_eq!(share.esi_sss.len(), 1);
-            self.0.push(share.esi_sss.capacity());
+            assert_eq!(len, 1);
+            self.0.push(capacity);
         }
     }
 
@@ -609,15 +603,23 @@ async fn deferred_share_collections_release_spare_capacity() -> Result<()> {
         .await?;
     let id = E3id::new("81", 1);
     route(&router, admission(&id)).await;
-    let mut share = threshold_share(0, &[]);
-    Arc::make_mut(&mut share).esi_sss.reserve(4096);
-    assert!(share.esi_sss.capacity() > 4096);
+    let share = threshold_share(0, &[]);
+    let mut proofs = vec![signed(
+        &id,
+        ProofType::C3aSkShareEncryption,
+        CircuitName::ShareEncryption,
+    )];
+    proofs.reserve(4096);
+    let mut requests = vec![c3(DkgInputType::SecretKey, 0, 0)];
+    requests.reserve(4096);
+    assert!(proofs.capacity() > 4096 && requests.capacity() > 4096);
     let mut sequence = 1;
     send_data(
         &router,
         &mut sequence,
         ThresholdShareCreated {
             share: share.clone(),
+            signed_c3a_proofs: proofs,
             ..peer_share(&id, 1, false)
         },
     )
@@ -630,9 +632,7 @@ async fn deferred_share_collections_release_spare_capacity() -> Result<()> {
             full_share: share,
             proof_request: c1(),
             sk_share_computation_request: c2(DkgInputType::SecretKey),
-            e_sm_share_computation_request: c2(DkgInputType::SmudgingNoise),
-            sk_share_encryption_requests: vec![],
-            e_sm_share_encryption_requests: vec![],
+            sk_share_encryption_requests: requests,
             recipient_party_ids: vec![],
         },
     )

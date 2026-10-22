@@ -17,9 +17,6 @@
 
 mod common;
 
-use e3_polynomial_fhe::FromFhePolynomial as _;
-use std::sync::Arc;
-
 use ark_bn254::Fr;
 use ark_ff::{BigInteger, PrimeField, Zero};
 use common::{
@@ -54,13 +51,25 @@ use e3_zk_witness::{
     compute_pk_aggregation_commitment, compute_share_computation_sk_commitment,
     compute_threshold_pk_commitment,
 };
-use fhe::trbfv::TRBFV;
 
 /// Sum per-modulus decrypted shares across honest parties (matches C4 `compute_aggregated_shares`).
 /// Coefficients are summed in the BN254 field, not reduced mod each CRT modulus (see `share_decryption.nr`).
 fn aggregate_dkg_decrypted_shares_to_crt(
     decrypted_shares: &[Vec<Vec<num_bigint::BigInt>>],
+    preset: BfvPreset,
 ) -> CrtPolynomial {
+    let mut unwrapped = decrypted_shares.to_vec();
+    for party in &mut unwrapped {
+        let packed = party[0]
+            .iter()
+            .map(|c| u64::try_from(c).unwrap())
+            .collect::<Vec<_>>();
+        let (residues, _) =
+            e3_fhe_params::unpack_prf_key(preset, &packed, e3_fhe_params::prf_key_modulus(preset))
+                .unwrap();
+        party[0] = residues.into_iter().map(num_bigint::BigInt::from).collect();
+    }
+    let decrypted_shares = &unwrapped;
     let h = decrypted_shares.len();
     let l = decrypted_shares[0].len();
     let n = decrypted_shares[0][0].len();
@@ -139,7 +148,7 @@ fn assert_proof_verifies<C: Provable>(
     );
 }
 
-async fn setup_share_encryption_e_sm_test() -> Option<(
+async fn setup_share_encryption_sk_test() -> Option<(
     ZkBackend,
     tempfile::TempDir,
     ZkProver,
@@ -165,7 +174,7 @@ async fn setup_share_encryption_e_sm_test() -> Option<(
         &dkg_params,
         preset,
         committee,
-        DkgInputType::SmudgingNoise,
+        DkgInputType::SecretKey,
         sd.z,
     )
     .ok()?;
@@ -197,7 +206,6 @@ async fn setup_share_computation_sk_test() -> Option<(
     let (backend, temp) = setup_test_prover(&bb).await;
 
     setup_compiled_circuit(&backend, "dkg", "sk_share_computation").await;
-    setup_compiled_circuit(&backend, "dkg", "e_sm_share_computation").await;
 
     let config = e3_zk_config::dkg::share_computation::Configs::for_preset(
         preset,
@@ -217,47 +225,6 @@ async fn setup_share_computation_sk_test() -> Option<(
         sample,
         preset,
         "1",
-    ))
-}
-
-async fn setup_share_computation_e_sm_test() -> Option<(
-    ZkBackend,
-    tempfile::TempDir,
-    ZkProver,
-    ShareComputationCircuit,
-    ShareComputationCircuitData,
-    BfvPreset,
-    &'static str,
-)> {
-    let preset = BfvPreset::InsecureThreshold64;
-    let bb = find_bb().await?;
-    require_minimum_circuits()?;
-    let (backend, temp) = setup_test_prover(&bb).await;
-
-    setup_compiled_circuit(&backend, "dkg", "sk_share_computation").await;
-    setup_compiled_circuit(&backend, "dkg", "e_sm_share_computation").await;
-
-    let config = e3_zk_config::dkg::share_computation::Configs::for_preset(
-        preset,
-        CiphernodesCommitteeSize::Minimum,
-    )
-    .ok()?;
-    let sample = e3_zk_samples::dkg::share_computation::generate(
-        &config,
-        preset,
-        DkgInputType::SmudgingNoise,
-    )
-    .ok()?;
-    let prover = ZkProver::new(&backend);
-
-    Some((
-        backend,
-        temp,
-        prover,
-        ShareComputationCircuit,
-        sample,
-        preset,
-        "2",
     ))
 }
 
@@ -492,8 +459,7 @@ macro_rules! e2e_proof_tests {
 
 e2e_proof_tests! {
     (share_computation_sk, setup_share_computation_sk_test(), CircuitVariant::Recursive, |preset| e3_zk_config::dkg::share_computation::Configs::for_preset(preset, CiphernodesCommitteeSize::Minimum).unwrap()),
-    (share_computation_e_sm, setup_share_computation_e_sm_test(), CircuitVariant::Recursive, |preset| e3_zk_config::dkg::share_computation::Configs::for_preset(preset, CiphernodesCommitteeSize::Minimum).unwrap()),
-    (share_encryption_e_sm, setup_share_encryption_e_sm_test(), CircuitVariant::Recursive, |preset| e3_zk_config::dkg::share_encryption::Configs::for_preset(preset).unwrap()),
+    (share_encryption_sk, setup_share_encryption_sk_test(), CircuitVariant::Recursive, |preset| e3_zk_config::dkg::share_encryption::Configs::for_preset(preset).unwrap()),
 }
 
 #[tokio::test]
@@ -536,9 +502,9 @@ async fn test_pk_generation_commitment_consistency() {
     let inputs =
         e3_zk_witness::threshold::pk_generation::Inputs::compute(&config, &sample).unwrap();
 
-    // Each commitment is represented as a single field element (32 bytes), and there are 3 commitments at the end of the public signals
-    let sk_commitment_from_proof = extract_field_from_end(&proof.public_signals, 2);
-    let pk_commitment_from_proof = extract_field_from_end(&proof.public_signals, 1);
+    // C1 now returns only SK and PK commitments; fresh noise belongs to C6.
+    let sk_commitment_from_proof = extract_field_from_end(&proof.public_signals, 1);
+    let pk_commitment_from_proof = extract_field_from_end(&proof.public_signals, 0);
 
     // Recompute commitments from the witness
     let sk_commitment_expected =
@@ -553,8 +519,6 @@ async fn test_pk_generation_commitment_consistency() {
         pk_commitment_from_proof, pk_commitment_expected,
         "pk commitment mismatch"
     );
-
-    // The correlated node-fold fixture checks the C1/C2 smudging commitment links.
 
     prover.cleanup(e3_id).unwrap();
 }
@@ -742,46 +706,20 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
         return;
     };
 
-    let committee = CiphernodesCommitteeSize::Minimum.values();
     let (threshold_params, _) = build_pair_for_preset(preset).unwrap();
-    let ctx = threshold_params.context_at_level(0).unwrap();
-    let moduli = threshold_params.moduli();
 
     let dkg_config = e3_zk_config::dkg::share_decryption::Configs::for_preset(preset).unwrap();
     let dkg_inputs =
         e3_zk_witness::dkg::share_decryption::Inputs::compute(&dkg_config, &dkg_sample).unwrap();
-    let agg_sk = aggregate_dkg_decrypted_shares_to_crt(&dkg_inputs.decrypted_shares);
-
-    // Rebuild the native FHE inputs for this cross-circuit transcript fixture.
-    let to_fhe = |crt: &CrtPolynomial| {
-        use fhe_math::rq::{traits::TryConvertFrom, Poly, PowerBasis};
-        use num_integer::Integer;
-        use num_traits::ToPrimitive;
-        let coefficients: Vec<u64> = crt
-            .limbs
-            .iter()
-            .zip(moduli)
-            .flat_map(|(limb, &qi)| {
-                let qi = num_bigint::BigInt::from(qi);
-                limb.coefficients()
-                    .iter()
-                    .map(move |c| c.mod_floor(&qi).to_u64().unwrap())
-            })
-            .collect();
-        Poly::<PowerBasis>::try_convert_from(coefficients, ctx, false).unwrap()
-    };
-    let sk_poly = to_fhe(&agg_sk).into_ntt();
-    let es_poly = to_fhe(&c6_sample.e);
-
-    let trbfv =
-        TRBFV::new(committee.n, committee.threshold, threshold_params.clone()).expect("TRBFV::new");
-
-    let d_share_rns = trbfv
-        .decryption_share(Arc::new(c6_sample.ciphertext.clone()), sk_poly, es_poly)
-        .expect("decryption_share");
-
+    let mut agg_sk = aggregate_dkg_decrypted_shares_to_crt(&dkg_inputs.decrypted_shares, preset);
+    agg_sk.reduce(threshold_params.moduli()).unwrap();
     c6_sample.s = agg_sk.clone();
-    c6_sample.d_share = CrtPolynomial::from_fhe_polynomial(&d_share_rns);
+    c6_sample.d_share = e3_zk_samples::threshold::share_decryption::synchronized_decryption_share(
+        &c6_sample,
+        &threshold_params,
+        preset,
+    )
+    .expect("synchronized decryption share");
 
     let e3_id_c4 = "c4-align";
     let e3_id_c6 = "c6-align";
@@ -809,6 +747,23 @@ async fn test_c4_c6_sk_commitment_aligned_transcript_e2e() {
             &artifacts_dir,
         )
         .expect("C6 proof generation should succeed");
+
+    assert_proof_verifies(
+        &DkgShareDecryptionCircuit,
+        &prover,
+        &c4_proof,
+        e3_id_c4,
+        CircuitVariant::Recursive,
+        &artifacts_dir,
+    );
+    assert_proof_verifies(
+        &ThresholdShareDecryptionCircuit,
+        &prover,
+        &c6_proof,
+        e3_id_c6,
+        CircuitVariant::Recursive,
+        &artifacts_dir,
+    );
 
     let c4_commitment = CircuitName::DkgShareDecryption
         .output_layout()

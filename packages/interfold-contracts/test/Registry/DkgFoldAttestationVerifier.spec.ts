@@ -37,7 +37,7 @@ describe("DkgFoldAttestationVerifier", function () {
   it("verifies a valid bundle and returns anchors", async function () {
     const { owner, mockRegistry, verifier, operators } =
       await loadFixture(setup);
-    const { ordered, proof, bundle, skCommits, esmCommits } =
+    const { ordered, proof, bundle, skCommits, prfCommits } =
       await buildMockDkgAttestationFixtureData(
         operators,
         e3Id,
@@ -50,7 +50,7 @@ describe("DkgFoldAttestationVerifier", function () {
       ordered.map((o) => o.addr),
     );
 
-    const [partyIds, skAggCommits, esmAggCommits] = await verifier.verify(
+    const [partyIds, skAggCommits, prfKeyCommits] = await verifier.verify(
       await mockRegistry.getAddress(),
       31337,
       e3Id,
@@ -60,7 +60,7 @@ describe("DkgFoldAttestationVerifier", function () {
 
     expect(partyIds.map((v: bigint) => Number(v))).to.deep.equal([0, 1, 2]);
     expect(skAggCommits).to.deep.equal(skCommits);
-    expect(esmAggCommits).to.deep.equal(esmCommits);
+    expect(prfKeyCommits).to.deep.equal(prfCommits);
   });
 
   it("rejects a bundle signed for another registry", async function () {
@@ -114,7 +114,7 @@ describe("DkgFoldAttestationVerifier", function () {
     ];
     const badBundle = ethers.AbiCoder.defaultAbiCoder().encode(
       [
-        "tuple(uint256 partyId, bytes32 skAggCommit, bytes32 esmAggCommit, bytes signature)[]",
+        "tuple(uint256 partyId, bytes32 skAggCommit, bytes32 prfKeyCommitsHash, bytes signature)[]",
         "tuple(uint256 partyId, address node)[]",
       ],
       [badAttestations, bindings],
@@ -151,7 +151,7 @@ describe("DkgFoldAttestationVerifier", function () {
     badBindings[1] = { ...badBindings[1], partyId: badBindings[0].partyId };
     const badBundle = ethers.AbiCoder.defaultAbiCoder().encode(
       [
-        "tuple(uint256 partyId, bytes32 skAggCommit, bytes32 esmAggCommit, bytes signature)[]",
+        "tuple(uint256 partyId, bytes32 skAggCommit, bytes32 prfKeyCommitsHash, bytes signature)[]",
         "tuple(uint256 partyId, address node)[]",
       ],
       [attestations, badBindings],
@@ -213,7 +213,7 @@ describe("DkgFoldAttestationVerifier", function () {
 
     const shortBundle = ethers.AbiCoder.defaultAbiCoder().encode(
       [
-        "tuple(uint256 partyId, bytes32 skAggCommit, bytes32 esmAggCommit, bytes signature)[]",
+        "tuple(uint256 partyId, bytes32 skAggCommit, bytes32 prfKeyCommitsHash, bytes signature)[]",
         "tuple(uint256 partyId, address node)[]",
       ],
       [attestations.slice(0, 2), bindings],

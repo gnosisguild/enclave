@@ -170,10 +170,10 @@ derivative = "=2.2.0"
 dirs = "=5.0.1"
 dialoguer = "=0.11.0"
 eyre = { version = "=0.6.12" }
-fhe = { git = "https://github.com/gnosisguild/fhe.rs", tag = "v0.4.2", features = ["experimental-mbfv"] }
-fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", tag = "v0.4.2" }
-fhe-math = { git = "https://github.com/gnosisguild/fhe.rs", tag = "v0.4.2" }
-fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", tag = "v0.4.2" }
+fhe = { git = "https://github.com/gnosisguild/fhe.rs", tag = "v0.5.1", features = ["experimental-mbfv"] }
+fhe-traits = { git = "https://github.com/gnosisguild/fhe.rs", tag = "v0.5.1" }
+fhe-math = { git = "https://github.com/gnosisguild/fhe.rs", tag = "v0.5.1" }
+fhe-util = { git = "https://github.com/gnosisguild/fhe.rs", tag = "v0.5.1" }
 figment = { version = "=0.10.19", features = ["env", "yaml", "test"] }
 futures = "=0.3.31"
 futures-util = "=0.3.31"
@@ -240,3 +240,8 @@ libp2p = { version = "=0.56.0", features = [
   "cbor"
 ]}
 zeroize = "=1.9.0"
+
+# fhe.rs threshold-decryption depends on e3-safe from this repository at a pinned rev
+# (see fhe.rs v0.5.1). Redirect it to the in-repo crate so both resolve to one package.
+[patch."https://github.com/theinterfold/interfold"]
+e3-safe = { path = "./crates/safe" }

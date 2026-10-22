@@ -11,7 +11,8 @@
 //! Each `mul_mod` therefore saves ~22 gates over `ModU128` (two range checks per call).
 
 use super::unconstrained_U64::{
-    __inv_mod_u64, __mul_mod_witness_u64, __neg_u64, __reduce_witness_u64, __sub_with_underflow_u64,
+    __inv_mod_u64, __mul_mod_witness_u64, __neg_u64, __reduce_field_witness_u64,
+    __reduce_witness_u64, __sub_with_underflow_u64,
 };
 
 /// Modular arithmetic context for prime moduli < 2^62.
@@ -42,6 +43,96 @@ impl ModU64 {
         assert((quo_u64 as Field) * (self.m as Field) + (rem_u64 as Field) == n);
         assert(rem_u64 < self.m);
         rem_u64 as Field
+    }
+
+    /// Reduce a canonical BN254 field element, with an integer quotient and no scalar wrap.
+    pub fn reduce_field(self, n: Field) -> Field {
+        self.reduce_fields([n])[0]
+    }
+
+    /// Reuse modulus-only bounds across a row instead of rebuilding their SSA for every output.
+    pub fn reduce_fields<let N: u32>(self, values: [Field; N]) -> [Field; N] {
+        assert(self.m > 0);
+        assert(self.m < (1u64 << 62));
+        let mut reduced = [0; N];
+        if self.m >= (1u64 << 26) {
+            let (bound, max_remainder) = self.field_reduction_bounds();
+            for i in 0..N {
+                // Safety: verification bounds both outputs and excludes quotient*m+remainder >= p.
+                let (quotient, remainder) =
+                    unsafe { __reduce_field_witness_u64(values[i], self.m) };
+                reduced[i] = self.verify_field_reduction(
+                    values[i],
+                    quotient,
+                    remainder,
+                    bound,
+                    max_remainder,
+                );
+            }
+        } else {
+            for i in 0..N {
+                reduced[i] = self.reduce_field_bytes(values[i]);
+            }
+        }
+        reduced
+    }
+
+    fn field_reduction_bounds(self) -> (Field, Field) {
+        // -1 is the canonical integer p-1. This checked, constant-input reduction
+        // fixes (p-1)%m; field division then equals the integer floor((p-1)/m).
+        // Production moduli are constants, so this does not decompose each PRF output.
+        let max_remainder = self.reduce_field_bytes(-1);
+        (((-1) - max_remainder) / self.get_mod_field(), max_remainder)
+    }
+
+    fn verify_field_reduction(
+        self,
+        n: Field,
+        quotient: Field,
+        remainder: Field,
+        bound: Field,
+        max_remainder: Field,
+    ) -> Field {
+        // m>=2^26 implies bound<2^228. Both range checks are far below p,
+        // so they enforce the integer interval 0<=quotient<=bound.
+        quotient.assert_max_bit_size::<228>();
+        (bound - quotient).assert_max_bit_size::<228>();
+        remainder.assert_max_bit_size::<62>();
+        (self.get_mod_field() - 1 - remainder).assert_max_bit_size::<62>();
+        // If quotient<bound the largest possible sum is already <p. At the
+        // boundary, this extra remainder limit excludes the alias n+p.
+        let at_bound = (quotient == bound) as Field;
+        (at_bound * (max_remainder - remainder)).assert_max_bit_size::<62>();
+        assert(quotient * self.get_mod_field() + remainder == n);
+        remainder
+    }
+
+    /// Checked byte/limb reduction also handles tiny test moduli with wider quotients.
+    fn reduce_field_bytes(self, n: Field) -> Field {
+        let bytes = n.to_le_bytes::<32>();
+        if self.m >= (1u64 << 58) {
+            // With m >= 2^58, each 120-bit digit contributes a <2^62 quotient.
+            // acc, base < m < 2^62, so acc*base + digit < 2^125 and its
+            // quotient is <2^63. Both fit reduce_mod's u128/u64 witness contract.
+            let base = self.reduce_mod(2.pow_32(120));
+            let mut acc = byte_limb::<30, 2>(bytes);
+            acc = self.reduce_mod(acc * base + byte_limb::<15, 15>(bytes));
+            self.reduce_mod(acc * base + byte_limb::<0, 15>(bytes))
+        } else {
+            // Compute 2^64 mod m without asking the hint for a 65-bit quotient
+            // when m=1. For m>=2 each fused quotient is <m+2^63<2^64;
+            // for m=1 the product is zero and the digit itself fits u64.
+            let next = self.reduce_mod(2.pow_32(64) - 1) + 1;
+            let base = if next == self.get_mod_field() {
+                0
+            } else {
+                next
+            };
+            let mut acc = self.reduce_mod(byte_limb::<24, 8>(bytes));
+            acc = self.reduce_mod(acc * base + byte_limb::<16, 8>(bytes));
+            acc = self.reduce_mod(acc * base + byte_limb::<8, 8>(bytes));
+            self.reduce_mod(acc * base + byte_limb::<0, 8>(bytes))
+        }
     }
 
     /// Asserts that n == 0 mod m without computing the remainder.
@@ -90,14 +181,11 @@ impl ModU64 {
     pub fn sub(self, lhs: Field, rhs: Field) -> Field {
         // Safety: __sub_with_underflow_u64 verified by the equation below.
         let (res_u64, underflow) = unsafe { __sub_with_underflow_u64(lhs, rhs, self.m) };
-        if underflow {
-            assert(
-                lhs + (self.m as Field) == rhs + (res_u64 as Field),
-                "Subtraction with underflow verification failed",
-            );
-        } else {
-            assert(lhs == rhs + (res_u64 as Field), "Subtraction verification failed");
-        }
+        assert(
+            lhs + (underflow as Field) * self.get_mod_field() == rhs + (res_u64 as Field),
+            "Subtraction verification failed",
+        );
+        assert(res_u64 < self.m, "Subtraction result is not canonical");
         res_u64 as Field
     }
 
@@ -153,7 +241,127 @@ impl ModU64 {
     }
 }
 
+fn byte_limb<let START: u32, let LEN: u32>(bytes: [u8; 32]) -> Field {
+    let mut acc: Field = 0;
+    let mut place: Field = 1;
+    for i in 0..LEN {
+        acc = acc + (bytes[START + i] as Field) * place;
+        place = place * 256;
+    }
+    acc
+}
+
 // ------------------------------ TESTS ------------------------------
+
+#[test]
+fn test_u64_reduce_field() {
+    let m = ModU64::new(100);
+    assert(m.reduce_field(42) == 42);
+    assert(m.reduce_field(250) == 50);
+    assert(m.reduce_field(2.pow_32(200) * 100 + 7) == 7);
+    assert(m.reduce_field(2.pow_32(60) * 13 + 7) == 95);
+}
+
+#[test]
+fn full_field_reduction_matches_integer_reference_vectors() {
+    let values: [Field; 10] = [
+        0,
+        1,
+        -1,
+        -2,
+        2.pow_32(64) - 1,
+        2.pow_32(64),
+        2.pow_32(120) - 1,
+        2.pow_32(120),
+        2.pow_32(240),
+        2.pow_32(253) + 2.pow_32(128) + 12345,
+    ];
+    let moduli: [u64; 8] =
+        [1, 2, 100, 134217089, (1u64 << 58) - 1, 1u64 << 58, 576460752317792257, (1u64 << 62) - 1];
+    // Python big-integer remainders, including p-1/p-2 and both limb-width paths.
+    let expected: [[Field; 10]; 8] = [
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 1, 1, 0, 1, 0, 0, 1],
+        [0, 1, 16, 15, 15, 16, 75, 76, 76, 93],
+        [0, 1, 106971341, 106971340, 15469436, 15469437, 19588124, 19588125, 61448896, 123812334],
+        [0, 1, 217004635485453411, 217004635485453410, 63, 64, 15, 16, 256, 2113593],
+        [
+            0,
+            1,
+            279774667609210880,
+            279774667609210879,
+            288230376151711743,
+            0,
+            288230376151711743,
+            0,
+            0,
+            12345,
+        ],
+        [
+            0,
+            1,
+            291189715534697300,
+            291189715534697299,
+            576460751857991648,
+            576460751857991649,
+            825846090301443,
+            825846090301444,
+            4335869519754109,
+            566753813557515260,
+        ],
+        [
+            0,
+            1,
+            200848709165208246,
+            200848709165208245,
+            3,
+            4,
+            288230376151711743,
+            288230376151711744,
+            18014398509481984,
+            12393,
+        ],
+    ];
+    for q in 0..8 {
+        let m = ModU64::new(moduli[q]);
+        assert(m.reduce_fields(values) == expected[q]);
+        for i in 0..10 {
+            assert(m.reduce_field(values[i]) == expected[q][i]);
+        }
+    }
+}
+
+#[test]
+fn full_field_reduction_accepts_the_scalar_boundary() {
+    let m = ModU64::new(576460752317792257);
+    let (bound, max_remainder) = m.field_reduction_bounds();
+    assert(
+        m.verify_field_reduction(-1, bound, max_remainder, bound, max_remainder) == max_remainder,
+    );
+}
+
+#[test(should_fail)]
+fn full_field_reduction_rejects_a_scalar_modulus_alias() {
+    let m = ModU64::new(576460752317792257);
+    let (bound, max_remainder) = m.field_reduction_bounds();
+    // This forged integer sum is exactly p, hence equals zero in the scalar field.
+    let _ = m.verify_field_reduction(0, bound, max_remainder + 1, bound, max_remainder);
+}
+
+#[test(should_fail)]
+fn full_field_reduction_rejects_an_oversized_quotient() {
+    let m = ModU64::new(576460752317792257);
+    let (bound, max_remainder) = m.field_reduction_bounds();
+    let alias = m.get_mod_field() - max_remainder - 1;
+    let _ = m.verify_field_reduction(alias, bound + 1, 0, bound, max_remainder);
+}
+
+#[test(should_fail)]
+fn full_field_reduction_rejects_a_noncanonical_remainder() {
+    let m = ModU64::new(576460752317792257);
+    let (bound, max_remainder) = m.field_reduction_bounds();
+    let _ = m.verify_field_reduction(m.get_mod_field(), 0, m.get_mod_field(), bound, max_remainder);
+}
 
 #[test]
 fn test_u64_reduce_mod_already_reduced() {

@@ -39,14 +39,18 @@ pub fn generate(
 
     let noise = match dkg_input_type {
         DkgInputType::SecretKey => None,
-        DkgInputType::SmudgingNoise => Some(crate::smudging::generator(
+        DkgInputType::SmudgingNoise => Some(crate::smudging::SmudgingDrawer::new(
             threshold_params,
             committee.n,
             usize::try_from(num_ciphertexts).map_err(|e| WitnessError::Sample(e.to_string()))?,
             preset,
-        )?),
+        )),
     };
     let share_row = super::share_row(&mut share_manager, noise.as_ref(), &mut rng)?;
+    let prf_key = vec![1; e3_fhe_params::prf_key_bit_len(preset) / 8];
+    let share_row =
+        e3_fhe_params::pack_prf_key(preset, &share_row, &prf_key, threshold_params.moduli()[0])
+            .map_err(|e| WitnessError::Sample(e.to_string()))?;
 
     let pt = Plaintext::try_encode(&share_row, Encoding::poly(), dkg_params)
         .map_err(|e| WitnessError::Sample(format!("Failed to encode plaintext: {:?}", e)))?;
@@ -56,6 +60,9 @@ pub fn generate(
         .map_err(|e| WitnessError::Sample(format!("Failed to encrypt extended: {:?}", e)))?;
 
     Ok(ShareEncryptionCircuitData {
+        recipient_party_idx: 0,
+        row_idx: 0,
+        prf_key,
         plaintext: pt,
         ciphertext: ct,
         public_key: dkg_public_key,

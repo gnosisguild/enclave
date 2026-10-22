@@ -134,7 +134,7 @@ const isCoverageRun = process.argv.includes("--coverage");
 
 function plaintextHashFromPublicInputs(publicInputs: string[]): string {
   const messageCoeffsCount = 50;
-  const offset = publicInputs.length - messageCoeffsCount;
+  const offset = bfvDecPartyColOffsets(BFV_THRESHOLD_T).message;
   const plaintext = new Uint8Array(messageCoeffsCount * 8);
   for (let i = 0; i < messageCoeffsCount; i++) {
     const coeff = BigInt(publicInputs[offset + i]);
@@ -376,39 +376,31 @@ describe("BfvVkBindingIntegration", function () {
       const abiCoder = ethers.AbiCoder.defaultAbiCoder();
       const verifyOverrides = { gasLimit: HONK_VERIFY_GAS_LIMIT };
 
-      // Derive DKG anchors straight from the real folded proof's own public inputs
-      // (circuit-side party_ids are 1-indexed; registry-side are 0-indexed) so the
-      // new cross-phase sk/esm binding check passes for this genuine proof.
-      const {
-        partyId: partyIdOffset,
-        sk: skOffset,
-        esm: esmOffset,
-      } = bfvDecPartyColOffsets(BFV_THRESHOLD_T);
-      const registryPartyIds: bigint[] = [];
-      const skCommits: string[] = [];
-      const esmCommits: string[] = [];
-      for (let i = 0; i < BFV_THRESHOLD_T + 1; i++) {
-        registryPartyIds.push(BigInt(decPublicInputs[partyIdOffset + i]) - 1n);
-        skCommits.push(decPublicInputs[skOffset + i]);
-        esmCommits.push(decPublicInputs[esmOffset + i]);
-      }
+      // DKG party IDs are zero-based. Authority must come from DKG, not from the
+      // decryption proof under test (whose Shamir coordinates are one-based).
+      const registryPartyIds = dkgPublicInputs
+        .slice(2, 2 + BFV_DKG_H)
+        .map(BigInt);
+      const skCommits = dkgPublicInputs.slice(5 + BFV_DKG_H, 5 + 2 * BFV_DKG_H);
+      const prfKeys = dkgPublicInputs.slice(6 + 2 * BFV_DKG_H);
       await mockCiphernodeRegistry.setDkgAnchors(
         testE3Id,
         registryPartyIds,
         skCommits,
-        esmCommits,
+        [],
       );
+      await mockCiphernodeRegistry.setDkgPrfKeyCommitments(testE3Id, prfKeys);
 
       const dkgEncoded = abiCoder.encode(
         ["bytes", "bytes32[]"],
         [folded.dkg_aggregator.proof_hex, dkgPublicInputs],
       );
-      const pkCommitment = dkgPublicInputs[dkgPublicInputs.length - 1];
+      const pkCommitment = dkgPublicInputs[5 + 2 * BFV_DKG_H];
       expect(
         await bfvPk.verify.staticCall(
           testE3Id,
           testRoot,
-          [testSigner.address],
+          Array(2 * BFV_THRESHOLD_T + 1).fill(testSigner.address),
           pkCommitment,
           dkgCommitteeHash,
           dkgEncoded,
@@ -470,7 +462,7 @@ describe("BfvVkBindingIntegration", function () {
         immediatePkWrapper.verify.staticCall(
           testE3Id,
           testRoot,
-          [testSigner.address],
+          Array(2 * BFV_THRESHOLD_T + 1).fill(testSigner.address),
           pkCommitment,
           dkgCommitteeHash,
           dkgEncoded,

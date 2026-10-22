@@ -19,7 +19,7 @@ contract BfvPkVerifierRouter is IPkVerifier {
 
     struct Route {
         IBfvPkVerifierRoute verifier;
-        uint256 expectedPublicInputsLen;
+        uint256 publicInputPrefixLen;
         bytes32 expectedNodesFoldKeyHash;
         bytes32 expectedC5KeyHash;
     }
@@ -46,7 +46,7 @@ contract BfvPkVerifierRouter is IPkVerifier {
             routes.push(
                 Route({
                     verifier: route,
-                    expectedPublicInputsLen: (3 * routeH) + 6,
+                    publicInputPrefixLen: (2 * routeH) + 6,
                     expectedNodesFoldKeyHash: route.expectedNodesFoldKeyHash(),
                     expectedC5KeyHash: route.expectedC5KeyHash()
                 })
@@ -65,7 +65,7 @@ contract BfvPkVerifierRouter is IPkVerifier {
         view
         returns (
             address verifier,
-            uint256 expectedPublicInputsLen,
+            uint256 publicInputPrefixLen,
             bytes32 expectedNodesFoldKeyHash,
             bytes32 expectedC5KeyHash
         )
@@ -73,7 +73,7 @@ contract BfvPkVerifierRouter is IPkVerifier {
         Route storage route = routes[index];
         return (
             address(route.verifier),
-            route.expectedPublicInputsLen,
+            route.publicInputPrefixLen,
             route.expectedNodesFoldKeyHash,
             route.expectedC5KeyHash
         );
@@ -101,7 +101,12 @@ contract BfvPkVerifierRouter is IPkVerifier {
         bool lengthMatched;
         for (uint256 i = 0; i < routes.length; ++i) {
             Route storage route = routes[i];
-            if (publicInputs.length != route.expectedPublicInputsLen) {
+            if (
+                publicInputs.length !=
+                route.publicInputPrefixLen +
+                    ((route.publicInputPrefixLen - 6) / 2) *
+                    sortedNodes.length
+            ) {
                 continue;
             }
             lengthMatched = true;

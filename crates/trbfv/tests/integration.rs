@@ -5,21 +5,30 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 use std::{collections::HashMap, sync::Arc};
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use e3_bfv_client::decode_bytes_to_vec_u64;
-use e3_crypto::Cipher;
+use e3_crypto::{Cipher, SensitiveBytes};
 use e3_fhe_params::create_deterministic_crp_from_default_seed;
-use e3_fhe_params::DEFAULT_BFV_PRESET;
+use e3_fhe_params::{zero_prf_key, DEFAULT_BFV_PRESET};
+
+fn pair_prf_key(sender: usize, recipient: usize) -> Vec<u8> {
+    let mut key = zero_prf_key(DEFAULT_BFV_PRESET);
+    key[0] = u8::try_from(sender).unwrap_or(255).saturating_add(1);
+    key[1] = u8::try_from(recipient).unwrap_or(255).saturating_add(1);
+    key
+}
 use e3_fhe_params::{encode_bfv_params, BfvParamSet};
 use e3_test_helpers::{create_shared_rng_from_u64, usecase_helpers};
 use e3_trbfv::{
     calculate_decryption_share::{
-        CalculateDecryptionShareRequest, CalculateDecryptionShareResponse,
+        calculate_decryption_share, CalculateDecryptionShareRequest,
+        CalculateDecryptionShareResponse,
     },
     calculate_threshold_decryption::{
-        CalculateThresholdDecryptionRequest, CalculateThresholdDecryptionResponse,
+        calculate_threshold_decryption, CalculateThresholdDecryptionRequest,
+        CalculateThresholdDecryptionResponse,
     },
-    TrBFVConfig, TrBFVRequest, TrBFVResponse,
+    TrBFVConfig,
 };
 use e3_utils::{to_ordered_vec, ArcBytes};
 use fhe_traits::Serialize;
@@ -81,24 +90,43 @@ async fn test_trbfv_isolation() -> Result<()> {
         .collect::<Vec<ArcBytes>>();
 
     let mut decryption_shares = HashMap::new();
-    // for party_id in 0..=threshold_m as usize {
+    // 0-based party ids 1, 4, and 2. This set is not the prefix 1..=T+1.
+    let decryptors = vec![2u32, 5, 3];
+    let mut sorted_decryptors = decryptors.clone();
+    sorted_decryptors.sort_unstable();
+    assert_ne!(sorted_decryptors, vec![1, 2, 3]);
+    let mut context_digest = None;
     for party_id in [1, 4, 2] {
-        let (es_poly_sum, sk_poly_sum) = decryption_keys.get(&party_id).unwrap();
+        let sk_poly_sum = decryption_keys.get(&party_id).unwrap();
+        let outgoing_prf_keys = (0..threshold_n)
+            .map(|other| SensitiveBytes::new(pair_prf_key(party_id, other), &cipher))
+            .collect::<Result<Vec<_>>>()?;
+        let incoming_prf_keys = (0..threshold_n)
+            .map(|other| SensitiveBytes::new(pair_prf_key(other, party_id), &cipher))
+            .collect::<Result<Vec<_>>>()?;
         println!("calculate_decryption_share for party_id={}", party_id);
-        let TrBFVResponse::CalculateDecryptionShare(CalculateDecryptionShareResponse {
+        let CalculateDecryptionShareResponse {
             d_share_poly,
-        }) = TrBFVRequest::CalculateDecryptionShare(CalculateDecryptionShareRequest {
-            name: format!("party_id({})", party_id),
-            sk_poly_sum: sk_poly_sum.clone(),
-            trbfv_config: trbfv_config.clone(),
-            es_poly_sum: es_poly_sum.clone(),
-            ciphertexts: ciphertexts.clone(),
-        })
-        .execute(&rng, &cipher)?
-        else {
-            bail!("wrong decryption-share response variant")
-        };
+            context_digest: share_digest,
+            ..
+        } = calculate_decryption_share(
+            &cipher,
+            CalculateDecryptionShareRequest {
+                name: format!("party_id({})", party_id),
+                sk_poly_sum: sk_poly_sum.clone(),
+                trbfv_config: trbfv_config.clone(),
+                ciphertexts: ciphertexts.clone(),
+                party_idx: party_id as u32,
+                decryptors: decryptors.clone(),
+                outgoing_prf_keys,
+                incoming_prf_keys,
+            },
+        )?;
 
+        match context_digest {
+            None => context_digest = Some(share_digest),
+            Some(previous) => assert_eq!(previous, share_digest),
+        }
         // store the decryption shares in a hash map indexed by party_id
         decryption_shares.insert(party_id as u64, d_share_poly);
     }
@@ -106,18 +134,15 @@ async fn test_trbfv_isolation() -> Result<()> {
     // Get a vector of the shares
     let d_share_polys: Vec<(u64, Vec<ArcBytes>)> = decryption_shares.into_iter().collect();
 
-    // Data preparation sorts the decryption shares by party_id.
-    let TrBFVResponse::CalculateThresholdDecryption(CalculateThresholdDecryptionResponse {
-        plaintext,
-    }) = TrBFVRequest::CalculateThresholdDecryption(CalculateThresholdDecryptionRequest {
-        ciphertexts,
-        trbfv_config: trbfv_config.clone(),
-        d_share_polys,
-    })
-    .execute(&rng, &cipher)?
-    else {
-        bail!("wrong plaintext response variant")
-    };
+    let CalculateThresholdDecryptionResponse { plaintext } =
+        // NOTE: data prep in this function will sort the decryption shares by party_id
+        calculate_threshold_decryption(CalculateThresholdDecryptionRequest {
+            ciphertexts,
+            trbfv_config: trbfv_config.clone(),
+            d_share_polys,
+            decryptors: sorted_decryptors,
+            context_digest: context_digest.expect("share context digest"),
+        })?;
 
     let results = plaintext
         .into_iter()

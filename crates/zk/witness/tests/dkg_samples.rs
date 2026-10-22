@@ -153,6 +153,13 @@ mod share_decryption {
                             sample.secret_key.try_decrypt(&party_cts[mod_idx]).unwrap();
                         Vec::<u64>::try_decode(&decrypted_pt, Encoding::poly()).unwrap()
                     }
+                    None if mod_idx == 0 => e3_fhe_params::pack_prf_key(
+                        preset,
+                        &sample.own_plaintext_share[mod_idx],
+                        &sample.prf_keys[party_idx],
+                        threshold_params.moduli()[0],
+                    )
+                    .unwrap(),
                     None => sample.own_plaintext_share[mod_idx].clone(),
                 };
                 // C2 commits to shares in highest-degree-first order.

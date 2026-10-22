@@ -87,37 +87,86 @@ impl ThresholdPlaintextAggregator {
         let state = self.state.try_get()?;
         let shares = match state {
             ThresholdPlaintextAggregatorState::Collecting(state) => {
+                let ids = ThresholdPlaintextAggregation::fresh_decryptor_ids(
+                    &self.committee_addresses,
+                    &self.honest_committee_addresses,
+                    &state.rejected_parties,
+                    state.threshold_m,
+                )?;
                 return Ok(!state.shares.is_empty()
+                    && (state.expected_decryptors.is_empty() || state.expected_decryptors == ids)
                     && state.shares.len() == state.c6_proofs.len()
                     && state.shares.iter().all(|(party, shares)| {
                         state.c6_proofs.get(party).is_some_and(|proofs| {
-                            self.share_is_authenticated(*party, shares, proofs, ciphertexts)
+                            C6ShareVerifier::matches_round(
+                                proofs,
+                                *party,
+                                &ids,
+                                self.committee_size.values().n,
+                            ) && self
+                                .share_is_authenticated(*party, shares, proofs, ciphertexts)
                                 .unwrap_or(false)
                         })
                     }));
             }
             ThresholdPlaintextAggregatorState::VerifyingC6(state) => {
-                return Ok(state.shares.len() == state.c6_proofs.len()
+                let ids = ThresholdPlaintextAggregation::fresh_decryptor_ids(
+                    &self.committee_addresses,
+                    &self.honest_committee_addresses,
+                    &state.rejected_parties,
+                    state.threshold_m,
+                )?;
+                return Ok(state.shares.len() == ids.len()
+                    && state.shares.len() == state.c6_proofs.len()
                     && state.shares.iter().all(|(party, shares)| {
                         state.c6_proofs.get(party).is_some_and(|proofs| {
-                            self.share_is_authenticated(*party, shares, proofs, ciphertexts)
+                            C6ShareVerifier::matches_round(
+                                proofs,
+                                *party,
+                                &ids,
+                                self.committee_size.values().n,
+                            ) && self
+                                .share_is_authenticated(*party, shares, proofs, ciphertexts)
                                 .unwrap_or(false)
                         })
                     })
                     && state.queued_shares.iter().all(|(party, queued)| {
-                        self.share_is_authenticated(
-                            *party,
-                            &queued.share,
+                        C6ShareVerifier::matches_round(
                             &queued.proofs,
-                            ciphertexts,
-                        )
-                        .unwrap_or(false)
+                            *party,
+                            &ids,
+                            self.committee_size.values().n,
+                        ) && self
+                            .share_is_authenticated(
+                                *party,
+                                &queued.share,
+                                &queued.proofs,
+                                ciphertexts,
+                            )
+                            .unwrap_or(false)
                     }));
             }
             ThresholdPlaintextAggregatorState::Computing(state) => state.shares,
             ThresholdPlaintextAggregatorState::GeneratingC7Proof(state) => state.shares,
             ThresholdPlaintextAggregatorState::Complete(state) => state.shares,
         };
+        let ids = shares
+            .iter()
+            .map(|(party, _)| {
+                u32::try_from(*party)
+                    .ok()
+                    .and_then(|party| party.checked_add(1))
+            })
+            .collect::<Option<Vec<_>>>();
+        let Some(ids) = ids else {
+            return Ok(false);
+        };
+        if ids.len() != self.committee_size.values().threshold + 1
+            || !ids.windows(2).all(|pair| pair[0] < pair[1])
+        {
+            return Ok(false);
+        }
+        let verifier = C6ShareVerifier::new(self.params_preset)?;
         Ok(!shares.is_empty()
             && shares.len() == proofs.len()
             && shares
@@ -127,6 +176,14 @@ impl ThresholdPlaintextAggregator {
                     party == proof_party
                         && shares.len() == ciphertexts.len()
                         && proofs.len() == ciphertexts.len()
+                        && shares.iter().zip(proofs).all(|(share, proof)| {
+                            C6ShareVerifier::proof_matches_round(
+                                proof,
+                                *party,
+                                &ids,
+                                self.committee_size.values().n,
+                            ) && verifier.share_matches(share, proof)
+                        })
                 }))
     }
 
@@ -142,6 +199,7 @@ impl ThresholdPlaintextAggregator {
             let state = match self.state.try_get()? {
                 ThresholdPlaintextAggregatorState::GeneratingC7Proof(state) => state,
                 ThresholdPlaintextAggregatorState::Complete(state) => GeneratingC7Proof {
+                    ciphertext_output: collecting.ciphertext_output.clone(),
                     threshold_m: collecting.threshold_m,
                     threshold_n: collecting.threshold_n,
                     shares: state.shares,
@@ -179,16 +237,26 @@ impl ThresholdPlaintextAggregator {
         }
         warn!(e3_id = %self.e3_id, "Rebuilding plaintext work with canonical C6 shares");
         let mut retained = BTreeMap::new();
-        let rejected = match self.state.try_get()? {
+        let (rejected, retained_decryptors) = match self.state.try_get()? {
             ThresholdPlaintextAggregatorState::Collecting(state) => {
                 for (party, share) in state.shares {
                     if let Some(proofs) = state.c6_proofs.get(&party) {
                         retained.insert(party, (share, proofs.clone()));
                     }
                 }
-                state.rejected_parties
+                (state.rejected_parties, state.expected_decryptors.clone())
             }
             ThresholdPlaintextAggregatorState::VerifyingC6(state) => {
+                let ids = state
+                    .shares
+                    .keys()
+                    .map(|party| {
+                        u32::try_from(*party)
+                            .ok()
+                            .and_then(|party| party.checked_add(1))
+                    })
+                    .collect::<Option<Vec<_>>>()
+                    .unwrap_or_default();
                 for (party, share) in state.shares {
                     if let Some(proofs) = state.c6_proofs.get(&party) {
                         retained.insert(party, (share, proofs.clone()));
@@ -199,9 +267,9 @@ impl ThresholdPlaintextAggregator {
                         .entry(party)
                         .or_insert((queued.share, queued.proofs));
                 }
-                state.rejected_parties
+                (state.rejected_parties, ids)
             }
-            _ => BTreeSet::new(),
+            _ => (BTreeSet::new(), Vec::new()),
         };
         self.state.stage();
         self.recovery.stage();
@@ -233,6 +301,7 @@ impl ThresholdPlaintextAggregator {
                         share.party_id,
                         share.decryption_share.clone(),
                         share.signed_decryption_proofs.clone(),
+                        &share.decryptors,
                         event.get_ctx(),
                     )?;
                 }
@@ -252,7 +321,7 @@ impl ThresholdPlaintextAggregator {
         })
         .await?;
         for (party, (shares, proofs)) in retained {
-            self.add_share(party, shares, proofs, &ec)?;
+            self.add_share(party, shares, proofs, &retained_decryptors, &ec)?;
         }
         // Historical event contexts precede the snapshot watermark. Save the repaired values
         // without those contexts before the actor starts receiving the replay suffix.

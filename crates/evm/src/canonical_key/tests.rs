@@ -18,13 +18,13 @@ fn proof_observation(
     nodes: Vec<Address>,
     commitment: [u8; 32],
 ) -> e3_events::EvmLogObserved {
-    let mut inputs = vec![B256::ZERO; 12];
+    let mut inputs = vec![B256::ZERO; 16];
     inputs[3] = B256::from(U256::from(2).to_be_bytes::<32>());
     inputs[7] = B256::repeat_byte(3);
     inputs[8] = B256::repeat_byte(4);
-    inputs[9] = B256::repeat_byte(5);
-    inputs[10] = B256::repeat_byte(6);
-    inputs[11] = commitment.into();
+    inputs[9] = commitment.into();
+    inputs[10..13].fill(B256::repeat_byte(5));
+    inputs[13..16].fill(B256::repeat_byte(6));
     let log = ICiphernodeRegistry::CommitteeProofPublished {
         e3Id: id.clone().try_into().unwrap(),
         nodes,
@@ -122,7 +122,13 @@ async fn confirmed_observations_admit_publications_in_either_order() -> Result<(
         assert_eq!(key.committee, nodes);
         assert_eq!(key.honest_committee, vec![nodes[0], nodes[2]]);
         assert_eq!(key.sk_agg_commits, vec![[3; 32], [4; 32]]);
-        assert_eq!(key.esm_agg_commits, vec![[5; 32], [6; 32]]);
+        assert_eq!(
+            key.prf_key_commits,
+            [[5; 32]; 3]
+                .into_iter()
+                .chain([[6; 32]; 3])
+                .collect::<Vec<_>>()
+        );
         assert_eq!(keys.public_key(&id), Some(publication.pubkey.clone()));
         let mut mismatch = publication.clone();
         mismatch.pk_commitment = [7; 32];

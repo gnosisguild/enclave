@@ -10,13 +10,16 @@
 //! encrypts a message, computes T+1 decryption shares, and decrypts to obtain the message.
 //! The result is used as inputs for computation and codegen.
 
-use e3_fhe_params::{create_deterministic_crp_from_default_seed, BfvPreset};
+use e3_fhe_params::{
+    create_deterministic_crp_from_default_seed, generate_smudging_error,
+    smudging_noise_from_signed_coefficients, BfvPreset,
+};
 use e3_zk_config::threshold::decrypted_shares_aggregation::Configs;
 use e3_zk_witness::threshold::decrypted_shares_aggregation::DecryptedSharesAggregationCircuitData;
 use e3_zk_witness::WitnessError;
 use fhe::bfv::{Encoding, Plaintext, PublicKey, SecretKey};
 use fhe::mbfv::{AggregateIter, PublicKeyShare};
-use fhe::trbfv::ShareManager;
+use fhe::trbfv::{PartyPrfKeyTransport, PartyPrfKeys, ShareManager, SynchronizedDecryptor};
 use fhe_math::rq::{Poly, PowerBasis};
 use fhe_traits::FheDecoder;
 use fhe_traits::{FheEncoder, FheEncrypter};
@@ -25,22 +28,44 @@ use std::sync::Arc;
 
 struct Party {
     sk_sss: Vec<Array2<u64>>,
-    esi_sss: Vec<Array2<u64>>,
 }
 
 /// Generates sample data for the decrypted shares aggregation circuit:
-/// TRBFV setup, parties with sk/pk shares and smudging error shares, share collection
-/// and aggregation, encryption of a message, T+1 decryption shares, and threshold decrypt.
+/// TRBFV setup, parties with sk/pk shares, share collection and aggregation, encryption of a
+/// message, T+1 synchronized decryption shares, and threshold decrypt.
 pub fn generate(
     config: &Configs,
     preset: BfvPreset,
 ) -> Result<DecryptedSharesAggregationCircuitData, WitnessError> {
+    generate_correlated(config, preset).map(|(data, _)| data)
+}
+
+/// Retain the exact per-party C6 inputs for cross-language and recursive-link tests.
+pub fn generate_correlated(
+    config: &Configs,
+    preset: BfvPreset,
+) -> Result<
+    (
+        DecryptedSharesAggregationCircuitData,
+        Vec<e3_zk_witness::threshold::share_decryption::ShareDecryptionCircuitData>,
+    ),
+    WitnessError,
+> {
+    use e3_polynomial::CrtPolynomial;
+    use e3_polynomial_fhe::FromFhePolynomial;
+    use e3_zk_witness::threshold::share_decryption::ShareDecryptionCircuitData;
     let threshold_params = &config.params;
     let committee = config.committee.values();
 
     let sd = preset
         .search_defaults()
         .ok_or_else(|| WitnessError::Sample("Preset has no search defaults".into()))?;
+    // The paired presets are summation-only; multiplication is not in their noise model.
+    let (num_ciphertexts, mult_depth) = (
+        usize::try_from(sd.z).map_err(|e| WitnessError::Sample(e.to_string()))?,
+        0,
+    );
+    let lambda = preset.metadata().lambda;
     let num_parties = committee.n;
     let threshold = committee.threshold;
     let degree = threshold_params.degree();
@@ -51,12 +76,6 @@ pub fn generate(
         ));
     }
     let mut share_manager = ShareManager::new(num_parties, threshold, threshold_params.clone())?;
-    let noise = crate::smudging::generator(
-        threshold_params,
-        num_parties,
-        usize::try_from(sd.z).map_err(|e| WitnessError::Sample(e.to_string()))?,
-        preset,
-    )?;
     let mut rng = rand::rng();
 
     let crp = create_deterministic_crp_from_default_seed(threshold_params);
@@ -81,20 +100,8 @@ pub fn generate(
                     WitnessError::Sample(format!("Failed to generate secret shares: {:?}", e))
                 })?;
 
-            let esi_coeffs = noise.generate_smudging_error(&mut rng).map_err(|e| {
-                WitnessError::Sample(format!("Failed to generate smudging error: {:?}", e))
-            })?;
-            let esi_poly = share_manager.bigints_to_poly(&esi_coeffs).map_err(|e| {
-                WitnessError::Sample(format!("Failed to convert error to poly: {:?}", e))
-            })?;
-            let esi_sss = share_manager
-                .generate_secret_shares_from_poly(esi_poly, &mut rng)
-                .map_err(|e| {
-                    WitnessError::Sample(format!("Failed to generate error shares: {:?}", e))
-                })?;
-
             pk_shares.push(pk_share);
-            Ok(Party { sk_sss, esi_sss })
+            Ok(Party { sk_sss })
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -119,43 +126,91 @@ pub fn generate(
 
     let ciphertext = Arc::new(ciphertext);
 
-    // Decryption shares from T+1 parties (1-based party IDs)
+    // Synchronized decryption shares from T+1 parties (1-based party IDs).
     let reconstructing_count = threshold + 1;
-    let mut d_share_polys: Vec<Poly<PowerBasis>> = Vec::with_capacity(reconstructing_count);
+    let decryptor_ids: Vec<usize> = (1..=reconstructing_count).collect();
+    let decryptor = SynchronizedDecryptor::new(num_parties, threshold, threshold_params.clone())?;
+    let mut decryption_shares = Vec::with_capacity(reconstructing_count);
+    let mut c6_samples = Vec::with_capacity(reconstructing_count);
 
     for receiver in 0..reconstructing_count {
+        let party_id = receiver + 1;
         // Keep every dealer contribution, but only collect the recipients used for reconstruction.
         // Each temporary contribution set is dropped after aggregation.
-        let sk_poly_sum = share_manager.aggregate_collected_shares(
+        let sk_poly_sum: Poly<PowerBasis> = share_manager.aggregate_collected_shares(
             &parties
                 .iter()
                 .map(|party| super::receiver_shares(&party.sk_sss, receiver, threshold_params))
                 .collect::<Vec<_>>(),
         )?;
-        let es_poly_sum = share_manager.aggregate_collected_shares(
-            &parties
-                .iter()
-                .map(|party| super::receiver_shares(&party.esi_sss, receiver, threshold_params))
-                .collect::<Vec<_>>(),
-        )?;
-        let d_share = share_manager
-            .decryption_share(Arc::clone(&ciphertext), sk_poly_sum.into_ntt(), es_poly_sum)
+        let prf_keys = sample_prf_keys(party_id, num_parties)?;
+        let coeffs = generate_smudging_error(
+            threshold_params.clone(),
+            num_parties,
+            num_ciphertexts,
+            mult_depth,
+            lambda,
+            &mut rng,
+        )
+        .map_err(|e| WitnessError::Sample(format!("Failed to generate smudging error: {:?}", e)))?;
+        let noise = smudging_noise_from_signed_coefficients(
+            threshold_params.clone(),
+            num_parties,
+            num_ciphertexts,
+            mult_depth,
+            lambda,
+            &coeffs,
+        )
+        .map_err(|e| WitnessError::Sample(format!("Failed to wrap smudging noise: {:?}", e)))?;
+        let share = decryptor
+            .decryption_share(
+                &ciphertext,
+                &sk_poly_sum.clone().into_ntt(),
+                party_id,
+                &decryptor_ids,
+                noise,
+                &prf_keys,
+            )
             .map_err(|e| {
                 WitnessError::Sample(format!("Failed to compute decryption share: {:?}", e))
             })?;
-        d_share_polys.push(d_share);
+        let transport = prf_keys.into_transport();
+        c6_samples.push(ShareDecryptionCircuitData {
+            ciphertext: (*ciphertext).clone(),
+            public_key: public_key.clone(),
+            s: CrtPolynomial::from_fhe_polynomial(&sk_poly_sum),
+            e: CrtPolynomial::from_mod_q_polynomial(&coeffs, threshold_params.moduli()),
+            e_signed: coeffs,
+            d_share: CrtPolynomial::from_fhe_polynomial(&share.clone().into_parts().0),
+            domain_hi: 1,
+            domain_lo: 2,
+            committee: committee.clone(),
+            party_idx: receiver as u32,
+            decryptors: decryptor_ids.iter().map(|id| *id as u32).collect(),
+            outgoing_prf_keys: transport
+                .keys_i_j()
+                .iter()
+                .map(|key| key.to_vec())
+                .collect(),
+            incoming_prf_keys: transport
+                .keys_j_i()
+                .iter()
+                .map(|key| key.to_vec())
+                .collect(),
+        });
+        decryption_shares.push(share);
     }
 
-    let reconstructing_parties: Vec<usize> = (1..=reconstructing_count).collect();
+    let reconstructing_parties: Vec<usize> = decryptor_ids.clone();
 
     // Threshold decrypt to obtain message (verify)
-    let plaintext = share_manager
-        .decrypt_from_shares(
-            d_share_polys.clone(),
-            reconstructing_parties.clone(),
-            Arc::clone(&ciphertext),
-        )
+    let plaintext = decryptor
+        .decrypt_from_shares(&decryption_shares, &ciphertext)
         .map_err(|e| WitnessError::Sample(format!("Failed to decrypt from shares: {:?}", e)))?;
+    let d_share_polys: Vec<Poly<PowerBasis>> = decryption_shares
+        .into_iter()
+        .map(|share| share.into_parts().0)
+        .collect();
 
     let message_vec = Vec::<u64>::try_decode(&plaintext, Encoding::poly())
         .map_err(|e| WitnessError::Sample(format!("Failed to decode plaintext: {:?}", e)))?;
@@ -165,11 +220,37 @@ pub fn generate(
         ));
     }
 
-    Ok(DecryptedSharesAggregationCircuitData {
-        d_share_polys,
-        reconstructing_parties,
-        message_vec,
-    })
+    Ok((
+        DecryptedSharesAggregationCircuitData {
+            ct0: ciphertext[0].clone().into_power_basis(),
+            d_share_polys,
+            reconstructing_parties,
+            message_vec,
+        },
+        c6_samples,
+    ))
+}
+
+fn sample_prf_keys(party_id: usize, committee_size: usize) -> Result<PartyPrfKeys, WitnessError> {
+    let directed = |from: usize, to: usize| {
+        let mut key = [0u8; 32];
+        key[0] = u8::try_from(from).unwrap_or(255);
+        key[1] = u8::try_from(to).unwrap_or(255);
+        key[2] = 1;
+        key
+    };
+    let keys_i_j = (1..=committee_size)
+        .map(|peer| directed(party_id, peer))
+        .collect();
+    let keys_j_i = (1..=committee_size)
+        .map(|peer| directed(peer, party_id))
+        .collect();
+    Ok(PartyPrfKeys::from_transport(PartyPrfKeyTransport::new(
+        party_id,
+        committee_size,
+        keys_i_j,
+        keys_j_i,
+    )?)?)
 }
 
 #[cfg(test)]

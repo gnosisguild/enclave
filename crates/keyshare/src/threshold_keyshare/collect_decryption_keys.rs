@@ -163,12 +163,10 @@ mod tests {
 
     fn share(party_id: u64) -> DecryptionKeyShared {
         DecryptionKeyShared {
-            signature: Default::default(),
             e3_id: E3id::new("1", 1),
             party_id,
             node: String::new(),
             signed_sk_decryption_proof: proof(),
-            signed_e_sm_decryption_proofs: Vec::new(),
             external: false,
         }
     }

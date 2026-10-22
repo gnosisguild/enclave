@@ -15,10 +15,11 @@ use e3_data::Repositories;
 use e3_events::{
     BusHandle, ComputeRequest, ComputeRequestError, ComputeResponse, ComputeResponseKind,
     CorrelationId, DKGInnerProofReady, DKGRecursiveAggregationComplete, DkgFoldAttestationContext,
-    DkgFoldAttestationContextEstablished, DkgFoldAttestationPayload, E3StageChanged, E3id,
-    EventContext, EventPublisher, EventSubscriber, EventType, InterfoldEvent, InterfoldEventData,
-    Proof, Sequenced, SignedDkgFoldAttestation, ThresholdSharePending, TypedEvent, ZkRequest,
-    ZkResponse, DKG_FOLD_ATTESTATION_CONTEXT_SCHEMA_VERSION,
+    DkgFoldAttestationContextEstablished, DkgFoldAttestationPayload, E3Failed, E3Stage,
+    E3StageChanged, E3id, EventContext, EventPublisher, EventSubscriber, EventType, FailureReason,
+    InterfoldEvent, InterfoldEventData, Proof, Sequenced, SignedDkgFoldAttestation,
+    ThresholdSharePending, TypedEvent, ZkRequest, ZkResponse,
+    DKG_FOLD_ATTESTATION_CONTEXT_SCHEMA_VERSION,
 };
 use e3_fhe_params::build_pair_for_preset;
 use tracing::{debug, error, info, warn};
@@ -257,9 +258,7 @@ mod tests {
                     party_id: 7,
                     total_expected: 0,
                     sk_enc_count: 0,
-                    e_sm_enc_count: 0,
                     sk_share_encryption_requests: Vec::new(),
-                    e_sm_share_encryption_requests: Vec::new(),
                     committee_n: 0,
                     committee_h: 0,
                     n_moduli: 0,
@@ -285,13 +284,9 @@ mod tests {
                 c0_proof: dummy_proof(1),
                 c1_proof: dummy_proof(2),
                 c2a_proof: dummy_proof(3),
-                c2b_proof: dummy_proof(4),
                 c3a_inner_proofs: Vec::new(),
-                c3b_inner_proofs: Vec::new(),
                 c4a_proof: dummy_proof(5),
-                c4b_proof: dummy_proof(6),
                 c3_slot_indices_a: Vec::new(),
-                c3_slot_indices_b: Vec::new(),
                 c3_total_slots: 0,
                 party_id: 7,
                 params_preset: e3_fhe_params::BfvPreset::InsecureThreshold64,
@@ -349,9 +344,7 @@ mod tests {
                     party_id: 1,
                     total_expected: 0,
                     sk_enc_count: 0,
-                    e_sm_enc_count: 0,
                     sk_share_encryption_requests: Vec::new(),
-                    e_sm_share_encryption_requests: Vec::new(),
                     committee_n: 3,
                     committee_h: 2,
                     n_moduli: 1,
@@ -445,11 +438,9 @@ mod tests {
             e3_id.clone(),
             NodeDkgFoldMeta {
                 party_id: 7,
-                total_expected: 6,
+                total_expected: 4,
                 sk_enc_count: 0,
-                e_sm_enc_count: 0,
                 sk_share_encryption_requests: Vec::new(),
-                e_sm_share_encryption_requests: Vec::new(),
                 committee_n: 0,
                 committee_h: 0,
                 n_moduli: 0,
@@ -473,7 +464,7 @@ mod tests {
             Some(1)
         );
 
-        for seq in 1..6 {
+        for seq in 1..4 {
             let proof = dummy_proof((10 + seq) as u8);
             aggregator.handle_inner_proof_ready(TypedEvent::new(
                 DKGInnerProofReady {
@@ -536,11 +527,9 @@ mod tests {
 
         let meta = NodeDkgFoldMeta {
             party_id: 7,
-            total_expected: 6,
+            total_expected: 4,
             sk_enc_count: 0,
-            e_sm_enc_count: 0,
             sk_share_encryption_requests: Vec::new(),
-            e_sm_share_encryption_requests: Vec::new(),
             committee_n: 3,
             committee_h: 2,
             n_moduli: 1,
@@ -572,11 +561,9 @@ mod tests {
         });
         let meta = NodeDkgFoldMeta {
             party_id: 7,
-            total_expected: 6,
+            total_expected: 4,
             sk_enc_count: 0,
-            e_sm_enc_count: 0,
             sk_share_encryption_requests: Vec::new(),
-            e_sm_share_encryption_requests: Vec::new(),
             committee_n: 3,
             committee_h: 2,
             n_moduli: 1,
@@ -656,9 +643,7 @@ mod tests {
             party_id: 7,
             total_expected: 1,
             sk_enc_count: 0,
-            e_sm_enc_count: 0,
             sk_share_encryption_requests: Vec::new(),
-            e_sm_share_encryption_requests: Vec::new(),
             committee_n: 3,
             committee_h: 2,
             n_moduli: 1,

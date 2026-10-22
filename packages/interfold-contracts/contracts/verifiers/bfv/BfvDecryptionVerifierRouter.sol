@@ -48,8 +48,12 @@ contract BfvDecryptionVerifierRouter is IDecryptionVerifier {
             routes.push(
                 Route({
                     verifier: route,
-                    // BfvDecryptionVerifier: 7 + 1 + 3 * (T + 1) + 50 message coefficients.
-                    expectedPublicInputsLen: 61 + (3 * routeThreshold),
+                    // Message prefix plus outgoing/incoming full-N rows for every decryptor.
+                    expectedPublicInputsLen: 61 +
+                        (3 * routeThreshold) +
+                        2 *
+                        (routeThreshold + 1) *
+                        (2 * routeThreshold + 1),
                     expectedC6FoldKeyHash: route.expectedC6FoldKeyHash(),
                     expectedC7KeyHash: route.expectedC7KeyHash()
                 })

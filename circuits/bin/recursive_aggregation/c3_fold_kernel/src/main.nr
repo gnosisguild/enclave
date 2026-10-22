@@ -16,12 +16,12 @@ use lib::configs::default::N_PARTIES;
 
 pub global C3_SLOTS: u32 = N_PARTIES * L_THRESHOLD;
 
-pub global C3_FOLD_PUBLIC_LEN: u32 = 5 + (3 * C3_SLOTS);
+pub global C3_FOLD_PUBLIC_LEN: u32 = 5 + (4 * C3_SLOTS);
 
 fn main(
     inner_vk: UltraHonkVerificationKey,
     inner_proof: UltraHonkZKProof,
-    c3_public_inputs: [Field; 3],
+    c3_public_inputs: [Field; 6],
     acc_vk: UltraHonkVerificationKey,
     acc_proof: UltraHonkProof,
     acc_public_inputs: [Field; C3_FOLD_PUBLIC_LEN],
@@ -30,8 +30,10 @@ fn main(
     kernel_key_hash: pub Field,
     is_first_step: pub bool,
     slot_index: pub u32,
-) -> pub ([Field; C3_SLOTS], [Field; C3_SLOTS], [Field; C3_SLOTS]) {
+) -> pub ([Field; C3_SLOTS], [Field; C3_SLOTS], [Field; C3_SLOTS], [Field; C3_SLOTS]) {
     assert(slot_index < C3_SLOTS);
+    assert(c3_public_inputs[2] == (slot_index / L_THRESHOLD) as Field);
+    assert(c3_public_inputs[3] == (slot_index % L_THRESHOLD) as Field);
 
     verify_honk_proof(inner_vk, inner_proof, c3_public_inputs, inner_key_hash);
 
@@ -42,11 +44,13 @@ fn main(
 
     let pk_new = c3_public_inputs[0];
     let msg_new = c3_public_inputs[1];
-    let ct_new = c3_public_inputs[2];
+    let ct_new = c3_public_inputs[5];
+    let key_new = c3_public_inputs[4];
 
     let mut out_pk: [Field; C3_SLOTS] = [0; C3_SLOTS];
     let mut out_msg: [Field; C3_SLOTS] = [0; C3_SLOTS];
     let mut out_ct: [Field; C3_SLOTS] = [0; C3_SLOTS];
+    let mut out_keys: [Field; C3_SLOTS] = [0; C3_SLOTS];
 
     for i in 0..C3_SLOTS {
         let idx = i as u32;
@@ -54,6 +58,7 @@ fn main(
             out_pk[i] = pk_new;
             out_msg[i] = msg_new;
             out_ct[i] = ct_new;
+            out_keys[i] = key_new;
         } else {
             out_pk[i] = 0;
             out_msg[i] = 0;
@@ -61,5 +66,5 @@ fn main(
         }
     }
 
-    (out_pk, out_msg, out_ct)
+    (out_pk, out_msg, out_ct, out_keys)
 }

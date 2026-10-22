@@ -12,7 +12,7 @@ use e3_events::{CircuitName, DkgFoldAggCommits, Proof};
 
 /// Total public field count for `node_fold` at committee size `n`, honest `h`, threshold moduli `l`.
 pub fn node_fold_public_field_count(n: usize, h: usize, l: usize) -> usize {
-    11 + n + 2 * (n + h) * l
+    10 + 2 * n + h + (n + h) * l
 }
 
 fn field_hex_to_bytes32(field: &str) -> Result<[u8; 32], ZkError> {
@@ -59,13 +59,18 @@ pub fn extract_node_fold_agg_commits(
         )));
     }
     let party_id = field_hex_to_u64(&fields[0])?;
-    let sk_agg_commit = field_hex_to_bytes32(&fields[fields.len() - 2])?;
-    let esm_agg_commit = field_hex_to_bytes32(&fields[fields.len() - 1])?;
+    let sk_index = 9 + committee_n + (committee_n + committee_h) * n_moduli;
+    let sk_agg_commit = field_hex_to_bytes32(&fields[sk_index])?;
+    let row = fields[sk_index + 1..sk_index + 1 + committee_n]
+        .iter()
+        .map(|field| field_hex_to_bytes32(field))
+        .collect::<Result<Vec<_>, _>>()?;
+    let prf_key_commits_hash = alloy::primitives::keccak256(row.concat()).into();
     Ok((
         party_id,
         DkgFoldAggCommits {
             sk_agg_commit,
-            esm_agg_commit,
+            prf_key_commits_hash,
         },
     ))
 }
@@ -86,8 +91,9 @@ mod tests {
 
         let mut fields = vec![[0u8; 32]; field_count];
         fields[0][31] = 2; // party_id = 2
-        fields[field_count - 2] = [0x11; 32];
-        fields[field_count - 1] = [0x22; 32];
+        let sk_index = 9 + n + (n + h) * l;
+        fields[sk_index] = [0x11; 32];
+        fields[sk_index + 1..sk_index + 1 + n].fill([0x22; 32]);
 
         let mut public_signals = Vec::with_capacity(field_count * 32);
         for f in fields {
@@ -104,6 +110,9 @@ mod tests {
             extract_node_fold_agg_commits(&proof, n, h, l).expect("extract should succeed");
         assert_eq!(party_id, 2);
         assert_eq!(commits.sk_agg_commit, [0x11; 32]);
-        assert_eq!(commits.esm_agg_commit, [0x22; 32]);
+        assert_eq!(
+            commits.prf_key_commits_hash,
+            <[u8; 32]>::from(alloy::primitives::keccak256(vec![0x22; 32 * n]))
+        );
     }
 }

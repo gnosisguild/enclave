@@ -6,18 +6,15 @@
 
 //! Sample data generation for pk generation circuit.
 //!
-//! The sample contains one public-key share and its matching secret and smudging material.
+//! The sample contains one public-key share and its matching secret and error material.
 
 use e3_fhe_params::create_deterministic_crp_from_default_seed;
-use e3_polynomial::{CrtPolynomial, Polynomial};
+use e3_polynomial::CrtPolynomial;
 use e3_polynomial_fhe::FromFhePolynomial as _;
 use e3_zk_config::threshold::pk_generation::Configs;
 use e3_zk_witness::{threshold::pk_generation::PkGenerationCircuitData, WitnessError};
+use fhe::bfv::SecretKey;
 use fhe::mbfv::PublicKeyShare;
-use fhe::{
-    bfv::SecretKey,
-    trbfv::{smudging::SmudgingNoiseGenerator, ShareManager},
-};
 
 pub fn generate(config: &Configs) -> Result<PkGenerationCircuitData, WitnessError> {
     let threshold_params = &config.params;
@@ -31,19 +28,9 @@ pub fn generate(config: &Configs) -> Result<PkGenerationCircuitData, WitnessErro
             WitnessError::Sample(format!("Failed to create public key share: {:?}", e))
         })?;
 
-    let committee = config.committee.values();
-    let share_manager =
-        ShareManager::new(committee.n, committee.threshold, threshold_params.clone())?;
-    // C1 supplies the same additive, all-N-participant bound as the sample noise setup.
-    let noise =
-        SmudgingNoiseGenerator::new(threshold_params.clone(), config.bounds.e_sm_bound.clone());
-    let e_sm = share_manager.bigints_to_poly(&noise.generate_smudging_error(&mut rng)?)?;
-
     Ok(PkGenerationCircuitData {
         pk0_share: CrtPolynomial::from_fhe_polynomial(pk_share.p0_share()),
         eek: CrtPolynomial::from_fhe_polynomial(intermediates.error()),
-        e_sm: CrtPolynomial::from_fhe_polynomial(&*e_sm),
-        e_sm_lifted: Polynomial::from_fhe_polynomial(&*e_sm),
         sk: CrtPolynomial::from_fhe_polynomial(intermediates.secret_key()),
     })
 }
@@ -70,14 +57,7 @@ mod tests {
 
             let num_moduli = config.params.moduli().len();
             assert_eq!(inputs.pk0is.limbs.len(), num_moduli);
-            assert_eq!(inputs.e_sm.limbs.len(), num_moduli);
             assert_eq!(inputs.ris.limbs.len(), num_moduli);
-            for coefficient in inputs.e_sm_lifted.coefficients() {
-                assert!(
-                    coefficient.abs() <= BigInt::from(bounds.e_sm_bound.clone()),
-                    "lifted smudging error exceeds the C1 bound"
-                );
-            }
             for coefficient in inputs.eek.coefficients() {
                 assert!(
                     coefficient.abs() <= BigInt::from(bounds.eek_bound.clone()),
@@ -89,14 +69,6 @@ mod tests {
                     coefficient.abs() <= BigInt::from(bounds.sk_bound.clone()),
                     "secret key exceeds the C1 bound"
                 );
-            }
-            for limb in &inputs.e_sm.limbs {
-                for coefficient in limb.coefficients() {
-                    assert!(
-                        coefficient.abs() <= BigInt::from(bounds.e_sm_bound.clone()),
-                        "smudging error exceeds the C1 bound"
-                    );
-                }
             }
             // One quotient replaces the `r1` / `r2` pair now that the identity is checked reduced
             // modulo X^N + 1. This is the check that would catch a bound derived from the wrong terms:

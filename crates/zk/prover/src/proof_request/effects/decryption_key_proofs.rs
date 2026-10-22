@@ -23,7 +23,6 @@ impl ProofRequestActor {
         };
         let (msg, ec) = msg.into_components();
         let e3_id = msg.e3_id.clone();
-        let esm_count = msg.esm_requests.len();
 
         if self.pending_decryption.contains_key(&e3_id) {
             warn!(
@@ -40,15 +39,13 @@ impl ProofRequestActor {
                 node: msg.node,
                 ec: ec.clone(),
                 sk_proof: None,
-                esm_proofs: HashMap::new(),
-                expected_esm_count: esm_count,
             },
         );
 
-        // C4a/C4b: dispatch share-decryption proof requests in canonical seq
+        // C4a: dispatch the share-decryption proof request in canonical seq
         // order. The pure domain planner owns seq assignment; the actor only
         // allocates correlation ids, publishes, and rolls back on failure.
-        for item in plan_decryption_dispatch(msg.sk_request, msg.esm_requests, c4_base_seq) {
+        for item in plan_decryption_dispatch(msg.sk_request, c4_base_seq) {
             let corr = CorrelationId::new();
             self.decryption_correlation
                 .insert(corr, (e3_id.clone(), item.kind, item.seq));
@@ -89,13 +86,6 @@ impl ProofRequestActor {
             DecryptionProofKind::SecretKey => {
                 info!("Received C4a SK decryption proof for E3 {}", e3_id);
                 pending.sk_proof = Some(proof);
-            }
-            DecryptionProofKind::SmudgingNoise { esi_idx } => {
-                info!(
-                    "Received C4b ESM decryption proof [{}] for E3 {}",
-                    esi_idx, e3_id
-                );
-                pending.esm_proofs.insert(esi_idx, proof);
             }
         }
 
@@ -146,25 +136,6 @@ impl ProofRequestActor {
             return false;
         };
 
-        // Sign C4b (ESM decryption proofs) in esi_idx order
-        let mut signed_esms = Vec::with_capacity(pending.expected_esm_count);
-        for idx in 0..pending.expected_esm_count {
-            let proof = pending
-                .esm_proofs
-                .get(&idx)
-                .expect("checked in is_complete")
-                .clone();
-            let Some(signed) = self.sign_proof(e3_id, ProofType::C4bESmShareDecryption, proof)
-            else {
-                error!(
-                    "Failed to sign the local C4b proof [{}]; pending work is preserved",
-                    idx
-                );
-                return false;
-            };
-            signed_esms.push(signed);
-        }
-
         info!(
             "All C4 proofs signed for E3 {} party {} (signer: {})",
             e3_id,
@@ -172,23 +143,16 @@ impl ProofRequestActor {
             self.signer.address()
         );
 
-        let message = DecryptionKeyShared {
-            signature: ArcBytes::default(),
-            e3_id: e3_id.clone(),
-            party_id: pending.party_id,
-            node: pending.node,
-            signed_sk_decryption_proof: signed_sk,
-            signed_e_sm_decryption_proofs: signed_esms,
-            external: false,
-        };
-        let message = match message.sign(&self.signer) {
-            Ok(message) => message,
-            Err(err) => {
-                error!("Failed to sign decryption key share: {err}");
-                return false;
-            }
-        };
-        if let Err(err) = self.bus.publish(message, pending.ec) {
+        if let Err(err) = self.bus.publish(
+            DecryptionKeyShared {
+                e3_id: e3_id.clone(),
+                party_id: pending.party_id,
+                node: pending.node,
+                signed_sk_decryption_proof: signed_sk,
+                external: false,
+            },
+            pending.ec,
+        ) {
             error!("Failed to publish DecryptionKeyShared: {err}");
         }
 

@@ -5,7 +5,10 @@
 // or FITNESS FOR A PARTICULAR PURPOSE.
 import { expect } from "chai";
 
-import { bfvDecExpectedPublicInputsLen } from "../scripts/utils";
+import {
+  bfvDecExpectedPublicInputsLen,
+  bfvPkExpectedPublicInputsLen,
+} from "../scripts/utils";
 import { ethers } from "./fixtures/connection";
 
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
@@ -65,7 +68,9 @@ describe("BFV verifier routers", function () {
       ],
       10,
     ]);
-    const smallProof = proofWithAnchors(36, HASH_C, HASH_D);
+    const smallLen = bfvPkExpectedPublicInputsLen(10, sortedNodes.length);
+    const minimumLen = bfvPkExpectedPublicInputsLen(2, sortedNodes.length);
+    const smallProof = proofWithAnchors(smallLen, HASH_C, HASH_D);
     // The selected route rejects any call other than this exact forwarding.
     await small.expectCall(
       small.interface.encodeFunctionData("verify", [...context, smallProof]),
@@ -76,14 +81,18 @@ describe("BFV verifier routers", function () {
     expect(await router.h()).to.equal(10);
     expect(await router.routeCount()).to.equal(3);
     expect(await verify(smallProof)).to.equal(true);
-    expect(await verify(proofWithAnchors(36, HASH_A, HASH_B))).to.equal(false);
-    expect(await verify(proofWithAnchors(12, HASH_A, HASH_B))).to.equal(false);
+    expect(await verify(proofWithAnchors(smallLen, HASH_A, HASH_B))).to.equal(
+      false,
+    );
+    expect(await verify(proofWithAnchors(minimumLen, HASH_A, HASH_B))).to.equal(
+      false,
+    );
 
     await expect(
-      verify(proofWithAnchors(36, HASH_A, HASH_D)),
+      verify(proofWithAnchors(smallLen, HASH_A, HASH_D)),
     ).to.be.revertedWithCustomError(router, "VkHashMismatch");
     await expect(
-      verify(proofWithAnchors(36, HASH_C, HASH_A)),
+      verify(proofWithAnchors(smallLen, HASH_C, HASH_A)),
     ).to.be.revertedWithCustomError(router, "VkHashMismatch");
     await expect(
       verify(proofWithAnchors(13, HASH_A, HASH_B)),

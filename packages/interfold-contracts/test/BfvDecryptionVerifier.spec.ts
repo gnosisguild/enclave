@@ -49,11 +49,14 @@ const COMMITTEE_HASH_LO_IDX = 3;
 const DECRYPTION_DOMAIN_HI_IDX = 4;
 const DECRYPTION_DOMAIN_LO_IDX = 5;
 
-/** `party_ids`/`expected_sk`/`expected_esm` column start indices for `THRESHOLD`. */
+/** Party, SK and c0 columns followed by the message and directed-key grids. */
 const {
   partyId: PARTY_ID_COL_OFFSET,
   sk: SK_COL_OFFSET,
-  esm: ESM_COL_OFFSET,
+  c0: C0_COL_OFFSET,
+  message: MESSAGE_OFFSET,
+  outgoingKeys: OUTGOING_KEYS_OFFSET,
+  incomingKeys: INCOMING_KEYS_OFFSET,
 } = bfvDecPartyColOffsets(THRESHOLD);
 
 /**
@@ -70,8 +73,12 @@ const DEFAULT_CIRCUIT_PARTY_IDS = DEFAULT_REGISTRY_PARTY_IDS.map(
 const DEFAULT_SK_COMMITS = DEFAULT_REGISTRY_PARTY_IDS.map((id) =>
   fieldHash(`sk-${id}`),
 );
-const DEFAULT_ESM_COMMITS = DEFAULT_REGISTRY_PARTY_IDS.map((id) =>
-  fieldHash(`esm-${id}`),
+const DEFAULT_C0_COMMITS = DEFAULT_REGISTRY_PARTY_IDS.map(() =>
+  fieldHash("c0"),
+);
+const N = 2 * THRESHOLD + 1;
+const DEFAULT_PRF_KEYS = DEFAULT_REGISTRY_PARTY_IDS.flatMap((sender) =>
+  Array.from({ length: N }, (_, peer) => fieldHash(`prf-${sender}-${peer}`)),
 );
 
 function committeeHashHi(committeeHash: string): string {
@@ -93,12 +100,12 @@ function buildPublicInputsWithMessage(
     EXPECTED_C7_KEY_HASH,
   ],
   committeeHash = ethers.ZeroHash,
-  // Circuit-side (1-indexed) party_ids and their sk/esm commitments. Defaults
+  // Circuit-side one-based party IDs and their SK/c0 commitments. Defaults
   // match `DEFAULT_REGISTRY_PARTY_IDS`'s anchors as configured by `deployWithMockCircuit`,
   // so tests unrelated to DKG-anchor binding pass that check transparently.
   partyIds: bigint[] = DEFAULT_CIRCUIT_PARTY_IDS.map(BigInt),
   skCommits: string[] = DEFAULT_SK_COMMITS,
-  esmCommits: string[] = DEFAULT_ESM_COMMITS,
+  c0Commits: string[] = DEFAULT_C0_COMMITS,
   decryptionDomain = DECRYPTION_DOMAIN,
 ): string[] {
   const arr: string[] = new Array(totalInputs);
@@ -117,12 +124,25 @@ function buildPublicInputsWithMessage(
   for (let i = 0; i < skCommits.length; i++) {
     arr[SK_COL_OFFSET + i] = skCommits[i];
   }
-  for (let i = 0; i < esmCommits.length; i++) {
-    arr[ESM_COL_OFFSET + i] = esmCommits[i];
+  for (let i = 0; i < c0Commits.length; i++) {
+    arr[C0_COL_OFFSET + i] = c0Commits[i];
+  }
+  for (let owner = 0; owner < partyIds.length; ++owner) {
+    for (let peer = 0; peer < N; ++peer) {
+      const id = Number(partyIds[owner]) - 1;
+      if (OUTGOING_KEYS_OFFSET + owner * N + peer < totalInputs)
+        arr[OUTGOING_KEYS_OFFSET + owner * N + peer] = fieldHash(
+          `prf-${id}-${peer}`,
+        );
+      if (INCOMING_KEYS_OFFSET + owner * N + peer < totalInputs)
+        arr[INCOMING_KEYS_OFFSET + owner * N + peer] = fieldHash(
+          `prf-${peer}-${id}`,
+        );
+    }
   }
   arr[DECRYPTION_DOMAIN_HI_IDX] = committeeHashHi(decryptionDomain);
   arr[DECRYPTION_DOMAIN_LO_IDX] = committeeHashLo(decryptionDomain);
-  const offset = totalInputs - MESSAGE_COEFFS_COUNT;
+  const offset = MESSAGE_OFFSET;
   for (let i = 0; i < messageCoeffs.length && i < MESSAGE_COEFFS_COUNT; i++) {
     arr[offset + i] = "0x" + messageCoeffs[i].toString(16).padStart(64, "0");
   }
@@ -173,8 +193,9 @@ describe("BfvDecryptionVerifier", function () {
       E3_ID,
       DEFAULT_REGISTRY_PARTY_IDS,
       DEFAULT_SK_COMMITS,
-      DEFAULT_ESM_COMMITS,
+      [],
     );
+    await registry.setDkgPrfKeyCommitments(E3_ID, DEFAULT_PRF_KEYS);
 
     const bfvDecryptionVerifier = await (
       await ethers.getContractFactory("BfvDecryptionVerifier")
@@ -340,7 +361,7 @@ describe("BfvDecryptionVerifier", function () {
         deployWithMockCircuit,
       );
       const { decryptionDomain } = ctx();
-      const messageOffset = EXPECTED_PUBLIC_INPUTS_LEN - MESSAGE_COEFFS_COUNT;
+      const messageOffset = MESSAGE_OFFSET;
       const verifyAlias = (alias: bigint) => {
         const publicInputs = buildPublicInputsWithMessage([]);
         publicInputs[messageOffset] = ethers.toBeHex(alias, 32);
@@ -653,7 +674,7 @@ describe("BfvDecryptionVerifier", function () {
         ethers.ZeroHash,
         DEFAULT_CIRCUIT_PARTY_IDS.map(BigInt),
         forgedSkCommits,
-        DEFAULT_ESM_COMMITS,
+        DEFAULT_C0_COMMITS,
       );
       const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
@@ -673,7 +694,7 @@ describe("BfvDecryptionVerifier", function () {
       );
     });
 
-    it("reverts DkgAnchorMismatch when a party's esm commitment doesn't match the stored DKG anchor", async function () {
+    it("reverts DkgAnchorMismatch when a directed PRF key does not match DKG", async function () {
       const { bfvDecryptionVerifier, mockCircuit } = await loadFixture(
         deployWithMockCircuit,
       );
@@ -681,10 +702,6 @@ describe("BfvDecryptionVerifier", function () {
       const { e3Id, decryptionDomain } = ctx();
 
       const messageCoeffs = [1n, 2n, 3n];
-      const forgedEsmCommits = [
-        DEFAULT_ESM_COMMITS[0],
-        fieldHash("forged-esm-1"),
-      ];
       const publicInputs = buildPublicInputsWithMessage(
         messageCoeffs,
         EXPECTED_PUBLIC_INPUTS_LEN,
@@ -692,8 +709,9 @@ describe("BfvDecryptionVerifier", function () {
         ethers.ZeroHash,
         DEFAULT_CIRCUIT_PARTY_IDS.map(BigInt),
         DEFAULT_SK_COMMITS,
-        forgedEsmCommits,
+        DEFAULT_C0_COMMITS,
       );
+      publicInputs[OUTGOING_KEYS_OFFSET + 1] = fieldHash("forged-prf-key");
       const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
 
@@ -733,7 +751,7 @@ describe("BfvDecryptionVerifier", function () {
         ethers.ZeroHash,
         unknownPartyIds,
         DEFAULT_SK_COMMITS,
-        DEFAULT_ESM_COMMITS,
+        DEFAULT_C0_COMMITS,
       );
       const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);
@@ -775,7 +793,7 @@ describe("BfvDecryptionVerifier", function () {
         ),
       ).to.be.revertedWithCustomError(
         bfvDecryptionVerifier,
-        "DkgAnchorNotFound",
+        "DkgAnchorMismatch",
       );
     });
 
@@ -798,7 +816,7 @@ describe("BfvDecryptionVerifier", function () {
         ethers.ZeroHash,
         zeroPartyIds,
         DEFAULT_SK_COMMITS,
-        DEFAULT_ESM_COMMITS,
+        DEFAULT_C0_COMMITS,
       );
       const plaintextHash = plaintextToHash(messageCoeffs);
       const proof = encodeProof("0x01", publicInputs);

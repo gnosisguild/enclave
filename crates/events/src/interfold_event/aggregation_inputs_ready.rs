@@ -83,3 +83,22 @@ mod tests {
         );
     }
 }
+
+/// Ask the listed decryptors to compute new shares. Old shares belong to the previous set.
+#[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[rtype(result = "()")]
+pub struct FreshDecryptionRound {
+    pub e3_id: E3id,
+    /// Strictly increasing 1-based decryptor ids.
+    pub decryptors: Vec<u32>,
+}
+
+impl Display for FreshDecryptionRound {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "FreshDecryptionRound {{ e3_id: {}, decryptors: {:?} }}",
+            self.e3_id, self.decryptors
+        )
+    }
+}

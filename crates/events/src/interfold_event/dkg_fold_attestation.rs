@@ -30,7 +30,8 @@ pub struct DkgFoldAttestationContext {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DkgFoldAggCommits {
     pub sk_agg_commit: [u8; 32],
-    pub esm_agg_commit: [u8; 32],
+    /// Keccak256 of the packed bytes32 outgoing-key row, indexed by all N recipients.
+    pub prf_key_commits_hash: [u8; 32],
 }
 
 /// Canonical EIP-712 payload signed after `NodeDkgFold` completes.
@@ -65,15 +66,15 @@ impl DkgFoldAttestationPayload {
         keccak256("InterfoldDkgFoldAttestation").into()
     }
 
-    /// `keccak256("1")`.
+    /// Version 2 binds PRF-key transport instead of retired ESM material.
     pub fn domain_version_hash() -> [u8; 32] {
-        keccak256("1").into()
+        keccak256("2").into()
     }
 
-    /// `keccak256("DkgFoldAttestation(address registry,uint256 e3Id,uint256 partyId,bytes32 skAggCommit,bytes32 esmAggCommit)")`.
+    /// EIP-712 type of the synchronized-decryption fold attestation.
     pub fn typehash() -> [u8; 32] {
         keccak256(
-            "DkgFoldAttestation(address registry,uint256 e3Id,uint256 partyId,bytes32 skAggCommit,bytes32 esmAggCommit)",
+            "DkgFoldAttestation(address registry,uint256 e3Id,uint256 partyId,bytes32 skAggCommit,bytes32 prfKeyCommitsHash)",
         )
         .into()
     }
@@ -104,7 +105,7 @@ impl DkgFoldAttestationPayload {
             e3_id_u256,
             U256::from(self.party_id),
             self.agg_commits.sk_agg_commit,
-            self.agg_commits.esm_agg_commit,
+            self.agg_commits.prf_key_commits_hash,
         )
             .abi_encode();
         Ok(keccak256(&encoded).into())
@@ -179,7 +180,7 @@ mod tests {
             party_id: 1,
             agg_commits: DkgFoldAggCommits {
                 sk_agg_commit: [7u8; 32],
-                esm_agg_commit: [9u8; 32],
+                prf_key_commits_hash: [9u8; 32],
             },
         };
         let signed = SignedDkgFoldAttestation::sign(payload, &signer).unwrap();

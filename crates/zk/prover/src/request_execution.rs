@@ -49,7 +49,7 @@ use e3_fhe_params::create_deterministic_crp_from_default_seed;
 use e3_fhe_params::BfvParamSet;
 #[cfg(test)]
 use e3_fhe_params::BfvPreset;
-use e3_polynomial::{CrtPolynomial, Polynomial};
+use e3_polynomial::CrtPolynomial;
 use e3_polynomial_fhe::FromFhePolynomial as _;
 use e3_trbfv::helpers::deserialize_secret_key;
 use e3_trbfv::helpers::try_poly_from_sensitive_bytes;
@@ -253,8 +253,8 @@ fn handle_threshold_share_decryption_proof(
     let config = e3_zk_config::threshold::share_decryption::Configs::new(&threshold_params)
         .map_err(|e| make_zk_error(&request, format!("circuit configuration: {e}")))?;
 
-    // Validate the published key at the request boundary, although C6 does not use it.
-    PublicKey::from_bytes(&req.aggregated_pk_bytes, &threshold_params)
+    // 2. Deserialize aggregated PublicKey
+    let public_key = PublicKey::from_bytes(&req.aggregated_pk_bytes, &threshold_params)
         .map_err(|e| make_zk_error(&request, format!("aggregated_pk deserialize: {:?}", e)))?;
 
     // 3. Decrypt sk_poly_sum → Poly → CrtPolynomial (s)
@@ -264,8 +264,17 @@ fn handle_threshold_share_decryption_proof(
 
     // 4. For each index, build circuit data and generate proof
     let num_indices = req.ciphertext_bytes.len();
-    if req.es_poly_sum.is_empty() {
-        return Err(make_zk_error(&request, "empty es_poly_sum".to_string()));
+    if req.e_fresh.len() < num_indices {
+        return Err(make_zk_error(
+            &request,
+            format!("e_fresh too short: {} < {num_indices}", req.e_fresh.len()),
+        ));
+    }
+    if req.e_signed.len() < num_indices {
+        return Err(make_zk_error(
+            &request,
+            format!("e_signed too short: {} < {num_indices}", req.e_signed.len()),
+        ));
     }
     if req.d_share_bytes.len() < num_indices {
         return Err(make_zk_error(
@@ -287,6 +296,17 @@ fn handle_threshold_share_decryption_proof(
             format!("invalid numeric E3 id for decryption domain: {e}"),
         )
     })?;
+    let decrypt_keys =
+        |keys: &[e3_crypto::SensitiveBytes]| -> Result<Vec<Vec<u8>>, ComputeRequestError> {
+            keys.iter()
+                .map(|key| {
+                    key.access_raw(cipher)
+                        .map_err(|e| make_zk_error(&request, format!("prf key decrypt: {e}")))
+                })
+                .collect()
+        };
+    let outgoing_prf_keys = decrypt_keys(&req.outgoing_prf_keys)?;
+    let incoming_prf_keys = decrypt_keys(&req.incoming_prf_keys)?;
 
     for i in 0..num_indices {
         // Deserialize ciphertext
@@ -295,17 +315,17 @@ fn handle_threshold_share_decryption_proof(
                 make_zk_error(&request, format!("ciphertext[{}] deserialize: {:?}", i, e))
             })?;
 
-        // Decrypt es_poly_sum → Poly → CrtPolynomial (e)
-        // Currently there is a single smudging noise polynomial shared across all
-        // ciphertexts (see calculate_decryption_share.rs).
-        let es_idx = i % req.es_poly_sum.len();
-        let e_poly = try_poly_from_sensitive_bytes(
-            req.es_poly_sum[es_idx].clone(),
-            threshold_params.clone(),
-            cipher,
-        )
-        .map_err(|e| make_zk_error(&request, format!("es_poly_sum[{}] decrypt: {}", i, e)))?;
-        let e = CrtPolynomial::from_fhe_polynomial(&e_poly);
+        // Decrypt the fresh noise polynomial reused by the C6 witness.
+        let noise =
+            try_poly_from_sensitive_bytes(req.e_fresh[i].clone(), threshold_params.clone(), cipher)
+                .map_err(|e| make_zk_error(&request, format!("e_fresh[{i}] decrypt: {e}")))?;
+        let e = CrtPolynomial::from_fhe_polynomial(&noise);
+        let signed_bytes = req.e_signed[i]
+            .access_raw(cipher)
+            .map_err(|e| make_zk_error(&request, format!("e_signed[{i}] decrypt: {e}")))?;
+        let e_signed =
+            e3_zk_witness::threshold::share_decryption::decode_signed_coefficients(&signed_bytes)
+                .map_err(|e| make_zk_error(&request, format!("e_signed[{i}] decode: {e}")))?;
 
         // Deserialize d_share → Poly → CrtPolynomial
         let d_share_poly = try_poly_pb_from_bytes(&req.d_share_bytes[i], &threshold_params)
@@ -321,11 +341,18 @@ fn handle_threshold_share_decryption_proof(
         // Build circuit data
         let circuit_data = e3_zk_witness::threshold::share_decryption::ShareDecryptionCircuitData {
             ciphertext,
+            public_key: public_key.clone(),
             s: s.clone(),
             e,
+            e_signed,
             d_share,
             domain_hi: domain.hi,
             domain_lo: domain.lo,
+            committee: req.committee_size.values(),
+            party_idx: req.party_idx,
+            decryptors: req.decryptors.clone(),
+            outgoing_prf_keys: outgoing_prf_keys.clone(),
+            incoming_prf_keys: incoming_prf_keys.clone(),
         };
 
         // Generate proof
@@ -391,7 +418,8 @@ mod threshold_share_decryption_tests {
                 ciphertext_bytes: vec![],
                 aggregated_pk_bytes: e3_utils::utility_types::ArcBytes::from_bytes(&key),
                 sk_poly_sum: SensitiveBytes::new(vec![], &cipher).unwrap(),
-                es_poly_sum: vec![],
+                e_fresh: vec![],
+                e_signed: vec![],
                 d_share_bytes: vec![],
                 decryption_domain: e3_committee_hash::DecryptionDomainContext {
                     interfold_address: Default::default(),
@@ -400,6 +428,10 @@ mod threshold_share_decryption_tests {
                 },
                 params_preset: preset,
                 committee_size: CiphernodesCommitteeSize::Minimum,
+                party_idx: 0,
+                decryptors: vec![1, 2],
+                outgoing_prf_keys: vec![],
+                incoming_prf_keys: vec![],
             };
             let request = ComputeRequest::zk(
                 ZkRequest::ThresholdShareDecryption(req.clone()),
@@ -430,14 +462,10 @@ fn handle_node_dkg_fold_proof(
         c0_proof: &req.c0_proof,
         c1_proof: &req.c1_proof,
         c2a_proof: &req.c2a_proof,
-        c2b_proof: &req.c2b_proof,
         c3a_inner_proofs: &req.c3a_inner_proofs,
-        c3b_inner_proofs: &req.c3b_inner_proofs,
         c3_slot_indices_a: &req.c3_slot_indices_a,
-        c3_slot_indices_b: &req.c3_slot_indices_b,
         c3_total_slots: req.c3_total_slots,
         c4a_proof: &req.c4a_proof,
-        c4b_proof: &req.c4b_proof,
         party_id: req.party_id,
     };
     let NodeDkgFoldProveResult {
@@ -631,6 +659,14 @@ fn handle_share_computation_proof(
 
     // 5. Build circuit data; the compiled Noir config contains the parity matrix.
     let circuit_data = ShareComputationCircuitData {
+        prf_keys: req
+            .prf_keys
+            .iter()
+            .map(|key| {
+                key.access_raw(cipher)
+                    .map_err(|e| make_zk_error(&request, format!("PRF key decrypt: {e}")))
+            })
+            .collect::<Result<Vec<_>, _>>()?,
         dkg_input_type: req.dkg_input_type,
         secret,
         secret_sss,
@@ -693,10 +729,6 @@ fn handle_pk_generation_proof(
         .eek
         .access_raw(cipher)
         .map_err(|e| make_zk_error(&request, format!("eek decrypt: {}", e)))?;
-    let e_sm_bytes = req
-        .e_sm
-        .access_raw(cipher)
-        .map_err(|e| make_zk_error(&request, format!("e_sm decrypt: {}", e)))?;
 
     // 3. Deserialize raw polynomial bytes → Poly
     let pk0_share_poly = try_poly_ntt_from_bytes(&req.pk0_share, &params)
@@ -708,24 +740,13 @@ fn handle_pk_generation_proof(
     let eek_poly = try_poly_ntt_from_bytes(&eek_bytes, &params)
         .map_err(|e| make_zk_error(&request, format!("eek: {}", e)))?;
 
-    let e_sm_poly = try_poly_pb_from_bytes(&e_sm_bytes, &params)
-        .map_err(|e| make_zk_error(&request, format!("e_sm: {}", e)))?;
-
     // 3. Convert Poly → CrtPolynomial
     let pk0_share = CrtPolynomial::from_fhe_polynomial(&pk0_share_poly);
     let sk = CrtPolynomial::from_fhe_polynomial(&sk_poly);
     let eek = CrtPolynomial::from_fhe_polynomial(&eek_poly);
-    let e_sm = CrtPolynomial::from_fhe_polynomial(&e_sm_poly);
-    let e_sm_lifted = Polynomial::from_fhe_polynomial(&e_sm_poly);
 
     // 4. Build circuit data
-    let circuit_data = PkGenerationCircuitData {
-        pk0_share,
-        eek,
-        e_sm,
-        e_sm_lifted,
-        sk,
-    };
+    let circuit_data = PkGenerationCircuitData { pk0_share, eek, sk };
 
     // 5. Generate proof via Provable trait
     let circuit = PkGenerationCircuit;
@@ -842,6 +863,14 @@ fn handle_share_encryption_proof(
 
     // 5. Build circuit data
     let circuit_data = ShareEncryptionCircuitData {
+        recipient_party_idx: u32::try_from(req.recipient_party_id)
+            .map_err(|e| make_zk_error(&request, e.to_string()))?,
+        row_idx: u32::try_from(req.row_index)
+            .map_err(|e| make_zk_error(&request, e.to_string()))?,
+        prf_key: req
+            .prf_key
+            .access_raw(cipher)
+            .map_err(|e| make_zk_error(&request, format!("PRF key decrypt: {e}")))?,
         plaintext,
         ciphertext,
         public_key,
@@ -997,6 +1026,16 @@ fn handle_dkg_share_decryption_proof(
     }
 
     let circuit_data = ShareDecryptionCircuitData {
+        recipient_party_idx: u32::try_from(req.recipient_party_id)
+            .map_err(|e| make_zk_error(&request, e.to_string()))?,
+        prf_keys: req
+            .prf_keys
+            .iter()
+            .map(|key| {
+                key.access_raw(cipher)
+                    .map_err(|e| make_zk_error(&request, format!("PRF key decrypt: {e}")))
+            })
+            .collect::<Result<Vec<_>, _>>()?,
         secret_key,
         honest_ciphertexts,
         own_plaintext_share,
@@ -1125,21 +1164,7 @@ fn handle_verify_share_decryption_proofs(
     for party in req.party_proofs {
         let sender = party.sender_party_id;
 
-        // Guard: an empty ESM proof list would make verification vacuously true.
-        if party.signed_e_sm_decryption_proofs.is_empty() {
-            party_results.push(PartyVerificationResult {
-                sender_party_id: sender,
-                all_verified: false,
-                failed_signed_payload: None,
-                recovered_address: None,
-            });
-            continue;
-        }
-
-        let all_signed: Vec<&e3_events::SignedProofPayload> =
-            std::iter::once(&party.signed_sk_decryption_proof)
-                .chain(party.signed_e_sm_decryption_proofs.iter())
-                .collect();
+        let all_signed = std::iter::once(&party.signed_sk_decryption_proof);
         let mut party_result = PartyVerificationResult {
             sender_party_id: sender,
             all_verified: true,
@@ -1278,6 +1303,15 @@ fn handle_decrypted_shares_aggregation_proof(
         // `DecryptionAggregator` via `verify_honk_proof_non_zk`. The EVM-facing proof for on-chain
         // is `CircuitName::DecryptionAggregator`.
         let circuit_data = DecryptedSharesAggregationCircuitData {
+            ct0: Ciphertext::from_bytes(
+                req.ciphertext_bytes
+                    .get(i)
+                    .ok_or_else(|| make_zk_error(&request, "missing C7 ciphertext".into()))?,
+                &threshold_params,
+            )
+            .map_err(|e| make_zk_error(&request, format!("C7 ciphertext decode: {e}")))?[0]
+                .clone()
+                .into_power_basis(),
             d_share_polys,
             reconstructing_parties,
             message_vec,
@@ -1385,6 +1419,7 @@ mod aggregation_request_tests {
             assert_eq!(rejected.request(), &request);
 
             let req = DecryptedSharesAggregationProofRequest {
+                ciphertext_bytes: vec![],
                 d_share_polys: vec![],
                 plaintext: vec![],
                 params_preset: preset,
@@ -1427,6 +1462,14 @@ mod aggregation_request_tests {
         let zero = fhe_math::rq::Poly::<PowerBasis>::zero(params.context_at_level(0).unwrap());
         let bytes = ArcBytes::from_bytes(&zero.to_bytes());
         let req = DecryptedSharesAggregationProofRequest {
+            ciphertext_bytes: vec![ArcBytes::from_bytes(
+                &Ciphertext::new(
+                    vec![zero.clone().into_ntt(), zero.clone().into_ntt()],
+                    &params,
+                )
+                .unwrap()
+                .to_bytes(),
+            )],
             d_share_polys: (0..10).rev().map(|id| (id, vec![bytes.clone()])).collect(),
             plaintext: vec![ArcBytes::from_bytes(
                 &e3_bfv_client::encode_vec_u64_to_bytes(&[0]),

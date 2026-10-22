@@ -45,6 +45,59 @@ impl CommitmentLink for TestLink {
             .iter()
             .any(|v| v[..] == target_public_signals[..32])
     }
+    fn applies_to(&self, source: &[u8], target: &[u8]) -> bool {
+        source.get(32..64) == target.get(32..64)
+    }
+}
+
+#[test]
+fn only_comparable_cross_party_targets_can_accuse_a_source() {
+    let mut svc = CommitmentConsistency::new(
+        e3(),
+        vec![Box::new(TestLink {
+            scope: LinkScope::CrossParty,
+            source: ProofType::C6ThresholdShareDecryption,
+            target: ProofType::C7DecryptedSharesAggregation,
+        })],
+        2,
+    );
+    let in_round = |value, round| ArcBytes::from_bytes(&[[value; 32], [round; 32]].concat());
+    assert!(svc
+        .on_proof_verified(passed(
+            e3(),
+            0,
+            addr(1),
+            ProofType::C6ThresholdShareDecryption,
+            [1; 32],
+            in_round(10, 1)
+        ))
+        .is_empty());
+    assert!(
+        svc.on_proof_verified(passed(
+            e3(),
+            1,
+            addr(2),
+            ProofType::C7DecryptedSharesAggregation,
+            [2; 32],
+            in_round(20, 2)
+        ))
+        .is_empty(),
+        "a replacement's proof cannot accuse the old round"
+    );
+    let violations = svc.on_proof_verified(passed(
+        e3(),
+        1,
+        addr(2),
+        ProofType::C7DecryptedSharesAggregation,
+        [3; 32],
+        in_round(20, 1),
+    ));
+    assert_eq!(
+        violations.len(),
+        1,
+        "a comparable mismatch must still be reported"
+    );
+    assert_eq!(violations[0].accused_party_id, 0);
 }
 
 fn e3() -> E3id {

@@ -14,10 +14,10 @@ use crate::core::dkg::share_encryption::Configs as ShareEncryptionConfigs;
 // Global configs for DKG secure preset
 pub global N: u32 = 8192;
 pub global L: u32 = 2;
-pub global QIS: [Field; L] = [2305843009214758913, 2305843009214988289];
-pub global PLAINTEXT_MODULUS: Field = 576460752317792257;
-pub global Q_MOD_T: Field = 3169161947774985;
-pub global Q_MOD_T_CENTERED: Field = 3169161947774985;
+pub global QIS: [Field; L] = [2648718071565238273, 2742124912636592129];
+pub global PLAINTEXT_MODULUS: Field = 1152921504635584514;
+pub global Q_MOD_T: Field = 877147769408258613;
+pub global Q_MOD_T_CENTERED: Field = -275773735227325901;
 
 // Parity matrix is sized for the active committee and the secure-8192 threshold QIS;
 // see `committee/{name}/parity_secure.nr`. Re-exported via `committee::active`.
@@ -72,38 +72,38 @@ pub global SHARE_ENCRYPTION_BIT_CT: u32 = 61;
 pub global SHARE_ENCRYPTION_BIT_U: u32 = 1;
 pub global SHARE_ENCRYPTION_BIT_E0: u32 = 5;
 pub global SHARE_ENCRYPTION_BIT_E1: u32 = 5;
-pub global SHARE_ENCRYPTION_BIT_MSG: u32 = 60;
-pub global SHARE_ENCRYPTION_CT0_BIT_R: u32 = 59;
+pub global SHARE_ENCRYPTION_BIT_MSG: u32 = 61;
+pub global SHARE_ENCRYPTION_CT0_BIT_R: u32 = 60;
 pub global SHARE_ENCRYPTION_CT1_BIT_R: u32 = 13;
 
-pub global SHARE_ENCRYPTION_K0IS: [Field; L] = [493937176208329543, 1434253984466648362];
-pub global SHARE_ENCRYPTION_PK_BOUNDS: [Field; L] = [1152921504607379456, 1152921504607494144];
+pub global SHARE_ENCRYPTION_K0IS: [Field; L] = [1317080645529497431, 1802808762723806675];
+pub global SHARE_ENCRYPTION_PK_BOUNDS: [Field; L] = [1324359035782619136, 1371062456318296064];
 pub global SHARE_ENCRYPTION_E0_BOUND: Field = 20;
 pub global SHARE_ENCRYPTION_E1_BOUND: Field = 20;
 pub global SHARE_ENCRYPTION_U_BOUND: Field = 1;
-pub global SHARE_ENCRYPTION_CT0_R_BOUNDS: [Field; L] = [123484294055107400, 358563496125402411];
+pub global SHARE_ENCRYPTION_CT0_R_BOUNDS: [Field; L] = [573292648950345391, 757987713000008615];
 pub global SHARE_ENCRYPTION_CT1_R_BOUNDS: [Field; L] = [4096, 4096];
-pub global SHARE_ENCRYPTION_MSG_BOUND: Field = 576460752317792257;
+pub global SHARE_ENCRYPTION_MSG_BOUND: Field = 1152921504635584514;
 
 // Scaled-quotient form of the `k0 * k1` term. `SCALED_QUOTIENT` is false for parameter sets that
 // cannot use it (notably L = 1, where `DELTA < q`); the circuit then keeps the direct `k1` path and
 // the constants below go unused.
-pub global SHARE_ENCRYPTION_SCALED_QUOTIENT: bool = true;
-pub global SHARE_ENCRYPTION_SCALE_K: Field = 4;
-pub global SHARE_ENCRYPTION_DELTA: Field = 9223372036634312696;
-pub global SHARE_ENCRYPTION_SMALL_D: [Field; L] = [224722956, 225640460];
-pub global SHARE_ENCRYPTION_ALPHA: [Field; L] = [678869678974347, 1971245714843270];
-pub global SHARE_ENCRYPTION_BETA: [Field; L] = [123484294055103304, 358563496125398315];
-pub global SHARE_ENCRYPTION_BIT_Z: u32 = 52;
-pub global SHARE_ENCRYPTION_T_POW_BIT: u32 = 59;
-pub global SHARE_ENCRYPTION_T_GAP: Field = 14368769;
-pub global SHARE_ENCRYPTION_T_GAP_BIT: u32 = 24;
-pub global SHARE_ENCRYPTION_BIT_Q0: u32 = 26;
-pub global SHARE_ENCRYPTION_Q0_OFFSET: Field = 4097;
-pub global SHARE_ENCRYPTION_BIT_Q0_DIFF: u32 = 18;
-pub global SHARE_ENCRYPTION_Q0_DIFF_OFFSET: Field = 8194;
-pub global SHARE_ENCRYPTION_BIT_Q1: u32 = 14;
-pub global SHARE_ENCRYPTION_Q1_OFFSET: Field = 4097;
+pub global SHARE_ENCRYPTION_SCALED_QUOTIENT: bool = false;
+pub global SHARE_ENCRYPTION_SCALE_K: Field = 0;
+pub global SHARE_ENCRYPTION_DELTA: Field = 0;
+pub global SHARE_ENCRYPTION_SMALL_D: [Field; L] = [0, 0];
+pub global SHARE_ENCRYPTION_ALPHA: [Field; L] = [0, 0];
+pub global SHARE_ENCRYPTION_BETA: [Field; L] = [0, 0];
+pub global SHARE_ENCRYPTION_BIT_Z: u32 = 0;
+pub global SHARE_ENCRYPTION_T_POW_BIT: u32 = 0;
+pub global SHARE_ENCRYPTION_T_GAP: Field = 0;
+pub global SHARE_ENCRYPTION_T_GAP_BIT: u32 = 0;
+pub global SHARE_ENCRYPTION_BIT_Q0: u32 = 0;
+pub global SHARE_ENCRYPTION_Q0_OFFSET: Field = 0;
+pub global SHARE_ENCRYPTION_BIT_Q0_DIFF: u32 = 0;
+pub global SHARE_ENCRYPTION_Q0_DIFF_OFFSET: Field = 0;
+pub global SHARE_ENCRYPTION_BIT_Q1: u32 = 0;
+pub global SHARE_ENCRYPTION_Q1_OFFSET: Field = 0;
 
 pub global SHARE_ENCRYPTION_CONFIGS: ShareEncryptionConfigs<L> = ShareEncryptionConfigs::new(
     PLAINTEXT_MODULUS,
@@ -133,5 +133,7 @@ share_decryption_e_sm (CIRCUIT 4b - BFV DECRYPTION E_SM)
 -------------------------------------
 ************************************/
 
-pub global SHARE_DECRYPTION_BIT_MSG: u32 = 60;
+pub global SHARE_DECRYPTION_BIT_MSG: u32 = 61;
 // SHARE_DECRYPTION_BIT_AGG: see `pub use` of `THRESHOLD_SHARE_DECRYPTION_BIT_SK` (C6 `BIT_SK`).
+
+pub global SHARE_COMPUTATION_PRF_KEY_BITS: u32 = 256;

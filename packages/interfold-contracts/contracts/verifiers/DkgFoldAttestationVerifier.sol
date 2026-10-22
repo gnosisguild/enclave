@@ -22,6 +22,7 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
         DkgFoldAttestationLib.Attestation[] attestations;
         DkgFoldAttestationLib.PartySlotBinding[] bindings;
         uint256 h;
+        uint256 n;
     }
 
     /// @inheritdoc IDkgFoldAttestationVerifier
@@ -37,14 +38,21 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
         returns (
             uint256[] memory partyIds,
             bytes32[] memory skAggCommits,
-            bytes32[] memory esmAggCommits
+            bytes32[] memory prfKeyCommits
         )
     {
-        BundleData memory data = _loadBundle(proof, dkgAttestationBundle);
+        BundleData memory data = _loadBundle(
+            registry,
+            e3Id,
+            proof,
+            dkgAttestationBundle
+        );
         return _fillAnchors(registry, chainId, e3Id, data);
     }
 
     function _loadBundle(
+        address registry,
+        uint256 e3Id,
         bytes calldata proof,
         bytes calldata dkgAttestationBundle
     ) private view returns (BundleData memory data) {
@@ -55,7 +63,8 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
         } catch {
             revert ICiphernodeRegistry.InvalidFoldAttestation();
         }
-        data.h = _honestPartyCount(data.publicInputs);
+        data.n = ICiphernodeRegistry(registry).getCommitteeNodes(e3Id).length;
+        data.h = _honestPartyCount(data.publicInputs, data.n);
         // Defense in depth: require the public-inputs `partyId` slots
         // (`publicInputs[2..2+h]`) to be strictly ascending. The zk circuit
         // already enforces this, but rejecting duplicates here prevents two
@@ -123,12 +132,12 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
         returns (
             uint256[] memory partyIdsOut,
             bytes32[] memory skAggOut,
-            bytes32[] memory esmAggOut
+            bytes32[] memory prfKeysOut
         )
     {
         partyIdsOut = new uint256[](data.h);
         skAggOut = new bytes32[](data.h);
-        esmAggOut = new bytes32[](data.h);
+        prfKeysOut = new bytes32[](data.h * data.n);
 
         for (uint256 i = 0; i < data.h; i++) {
             _applyBinding(
@@ -139,7 +148,7 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
                 i,
                 partyIdsOut,
                 skAggOut,
-                esmAggOut
+                prfKeysOut
             );
         }
     }
@@ -152,7 +161,7 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
         uint256 i,
         uint256[] memory partyIdsOut,
         bytes32[] memory skAggOut,
-        bytes32[] memory esmAggOut
+        bytes32[] memory prfKeysOut
     ) private view {
         if (i > 0) {
             require(
@@ -165,7 +174,7 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
             );
         }
 
-        (uint256 slot, bytes32 sk, bytes32 esm) = _verifyBinding(
+        (uint256 slot, bytes32 sk) = _verifyBinding(
             registry,
             chainId,
             e3Id,
@@ -176,21 +185,28 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
 
         partyIdsOut[slot] = data.bindings[i].partyId;
         skAggOut[slot] = sk;
-        esmAggOut[slot] = esm;
+        for (uint256 peer; peer < data.n; ++peer) {
+            prfKeysOut[slot * data.n + peer] = data.publicInputs[
+                6 + 2 * data.h + slot * data.n + peer
+            ];
+        }
     }
 
     function _honestPartyCount(
-        bytes32[] memory publicInputs
+        bytes32[] memory publicInputs,
+        uint256 n
     ) private pure returns (uint256 h) {
         require(
-            publicInputs.length >= 6 && (publicInputs.length - 6) % 3 == 0,
+            n > 0 &&
+                publicInputs.length >= 6 &&
+                (publicInputs.length - 6) % (n + 2) == 0,
             ICiphernodeRegistry.InvalidFoldAttestation()
         );
-        h = (publicInputs.length - 6) / 3;
+        h = (publicInputs.length - 6) / (n + 2);
         // Defense in depth: the BFV pk-verifier already rejects `h == 0`, but
         // a zero-honest-party proof would otherwise pass this verifier with no
         // attestations to check and write empty anchors to the registry.
-        require(h > 0, ICiphernodeRegistry.InvalidFoldAttestation());
+        require(h > 0 && h <= n, ICiphernodeRegistry.InvalidFoldAttestation());
     }
 
     function _verifyBinding(
@@ -200,7 +216,7 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
         BundleData memory data,
         DkgFoldAttestationLib.PartySlotBinding memory binding,
         DkgFoldAttestationLib.Attestation memory att
-    ) private view returns (uint256 slot, bytes32 skCommit, bytes32 esmCommit) {
+    ) private view returns (uint256 slot, bytes32 skCommit) {
         // Canonical-slot binding: `binding.node` must equal the canonical
         // operator at index `partyId` of the finalized committee — i.e.
         // `canonicalCommitteeNodeAt(e3Id, partyId)`, which returns
@@ -244,7 +260,6 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
 
         uint256 partyIdOffset = 2;
         uint256 skOffset = 5 + data.h;
-        uint256 esmOffset = 5 + (2 * data.h);
 
         slot = _partySlot(
             data.publicInputs,
@@ -253,13 +268,19 @@ contract DkgFoldAttestationVerifier is IDkgFoldAttestationVerifier {
             binding.partyId
         );
 
+        bytes32[] memory keys = new bytes32[](data.n);
+        for (uint256 peer; peer < data.n; ++peer) {
+            keys[peer] = data.publicInputs[
+                6 + 2 * data.h + slot * data.n + peer
+            ];
+        }
         require(
             data.publicInputs[skOffset + slot] == att.skAggCommit &&
-                data.publicInputs[esmOffset + slot] == att.esmAggCommit,
+                keccak256(abi.encodePacked(keys)) == att.prfKeyCommitsHash,
             ICiphernodeRegistry.InvalidFoldAttestation()
         );
 
-        return (slot, att.skAggCommit, att.esmAggCommit);
+        return (slot, att.skAggCommit);
     }
 
     function _partySlot(

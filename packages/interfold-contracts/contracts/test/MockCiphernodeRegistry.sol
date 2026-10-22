@@ -174,6 +174,21 @@ contract MockCiphernodeRegistry is ICiphernodeRegistry {
         );
     }
 
+    mapping(uint256 => bytes32[]) private _prfKeyCommitments;
+
+    function setDkgPrfKeyCommitments(
+        uint256 e3Id,
+        bytes32[] calldata keys
+    ) external {
+        _prfKeyCommitments[e3Id] = keys;
+    }
+
+    function getDkgPrfKeyCommitments(
+        uint256 e3Id
+    ) external view override returns (bytes32[] memory) {
+        return _prfKeyCommitments[e3Id];
+    }
+
     function root() external pure returns (uint256) {
         return 0;
     }

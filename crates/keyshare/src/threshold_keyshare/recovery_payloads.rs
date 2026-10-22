@@ -194,20 +194,16 @@ mod tests {
     fn share_event() -> TypedEvent<ThresholdShareCreated> {
         TypedEvent::new(
             ThresholdShareCreated {
-                signature: Default::default(),
                 e3_id: E3id::new("1", 1),
                 share: Arc::new(ThresholdShare {
                     party_id: 2,
                     pk_share: ArcBytes::from_bytes(&[7; 32]),
                     sk_sss: BfvEncryptedShares::default(),
-                    esi_sss: Vec::new(),
                 }),
                 target_party_id: 0,
                 external: true,
                 signed_c2a_proof: None,
-                signed_c2b_proof: None,
                 signed_c3a_proofs: Vec::new(),
-                signed_c3b_proofs: Vec::new(),
             },
             context(),
         )

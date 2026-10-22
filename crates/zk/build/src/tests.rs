@@ -367,6 +367,7 @@ fn source_identity_tracks_inputs_not_generated_selections_or_tests() {
     for path in [
         "circuits/lib/src/core/dkg/pk.nr",
         "circuits/lib/src/math/commitments.nr",
+        "circuits/lib/src/configs/recursive.nr",
         "circuits/lib/Nargo.toml",
         "circuits/lib/src/configs/committee/micro/mod.nr",
         "scripts/circuits/build-pairs.json",
@@ -817,18 +818,50 @@ fn hydration_accepts_other_source_but_records_actual_artifact_identity() {
     assert!(artifacts::hydration_stamp(&pair, "insecure-64", "minimum", "current-source").is_err());
 }
 
+#[test]
+fn preset_sync_installs_new_declarations_but_check_rejects_missing_ones() {
+    let generated = "pub global SHARE_COMPUTATION_PRF_KEY_BITS: u32 = 32;";
+    assert!(
+        configuration::replace_declarations("", generated, "SHARE_COMPUTATION_", &[], true)
+            .is_err()
+    );
+    let installed =
+        configuration::replace_declarations("", generated, "SHARE_COMPUTATION_", &[], false)
+            .unwrap();
+    assert!(installed.contains(generated));
+    assert_eq!(
+        configuration::replace_declarations(
+            &installed,
+            generated,
+            "SHARE_COMPUTATION_",
+            &[],
+            false
+        )
+        .unwrap(),
+        installed
+    );
+    let reexport = "pub use crate::threshold::BIT_SK as SHARE_DECRYPTION_BIT_AGG;\n";
+    let declaration = "pub global SHARE_DECRYPTION_BIT_AGG: u32 = 26;";
+    let repaired = configuration::replace_declarations(
+        &format!("{reexport}{declaration}"),
+        declaration,
+        "SHARE_DECRYPTION_",
+        &[],
+        false,
+    )
+    .unwrap();
+    assert!(repaired.contains(reexport));
+    assert!(!configuration::declarations(&repaired).contains_key("SHARE_DECRYPTION_BIT_AGG"));
+}
+
 const VK_PATHS: &[(&str, &str, &str)] = &[
     ("recursive", "dkg", "sk_share_computation"),
-    ("recursive", "dkg", "e_sm_share_computation"),
     ("default", "recursive_aggregation", "c3_fold"),
     ("default", "recursive_aggregation", "c3_fold_kernel"),
     ("recursive", "dkg", "share_encryption"),
     ("recursive", "dkg", "share_decryption"),
     ("recursive", "dkg", "pk"),
     ("recursive", "threshold", "pk_generation"),
-    ("default", "recursive_aggregation", "c2ab_fold"),
-    ("default", "recursive_aggregation", "c3ab_fold"),
-    ("default", "recursive_aggregation", "c4ab_fold"),
     ("default", "recursive_aggregation", "nodes_fold"),
     ("default", "recursive_aggregation", "nodes_fold_kernel"),
     ("default", "recursive_aggregation", "node_fold"),
@@ -860,26 +893,16 @@ fn anchors_bind_all_descendants_in_circuit_order_and_reject_noncanonical_keys() 
     for (i, key) in keys.iter().enumerate() {
         write(root, &key_path(i), field_bytes(*key));
     }
-    let c2 = compute_vk_hash(vec![keys[0], keys[1]]);
-    let c3_chain = compute_vk_hash(vec![keys[2], keys[3], keys[4]]);
-    let node = compute_vk_hash(vec![
-        keys[6],
-        keys[7],
-        keys[8],
-        c2,
-        keys[9],
-        compute_vk_hash(vec![c3_chain, c3_chain]),
-        keys[10],
-        compute_vk_hash(vec![keys[5], keys[5]]),
-    ]);
+    let c3_chain = compute_vk_hash(vec![keys[1], keys[2], keys[3]]);
+    let node = compute_vk_hash(vec![keys[5], keys[6], keys[0], keys[1], c3_chain, keys[4]]);
     let expected = [
         (
             "nodes_fold",
-            field_bytes(compute_vk_hash(vec![keys[11], keys[12], keys[13], node])),
+            field_bytes(compute_vk_hash(vec![keys[7], keys[8], keys[9], node])),
         ),
         (
             "c6_fold",
-            field_bytes(compute_vk_hash(vec![keys[14], keys[15], keys[16]])),
+            field_bytes(compute_vk_hash(vec![keys[10], keys[11], keys[12]])),
         ),
     ];
     assert_eq!(vk_tree::hashes(root).unwrap(), expected);
@@ -887,14 +910,14 @@ fn anchors_bind_all_descendants_in_circuit_order_and_reject_noncanonical_keys() 
         write(root, &key_path(i), field_bytes(Fr::from(99_u64)));
         let changed = vk_tree::hashes(root).unwrap();
         assert_ne!(
-            changed[usize::from(i >= 14)].1,
-            expected[usize::from(i >= 14)].1,
+            changed[usize::from(i >= 10)].1,
+            expected[usize::from(i >= 10)].1,
             "{}",
             key_path(i)
         );
         assert_eq!(
-            changed[usize::from(i < 14)].1,
-            expected[usize::from(i < 14)].1
+            changed[usize::from(i < 10)].1,
+            expected[usize::from(i < 10)].1
         );
         write(root, &key_path(i), field_bytes(*key));
     }

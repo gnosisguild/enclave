@@ -589,13 +589,27 @@ impl Configs {
 mod scaled_quotient_tests {
     use super::*;
     use e3_fhe_params::utils::compute_k0is;
-    use e3_fhe_params::{build_pair_for_preset, BfvPreset};
+    use e3_fhe_params::BfvPreset;
 
     fn derive_for(preset: BfvPreset) -> (ScaledQuotient, Vec<u64>, u64) {
-        let config = Configs::for_preset(preset).unwrap();
-        let moduli = config.params.moduli().to_vec();
-        let t = config.params.plaintext();
-        (config.scaled_quotient, moduli, t)
+        // Keep coverage of the optimization independently of the active transport presets.
+        let (moduli, t, n): (Vec<u64>, u64, u64) = match preset {
+            BfvPreset::InsecureThreshold64 => (vec![0x1fffba01, 0x1fffc081], 134217089, 64),
+            BfvPreset::SecureThreshold8192 => (
+                vec![0x2000000000104001, 0x200000000013c001],
+                576460752317792257,
+                8192,
+            ),
+            _ => unreachable!(),
+        };
+        let product: BigUint = moduli.iter().copied().map(BigUint::from).product();
+        let scale = (&product % t).to_u64().unwrap();
+        let k0is = compute_k0is(&moduli, t).unwrap();
+        (
+            ScaledQuotient::derive(&moduli, t, scale, &k0is, n, 1, 20, 20, &BigUint::from(t)),
+            moduli,
+            t,
+        )
     }
 
     /// The substitution only holds if both numerators divide exactly. `derive` returns
@@ -607,10 +621,8 @@ mod scaled_quotient_tests {
             "{preset:?} should admit the scaled-quotient form"
         );
 
-        let (_, dkg) = build_pair_for_preset(preset).unwrap();
-        let scale = (dkg.context_at_level(0).unwrap().modulus() % t)
-            .to_u64()
-            .unwrap();
+        let product: BigUint = moduli.iter().copied().map(BigUint::from).product();
+        let scale = (&product % t).to_u64().unwrap();
         let k0is = compute_k0is(&moduli, t).unwrap();
 
         let t_big = BigInt::from(t);
@@ -656,5 +668,17 @@ mod scaled_quotient_tests {
     #[test]
     fn insecure_identities_hold_exactly() {
         assert_identities_hold_exactly(BfvPreset::InsecureThreshold64);
+    }
+
+    #[test]
+    fn packed_key_presets_use_the_direct_quotient_path() {
+        for preset in BfvPreset::PAIR_PRESETS {
+            assert!(
+                !Configs::for_preset(preset)
+                    .unwrap()
+                    .scaled_quotient
+                    .available
+            );
+        }
     }
 }

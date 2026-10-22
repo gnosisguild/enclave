@@ -107,7 +107,7 @@ async fn build_public_key_aggregator_with_committee(
 }
 
 fn c1_proof_with_pk_commitment(e3_id: &E3id, pk_commitment: [u8; 32]) -> SignedProofPayload {
-    let mut signals = vec![0u8; 96];
+    let mut signals = vec![0u8; 64];
     signals[32..64].copy_from_slice(&pk_commitment);
     SignedProofPayload {
         payload: ProofPayload {
@@ -980,13 +980,13 @@ async fn mock_publication_carries_registry_roster() -> Result<()> {
     };
     let proof = result.dkg_aggregator_proof.as_ref().unwrap();
     let fields: Vec<_> = proof.public_signals.chunks_exact(32).collect();
-    assert_eq!(fields.len(), 12, "registry requires 6 + 3H fields");
+    assert_eq!(fields.len(), 16, "registry requires 6 + 2H + H*N fields");
     assert_eq!(fields[2], &[0; 32]);
     assert_eq!(
         fields[3],
         &alloy::primitives::U256::from(2).to_be_bytes::<32>()
     );
-    assert_eq!(fields[11], &commitment);
+    assert_eq!(fields[9], &commitment);
     assert_eq!(
         result.honest_committee_addresses,
         vec![result.committee_addresses[0], result.committee_addresses[2]]

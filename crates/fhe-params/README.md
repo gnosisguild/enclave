@@ -242,6 +242,7 @@ let config = BfvSearchConfig {
     insecure: false,  // Enforce the security limit
     mult_depth: 0,    // Summation only
     min_prime_bits: 50,
+    second_k_multiple: 2,
     verbose: true,    // Show detailed output
 };
 
@@ -299,6 +300,8 @@ The defaults are the search inputs of `SecureThreshold8192` (`constants::search_
   `false`
 - `--min-prime-bits <BITS>`: Smallest prime bit-length for both parameter sets. Default: `50`
 - `--mult-depth <D>`: Levels of multiplication after the `z` additions. Default: `0`
+- `--second-k-multiple <M>`: DKG plaintext modulus multiplier on the largest threshold prime.
+  Default: `2`, which reserves one key bit per coefficient in the PRF transport limb.
 - `--verbose`: Enable verbose output showing detailed search process
 - `--help`: Show help message
 - `--version`: Show version information
@@ -314,7 +317,7 @@ cargo run --bin search_params --package e3-fhe-params
 
 - Degree: 8192
 - First set: 3 NTT-friendly 60-bit primes, `ERROR1_VARIANCE` from `Var(e_1)`
-- Second set: 2 NTT-friendly 62-bit primes, plaintext modulus = largest first-set prime
+- Second set: 2 NTT-friendly 62-bit primes, plaintext modulus = twice the largest first-set prime
 - All noise budgets and validation metrics
 
 The insecure presets `InsecureThreshold64` and `InsecureDkg64` come from the insecure search inputs

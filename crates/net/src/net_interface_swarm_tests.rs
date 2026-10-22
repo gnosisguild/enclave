@@ -1370,9 +1370,11 @@ async fn a_running_put_reports_expired_at_its_deadline_once() -> anyhow::Result<
         }
         silent.process(event).await?;
     }
+    // Dial locally rather than picking a possibly unreachable VPN/container interface. Identify
+    // still advertises the non-loopback listeners used by the node's Kademlia address filter.
     let address = addresses
         .iter()
-        .find(|address| !super::is_loopback_addr(address))
+        .find(|address| super::is_loopback_addr(address))
         .or(addresses.first())
         .cloned()
         .ok_or_else(|| anyhow::anyhow!("the peer did not listen"))?;

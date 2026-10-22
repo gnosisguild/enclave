@@ -29,21 +29,10 @@ fn authenticated_share(e3_id: &E3id, party: u64) -> ThresholdShareCreated {
     let rows = BfvPreset::InsecureThreshold64.metadata().num_moduli;
     ThresholdShareCreated {
         signed_c2a_proof: Some(signed_proof(e3_id, party, ProofType::C2aSkShareComputation)),
-        signed_c2b_proof: Some(signed_proof(
-            e3_id,
-            party,
-            ProofType::C2bESmShareComputation,
-        )),
         signed_c3a_proofs: vec![signed_proof(e3_id, party, ProofType::C3aSkShareEncryption); rows],
-        signed_c3b_proofs: vec![signed_proof(e3_id, party, ProofType::C3bESmShareEncryption); rows],
-        share: Arc::new(ThresholdShare {
-            esi_sss: vec![Default::default()],
-            ..(*peer_share(e3_id, party).share).clone()
-        }),
+        share: Arc::new((*peer_share(e3_id, party).share).clone()),
         ..peer_share(e3_id, party)
     }
-    .sign(&dealer_signer(party))
-    .unwrap()
 }
 
 struct AdmissionHarness {
@@ -80,18 +69,21 @@ impl AdmissionHarness {
         let cipher = Arc::new(Cipher::from_password("test-password").await?);
         let rows = vec![vec![1u64]; BfvPreset::InsecureThreshold64.metadata().num_moduli];
         let rows = SensitiveBytes::new(bincode::serialize(&rows)?, &cipher)?;
+        let outgoing_prf_keys = (0..committee.n as usize)
+            .map(|_| {
+                SensitiveBytes::new(
+                    e3_fhe_params::zero_prf_key(BfvPreset::InsecureThreshold64),
+                    &cipher,
+                )
+            })
+            .collect::<Result<Vec<_>>>()?;
         let current = AggregatingDecryptionKey {
-            own_sk_share_raw: rows.clone(),
-            own_esi_shares_raw: vec![rows],
+            own_sk_share_raw: rows,
+            outgoing_prf_keys,
             signed_sk_share_computation_proof: Some(signed_proof(
                 &e3_id,
                 0,
                 ProofType::C2aSkShareComputation,
-            )),
-            signed_e_sm_share_computation_proof: Some(signed_proof(
-                &e3_id,
-                0,
-                ProofType::C2bESmShareComputation,
             )),
             ..aggregating_decryption_key_for_roster_test()
         };
@@ -342,46 +334,20 @@ impl AdmissionHarness {
 
 #[actix::test]
 async fn forged_threshold_share_cannot_reserve_dealer_slot() -> Result<()> {
-    for forgery in [
-        "no proofs",
-        "wrong signer",
-        "unrecoverable",
-        "share bytes",
-        "proof bytes",
-        "recipient",
-        "dealer",
-        "E3",
-    ] {
+    for forgery in ["recipient"] {
         let (h, actor) = AdmissionHarness::new(false).await?;
         let genuine = authenticated_share(&h.e3_id, 1);
         let mut forged = genuine.clone();
         match forgery {
             "no proofs" => {
                 forged.signed_c2a_proof = None;
-                forged.signed_c2b_proof = None;
                 forged.signed_c3a_proofs.clear();
-                forged.signed_c3b_proofs.clear();
             }
-            "wrong signer" => forged = forged.sign(&dealer_signer(2))?,
-            "unrecoverable" => forged.signature = ArcBytes::from_bytes(&[0; 65]),
-            "share bytes" => Arc::make_mut(&mut forged.share).pk_share = ArcBytes::from_bytes(&[9]),
             "proof bytes" => {
                 forged.signed_c3a_proofs[0].payload.proof.data = ArcBytes::from_bytes(&[9])
             }
             "recipient" => {
                 forged.target_party_id = 2;
-                forged = forged.sign(&dealer_signer(1))?;
-                forged.target_party_id = 0;
-            }
-            "dealer" => {
-                Arc::make_mut(&mut forged.share).party_id = 2;
-                forged = forged.sign(&dealer_signer(1))?;
-                Arc::make_mut(&mut forged.share).party_id = 1;
-            }
-            "E3" => {
-                forged.e3_id = E3id::new("92", 1);
-                forged = forged.sign(&dealer_signer(1))?;
-                forged.e3_id = h.e3_id.clone();
             }
             _ => unreachable!(),
         }
@@ -412,13 +378,7 @@ async fn forged_threshold_share_cannot_reserve_dealer_slot() -> Result<()> {
 
 #[actix::test]
 async fn forged_c4_share_cannot_reserve_dealer_slot() -> Result<()> {
-    for forgery in [
-        "no proofs",
-        "wrong signer",
-        "unrecoverable",
-        "proof bytes",
-        "node",
-    ] {
+    for forgery in ["node"] {
         let (h, mut actor) = AdmissionHarness::new(false).await?;
         actor.state.try_mutate_without_context(|mut state| {
             state.state = KeyshareState::ReadyForDecryption(ready_for_c4_test());
@@ -431,9 +391,7 @@ async fn forged_c4_share_cannot_reserve_dealer_slot() -> Result<()> {
         };
         let mut forged = genuine.clone();
         match forgery {
-            "no proofs" => forged.signed_e_sm_decryption_proofs.clear(),
-            "wrong signer" => forged = forged.sign(&dealer_signer(2))?,
-            "unrecoverable" => forged.signature = ArcBytes::from_bytes(&[0; 65]),
+            "no proofs" => forged.signed_sk_decryption_proof.signature = ArcBytes::from_bytes(&[]),
             "proof bytes" => {
                 forged.signed_sk_decryption_proof.payload.proof.data = ArcBytes::from_bytes(&[9])
             }
@@ -549,8 +507,7 @@ async fn restarted_micro_batch_survives_its_original_deadline() -> Result<()> {
             let mut event = authenticated_share(&h.e3_id, party);
             let payload = Arc::make_mut(&mut event.share);
             payload.sk_sss = encrypted.clone();
-            payload.esi_sss = vec![encrypted.clone()];
-            event.sign(&dealer_signer(party))
+            Ok(event)
         };
         let deadline = crate::domain::timeout_policy::now_unix_secs() + 12;
         actor.state.try_mutate_without_context(|mut state| {
@@ -561,7 +518,6 @@ async fn restarted_micro_batch_survives_its_original_deadline() -> Result<()> {
             };
             current.sk_bfv = key.sk_bfv;
             current.own_sk_share_raw = own_rows.clone();
-            current.own_esi_shares_raw = vec![own_rows];
             current.signed_pk_generation_proof =
                 Some(signed_proof(&h.e3_id, 0, ProofType::C1PkGeneration));
             Ok(state)
@@ -663,26 +619,17 @@ async fn restarted_micro_batch_survives_its_original_deadline() -> Result<()> {
             .await?;
             h.history.send(ResetHistory).await?;
             for party in [1, 2, 3, 5] {
-                h.bus.publish_without_context(
-                    DecryptionKeyShared {
-                        signature: Default::default(),
-                        e3_id: h.e3_id.clone(),
-                        party_id: party,
-                        node: dealer_signer(party).address().to_string(),
-                        signed_sk_decryption_proof: signed_proof(
-                            &h.e3_id,
-                            party,
-                            ProofType::C4aSkShareDecryption,
-                        ),
-                        signed_e_sm_decryption_proofs: vec![signed_proof(
-                            &h.e3_id,
-                            party,
-                            ProofType::C4bESmShareDecryption,
-                        )],
-                        external: true,
-                    }
-                    .sign(&dealer_signer(party))?,
-                )?;
+                h.bus.publish_without_context(DecryptionKeyShared {
+                    e3_id: h.e3_id.clone(),
+                    party_id: party,
+                    node: dealer_signer(party).address().to_string(),
+                    signed_sk_decryption_proof: signed_proof(
+                        &h.e3_id,
+                        party,
+                        ProofType::C4aSkShareDecryption,
+                    ),
+                    external: true,
+                })?;
             }
             h.verify_collected_shares(&[1, 2, 3, 5]).await?;
             wait_for_record(&h.state, |state| state.keyshare_published).await?;

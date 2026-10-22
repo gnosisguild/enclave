@@ -20,6 +20,8 @@ pub struct DecryptionshareCreated {
     pub node: String,
     /// C6 raw proofs (signed): one per ciphertext index, used for ShareVerification.
     pub signed_decryption_proofs: Vec<SignedProofPayload>,
+    /// 1-based decryptor ids this share was computed for.
+    pub decryptors: Vec<u32>,
 }
 
 impl Display for DecryptionshareCreated {

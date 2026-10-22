@@ -192,6 +192,36 @@ impl<let L: u32> SafeSponge<L> {
         output
     }
 
+    /// Fixed-length SQUEEZE starting at a permutation boundary (e.g. immediately after ABSORB).
+    /// This preserves the streaming transitions without growing a vector or branching per element.
+    pub fn squeeze_array<let OUT: u32>(&mut self) -> [Field; OUT] {
+        assert(self.io_count < L);
+        let expected = self.io_pattern[self.io_count];
+        assert((expected & ABSORB_FLAG) == 0, "Expected SQUEEZE operation");
+        assert((expected & 0x7FFFFFFF) == OUT, "Length mismatch");
+        assert(self.squeeze_pos == RATE, "SQUEEZE must start at a permutation boundary");
+        let mut output = [0; OUT];
+        for block in 0..(OUT / RATE) {
+            self.state = self.permute();
+            for i in 0..RATE {
+                output[block * RATE + i] = self.state[i + CAPACITY];
+            }
+        }
+        let tail = OUT % RATE;
+        if tail > 0 {
+            self.state = self.permute();
+            for i in 0..tail {
+                output[(OUT / RATE) * RATE + i] = self.state[i + CAPACITY];
+            }
+        }
+        if OUT > 0 {
+            self.absorb_pos = 0;
+            self.squeeze_pos = if tail == 0 { RATE } else { tail };
+        }
+        self.io_count += 1;
+        output
+    }
+
     /// Finalizes the sponge instance, verifying that all expected operations have been performed and clearing the internal state for security (following spec 2.4).
     ///
     /// This function is used to ensure that the sponge instance has been used correctly and to prevent information leakage.
@@ -363,6 +393,56 @@ fn test_safe_hashing() {
 
     assert(output2.len() == 1);
     assert(output2[0] != 0);
+}
+
+fn compare_array_squeeze<let INPUT: u32, let OUTPUT: u32>(input: [Field; INPUT]) {
+    let pattern = [ABSORB_FLAG | INPUT, OUTPUT, ABSORB_FLAG | 2, 5];
+    let mut streaming = SafeSponge::start(pattern, [0; 64]);
+    let mut fixed = SafeSponge::start(pattern, [0; 64]);
+    streaming.absorb(input.as_vector());
+    fixed.absorb(input.as_vector());
+    let expected = streaming.squeeze();
+    let actual = fixed.squeeze_array::<OUTPUT>();
+    for i in 0..OUTPUT {
+        assert(expected[i] == actual[i]);
+    }
+    streaming.absorb([13, 17].as_vector());
+    fixed.absorb([13, 17].as_vector());
+    let expected = streaming.squeeze();
+    let actual = fixed.squeeze();
+    for i in 0..5 {
+        assert(expected[i] == actual[i]);
+    }
+    streaming.finish();
+    fixed.finish();
+}
+
+#[test]
+fn array_squeeze_preserves_rate_boundaries_and_continuation() {
+    compare_array_squeeze::<0, 0>([]);
+    compare_array_squeeze::<0, 1>([]);
+    compare_array_squeeze::<1, 2>([5]);
+    compare_array_squeeze::<1, 3>([5]);
+    compare_array_squeeze::<3, 4>([5, 7, 11]);
+    compare_array_squeeze::<3, 5>([5, 7, 11]);
+    compare_array_squeeze::<7, 7>([1, 2, 3, 4, 5, 6, 7]);
+    compare_array_squeeze::<7, 9>([1, 2, 3, 4, 5, 6, 7]);
+    compare_array_squeeze::<7, 31>([1, 2, 3, 4, 5, 6, 7]);
+}
+
+#[test(should_fail_with = "SQUEEZE must start at a permutation boundary")]
+fn array_squeeze_rejects_a_partial_rate_position() {
+    let mut sponge = SafeSponge::start([ABSORB_FLAG | 1, 2, 3], [0; 64]);
+    sponge.absorb([5].as_vector());
+    let _ = sponge.squeeze();
+    let _ = sponge.squeeze_array::<3>();
+}
+
+#[test(should_fail_with = "Length mismatch")]
+fn array_squeeze_rejects_a_different_declared_length() {
+    let mut sponge = SafeSponge::start([ABSORB_FLAG | 1, 2], [0; 64]);
+    sponge.absorb([5].as_vector());
+    let _ = sponge.squeeze_array::<3>();
 }
 
 #[test]

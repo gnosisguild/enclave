@@ -177,6 +177,21 @@ pub fn compute_vk_hash(vk_hashes: Vec<Field>) -> Field {
     compute_commitments(vk_hashes, DS_VK_HASH, io_pattern)[0]
 }
 
+/// Commit the native ascending c0 prefix added once by final reconstruction.
+pub fn compute_partial_decryption_c0_commitment(
+    ct0: &CrtPolynomial,
+    native_coeff_bit: u32,
+    max_k: usize,
+) -> BigInt {
+    let truncated = truncate_crt_polynomial_to_max_coeffs(ct0, max_k);
+    let payload = flatten(Vec::new(), &truncated.limbs, native_coeff_bit);
+    let length = payload.len() as u32;
+    let mut domain = [0; 64];
+    domain[..14].copy_from_slice(b"PARTIAL_DEC_C0");
+    let value = compute_commitments(payload, domain, [0x8000_0000 | length, 1])[0];
+    BigInt::from_bytes_le(num_bigint::Sign::Plus, &value.into_bigint().to_bytes_le())
+}
+
 // ============================================================================
 // COMMITMENTS
 // ============================================================================

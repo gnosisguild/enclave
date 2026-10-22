@@ -16,6 +16,35 @@ pub(crate) struct C6ShareVerifier {
 }
 
 impl C6ShareVerifier {
+    /// The signed leaf, not its unsigned transport metadata, chooses the owner and set.
+    pub(crate) fn matches_round(
+        proofs: &[SignedProofPayload],
+        party: u64,
+        ids: &[u32],
+        n: usize,
+    ) -> bool {
+        !proofs.is_empty()
+            && proofs
+                .iter()
+                .all(|proof| Self::proof_matches_round(&proof.payload.proof, party, ids, n))
+    }
+
+    pub(crate) fn proof_matches_round(proof: &Proof, party: u64, ids: &[u32], n: usize) -> bool {
+        use alloy::primitives::U256;
+        let bytes = (7 + ids.len() + 2 * n) * 32;
+        let raw = &proof.public_signals[..];
+        let raw = if raw.len() == 2 * bytes && raw[..bytes] == raw[bytes..] {
+            &raw[..bytes]
+        } else {
+            raw
+        };
+        raw.len() == bytes
+            && raw[5 * 32..6 * 32] == U256::from(party).to_be_bytes::<32>()
+            && ids.iter().enumerate().all(|(index, id)| {
+                raw[(6 + index) * 32..(7 + index) * 32] == U256::from(*id).to_be_bytes::<32>()
+            })
+    }
+
     pub(crate) fn new(preset: BfvPreset) -> Result<Self> {
         let (params, _) = e3_fhe_params::build_pair_for_preset(preset)?;
         // Use the same bit-width calculation as C6 code generation.
@@ -35,7 +64,7 @@ impl C6ShareVerifier {
                 .all(|(share, proof)| self.share_matches(share, &proof.payload.proof))
     }
 
-    fn share_matches(&self, share: &ArcBytes, proof: &Proof) -> bool {
+    pub(crate) fn share_matches(&self, share: &ArcBytes, proof: &Proof) -> bool {
         let layout = CircuitName::ThresholdShareDecryption.output_layout();
         let Some(expected) = layout.extract_field(&proof.public_signals, "d_commitment") else {
             return false;

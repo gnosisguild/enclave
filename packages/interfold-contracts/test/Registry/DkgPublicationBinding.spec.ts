@@ -7,7 +7,7 @@ import { expect } from "chai";
 import type { Signer } from "ethers";
 
 import MockCircuitVerifierModule from "../../ignition/modules/mockSlashingVerifier";
-import { BFV_DKG_H } from "../../scripts/utils";
+import { BFV_DKG_H, bfvPkExpectedPublicInputsLen } from "../../scripts/utils";
 import {
   ENCRYPTION_SCHEME_ID,
   buildRequestParams,
@@ -22,8 +22,12 @@ import {
 const { loadFixture, time } = networkHelpers;
 const abiCoder = ethers.AbiCoder.defaultAbiCoder();
 
-const NODES_FOLD_KEY_HASH = ethers.id("nodes_fold");
-const C5_KEY_HASH = ethers.id("c5");
+const P =
+  21888242871839275222246405745257275088548364400416034343698204186575808495617n;
+const fieldHash = (label: string) =>
+  ethers.toBeHex(BigInt(ethers.id(label)) % P, 32);
+const NODES_FOLD_KEY_HASH = fieldHash("nodes_fold");
+const C5_KEY_HASH = fieldHash("c5");
 
 // `BfvPkVerifier` checks the committee hash but not the E3 or the chain, and two E3s with the same
 // committee share that hash. The fold attestations bind a publication to one E3 on one chain: each
@@ -127,7 +131,7 @@ describe("DKG publication binding", function () {
     const committeeHash = BigInt(ethers.keccak256(ethers.concat(nodes)));
     const h = BFV_DKG_H;
     const publicInputs: string[] = Array.from(
-      { length: 3 * h + 6 },
+      { length: bfvPkExpectedPublicInputsLen(h, nodes.length) },
       () => ethers.ZeroHash,
     );
     publicInputs[0] = NODES_FOLD_KEY_HASH;
@@ -137,21 +141,26 @@ describe("DKG publication binding", function () {
       committeeHash & ((1n << 128n) - 1n),
       32,
     );
-    publicInputs[3 * h + 5] = pkCommitment;
+    publicInputs[2 * h + 5] = pkCommitment;
 
     const attestations = [];
     const bindings = [];
     for (let partyId = 0; partyId < h; partyId++) {
       const node = nodes[partyId]!;
-      const skAggCommit = ethers.id(`sk-${e3Id}-${partyId}`);
-      const esmAggCommit = ethers.id(`esm-${e3Id}-${partyId}`);
+      const skAggCommit = fieldHash(`sk-${e3Id}-${partyId}`);
+      const keys = nodes.map((_, peer) =>
+        fieldHash(`prf-${e3Id}-${partyId}-${peer}`),
+      );
+      const prfKeyCommitsHash = ethers.keccak256(ethers.concat(keys));
       publicInputs[2 + partyId] = ethers.toBeHex(partyId, 32);
       publicInputs[5 + h + partyId] = skAggCommit;
-      publicInputs[5 + 2 * h + partyId] = esmAggCommit;
+      keys.forEach((key, peer) => {
+        publicInputs[6 + 2 * h + partyId * nodes.length + peer] = key;
+      });
       attestations.push({
         partyId,
         skAggCommit,
-        esmAggCommit,
+        prfKeyCommitsHash,
         signature: await signFoldAttestation(
           signers.get(node.toLowerCase())!,
           signedChainId,
@@ -160,7 +169,7 @@ describe("DKG publication binding", function () {
           signedE3Id,
           partyId,
           skAggCommit,
-          esmAggCommit,
+          prfKeyCommitsHash,
         ),
       });
       bindings.push({ partyId, node });
@@ -172,7 +181,7 @@ describe("DKG publication binding", function () {
       proof: abiCoder.encode(["bytes", "bytes32[]"], ["0x", publicInputs]),
       bundle: abiCoder.encode(
         [
-          "tuple(uint256 partyId, bytes32 skAggCommit, bytes32 esmAggCommit, bytes signature)[]",
+          "tuple(uint256 partyId, bytes32 skAggCommit, bytes32 prfKeyCommitsHash, bytes signature)[]",
           "tuple(uint256 partyId, address node)[]",
         ],
         [attestations, bindings],
@@ -185,7 +194,7 @@ describe("DKG publication binding", function () {
     const { registry, pkVerifier, e3Ids } = fixture;
     const [first, second] = e3Ids;
     const { chainId } = await ethers.provider.getNetwork();
-    const pkCommitment = ethers.id("first-e3-public-key");
+    const pkCommitment = fieldHash("first-e3-public-key");
     const firstPublication = await buildPublication(
       fixture,
       first,
@@ -225,7 +234,7 @@ describe("DKG publication binding", function () {
         firstPublication.bundle,
       ),
     ).to.emit(registry, "CommitteeProofPublished");
-    const secondPkCommitment = ethers.id("second-e3-public-key");
+    const secondPkCommitment = fieldHash("second-e3-public-key");
     const secondPublication = await buildPublication(
       fixture,
       second,
@@ -248,7 +257,7 @@ describe("DKG publication binding", function () {
     const { registry, e3Ids } = fixture;
     const [first] = e3Ids;
     const { chainId } = await ethers.provider.getNetwork();
-    const pkCommitment = ethers.id("first-e3-public-key");
+    const pkCommitment = fieldHash("first-e3-public-key");
     const otherChain = await buildPublication(
       fixture,
       first,

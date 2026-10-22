@@ -206,6 +206,7 @@ fn threshold_share_pending(e3_id: E3id, marker: u8) -> ThresholdSharePending {
         dkg_input_type: DkgInputType::SecretKey,
         params_preset: BfvPreset::InsecureThreshold64,
         committee_size: CiphernodesCommitteeSize::Minimum,
+        prf_keys: vec![],
     };
 
     ThresholdSharePending {
@@ -214,20 +215,16 @@ fn threshold_share_pending(e3_id: E3id, marker: u8) -> ThresholdSharePending {
             party_id: 0,
             pk_share: ArcBytes::from_bytes(&[marker]),
             sk_sss: BfvEncryptedShares::default(),
-            esi_sss: vec![],
         }),
         proof_request: PkGenerationProofRequest {
             pk0_share: ArcBytes::from_bytes(&[marker]),
             sk: sensitive(),
             eek: sensitive(),
-            e_sm: sensitive(),
             params_preset: BfvPreset::InsecureThreshold64,
             committee_size: CiphernodesCommitteeSize::Minimum,
         },
         sk_share_computation_request: share_request(),
-        e_sm_share_computation_request: share_request(),
         sk_share_encryption_requests: vec![],
-        e_sm_share_encryption_requests: vec![],
         recipient_party_ids: vec![0],
     }
 }
@@ -280,7 +277,7 @@ async fn restart_dispatches_only_missing_threshold_proofs() -> Result<()> {
     let (bus, _rng, _seed, _params, _crp, _errors, history) = get_common_setup(None)?;
     let e3_id = E3id::new("partially-recovered-threshold", 1);
     let mut actor = ProofRequestActor::new(&bus, PrivateKeySigner::random(), true)
-        .with_recovered_inner_proofs(recovered_threshold_proofs(e3_id.clone(), 2));
+        .with_recovered_inner_proofs(recovered_threshold_proofs(e3_id.clone(), 1));
     let event = threshold_share_pending(e3_id.clone(), 0x11);
 
     actor.handle_threshold_share_pending(TypedEvent::new(event.clone(), test_ctx(event)));
@@ -292,7 +289,7 @@ async fn restart_dispatches_only_missing_threshold_proofs() -> Result<()> {
         .filter(|event| matches!(event.get_data(), InterfoldEventData::ComputeRequest(_)))
         .count();
     assert_eq!(requests, 1);
-    assert_eq!(actor.pending_threshold[&e3_id].total_received(), 2);
+    assert_eq!(actor.pending_threshold[&e3_id].total_received(), 1);
     assert_eq!(actor.threshold_correlation.len(), 1);
     Ok(())
 }
@@ -317,14 +314,14 @@ async fn replayed_threshold_work_invalidates_old_correlations() -> Result<()> {
         .keys()
         .copied()
         .collect::<Vec<_>>();
-    assert_eq!(first_correlations.len(), 3);
+    assert_eq!(first_correlations.len(), 2);
 
     actor.handle_threshold_share_pending(TypedEvent::new(
         threshold_share_pending(e3_id.clone(), 0x22),
         ec.clone(),
     ));
 
-    assert_eq!(actor.threshold_correlation.len(), 3);
+    assert_eq!(actor.threshold_correlation.len(), 2);
     assert!(first_correlations
         .iter()
         .all(|correlation| !actor.threshold_correlation.contains_key(correlation)));
@@ -357,17 +354,18 @@ async fn c4_dispatch_before_the_seq_layout_is_held_until_threshold_share_pending
         num_honest_parties: 0,
         num_moduli: 0,
         own_plaintext_idx: None,
+        recipient_party_id: 0,
         own_share_raw: None,
         dkg_input_type,
         params_preset: BfvPreset::InsecureThreshold64,
         committee_size: CiphernodesCommitteeSize::Minimum,
+        prf_keys: vec![],
     };
     let c4 = DecryptionShareProofsPending {
         e3_id: e3_id.clone(),
         party_id: 0,
         node: "0x00".into(),
         sk_request: request(DkgInputType::SecretKey),
-        esm_requests: vec![request(DkgInputType::SmudgingNoise)],
     };
     let layout = threshold_share_pending(e3_id, 0x11);
 
@@ -375,14 +373,15 @@ async fn c4_dispatch_before_the_seq_layout_is_held_until_threshold_share_pending
     assert!(actor.decryption_correlation.is_empty());
     actor.handle_threshold_share_pending(TypedEvent::new(layout.clone(), test_ctx(layout)));
 
-    // With no share encryptions C0-C3 take seqs 0-3, so C4a and C4b take 4 and 5.
+    // With no share encryptions C0, C1, and C2a take seqs 0-2, so the single C4a proof
+    // takes the last inner-proof seq 3.
     let mut seqs: Vec<_> = actor
         .decryption_correlation
         .values()
         .map(|(_, _, seq)| *seq)
         .collect();
     seqs.sort_unstable();
-    assert_eq!(seqs, vec![4, 5]);
+    assert_eq!(seqs, vec![3]);
     Ok(())
 }
 
@@ -421,7 +420,7 @@ fn c6_fixture(
         committee_size: CiphernodesCommitteeSize::Minimum,
         interfold_address: Address::repeat_byte(9),
         sk_agg_commits: vec![],
-        esm_agg_commits: vec![],
+        prf_key_commits: vec![],
     };
     let keys = CanonicalPublicKeys::default();
     keys.insert(id.clone(), key.clone())?;
@@ -431,15 +430,21 @@ fn c6_fixture(
         party_id: 0,
         node: Address::repeat_byte(1).to_string(),
         decryption_share: vec![ArcBytes::from_bytes(&[4])],
+        decryptors: vec![1, 2],
         proof_request: ThresholdShareDecryptionProofRequest {
             ciphertext_bytes: vec![ArcBytes::from_bytes(&[5])],
             aggregated_pk_bytes: ArcBytes::from_bytes(&pk),
             sk_poly_sum: e3_crypto::SensitiveBytes::from_encrypted(&[2]),
-            es_poly_sum: vec![e3_crypto::SensitiveBytes::from_encrypted(&[3])],
+            e_fresh: vec![e3_crypto::SensitiveBytes::from_encrypted(&[3])],
+            e_signed: vec![e3_crypto::SensitiveBytes::from_encrypted(&[3])],
             d_share_bytes: vec![ArcBytes::from_bytes(&[4])],
             decryption_domain: key.domain(Address::ZERO),
             params_preset: key.params_preset,
             committee_size: key.committee_size,
+            party_idx: 0,
+            decryptors: vec![1, 2],
+            outgoing_prf_keys: vec![],
+            incoming_prf_keys: vec![],
         },
         redelivery: 0,
     };
@@ -578,6 +583,46 @@ async fn a_c6_request_after_the_e3_ended_is_ignored() -> Result<()> {
         .await?;
 
     assert_no_events(&history).await
+}
+
+#[actix::test]
+async fn replacing_a_c6_set_retires_old_worker_correlations() -> Result<()> {
+    let (bus, _, _, _, _, _, history) = get_common_setup(None)?;
+    let mut actor = ProofRequestActor::new(&bus, PrivateKeySigner::random(), true);
+    let id = E3id::new("85", 1);
+    let (keys, mut pending) = c6_fixture(&id)?;
+    actor.canonical_keys = keys;
+    actor.handle_share_decryption_proof_pending(TypedEvent::new(
+        pending.clone(),
+        test_ctx(pending.clone()),
+    ));
+    let old = *actor.share_decryption_correlation.keys().next().unwrap();
+    pending.decryptors = vec![1, 3];
+    pending.proof_request.decryptors = pending.decryptors.clone();
+    actor
+        .handle_share_decryption_proof_pending(TypedEvent::new(pending.clone(), test_ctx(pending)));
+    assert_eq!(actor.share_decryption_correlation.len(), 1);
+    assert!(!actor.share_decryption_correlation.contains_key(&old));
+    actor.handle_share_decryption_proof_response(
+        &old,
+        vec![Proof::new(
+            CircuitName::ThresholdShareDecryption,
+            ArcBytes::from_bytes(&[1]),
+            ArcBytes::from_bytes(&[2]),
+        )],
+    );
+    assert_eq!(actor.pending_share_decryption[&id].decryptors, vec![1, 3]);
+    bus.flush_event_pipeline().await?;
+    assert!(!history
+        .send(GetEvents::<InterfoldEvent>::new())
+        .await?
+        .iter()
+        .any(|event| matches!(
+            event.get_data(),
+            InterfoldEventData::DecryptionshareCreated(_)
+                | InterfoldEventData::DecryptionShareProofSigned(_)
+        )));
+    Ok(())
 }
 
 #[test]

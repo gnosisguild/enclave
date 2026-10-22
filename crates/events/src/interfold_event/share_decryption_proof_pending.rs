@@ -32,4 +32,6 @@ pub struct ShareDecryptionProofPending {
     /// restart. EventBus deduplication passes each redelivery, and ProofRequestActor tells it from
     /// a copy of a request that it already has.
     pub redelivery: u64,
+    /// 1-based decryptor ids this share was computed for.
+    pub decryptors: Vec<u32>,
 }

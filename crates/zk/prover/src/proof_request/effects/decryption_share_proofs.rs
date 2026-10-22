@@ -29,6 +29,16 @@ impl ProofRequestActor {
         }
         self.held_share_decryption.remove(&e3_id);
 
+        if self
+            .pending_share_decryption
+            .get(&e3_id)
+            .is_some_and(|pending| pending.decryptors != msg.decryptors)
+        {
+            self.pending_share_decryption.remove(&e3_id);
+            self.share_decryption_correlation
+                .retain(|_, pending_e3| pending_e3 != &e3_id);
+        }
+
         if let Some(pending) = self.pending_share_decryption.get_mut(&e3_id) {
             // The keyshare redelivers its request when the proof result did not reach it. A lost
             // compute request or response leaves this proof pending, so request it again under a
@@ -54,6 +64,7 @@ impl ProofRequestActor {
                     decryption_share: msg.decryption_share,
                     ec: ec.clone(),
                     redelivery: msg.redelivery,
+                    decryptors: msg.decryptors,
                 },
             );
         }
@@ -142,6 +153,7 @@ impl ProofRequestActor {
                 e3_id: e3_id.clone(),
                 decryption_share: pending.decryption_share,
                 signed_decryption_proofs: signed_proofs,
+                decryptors: pending.decryptors.clone(),
             },
             ec.clone(),
         ) {
@@ -150,6 +162,7 @@ impl ProofRequestActor {
                     DecryptionShareProofSigned {
                         e3_id: e3_id.clone(),
                         redelivery: pending.redelivery,
+                        decryptors: pending.decryptors.clone(),
                     },
                     ec,
                 ) {

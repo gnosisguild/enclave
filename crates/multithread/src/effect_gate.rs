@@ -1248,7 +1248,7 @@ pub(crate) mod tests {
             committee_size: CiphernodesCommitteeSize::Minimum,
             interfold_address: Address::repeat_byte(9),
             sk_agg_commits: vec![],
-            esm_agg_commits: vec![],
+            prf_key_commits: vec![],
         };
         let keys = CanonicalPublicKeys::default();
         keys.insert(id.clone(), key.clone())?;
@@ -1256,7 +1256,12 @@ pub(crate) mod tests {
             ciphertext_bytes: vec![ArcBytes::from_bytes(&[5])],
             aggregated_pk_bytes: ArcBytes::from_bytes(&bytes),
             sk_poly_sum: e3_crypto::SensitiveBytes::from_encrypted(&[2]),
-            es_poly_sum: vec![e3_crypto::SensitiveBytes::from_encrypted(&[3])],
+            e_fresh: vec![e3_crypto::SensitiveBytes::from_encrypted(&[3])],
+            e_signed: vec![e3_crypto::SensitiveBytes::from_encrypted(&[3])],
+            party_idx: 0,
+            decryptors: vec![1, 3],
+            outgoing_prf_keys: vec![],
+            incoming_prf_keys: vec![],
             d_share_bytes: vec![ArcBytes::from_bytes(&[4])],
             decryption_domain: key.domain(Address::ZERO),
             params_preset: key.params_preset,

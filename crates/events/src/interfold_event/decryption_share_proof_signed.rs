@@ -13,4 +13,6 @@ pub struct DecryptionShareProofSigned {
     /// The `redelivery` of the request that this proof answers. A redelivered request gets its own
     /// completion event, which EventBus deduplication does not drop.
     pub redelivery: u64,
+    /// 1-based decryptor ids this share was computed for.
+    pub decryptors: Vec<u32>,
 }

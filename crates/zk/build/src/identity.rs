@@ -31,6 +31,7 @@ const SOURCE_FILES: &[&str] = &[
     "circuits/lib/Nargo.toml",
     "circuits/lib/src/lib.nr",
     "circuits/lib/src/configs/mod.nr",
+    "circuits/lib/src/configs/recursive.nr",
     "circuits/lib/src/configs/committee/mod.nr",
     "circuits/lib/src/configs/default/mod.nr",
     "crates/zk/build/Cargo.toml",

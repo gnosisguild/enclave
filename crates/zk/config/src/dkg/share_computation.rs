@@ -95,6 +95,7 @@ share_computation_sk (CIRCUIT 2a)
 // share_computation_sk - bit parameters
 pub global {}_BIT_SHARE: u32 = {};
 pub global {}_SK_BIT_SECRET: u32 = {};
+pub global SHARE_COMPUTATION_PRF_KEY_BITS: u32 = {};
 
 // share_computation_sk - configs
 pub global {}_SK_CONFIGS: ShareComputationConfigs<L_THRESHOLD> =
@@ -120,6 +121,7 @@ pub global {}_E_SM_CONFIGS: ShareComputationConfigs<L_THRESHOLD> =
             bits.bit_share,
             prefix,
             bits.bit_sk_secret,
+            e3_fhe_params::prf_key_bit_len(preset),
             prefix,
             prefix,
             bits.bit_e_sm_secret,

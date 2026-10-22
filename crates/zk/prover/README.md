@@ -105,6 +105,16 @@ preset and committee through the
 separate network/download integration target; enabling it alone is not evidence of proof execution.
 Test-only aggregation skipping in the wider harness is never a production fallback.
 
+`secure_sync_decryption_tests` is a separate ignored target for real secure-8192/minimum C6/C7
+proofs. Build those two threshold circuits with that preset/committee, then run
+`E3_ZK_PROVER_SKIP_FIXTURE_BUILD=1 cargo test --locked -p e3-zk-prover --test secure_sync_decryption_tests -- --ignored`.
+It verifies every correlated C6 share and C7, but not secure DKG, recursive aggregation or Solidity
+acceptance. `E3_SECURE_SYNC_COMMITTEE` selects `minimum` (default), `micro` or `small`; artifacts
+and the active stamp must match. Optional `E3_SECURE_SYNC_PUBLIC_PROOFS=<directory>` retains only
+public proof JSON, not witness inputs. The test also rejects tampered C6/C7 public inputs. Preset
+switches share repository files: coordinate them and restore the complete intended artifact pair
+afterward, even on failure; changing only the active source selector is insufficient.
+
 See [proof statements](../../../docs/architecture/proof-statements.md) and
 [artifact compatibility](../../../docs/architecture/circuit-artifacts.md) for required cross-layer
 acceptance. Witness generation, process success, checksum matching, and verified statements are

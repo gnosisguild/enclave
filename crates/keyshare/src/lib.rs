@@ -12,14 +12,13 @@ mod repo;
 
 pub use actors::{
     AllEncryptionKeysCollected, AllThresholdSharesCollected, BfvKeyIntent, DkgTimingReader,
-    EncryptionKeyCollector, ExpelPartyFromKeyCollection, GenEsiSss, GenPkShareAndSkSss,
-    RecoveryPayloadRef, ThresholdKeyshare, ThresholdKeyshareParams,
-    ThresholdKeyshareRecoveryPayloads, ThresholdKeyshareRecoveryState,
-    THRESHOLD_KEYSHARE_RECOVERY_SCHEMA_VERSION,
+    EncryptionKeyCollector, ExpelPartyFromKeyCollection, GenPkShareAndSkSss, RecoveryPayloadRef,
+    ThresholdKeyshare, ThresholdKeyshareParams, ThresholdKeyshareRecoveryPayloads,
+    ThresholdKeyshareRecoveryState, THRESHOLD_KEYSHARE_RECOVERY_SCHEMA_VERSION,
 };
 pub use domain::{
-    AggregatingDecryptionKey, CollectingEncryptionKeysData, Decrypting, GeneratingDecryptionProof,
-    GeneratingThresholdShareData, KeyshareState, ProofRequestData, ReadyForDecryption,
-    ThresholdKeyshareState,
+    AggregatingDecryptionKey, CollectingEncryptionKeysData, Completed, Decrypting,
+    GeneratingDecryptionProof, GeneratingThresholdShareData, KeyshareState, ProofRequestData,
+    ReadyForDecryption, ThresholdKeyshareState,
 };
 pub use repo::*;

@@ -341,8 +341,17 @@ impl CommitmentConsistency {
                         if vals.is_empty() {
                             continue;
                         }
+                        let targets: Vec<_> = all_targets
+                            .iter()
+                            .filter(|target| {
+                                link.applies_to(&src.public_signals, &target.public_signals)
+                            })
+                            .collect();
+                        if targets.is_empty() {
+                            continue;
+                        }
                         // Source must match AT LEAST ONE target.
-                        let found = all_targets.iter().any(|tgt| {
+                        let found = targets.iter().any(|tgt| {
                             link.check_consistency(
                                 &vals,
                                 &tgt.public_signals,

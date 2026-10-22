@@ -175,3 +175,30 @@ mod tests {
         }
     }
 }
+/// Public Lagrange weight at zero for a canonical one-based decryptor set.
+pub fn lagrange_at_zero(ids: &[u32], party_id: u32, q: u64) -> Result<u64, String> {
+    use num_traits::{One, ToPrimitive};
+    if q < 2
+        || !ids.contains(&party_id)
+        || ids.iter().any(|id| *id == 0 || u64::from(*id) >= q)
+        || ids.windows(2).any(|pair| pair[0] >= pair[1])
+    {
+        return Err("invalid canonical decryptor set".into());
+    }
+    let modulus = num_bigint::BigUint::from(q);
+    let mut numerator = num_bigint::BigUint::one();
+    let mut denominator = num_bigint::BigUint::one();
+    for &id in ids {
+        if id != party_id {
+            numerator = numerator * id % &modulus;
+            denominator =
+                denominator * (u128::from(q) + u128::from(id) - u128::from(party_id)) % &modulus;
+        }
+    }
+    let inverse = denominator
+        .modinv(&modulus)
+        .ok_or("non-invertible Lagrange denominator")?;
+    (numerator * inverse % modulus)
+        .to_u64()
+        .ok_or_else(|| "Lagrange residue does not fit u64".into())
+}

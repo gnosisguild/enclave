@@ -16,6 +16,8 @@ use fhe::bfv::SecretKey;
 use fhe::trbfv::ShareManager;
 use num_bigint::BigInt;
 
+use crate::smudging::SmudgingDrawer;
+
 /// Generates sample data for the share-computation circuit.
 pub fn generate(
     config: &Configs,
@@ -66,11 +68,8 @@ pub fn generate(
         }
         DkgInputType::SmudgingNoise => {
             // C2 samples with committee.n ciphertexts, not the other families' default z.
-            let noise =
-                crate::smudging::generator(threshold_params, committee.n, committee.n, preset)?;
-            let esi_coeffs = noise.generate_smudging_error(&mut rng).map_err(|e| {
-                WitnessError::Sample(format!("Failed to generate smudging error: {:?}", e))
-            })?;
+            let noise = SmudgingDrawer::new(threshold_params, committee.n, committee.n, preset);
+            let esi_coeffs = noise.draw(&mut rng)?;
             let esi_poly = share_manager.bigints_to_poly(&esi_coeffs)?;
             let esi_sss_u64 = share_manager
                 .generate_secret_shares_from_poly(esi_poly, &mut rng)
@@ -91,6 +90,9 @@ pub fn generate(
     };
 
     Ok(ShareComputationCircuitData {
+        prf_keys: (0..config.committee.values().n)
+            .map(|party| vec![party as u8 + 1; e3_fhe_params::prf_key_bit_len(preset) / 8])
+            .collect(),
         dkg_input_type,
         secret,
         secret_sss,

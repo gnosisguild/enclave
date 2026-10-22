@@ -10,7 +10,7 @@ import { ethers } from "./connection";
 export type DkgFoldAttestation = {
   partyId: number;
   skAggCommit: string;
-  esmAggCommit: string;
+  prfKeyCommitsHash: string;
   signature: string;
 };
 
@@ -24,19 +24,22 @@ export function encodeMockDkgProofForAttestation(
   pkCommitment: string,
   partyIds: number[],
   skCommits: string[],
-  esmCommits: string[],
+  prfCommits: string[],
+  n: number,
 ): string {
   const h = partyIds.length;
   const publicInputs: string[] = Array.from(
-    { length: 6 + 3 * h },
+    { length: 6 + 2 * h + h * n },
     () => ethers.ZeroHash,
   );
-  publicInputs[publicInputs.length - 1] = pkCommitment;
+  publicInputs[5 + 2 * h] = pkCommitment;
   for (let i = 0; i < h; i++) {
     publicInputs[2 + i] = ethers.zeroPadValue(ethers.toBeHex(partyIds[i]), 32);
     publicInputs[5 + h + i] = skCommits[i];
-    publicInputs[5 + 2 * h + i] = esmCommits[i];
   }
+  prfCommits.forEach((key, i) => {
+    publicInputs[6 + 2 * h + i] = key;
+  });
   return ethers.AbiCoder.defaultAbiCoder().encode(
     ["bytes", "bytes32[]"],
     ["0x", publicInputs],
@@ -52,11 +55,11 @@ export async function signFoldAttestation(
   e3Id: number | bigint,
   partyId: number,
   skAggCommit: string,
-  esmAggCommit: string,
+  prfKeyCommitsHash: string,
 ): Promise<string> {
   const domain = {
     name: "InterfoldDkgFoldAttestation",
-    version: "1",
+    version: "2",
     chainId,
     verifyingContract,
   };
@@ -66,7 +69,7 @@ export async function signFoldAttestation(
       { name: "e3Id", type: "uint256" },
       { name: "partyId", type: "uint256" },
       { name: "skAggCommit", type: "bytes32" },
-      { name: "esmAggCommit", type: "bytes32" },
+      { name: "prfKeyCommitsHash", type: "bytes32" },
     ],
   };
   return signer.signTypedData(domain, types, {
@@ -74,7 +77,7 @@ export async function signFoldAttestation(
     e3Id,
     partyId,
     skAggCommit,
-    esmAggCommit,
+    prfKeyCommitsHash,
   });
 }
 
@@ -94,7 +97,7 @@ export async function buildMockDkgAttestationFixtureData(
   bundle: string;
   partyIds: number[];
   skCommits: string[];
-  esmCommits: string[];
+  prfCommits: string[];
   attestations: DkgFoldAttestation[];
   bindings: DkgPartySlotBinding[];
 }> {
@@ -111,22 +114,29 @@ export async function buildMockDkgAttestationFixtureData(
 
   const partyIds = ordered.map((_, idx) => idx);
   const skCommits = partyIds.map((i) => ethers.id(`sk-${e3Id}-${i}`));
-  const esmCommits = partyIds.map((i) => ethers.id(`esm-${e3Id}-${i}`));
+  const n = ordered.length;
+  const prfCommits = partyIds.flatMap((i) =>
+    partyIds.map((j) => ethers.id(`prf-${e3Id}-${i}-${j}`)),
+  );
   const proof = encodeMockDkgProofForAttestation(
     pkCommitment,
     partyIds,
     skCommits,
-    esmCommits,
+    prfCommits,
+    n,
   );
 
   const { chainId } = await ethers.provider.getNetwork();
   const attestations: DkgFoldAttestation[] = [];
   const bindings: DkgPartySlotBinding[] = [];
   for (let i = 0; i < ordered.length; i++) {
+    const prfKeyCommitsHash = ethers.keccak256(
+      ethers.concat(prfCommits.slice(i * n, (i + 1) * n)),
+    );
     attestations.push({
       partyId: i,
       skAggCommit: skCommits[i],
-      esmAggCommit: esmCommits[i],
+      prfKeyCommitsHash,
       signature: await signFoldAttestation(
         ordered[i].op,
         chainId,
@@ -135,7 +145,7 @@ export async function buildMockDkgAttestationFixtureData(
         e3Id,
         i,
         skCommits[i],
-        esmCommits[i],
+        prfKeyCommitsHash,
       ),
     });
     bindings.push({ partyId: i, node: ordered[i].addr });
@@ -143,7 +153,7 @@ export async function buildMockDkgAttestationFixtureData(
 
   const bundle = ethers.AbiCoder.defaultAbiCoder().encode(
     [
-      "tuple(uint256 partyId, bytes32 skAggCommit, bytes32 esmAggCommit, bytes signature)[]",
+      "tuple(uint256 partyId, bytes32 skAggCommit, bytes32 prfKeyCommitsHash, bytes signature)[]",
       "tuple(uint256 partyId, address node)[]",
     ],
     [attestations, bindings],
@@ -155,7 +165,7 @@ export async function buildMockDkgAttestationFixtureData(
     bundle,
     partyIds,
     skCommits,
-    esmCommits,
+    prfCommits,
     attestations,
     bindings,
   };

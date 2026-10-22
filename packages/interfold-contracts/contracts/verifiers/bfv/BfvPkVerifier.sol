@@ -24,9 +24,11 @@ import { CommitteeHashLib } from "../../lib/CommitteeHashLib.sol";
  *        [2 .. 2+H)         = party_ids                 (H slots)
  *        [2+H]              = committee_hash_hi
  *        [3+H]              = committee_hash_lo
- *        [4+H .. 4+3H)      = expected_pk               (2*H slots)
- *        [4+3H]             = pk_commitment
- *        Total: expectedPublicInputsLen = 3*H + 6.
+ *        [4+H]              = aggregate recursive VK key hash
+ *        [5+H .. 5+2H)      = aggregate SK commitments
+ *        [5+2H]             = pk_commitment
+ *        [6+2H .. end)      = outgoing PRF commitments [H][N]
+ *        Total: 6 + 2*H + H*N, with N = sortedNodes.length.
  *
  *      The two VK-hash slots are checked against contract immutables set at
  *      construction; this anchors the recursive aggregation trust and
@@ -41,9 +43,7 @@ import { CommitteeHashLib } from "../../lib/CommitteeHashLib.sol";
 contract BfvPkVerifier is IPkVerifier {
     error InvalidCircuitVerifier(address verifier);
     error InvalidVerificationKeyHash();
-
-    /// @dev `dkg_aggregator` return field count.
-    uint256 internal constant DKG_RETURN_TAIL_LEN = 2;
+    error NonCanonicalPublicInput(uint256 index);
 
     /// @notice Honest-set size `H` (`party_ids` length); must match the compiled DkgAggregator circuit.
     uint256 public immutable override h;
@@ -54,10 +54,10 @@ contract BfvPkVerifier is IPkVerifier {
     /// @dev `publicInputs` index for `committee_hash_lo`.
     uint256 internal immutable committeeHashLoIdx;
 
-    /// @dev Total expected length of EVM public inputs for `dkg_aggregator`.
+    /// @dev Public-input prefix length, excluding the dynamically sized H*N key grid.
     uint256 internal immutable expectedPublicInputsLen;
 
-    /// @dev Index of `pkCommitment` (last return field).
+    /// @dev Index of `pkCommitment` before the outgoing-key grid.
     uint256 internal immutable pkCommitmentIdx;
 
     /// @notice Underlying Honk verifier for the DkgAggregator circuit.
@@ -89,8 +89,9 @@ contract BfvPkVerifier is IPkVerifier {
         h = _h;
         committeeHashHiIdx = 2 + _h;
         committeeHashLoIdx = 3 + _h;
-        expectedPublicInputsLen = (3 * _h) + 6;
-        pkCommitmentIdx = expectedPublicInputsLen - 1;
+        // The final H*N PRF grid is sized from the canonical full committee at verification.
+        expectedPublicInputsLen = (2 * _h) + 6;
+        pkCommitmentIdx = 5 + 2 * _h;
 
         circuitVerifier = ICircuitVerifier(_circuitVerifier);
         expectedNodesFoldKeyHash = _expectedNodesFoldKeyHash;
@@ -111,8 +112,19 @@ contract BfvPkVerifier is IPkVerifier {
             (bytes, bytes32[])
         );
 
-        if (publicInputs.length != expectedPublicInputsLen) {
+        if (
+            publicInputs.length !=
+            expectedPublicInputsLen + h * sortedNodes.length
+        ) {
             revert InvalidPublicInputsLength();
+        }
+        for (uint256 i; i < publicInputs.length; ++i) {
+            if (
+                uint256(publicInputs[i]) >=
+                21888242871839275222246405745257275088548364400416034343698204186575808495617
+            ) {
+                revert NonCanonicalPublicInput(i);
+            }
         }
 
         // Anchor recursive-aggregation trust to immutable VK hashes.

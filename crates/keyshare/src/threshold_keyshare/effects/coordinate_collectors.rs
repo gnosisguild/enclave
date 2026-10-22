@@ -2,6 +2,7 @@
 
 //! Collector lifecycle, expulsion, and early artifact routing.
 
+use super::create_decryption_share::{canonical_decryptors, reconstruction_count};
 use super::*;
 
 impl ThresholdKeyshare {
@@ -371,7 +372,31 @@ impl ThresholdKeyshare {
         }
         recorded?;
         // The expulsion can explain a dealer that a held Ready update lacks.
-        self.apply_held_ready_updates(ec)
+        self.apply_held_ready_updates(ec.clone())?;
+        let state = self.state.try_get()?;
+        if matches!(
+            state.state,
+            KeyshareState::Decrypting(_)
+                | KeyshareState::GeneratingDecryptionProof(_)
+                | KeyshareState::Completed(_)
+        ) {
+            if let Ok(decryptors) = canonical_decryptors(
+                state.honest_parties.as_ref(),
+                &state.expelled_parties,
+                reconstruction_count(state.threshold_m)?,
+            ) {
+                // Direct delivery avoids deduplication of an earlier, non-authoritative local
+                // round request. Confirmed exclusions, not gossip, authorize recomputation.
+                self.apply_fresh_decryption_round(TypedEvent::new(
+                    e3_events::FreshDecryptionRound {
+                        e3_id: state.e3_id.clone(),
+                        decryptors,
+                    },
+                    ec,
+                ))?;
+            }
+        }
+        Ok(())
     }
 
     pub fn handle_threshold_share_created(
@@ -407,15 +432,6 @@ impl ThresholdKeyshare {
             info!(
                 "Dropping ThresholdShareCreated from expelled party {} for us (party {})",
                 msg.share.party_id, my_party_id
-            );
-            return Ok(());
-        }
-        let expected = self.dkg_dealer_address(&msg.e3_id, msg.share.party_id)?;
-        if expected.is_none() || msg.recover_address().ok() != expected {
-            warn!(
-                party_id = msg.share.party_id,
-                e3_id = %msg.e3_id,
-                "Dropping threshold share without its dealer's signature"
             );
             return Ok(());
         }

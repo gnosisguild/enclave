@@ -155,13 +155,20 @@ impl Handler<E3CommitteeContainsResponse<TypedEvent<DecryptionshareCreated>>>
                         party_id,
                         decryption_share,
                         signed_decryption_proofs,
+                        decryptors,
                         ..
                     },
                     ec,
                 ) = msg.into_inner().into_components();
 
                 let was_ready = self.aggregation_inputs_ready();
-                self.add_share(party_id, decryption_share, signed_decryption_proofs, &ec)?;
+                self.add_share(
+                    party_id,
+                    decryption_share,
+                    signed_decryption_proofs,
+                    &decryptors,
+                    &ec,
+                )?;
                 let became_ready = !was_ready && self.aggregation_inputs_ready();
                 if became_ready {
                     self.publish_inputs_ready(ec.clone())?;

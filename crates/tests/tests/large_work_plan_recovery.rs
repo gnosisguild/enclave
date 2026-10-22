@@ -25,6 +25,8 @@ use e3_zk_config::DkgInputType;
 use e3_zk_prover::ProofRequestActor;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
+const EXPECTED_PROOF_REQUESTS: usize = 56;
+
 fn pending_small_work_plan() -> ThresholdSharePending {
     let committee = CiphernodesCommitteeSize::Small;
     let n = committee.values().n;
@@ -34,11 +36,11 @@ fn pending_small_work_plan() -> ThresholdSharePending {
         pk0_share: ArcBytes::from_bytes(&[]),
         sk: empty.clone(),
         eek: empty.clone(),
-        e_sm: empty.clone(),
         params_preset: preset,
         committee_size: committee,
     };
     let computation = |kind| ShareComputationProofRequest {
+        prf_keys: vec![empty.clone(); n],
         secret_raw: empty.clone(),
         secret_sss_raw: empty.clone(),
         dkg_input_type: kind,
@@ -47,11 +49,12 @@ fn pending_small_work_plan() -> ThresholdSharePending {
     };
 
     // Small has 18 external recipients and three secure-8192 modulus rows.
-    // Each recipient has C3a and C3b work, for 108 C3 requests plus C1/C2a/C2b.
+    // Each recipient has C3a work, for 54 C3 requests plus C1/C2a.
     // The payload bytes are synthetic; this test checks durable transport and dispatch,
     // not BFV witness validity or proof generation.
-    let large_ciphertext = ArcBytes::from_bytes(&vec![0x5a; 1_130_000]);
+    let large_ciphertext = ArcBytes::from_bytes(&vec![0x5a; 2_260_000]);
     let encryption_request = |party_id, row_index, kind| ShareEncryptionProofRequest {
+        prf_key: empty.clone(),
         share_row_raw: empty.clone(),
         ciphertext_raw: large_ciphertext.clone(),
         recipient_pk_raw: ArcBytes::from_bytes(&[]),
@@ -66,7 +69,6 @@ fn pending_small_work_plan() -> ThresholdSharePending {
         esi_index: 0,
     };
     let mut sk_requests = Vec::new();
-    let mut esm_requests = Vec::new();
     for party_id in 1..n {
         for row_index in 0..3 {
             sk_requests.push(encryption_request(
@@ -74,14 +76,9 @@ fn pending_small_work_plan() -> ThresholdSharePending {
                 row_index,
                 DkgInputType::SecretKey,
             ));
-            esm_requests.push(encryption_request(
-                party_id,
-                row_index,
-                DkgInputType::SmudgingNoise,
-            ));
         }
     }
-    assert_eq!(sk_requests.len() + esm_requests.len() + 3, 111);
+    assert_eq!(sk_requests.len() + 2, EXPECTED_PROOF_REQUESTS);
 
     ThresholdSharePending {
         e3_id: E3id::new("7", 1),
@@ -89,13 +86,10 @@ fn pending_small_work_plan() -> ThresholdSharePending {
             party_id: 0,
             pk_share: ArcBytes::from_bytes(&[]),
             sk_sss: BfvEncryptedShares::default(),
-            esi_sss: vec![],
         }),
         proof_request,
         sk_share_computation_request: computation(DkgInputType::SecretKey),
-        e_sm_share_computation_request: computation(DkgInputType::SmudgingNoise),
         sk_share_encryption_requests: sk_requests,
-        e_sm_share_encryption_requests: esm_requests,
         recipient_party_ids: (0..n as u64).collect(),
     }
 }
@@ -124,14 +118,17 @@ async fn dispatch_work_plan(event: InterfoldEvent<Unsequenced>) -> Result<Vec<Co
                     _ => None,
                 })
                 .collect();
-            if requests.len() >= 111 {
+            if requests.len() >= EXPECTED_PROOF_REQUESTS {
                 break Ok::<_, anyhow::Error>(());
             }
             tokio::time::sleep(Duration::from_millis(25)).await;
         }
     })
     .await??;
-    ensure!(requests.len() == 111, "unexpected proof request count");
+    ensure!(
+        requests.len() == EXPECTED_PROOF_REQUESTS,
+        "unexpected proof request count"
+    );
     Ok(requests)
 }
 

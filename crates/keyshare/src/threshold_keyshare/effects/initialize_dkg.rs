@@ -235,8 +235,6 @@ impl ThresholdKeyshare {
                 GeneratingThresholdShareData {
                     sk_sss: None,
                     pk_share: None,
-                    esi_sss: None,
-                    e_sm_raw: None,
                     sk_bfv: current.sk_bfv,
                     pk_bfv: current.pk_bfv,
                     collected_encryption_keys: filtered_keys,
@@ -294,6 +292,7 @@ impl ThresholdKeyshare {
                 crp,
                 lambda: threshold_preset.lambda_config(),
                 num_ciphertexts: defaults.z as usize,
+                mult_depth: 0,
             }),
             CorrelationId::new(),
             e3_id,
@@ -313,7 +312,6 @@ impl ThresholdKeyshare {
             KeyshareState::GeneratingThresholdShare(data)
                 if data.pk_share.is_none()
                     && data.sk_sss.is_none()
-                    && data.e_sm_raw.is_none()
                     && data.proof_request_data.is_none() => {}
             KeyshareState::GeneratingThresholdShare(_) => {
                 info!("Ignoring duplicate GenPkShareAndSkSss response");
@@ -323,7 +321,7 @@ impl ThresholdKeyshare {
             | KeyshareState::ReadyForDecryption(_)
             | KeyshareState::Decrypting(_)
             | KeyshareState::GeneratingDecryptionProof(_)
-            | KeyshareState::Completed
+            | KeyshareState::Completed(_)
             | KeyshareState::Failed { .. } => {
                 info!(
                     state = state.variant_name(),
@@ -356,11 +354,7 @@ impl ThresholdKeyshare {
             .try_into()
             .context("Error extracting data from compute process")?;
 
-        let (pk_share, sk_sss, e_sm_raw) = (
-            output.pk_share.clone(),
-            output.sk_sss,
-            output.e_sm_raw.clone(),
-        );
+        let (pk_share, sk_sss) = (output.pk_share.clone(), output.sk_sss);
 
         // Store proof request data for later use by ProofRequestActor
         let proof_request_data = ProofRequestData {
@@ -376,31 +370,14 @@ impl ThresholdKeyshare {
                 GeneratingThresholdShareData {
                     pk_share: Some(pk_share),
                     sk_sss: Some(sk_sss),
-                    e_sm_raw: Some(e_sm_raw.clone()),
                     proof_request_data: Some(proof_request_data),
                     ..current
                 },
             ))
         })?;
 
-        if let Some(response) = self.pending.gen_esi_response.take() {
-            self.handle_gen_esi_sss_response(response)?;
-        } else {
-            // Fire gen_esi_sss with the e_sm_raw
-            let current_state: GeneratingThresholdShareData = self.state.try_get()?.try_into()?;
-            if let Some(ciphernode_selected) = current_state.ciphernode_selected {
-                self.handle_gen_esi_sss_requested(TypedEvent::new(
-                    GenEsiSss {
-                        ciphernode_selected,
-                        e_sm_raw: current_state
-                            .e_sm_raw
-                            .expect("e_sm_raw should be set at this point"),
-                    },
-                    ec.clone(),
-                ))?;
-            }
-        }
-
-        Ok(())
+        // The shares (with the packed outgoing PRF keys) publish immediately; fresh
+        // smudging noise is sampled per decryption inside the compute worker.
+        self.publish_generated_threshold_shares(ec)
     }
 }

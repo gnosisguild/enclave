@@ -273,6 +273,7 @@ async fn replay_delivers_the_shares_and_chain_stages_behind_resends() -> anyhow:
     let events = vec![
         InterfoldEvent::<Unsequenced>::test_event("share")
             .data(DecryptionshareCreated {
+                decryptors: vec![],
                 party_id: 1,
                 decryption_share: vec![ArcBytes::from_bytes(&[1])],
                 e3_id: e3_id.clone(),

@@ -274,8 +274,11 @@ export function committeeThresholdsForChain(
 }
 
 /** `dkg_aggregator` EVM public-input count for honest-set size `h`. */
-export function bfvPkExpectedPublicInputsLen(h: number): number {
-  return 3 * h + 6;
+export function bfvPkExpectedPublicInputsLen(
+  h: number,
+  n = 2 * BFV_THRESHOLD_T + 1,
+): number {
+  return 6 + 2 * h + h * n;
 }
 
 /** `publicInputs` indices for `committee_hash_hi` / `committee_hash_lo` (matches `BfvPkVerifier`). */
@@ -288,7 +291,7 @@ export function bfvDkgCommitteeHashIndices(h: number): {
 
 /** `decryption_aggregator` EVM public-input count for BFV threshold `t`. */
 export function bfvDecExpectedPublicInputsLen(threshold: number): number {
-  return 61 + 3 * threshold;
+  return 61 + 3 * threshold + 2 * (threshold + 1) * (2 * threshold + 1);
 }
 
 /** `publicInputs` indices for decryption-aggregator committee hash limbs. */
@@ -304,12 +307,18 @@ export function bfvDecCommitteeHashIndices(): { hi: number; lo: number } {
 export function bfvDecPartyColOffsets(threshold: number): {
   partyId: number;
   sk: number;
-  esm: number;
+  c0: number;
+  message: number;
+  outgoingKeys: number;
+  incomingKeys: number;
 } {
   const partyId = 8; // 7 domain/VK/committee/commitment inputs + DEC_RETURN_PREFIX_LEN
   const sk = partyId + (threshold + 1);
-  const esm = sk + (threshold + 1);
-  return { partyId, sk, esm };
+  const c0 = sk + (threshold + 1);
+  const message = c0 + threshold + 1;
+  const outgoingKeys = message + 50;
+  const incomingKeys = outgoingKeys + (threshold + 1) * (2 * threshold + 1);
+  return { partyId, sk, c0, message, outgoingKeys, incomingKeys };
 }
 
 /** `publicInputs` indices for decryption-aggregator E3 domain limbs. */

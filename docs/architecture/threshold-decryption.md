@@ -1,5 +1,53 @@
 # Threshold decryption
 
+## Synchronized-decryption migration status
+
+This branch is an incomplete protocol migration, not a deployable upgrade. The v0.5.1 fhe.rs
+integration computes `lambda_i * c1 * sk_i + e_i + mask_i` for exactly T+1 designated parties. Fresh
+local noise replaces the shared ESM polynomial. Pairwise PRF masks cancel only when all shares use
+the same ciphertext and designated set. Final reconstruction adds c0 once and does not interpolate
+again.
+
+The changed C1-C4 and C6/C7 leaf circuits have matching Rust witnesses. DKG C2/C3/C4 bind key bits
+packed into share-encryption plaintext under DKG t = 2q. C3/node/DKG folds carry the selected-H by
+full-N outgoing commitment grid. C6 binds its owner and designated IDs; C6 folds require the same
+set and domain throughout. Final public counts are `6+2H+HN` for DKG and `8+3S+50+2SN` for
+decryption, where `S=T+1`. SK and selected directed PRF commitments are checked against registry
+anchors; unused peer columns are not mistaken for selected-dealer rows.
+
+Fresh source-bound insecure-64/minimum artifacts verify the correlated C0-C7 pipeline with dealers
+`[0,2]` and decryptors `[1,3]`, including regenerated Solidity Honk verifier/wrapper acceptance and
+malformed-input rejection. A separate real-proof multi-node run also passes a disk restart during
+C6. Secure-8192/minimum C6/C7 leaf proofs verify their correlated share commitments and reject
+tampered public inputs. Secure DKG/recursion/Solidity, larger secure committees and the complete
+release matrix remain unqualified. These local results do not authorize a merge, deployment or
+production rollout.
+
+A separate insecure-64/Small real-proof multi-node run delivers a confirmed exclusion while share
+calculations are queued, observes a converged replacement set, releases a retired calculation and
+completes recursive aggregation with replacement-only signed shares. It tests exclusion delivery and
+stale-calculation handling, not accusation consensus or on-chain slashing; late proof-worker
+responses have separate native/unit coverage.
+
+Live admission checks unsigned transport IDs against the signed C6 owner/set before reserving a
+slot. Replaced sets discard old shares, recovery intents and proof-worker correlations. Each node
+derives the replacement from authenticated exclusions; `FreshDecryptionRound` is a local wakeup, not
+peer authority to choose a set. Identical wakeups coalesce, and replay records state without
+dispatching work. Restored DKG rosters cannot reintroduce durably excluded decryptors.
+
+Fold attestations use EIP-712 version 2 and bind the SK commitment plus Keccak of the outgoing
+bytes32 key row. The registry appends PRF storage while preserving old ESM slots and consuming one
+reserved gap slot. The deployed/pre-migration flow below still uses SK/ESM anchors. This development
+branch declares protocol 9 / generation 2, schema 9, gossip wire 6 and sync wire 5; its
+source-counter change and drained fresh-history boundary have human approval, not permission to
+merge or deploy. The protocol overlay and wire majors prevent mixing the changed payloads with old
+nodes. No live-store migration, verifier deployment or production rollout is authorized here.
+Same-address replay of historical old-layout DKG logs is not supported by the new canonical-key
+projection: this proposal requires a drained fresh deployment/history boundary unless a separate
+migration is implemented and reviewed.
+
+## Deployed / pre-migration flow
+
 Owners: [keyshare](../../crates/keyshare/src/threshold_keyshare/),
 [plaintext aggregation](../../crates/aggregator/src/plaintext_aggregation/),
 [canonical key projection](../../crates/request/src/canonical_key.rs), and

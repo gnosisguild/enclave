@@ -43,17 +43,20 @@ pub fn generate(
             let defaults = preset
                 .search_defaults()
                 .ok_or_else(|| WitnessError::Sample("Preset has no search defaults".into()))?;
-            Some(crate::smudging::generator(
+            Some(crate::smudging::SmudgingDrawer::new(
                 threshold_params,
                 committee.n,
                 usize::try_from(defaults.z).map_err(|e| WitnessError::Sample(e.to_string()))?,
                 preset,
-            )?)
+            ))
         }
     };
 
     let mut honest_ciphertexts: Vec<Option<Vec<Ciphertext>>> = Vec::new();
     let num_honest = committee.h;
+    let prf_keys: Vec<Vec<u8>> = (0..num_honest)
+        .map(|slot| vec![slot as u8 + 1; e3_fhe_params::prf_key_bit_len(preset) / 8])
+        .collect();
     // Midpoint own slot exercises both the None (own plaintext) and Some (BFV-decrypt) branches.
     let own_slot_idx = num_honest / 2;
     let mut own_plaintext_share: Vec<Vec<u64>> =
@@ -62,15 +65,30 @@ pub fn generate(
     for slot_idx in 0..num_honest {
         let mut party_cts = Vec::new();
         let mut own_share_for_slot: Vec<Vec<u64>> = Vec::new();
-        for _ in 0..threshold_params.moduli().len() {
+        for row in 0..threshold_params.moduli().len() {
             // Each modulus keeps its fresh draw and selects first-modulus receiver zero.
             let share_row = super::share_row(&mut share_manager, noise.as_ref(), &mut rng)?;
+            let share_row: Vec<u64> = share_row
+                .into_iter()
+                .map(|value| value % threshold_params.moduli()[row])
+                .collect();
 
             if slot_idx == own_slot_idx {
                 own_share_for_slot.push(share_row);
                 continue;
             }
 
+            let share_row = if row == 0 {
+                e3_fhe_params::pack_prf_key(
+                    preset,
+                    &share_row,
+                    &prf_keys[slot_idx],
+                    threshold_params.moduli()[0],
+                )
+                .map_err(|e| WitnessError::Sample(e.to_string()))?
+            } else {
+                share_row
+            };
             let pt =
                 Plaintext::try_encode(&share_row, Encoding::poly(), dkg_params).map_err(|e| {
                     WitnessError::Sample(format!("Failed to encode plaintext: {:?}", e))
@@ -92,6 +110,8 @@ pub fn generate(
     }
 
     Ok(ShareDecryptionCircuitData {
+        recipient_party_idx: 0,
+        prf_keys,
         honest_ciphertexts,
         own_plaintext_share,
         secret_key: dkg_secret_key,
@@ -124,8 +144,21 @@ mod tests {
         let encrypted_row = sample
             .own_plaintext_share
             .iter()
-            .map(|row| {
-                let plaintext = Plaintext::try_encode(row, Encoding::poly(), dkg_params).unwrap();
+            .enumerate()
+            .map(|(limb, row)| {
+                let packed = if limb == 0 {
+                    e3_fhe_params::pack_prf_key(
+                        preset,
+                        row,
+                        &sample.prf_keys[own_idx],
+                        config.threshold_params.moduli()[0],
+                    )
+                    .unwrap()
+                } else {
+                    row.clone()
+                };
+                let plaintext =
+                    Plaintext::try_encode(&packed, Encoding::poly(), dkg_params).unwrap();
                 public_key.try_encrypt(&plaintext, &mut rng).unwrap()
             })
             .collect();

@@ -53,6 +53,9 @@ pub struct Collecting {
     pub(crate) ciphertext_output: Vec<ArcBytes>,
     pub(crate) params: ArcBytes,
     pub(crate) rejected_parties: BTreeSet<u64>,
+    /// Strictly increasing 1-based decryptor ids designated for the current round. Empty means
+    /// the round is unrestricted: the first `threshold + 1` accepted shares designate the set.
+    pub(crate) expected_decryptors: Vec<u32>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -80,6 +83,7 @@ pub struct Computing {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GeneratingC7Proof {
+    pub(crate) ciphertext_output: Vec<ArcBytes>,
     pub(crate) threshold_m: u64,
     pub(crate) threshold_n: u64,
     pub(crate) shares: Vec<(u64, Vec<ArcBytes>)>,
@@ -178,6 +182,7 @@ impl ThresholdPlaintextAggregatorState {
             ciphertext_output,
             params,
             rejected_parties: BTreeSet::new(),
+            expected_decryptors: Vec::new(),
         })
     }
 }

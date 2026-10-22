@@ -1,0 +1,627 @@
+# Plan: Synchronized TRBFV decryption on a fresh main-aligned branch
+
+Status: review-branch local qualification passed; final commit/push checks remain. Secure/minimum
+C6/C7 leaves are verified, but the full secure matrix remains unqualified. Date: 2026-10-22.
+Reference implementation: `feat/share-prf-bit` @ `27041b947` (kept as read-only reference; built on
+the dead `lbfv/chunking` lineage). Upstream dependency:
+[fhe.rs v0.5.1](https://github.com/gnosisguild/fhe.rs/releases) — contains
+[#286](https://github.com/gnosisguild/fhe.rs/pull/286) (synchronized TRBFV decryption) and
+[#289](https://github.com/gnosisguild/fhe.rs/pull/289) (consolidated threshold decryption APIs,
+breaking).
+
+## Goal
+
+Ship the synchronized decryptor (PRF-masked partial decryption, designated set of `threshold + 1`
+parties, local Lagrange weighting, fresh local smudging noise) on a branch based on current
+`origin/main`, **without** any lbfv/chunking lineage content.
+
+## Current checkpoint
+
+### Qualification resumed; branch commit/push authorized when complete
+
+The user authorized finishing the remaining work, then committing and pushing the feature branch;
+merging to main, deployment and publication are not authorized. The user separately approved
+protocol **9** / generation **2** and the drained fresh-deployment/history boundary for source
+configuration. Schema 9 / gossip 6 / sync 5 remain reserved. The migration/rollback description is
+in `docs/architecture/upgrades.md`; execution and the required pre-merge review are still separate.
+The user subsequently selected **"Push tested review branch"**: finish branch-level recursive,
+contract and recovery checks, then commit/push with larger secure pairs explicitly pending. The full
+six-pair production qualification is not a condition of that review-branch push, and must not be
+represented as completed.
+
+The latest compiler fix adds a fixed-array SAFE squeeze at a checked permutation boundary, used by
+PRF expansion only. It preserves tags, full stream lengths, permutation order, empty/tail behavior,
+and continuation state; the general streaming API remains unchanged. **223 Noir tests** and six
+nonconstant secure-width old/new mask comparisons passed. This is distinct from the rejected
+one-shot/vector and per-element fixed-output experiments below.
+
+The canonical builder has now completed **secure-8192/minimum C6 and C7 plus their VK variants** in
+640.15 seconds, with sampled peak 24,383 MiB, under a 900-second / 28-GiB guard. Source-bound stamp:
+`71d5265019dfcc1c`. The earlier secure compilation blocker is therefore cleared for this pair.
+Actual correlated secure leaf qualification then **passed**: both C6 shares and C7 proved and
+verified, their public commitment links matched, and tampered C6/C7 public inputs were rejected. The
+run took 282.88 seconds with sampled peak 21,310 MiB. Public-only proof JSON is retained under
+`sync-dec-qualification/secure-minimum-public-proofs/`; no witness was exported. This is not secure
+DKG/recursion/Solidity or larger-committee qualification. The ignored target supports explicitly
+selected committees and optional public-only exports. Its first attempt exposed a test-helper
+symlink destination incorrectly reapplying `E3_CUSTOM_BB`; the fixture path is now isolated from the
+already-resolved real binary, and the rerun passed with the explicit custom binary.
+
+Native builder tests passed (18 library + 2 CLI, one ignored); canonical generated-config comparison
+passed. Updated capability runs passed aggregator (93), config (45) and keyshare (162). A network
+expiry scenario failed both parallel and serial runs because its peer-dial selection could choose a
+non-loopback host interface. Its test-only dial now prefers loopback while retaining advertised
+non-loopback Kademlia addresses; the focused regression passes without changing admission policy or
+timeouts. The complete serial network rerun passed all **303 tests**. Slashing (46), trbfv (7) and
+zk-prover (166, two ignored) also passed. The replacement scenario compiles successfully.
+
+An optional Small-committee real-proof scenario now holds compute admission while delivering a
+confirmed exclusion, observes replacement requests on every newly designated node, then releases the
+retired share calculation and checks that it starts no C6 proof. It also asserts that all published
+shares use the replacement set. Its complete insecure/Small artifacts built in an isolated worktree
+in 55.41 seconds (sampled peak 4,944 MiB). The real-proof scenario **passed** in 4,997.91 seconds,
+with sampled peak 8,388 MiB, below its 6,000-second / 12-GiB guard. It completed 20 share
+calculations (old and replacement sets) but only the 10 replacement C6 proofs, then real recursive
+aggregation and the expected plaintext. Minimum/Micro have no spare member in their selected H
+roster. This models delivery of an authenticated exclusion fact, not accusation consensus or
+on-chain slashing. The explicit late-response injection is a retired share calculation; late C6
+proof-worker responses retain their separate native/unit coverage rather than being described as the
+same real-proof case.
+
+The complete insecure/minimum artifact pair was rebuilt canonically afterward (47.23 seconds,
+sampled peak 4,925 MiB), restoring the intended default selection and both VK-tree anchors. Fresh
+recursive/contract and distributed checks use these regenerated artifacts, not the earlier fixture.
+The default pair's source-bound stamp is `65bc58b7910d3084`; the secure leaf stamp above belongs to
+its different preset.
+
+Completed current-revision verification:
+
+- The correlated full C0-C7 recursive suite and both adversarial fold tests passed. The final EVM
+  proofs refreshed the committed public-only fixture through its canonical sync script.
+- All **859 contract tests** passed, including actual real-proof Solidity acceptance. An initial
+  invocation incorrectly supplied a wrapped export as a raw fixture and skipped that one case; the
+  corrected raw-fixture run has no pending tests. Storage validation, size checks and verifier
+  comparison passed; registry EIP-170 headroom remains 205 bytes.
+- The full real-proof multi-node flow passed with recursive aggregation enabled and a persisted-C6
+  disk restart (184.85 seconds, sampled peak 6,206 MiB). It exported public proofs and timing data,
+  not node secrets. This is separate from the successful Small replacement case.
+- The complete root Noir suite, Noir checks and Rust formatting passed. Its configuration verifier
+  first exposed the stale pre-Lagrange C6 quotient formula and a narrowing u128 comparison. The
+  verifier now independently decomposes the cubic bound in safe u128 intermediates and compares the
+  final 129-bit result in Field; generated parameters and cryptographic statements were not
+  weakened. The same command failed before this checker fix and passed afterward.
+- Events (136), EVM (258), request (67), multithread (32), proof/slashing integration (12) and the
+  runtime layout comparison passed in addition to the capability counts above.
+- SDK tests initially found a stale generated WASM bundle without the current preset name. Both WASM
+  targets were rebuilt after preserving the old bundle. All **37 SDK tests**, **7 prepared real
+  encryption-proof tests**, and the actual browser encryption smoke passed. The browser run used
+  installed Chrome through the supported `CHROME_BIN` option; no check was skipped.
+- Circuit tooling, license, committee, address, repository and documentation-link checks passed.
+  Root ESLint traversed the preserved ignored CRISP experiment; the same unchanged check passed in
+  the clean verification worktree. The experiment and lint exclusions were not modified.
+
+Qualification logs and the debug-info-disabled Cargo target are isolated under the approved
+temporary directory's `sync-dec-qualification/`. Canonical circuit outputs are being recreated as
+needed, with a 20-GiB free-disk reserve; unrelated experiments remain untouched. The primary
+checkout stayed on insecure/minimum while Small ran in the separate worktree. That worktree has now
+been restored through the canonical builder to the complete default pair for final checks/push. At
+this pre-commit checkpoint no commit or push has run; final repository hooks still gate the approved
+review-branch push. The full release matrix and larger secure qualification remain explicitly
+outside this milestone. Main merge, deployment and publication remain unauthorized.
+
+### Post-change read-only review for the review branch
+
+Reviewed the actual latest diff and owner code separately from editing, under proof statements,
+threshold decryption, DKG, persistence/replay, network delivery and upgrade policy. This is an
+implementation review, not an independent cryptographic audit or the required human pre-merge
+approval.
+
+- Checked fixed-array SAFE rate/tail/empty transitions and its boundary/IO assertions against the
+  original streaming API; checked context index partition, exact-peer selection, full-N recipient
+  anchors, scalar-quotient no-wrap conditions and already-bounded wide packing.
+- The configuration checker's cube decomposition keeps its u128 intermediates bounded for `q<2^62`
+  and u32 degree, while its final Field result stays below the scalar modulus. No generated bound,
+  scalar-equality requirement or compiler safety check was relaxed.
+- Rechecked current-round digest validation before C6 intent creation, authenticated share/domain
+  admission before slot use, and exclusion-derived replacement/retirement. The new harness holds
+  compute admission rather than actor mailboxes and releases the slot on early failure.
+- Old-data replay remains unsupported across schema 8/9; old peers fail protocol/wire admission; old
+  deployed verifiers/anchors do not establish acceptance of the new statements. The approved source
+  decision is protocol 9/generation 2 with a fresh drained history boundary, not a rolling upgrade
+  or counter downgrade. Same-address history conversion and rollout execution remain out of scope.
+- Test-only symlink and interface-selection fixes preserve production configuration precedence, peer
+  admission and timeout semantics. No L-BFV/chunking feature was introduced and the local SAFE
+  dependency patch is retained. Remaining evidence limits are recorded above, not treated as
+  successful release qualification.
+
+### Secure-size component isolation and fixed context storage
+
+Follow-up probes used the pinned compiler with all constraint checks enabled, normally capped at 60
+seconds / 8 GiB. Degree-8192 results isolated several distinct costs: the existing product kernel
+compiled in 4.18 seconds, checked ciphertext commitments in 7.26 seconds, and the C6-style packed
+transcript in 50.83 seconds. A 24,576-value reduction batch and the original context digest reached
+the time cap; a full PRF stream reached the memory cap. These are component diagnostics, not secure
+C6 qualification. A synthetic degree-1024 C6 with secure widths/bounds compiled in 25.91 seconds; it
+is not a supported BFV preset.
+
+Adopted one further change in `circuits/lib/src/math/prf.nr`: construct the complete PRF context in
+a fixed-size array rather than repeatedly growing a vector. Preserve exactly
+`|S|, S, level, component count`, each component's `L, N`, CRT/ascending coefficient order, native
+conversion, domain, IO pattern and digest width. The general streaming SAFE implementation remains
+unchanged. The latest repository context component compiled at degree 8192 in **17.88 seconds**,
+below the same 60-second guard, to 999,436 ACIR opcodes. The prior growing-vector version did not
+complete within that guard. No claim is made about its uncapped time or full-C6 speedup.
+
+Verification after adoption: **220 Noir tests** passed, including a frozen legacy three-CRT digest
+with signed boundary coefficients. Six nonconstant secure-width old/new mask comparisons and three
+nonconstant three-CRT context comparisons passed. The actual insecure/minimum C6 still has 23,727
+ACIR opcodes / 88,437 Honk gates (latest compile: 1.58 seconds); a fresh real recursive-target proof
+verified with the unchanged legacy nonzero-mask witness. Wrong quotient, noise lift, key and
+owner/set witnesses, plus tampered proof public inputs, were rejected. The existing 120-case integer
+reference evidence still covers the unchanged reduction implementation. Read-only review recorded
+the quotient/no-wrap argument, exact peer selection, subtraction preconditions, wide packing and
+context index partition in the scratch audit's `performance-review.md`.
+
+Rejected scratch alternatives remain outside repository source: batching all division hints into one
+unconstrained call did not materially improve compilation, and a fixed-output squeeze method did not
+resolve PRF-stream scaling. Their value tests passed; that alone did not justify adoption. These
+snapshots are separate from the earlier rejected one-shot SAFE experiment.
+
+One post-change full secure C6 diagnostic reused the earlier **180-second / 16-GiB** guard. It still
+reached the time cap (sampled peak 11,219 MiB), with no compiler diagnostic or proof attempt. Pass
+timings show that the first constant-folding pass completed, but the first unrolling pass did not
+finish. Remaining investigation should therefore cover whole-C6 unrolling/array handling as well as
+the earlier dominator hotspot, rather than only extending timeouts or rewriting the product kernel.
+**Secure compilation/proving, fresh correlated recursion/contract runs, the release matrix and
+distributed failure/recovery qualification remain outstanding.**
+
+Logs, bounded runners, source snapshots, differential programs and public proofs are preserved in
+the approved temporary directory's `c6-cost-audit/`. `report-before-context.json` preserves the
+prior report; `report.json` records the latest source fingerprints and evidence. Disposable scratch
+component targets were cleaned without touching the other experiments, saved results or proofs. No
+repository preset switch, Cargo target, circuit archive, commit, push or publication was made.
+
+### C6 cost audit and bounded optimization
+
+After the requested artifact cleanup, inspected C6 without recreating Cargo or project circuit
+outputs. The polynomial product already uses the linear-time negacyclic kernel. The main cost was
+the PRF: a full-committee loop behind witness-dependent branches expanded unnecessary streams, and
+every output used a canonical 254-bit decomposition and repeated modular operations.
+
+Changes under test:
+
+- Select exactly `S-1=T` peers before expanding their two PRF streams. Preserve full-N key indexing,
+  canonical owner/set checks, key commitments, SAFE domain/IO pattern, full `L*N` output length and
+  coefficient order.
+- Verify full-field quotient/remainder witnesses with `quotient<=floor((p-1)/q)` and a tighter
+  remainder limit at that quotient. Bounds derive from a checked byte reduction of p-1, so scalar
+  equality cannot conceal the integer alias n+p. Small moduli retain the checked byte/limb path. No
+  unverified remainder or mask is trusted.
+- Flatten modular subtraction's verification equation and require its result below the modulus. This
+  resolved a Brillig-coverage `bug:` diagnostic exposed during a full C6 compile; no underconstraint
+  or Brillig checks were disabled.
+- Batch modulus-only bounds per CRT row and keep the scalar-bound implication and centered-residue
+  selection branchless. A sampled secure compile spent almost all active compiler samples in
+  constant-folding dominator lookups, not BFV convolution. Long coefficient-wise control-flow chains
+  therefore need attention as well as final gate counts.
+- Fix the secure quotient packing path: `BIT_R=129` needs one shifted coefficient per carrier. Plain
+  packing now permits that already-bounded case, matching Rust's existing codec; checked packing
+  still rejects the unhelpful single-carrier layout. This does not substitute raw coefficients into
+  the Fiat-Shamir transcript.
+
+Single-run isolated measurements with pinned nargo/bb (not the release matrix):
+
+| Case                                                        | Before                 | After               |
+| ----------------------------------------------------------- | ---------------------- | ------------------- |
+| One secure-width field reduction                            | 1,407 ACIR opcodes     | 14 ACIR opcodes     |
+| One PRF stream, degree 64 / 3 limbs                         | 270,204 ACIR opcodes   | 2,748 ACIR opcodes  |
+| Full PRF mask, degree 64 / 3 limbs / 3 parties / set size 2 | 1,448,466 ACIR opcodes | 16,669 ACIR opcodes |
+| Same mask compile time                                      | 102.57 seconds         | 1.26 seconds        |
+| Same mask peak resident memory                              | 10.12 GB               | 0.34 GB             |
+
+The mask microbenchmark repeats a secure-width modulus to isolate arithmetic cost; it is not a valid
+BFV preset qualification. The actual insecure/minimum C6 wrapper compiled separately to 23,727 ACIR
+opcodes / 88,437 Honk circuit gates (latest compile: 1.68 seconds). A real recursive-target C6 proof
+verified for non-prefix set `[1,3]`, using a nonzero mask generated by the pre-optimization code and
+deterministic zero SK/ciphertext/noise material. A tampered public-domain input was rejected. This
+is a leaf regression proof, not a new DKG-to-contract or distributed run.
+
+Verification: 219 Noir library tests passed, including malformed sets, frozen non-prefix masks,
+Python integer remainder vectors and forged scalar-wrap/quotient/remainder rejection. A constrained
+program also matched 120 nonconstant witness cases against Python and rejected an incorrect
+remainder. Six constrained old/new mask comparisons passed for all owner positions in `[1,3,5]`,
+including negative centered ciphertext coefficients. The latest full C6 accepted the unchanged
+public share commitment and old nonzero mask; wrong quotient, noise lift, key and owner/set were
+rejected, and a freshly generated proof verified. Scratch programs/logs/public test proofs are in
+the approved temporary directory's `c6-cost-audit/`; no real node secrets were used.
+
+Isolated secure-size C6 compiles reached diagnostic time caps (180 and 360 seconds, peaks below 11
+GiB), without a compiler diagnostic; those caps are not proof rejection. Sampling identified
+`InstructionResultCache::get` / `DominatorTree::dominates_helper` in Noir's constant-folding pass as
+the active hotspot. A block-wise one-shot SAFE experiment passed 220 Noir tests and preserved six
+old/new mask cases, but still hit the 180-second cap (peak below 13 GiB). It was therefore **not
+applied to repository source**. The general streaming SAFE implementation is unchanged. Further
+secure compiler scaling investigation and actual secure proofs remain necessary. No repository
+preset was switched. **Earlier recursive/Honk fixtures and verification results below predate these
+optimizations**: canonical artifacts, real secure C6/C7, recursive/contract acceptance and the
+supported release matrix must be regenerated/revalidated before production readiness.
+
+### Production completion pass (2026-10-22)
+
+- Full correlated C0-C7 test restored and passing: selected dealers `[0,2]`, decryptor coordinates
+  `[1,3]`, DKG/decryption EVM-target proof verification and tampered-proof rejection. Final counts
+  are 16 and 76 fields. Public-only exports refresh the committed BFV fixture through
+  `sync_bfv_vk_binding_fixture.sh`; no witness secrets are exported.
+- `BfvVkBindingIntegration.spec.ts`: all 3 tests passed, including real final Honk proof acceptance
+  through both wrappers. Registry anchors come from the correlated DKG proof, not the decryption
+  proof under test. These results are insecure-64/minimum only.
+- C3/node/nodes/DKG/C6/final-decryption folds and Rust builders now propagate PRF commitments.
+  Complete insecure/minimum artifacts and both Honk verifiers were regenerated canonically. Both
+  fold-accumulator tests passed, including adversarial leaf/genesis/predecessor VK substitution.
+- EIP-712 v2 uses `prfKeyCommitsHash`; v1 signatures and altered rows are rejected. New PRF storage
+  is appended and the registry gap shrinks by one slot; old ESM mappings stay reserved. The registry
+  uses its existing linked library to verify/store DKG anchors and stays below the release size
+  budget (24,371 runtime bytes, 205 EIP-170 bytes headroom). Production storage baselines are
+  unchanged.
+- PK/decryption routers now dispatch the new grid-carrying layouts. The focused wrapper/PRF/v2
+  contract run passed 58 tests. The complete `pnpm evm:test` suite passed **859 tests**, including
+  the real-proof fixture, router, attestation, publication and lifecycle cases.
+- Strict admission binds signed C6 owner/set before slot reservation. Hydration also validates round
+  identity and share commitments. Local wakeups do not authorize arbitrary sets; authenticated
+  exclusions independently drive each keyshare, duplicate sets coalesce, and replacement retires
+  obsolete recovery work and proof correlations. Actor fixtures were updated rather than relaxing
+  checks. Keyshare passed 162 tests; aggregator passed 93 tests after the hydration checks; the
+  proof-request actor target also passed with the replaced-set regression.
+- The final zk-prover unit run passed 166 tests with 2 intentionally ignored tests after removing
+  retired ESM-only links/tests. The v2 ethers digest/signature vector passed in that run.
+- `pnpm evm:build`, `validate:upgrade`, and `size:check` passed after the gap/size corrections.
+  `check:bindings` reports the intentionally added getter versus HEAD; regenerated artifacts are in
+  the uncommitted diff. It cannot pass its HEAD comparison until those artifacts are committed;
+  committing is not authorized by this task.
+- Native suites passed for events (136), EVM (258), multithread (32), request (67), trbfv (7),
+  slashing (46) and net (303). Runtime, DHT and node-proof-plan layout locks were regenerated only
+  for the reserved schema/wire change; normal comparison runs passed afterward. Config (22),
+  parameter (54), witness targets, samples (13) and trbfv integration also passed.
+- `test_trbfv_actor` passed with real recursive aggregation enabled and the normal 1,000-second
+  plaintext observation budget (441.46 seconds total). The earlier 180-second override timed out
+  while a second C6 job was still running. A preceding run exposed a genuine old C2 parser in the
+  runtime consistency checker; it is fixed to skip the outgoing-key prefix rather than mistake keys
+  for messages. The same scenario failed before that fix and passed afterward.
+- Retired ESM consistency rules and their obsolete rule-specific tests were removed; enum wire
+  discriminants remain reserved. New C2/C3 tests reject keys used as message commitments. C6/C7
+  comparisons now require the same designated set and c0, so absence of a comparable target cannot
+  accuse an earlier round; both link and slashing-owner regression tests passed.
+- Both adversarial fold tests passed (186.78 seconds); `rust:test:slashing` passed all 12 selected
+  tests, including Anvil collateral-call mocks (not real collateral settlement). Rust's v2 fold
+  digest/signature also matches an independently generated ethers v6 vector.
+- `build:circuits check --committee all`, builder tests (18 plus 2 library tests, 1 ignored),
+  `nargo test` (205), verifier comparison, whole-workspace test compilation and repository guards
+  passed. The new authored `configs/recursive.nr` is now a required source-hash input, with a
+  mutation regression; the complete insecure/minimum pair was rebuilt rather than restamped.
+- Secure-8192/minimum C6/C7 qualification was **blocked before proving**. C7 built; C6's
+  `nargo compile` ended with `SIGKILL`, and the runner reached its 1,800-second build cap. No secure
+  proof test ran, so this is neither proof rejection nor qualification. The complete
+  insecure/minimum artifact pair and selectors were then rebuilt successfully; no compiler/prover
+  jobs remained. Logs: `prod-secure-qualification.log`, `prod-secure-leaf-build.log`, and
+  `prod-post-secure-restore.log` in the approved OpenCode temporary directory. The ignored
+  `secure_sync_decryption_tests` target is ready for a prepared secure runner. Secure final
+  aggregation and the full six-pair release matrix remain unqualified.
+- After restoration, Solidity compilation, real wrapper/v2 tests, storage compatibility, verifier
+  comparison and Solhint passed again. Rust formatting and license checks passed. The only Solhint
+  warnings are the repository's existing 10 warnings; no limits or baselines were changed.
+
+Still required: resolve secure C6 compile/resource limits, verify secure artifacts/proofs and the
+complete release matrix, and obtain the required human review. Same-address historical DKG replay is
+**not supported**: the proposed rollout requires a drained fresh registry/deployment-history
+boundary, not a bare store reset on old addresses. Final protocol counters and rollout remain for
+human approval. No commit, push, deployment or release ran.
+
+### Read-only protocol review record
+
+Reviewed the actual diff and post-change keyshare/aggregator admission, canonical-key projection,
+recursive trust tree, final decryption statement, registry/wrapper/storage and source-identity code.
+References: DKG, threshold decryption, proof statements, artifact identity, persistence/replay,
+network delivery and upgrade policy. This is a scoped implementation review, not a cryptographic
+audit or the required human approval.
+
+Findings fixed and regression-checked: stale C2 consistency offsets could accuse honest dealers;
+old-round C6/C7 comparisons could treat missing comparable work as fault; missing recursive-layout
+source identity allowed stale artifact provenance; appended registry storage needed one gap slot;
+registry bytecode initially exceeded EIP-170. Preserved constraints include exact T+1
+reconstruction, selected-H/full-N indexing, complete recursive VK anchoring, canonical fields and
+message ranges, fresh-noise reuse, signed owner/set admission and exclusion-derived replacement.
+
+Compatibility remains deliberately breaking: schema-8 stores cannot be reused, old wire majors are
+rejected before decoding, and deployed pre-migration verifiers do not accept the new statements.
+Same-address old-chain replay and secure matrix coverage are outstanding limits. `protocol_version`
+and `node_generation` remain unchanged for explicit human review; **not approved for release**.
+
+### Earlier leaf checkpoint (superseded where the production pass above differs)
+
+- Branch: `feat/sync-decryption`, base/HEAD `354af6bef`; all changes remain uncommitted.
+- C6 now prepares and proves `lambda*c1*sk + fresh_noise + PRF_mask`. It retains main's checked
+  packing and reduced negacyclic identity. Bounds use arbitrary-precision integers, including the
+  centered Lagrange factor. The witness uses the released FHE PRF implementation, not a copied host
+  implementation.
+- C7 adds the committed c0 prefix once and sums already-weighted partials without interpolation.
+  Correlated sample data retain the exact C6 inputs from the same released-FHE reconstruction.
+- Both C6 and C7 generated and verified real Barretenberg proofs with the current insecure/minimum
+  artifacts. Dedicated compiled-Noir tests also reject altered keys, shares, noise, c0 and message.
+  This is leaf evidence, not a recursive or contract end-to-end result.
+- C2 commits packed messages plus outgoing key commitments; C3 constrains the transported key bits;
+  C4 opens the packed messages, removes the bits, and commits the normalized aggregate SK plus
+  incoming key commitments. Compiled witness acceptance/rejection tests cover these leaves.
+- C1 no longer takes or outputs shared ESM material. Its public output is
+  `(sk_commitment, pk_commitment)`; the generated noise bound remains available for C6.
+- Whole-workspace test compilation passed with fixture auto-build disabled. Native tests and format
+  checks are being repeated as interfaces change; do not treat that as proof-matrix success.
+- The filesystem filled during testing. Only rebuildable Cargo outputs for zk-prover, keyshare, evm
+  and net were cleaned; source work and saved benchmarks were retained. Subsequent checks use
+  `CARGO_INCREMENTAL=0` to limit cache growth.
+
+### Required before completion
+
+1. Propagate the changed public-input layouts through C3/C6/node folds, DKG/decryption aggregation,
+   Rust proof parsing, VK genealogy, canonical key projection, and Solidity wrappers/registry
+   anchors. PRF key commitments must be anchored across DKG and decryption, not merely supplied by
+   the prover. Old ESM anchors do not establish that binding.
+2. Bind every admitted decryption bundle to one canonical designated set, including initial
+   collection, recovery, and set replacement. Review authenticated network delivery and replay of
+   `FreshDecryptionRound`; its local event alone does not reach another node.
+3. Restore and adapt the correlated node-fold proof tests removed by an earlier port batch
+   (`crates/zk/prover/tests/common/node_fold_witness.rs` and
+   `crates/zk/prover/tests/node_fold_correlated_e2e_tests.rs`). A compile after deleting coverage is
+   not a replacement for those tests. Update the remaining old-public-layout fixtures faithfully.
+4. Regenerate final recursive artifacts/verifiers through the canonical flow; run the real
+   multi-node and proof-to-contract scenarios and review the actual diff.
+
+### Compatibility decision for review
+
+The current development branch uses disk schema **9**, gossip wire **6**, and sync wire **5** to
+reject old payload encodings rather than decode them as new events. The proposed rollout is a
+drained, coordinated reset/redeployment, not a rolling upgrade. DKG key material and proof artifacts
+must be regenerated. Existing deployed verifiers remain pre-migration-only; they are not declared
+compatible with the new leaves. `protocol_version` and `node_generation` have **not** been changed;
+their final values and the production rollout require human approval. Rollback requires the old
+binary, old verifier/artifact combination and a pre-upgrade store backup, not reuse of schema-9
+state. No deployment, publication, release or rollback operation has been run.
+
+Review references:
+`docs/architecture/{dkg,threshold-decryption,proof-statements, circuit-artifacts,persistence-and-replay,upgrades}.md`
+and `CONTRIBUTING.md#protocol-compatibility`. Review outcome: **incomplete / not ready for merge**
+until the requirements above are met.
+
+### Verification record for this checkpoint
+
+Cargo commands below used `CARGO_INCREMENTAL=0 E3_ZK_PROVER_SKIP_FIXTURE_BUILD=1`; the latter
+disables fixture installation, not proof verification. Pinned tools available locally were nargo
+1.0.0-beta.26 and Barretenberg 5.2.0.
+
+- `cargo check --locked --workspace --tests`: passed.
+- `cargo test --locked -p e3-zk-config -p e3-zk-witness`: passed (22 configuration tests and 41
+  witness tests across targets). Two additional signed-noise encoding/parser tests passed.
+- `cargo test --locked -p e3-fhe-params`: 58 tests passed in the covering parameter run.
+- `pnpm build:circuits check --committee all`: passed.
+- `nargo test` in `circuits/lib`: 205 tests passed; output contained no `bug:` diagnostic.
+- `cargo test --locked -p e3-net --lib domain::wire::tests::`: 9 tests passed, including rejection
+  of pre-migration wire versions before payload decoding. Earlier use of a different filter ran zero
+  tests and is not counted as evidence.
+- `cargo test --locked -p e3-aggregator --lib`: 93 tests passed after adapting C1/C7 fixtures;
+  recovery now rejects a retained C7 proof with a mismatched c0 commitment.
+- `cargo test --locked -p e3-zk-prover --test witness_compatibility -- --ignored`: all 4 selected
+  compiled-circuit tests passed, including the nonconsecutive C6 set `{1,3}` and malformed inputs.
+- `cargo test --locked -p e3-zk-prover --test local_e2e_tests test_share_ -- --nocapture`: C2 and C3
+  proofs generated and verified, 2 tests passed without skips.
+- The same real-proof target's `test_pk_generation_commitment_consistency`,
+  `test_threshold_share_decryption_commitment_consistency`,
+  `test_decrypted_shares_aggregation_commitment_consistency`, and
+  `test_c4_c6_sk_commitment_aligned_transcript_e2e` passed. The last explicitly verifies both proofs
+  before comparing the C4-to-C6 SK anchor.
+- `witness_compatibility` compiled-circuit tests cover changed C6 inputs, C7 reconstruction and
+  C2/C3/C4 packed-key constraints. These are witness checks, not additional SNARK verification.
+
+Real-proof coverage above is **insecure-64/minimum only**, not a secure preset, committee matrix,
+recursive tree, multi-node deployment or deployed contract result. The full zk-prover unit suite has
+not been revalidated. The earlier C0 recovery failure from a stale degree-128 `pk.json` was resolved
+by a canonical `--group dkg --circuit pk` rebuild; the exact failing recovery test then passed.
+Regenerated leaf VKs do not supply the missing final recursive VK-tree anchors.
+Formatting/shared-source changes also require the final source-bound artifact rebuild before any
+release.
+
+### Leaf ABI checkpoint for the recursive port
+
+These are current wrapper public-field orders, not a completed recursive interface. Set size is
+`S = T+1`, message width is `K`, and `L` below is the threshold CRT count. The full-N grid and
+selected-H roster axes must not be interchanged.
+
+| Leaf | Public fields, in order                                                                                                                         |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1   | SK commitment, threshold-PK commitment                                                                                                          |
+| C2   | expected SK commitment, outgoing key commitments `[N]`, packed-message commitments `[N][L]`                                                     |
+| C3   | expected recipient PK, expected packed message, recipient index, row index, key commitment, ciphertext commitment                               |
+| C4   | expected packed-message commitments `[H][L]`, recipient index, incoming key commitments `[H]`, aggregate SK commitment                          |
+| C6   | aggregate SK, ciphertext, c0 prefix, domain high/low, party index, designated IDs `[S]`, outgoing keys `[N]`, incoming keys `[N]`, d commitment |
+| C7   | d commitments `[S]`, party IDs `[S]`, message `[K]`, c0-prefix commitment                                                                       |
+
+The C7 c0 commitment is appended, preserving the existing D/party/message prefix and matching the
+reference decryption-aggregator convention. Runtime C7 admission compares that tail against every
+selected C6 c0 input. C6 key fields above are commitments; raw keys remain private witnesses. The
+recursive port must also retain main's recipient-key consistency and checked-opening guards.
+
+## Non-goals
+
+- No lbfv modules (`aggregate_lbfv`, `gen_lbfv_key_shares`, `lbfv_operation`, `bfv-client` lbfv
+  envelope), no chunk circuits (`esm`/`sk`/`c2ab`/`c3ab`/`c4ab` folds), no preset renames
+  (`secure_8192`/`secure_16384` stay as main's current scheme).
+- No `crates/support` (risc0/Boundless compute provider) — separate feature, tracked separately.
+- No `agent/` harness docs, no `examples/CRISP` changes (both lineage-only).
+
+## Why a fresh branch instead of moving `feat/share-prf-bit`
+
+- The branch is 205 commits behind main; its base (`lbfv/chunking`, PRs #1909–#2041) was never
+  merged into main and its `origin/lbfv/*` branches were deleted upstream.
+- Merging main into the branch yields ~365 conflicts (crate restructure, CRISP deletion, preset
+  rename collisions) and the end state would still contain lbfv — contradicting the goal.
+- The sync-dec slice is separable: measured drift of main vs the lineage base against the feature
+  delta for the core files:
+
+  | File                                           | main drift   | feature delta | port difficulty            |
+  | ---------------------------------------------- | ------------ | ------------- | -------------------------- |
+  | `trbfv/calculate_threshold_decryption.rs`      | none         | +102/−12      | applies as-is              |
+  | `trbfv/calculate_decryption_share.rs`          | small        | +157/−73      | near-direct                |
+  | `aggregator/.../verify_decryption_shares.rs`   | tiny         | +113/−20      | near-direct                |
+  | `keyshare/.../create_decryption_share.rs`      | moderate     | +240/−18      | adapt                      |
+  | `circuits/.../share_decryption.nr`             | heavy        | +233/−81      | semantic rework (hardest)  |
+  | `circuits/.../decrypted_shares_aggregation.nr` | near-rewrite | +30/−94       | re-apply on main's version |
+  | `circuits/.../dkg/share_encryption.nr`         | huge         | +52/−15       | targeted re-apply          |
+
+- Additive circuit pieces port directly: `circuits/lib/src/math/prf.nr` (+197, new),
+  `math/modulo/U64.nr` (+53, new), `math/commitments.nr` additions (+54).
+
+## Dependency changes (fhe.rs v0.4.2 → v0.5.1)
+
+- `fhe`, `fhe-traits`, `fhe-math`, and `fhe-util` now use tag `v0.5.1`; the local e3-safe patch is
+  active.
+- `threshold-decryption` is **on by default** (optional `ark-ff 0.5`, `e3-safe` git rev `fb5f141`).
+- Add to the workspace manifest:
+  `[patch."https://github.com/theinterfold/interfold"] e3-safe = { path = "./crates/safe" }` so the
+  graph uses the in-repo `crates/safe` (0.20.0-dev.2).
+
+**Decision (2026-10-21):** patch bridge now, publish later.
+
+- fhe.rs re-pins `e3-safe` from rev `fb5f141` (0.17.0) to the Interfold commit this port branches
+  from (currently `ab6b9c943`, 0.20.0-dev.2) via a quick upstream PR. Pin to the **port branch's
+  base commit**, not "latest main" — Interfold is mid folder-restructuring, and pinning the exact
+  base makes the patch unification exact by construction.
+- Interfold adds the `[patch]` above. It applies because both sides then resolve version
+  `0.20.0-dev.2`; with a rev pin this is stable (no floating-source drift).
+- Publishing `e3-safe` to crates.io and switching fhe.rs to a version requirement is **deferred
+  until the Interfold folder restructuring completes**; revisit at the 0.20.0 release. Note caret
+  requirements cannot match pre-release versions, so the version dep needs a stable tag anyway.
+- Sequencing: the port can start on fhe.rs v0.5.0 **before** the upstream re-pin lands — the
+  unpatched graph carries two e3-safe copies (git 0.17.0 + in-repo 0.20.0-dev.2), which compiles and
+  is functionally identical on native targets (changes since `fb5f141` are OpenVM feature-gating and
+  test cleanup; the native `SafeSponge`/permutation is untouched). Switch to the re-pinned tag
+  (v0.5.1 or the merge commit) + `[patch]` as soon as it is available.
+- During restructuring, re-check the patch source URL, crate path, upstream version requirements and
+  lockfile. A workspace version change alone does not establish a patch failure: the released fhe.rs
+  manifest specifies a git revision for e3-safe without an explicit version requirement.
+- Blast radius on main is small: `ShareManager`, `SmudgingBoundCalculator(Config)` re-exports
+  survive at the same `fhe::trbfv` paths. The retired legacy threshold-decryption _methods_ affect
+  exactly the two trbfv files this port rewrites — dependency migration and feature port coincide.
+- New API surface consumed: `SynchronizedDecryptor`, `DecryptionShare`, `PartyPrfKeys`,
+  `PartyPrfKeyTransport`, `PrfKey`, `PRF_KEY_LEN`, `SmudgingNoise(Generator)`, `Lambda`,
+  `ShamirSecretSharing`. The reference branch was already aligned to this API (commit f342b4ef0
+  "align PRF integration with consolidated fhe API"), and fhe.rs v0.5.0's `trbfv_sync_dec` fixed
+  vectors were generated against it.
+
+## Workstreams
+
+1. **Dependency bump + compile**: bump tags, add `[patch]`, fix retired-method call sites (expected
+   only `crates/trbfv/src/{calculate_decryption_share,calculate_threshold_decryption}.rs`). Verify:
+   `cargo check -p e3-trbfv -p e3-fhe-params`, workspace `cargo check`.
+2. **Circuit math (additive)**: port `prf.nr`, `math/modulo/U64.nr`, `commitments.nr` additions.
+   Verify: circuit compile for affected bins; PRF gadget must reproduce fhe.rs v0.5.0 fixed vectors
+   (domain separators, encoding, coefficient order) — cross-check against
+   `crates/fhe/tests/trbfv_sync_dec.rs` upstream.
+3. **Host Rust**: trbfv sync-dec path (near-direct port), keyshare `create_decryption_share.rs`
+   (+240 reference, adapt to main's threshold_keyshare), aggregator `verify_decryption_shares.rs`,
+   events/net wiring. Verify: `cargo test -p` per crate.
+4. **Circuit rework**: `share_decryption.nr` (heaviest), `decrypted_shares_aggregation.nr`,
+   `pk_generation.nr`, dkg `share_encryption/share_decryption/share_computation` on main's bases.
+   Witness shapes rebuilt for main's `secure`/`insecure` + committee presets (micro/minimum/small).
+5. **zk prover**: adapt threshold/proof-request wiring to `crates/zk/{config,prover,witness}`.
+6. **Contracts**: `BfvDecryptionVerifier.sol` changes from the reference; regenerate verifiers and
+   artifacts via the canonical generators (`scripts/circuits`); update addresses/manifests per
+   `packages/interfold-contracts/README.md`. **Protocol gate — see below.**
+7. **Tests/e2e**: port reference tests (keyshare, trbfv integration, circuits e2e, contracts specs);
+   real-crypto end-to-end scenario as the final gate (mocks are insufficient for proof changes).
+
+## Protocol / review gates (per CONTRIBUTING "Protocol compatibility")
+
+- Decryption share proofs and the decryption verifier change cryptographic statements and witness
+  shapes: needs explicit compatibility/rollout decision (coordinated verifier + program
+  redeployment; release-counter implications) recorded for human review. Not decided silently.
+- PRF key transport during DKG touches durable event/snapshot schemas (`PartyPrfKeyTransport`):
+  confirm event identity/replay implications and whether a schema-version bump is required.
+- `invariant-review` pass required before reporting contracts/circuits changes done.
+
+## Risks
+
+- Circuit ↔ host PRF equivalence (mitigated: upstream fixed vectors + cross-check tests).
+- Main's preset/committee structure differs from the reference lineage — witness regeneration and
+  verifier rebuilds must use canonical generators; preset switches touch shared files (coordinate).
+- fhe.rs v0.5.x patch releases could adjust the consolidated API (low — just released from our own
+  stack).
+
+## Estimate
+
+~60–90 files (vs 276 in the lineage diff). Host side: days. Circuits: the hard core.
+Contracts/verifier regen + real-crypto e2e: the gating tail. Order of a focused week of engineering
+with verification.
+
+## Disposition of existing branch
+
+`feat/share-prf-bit` stays as the reference. After the port lands and is validated, archive/delete
+it and the `lbfv` local branches.
+
+## Open questions
+
+1. **RESOLVED — PRF key transport vs. main's DKG presets.** The reference packs each PRF key bit as
+   `residue + bit·q` in a share-limb coefficient, which requires DKG share plaintext modulus
+   `t = 2q` (q = largest threshold modulus). Parameters differ between the lines:
+
+   | preset                         | threshold max q         | DKG t                   | relation  |
+   | ------------------------------ | ----------------------- | ----------------------- | --------- |
+   | reference secure 8192          | 288,230,376,164,294,657 | 576,460,752,328,589,314 | t = 2q ✅ |
+   | main secure 8192               | 576,460,752,317,792,257 | 576,460,752,317,792,257 | t = q ❌  |
+   | pre-migration main insecure 64 | 134,217,089             | 134,217,089             | t = q ❌  |
+
+   Options: **A** narrow preset switch (keep main's threshold params, set DKG t = 2q per preset,
+   regenerate DKG-side configs/verifiers via canonical generators, port `prf_key.rs` as-is); **B**
+   redesign packing on current params (bit- or byte-per-coefficient; new proof surface in the
+   share-encryption circuit, unvalidated). The user approved option A using the parameter search,
+   without waiting for final production parameters. The resulting t=2q parameter pairs and the
+   packing module are installed and tested; see the progress log.
+
+2. Does the DKG-time PRF key transport require new durable events (schema bump) or reuse existing
+   threshold-share events?
+3. Committee/preset scope for the first cut: `insecure` only for dev-loop speed, `secure` gated
+   behind circuit build times?
+4. Deployment sequencing for the new `BfvDecryptionVerifier` (fresh deployment vs upgrade path).
+
+## Progress log
+
+- 2026-10-21: fhe.rs bumped to v0.5.1 with working `[patch]` for `e3-safe` (branch
+  `feat/sync-decryption` off `origin/main` @ 354af6bef). v0.5.1 has no legacy decryption path, so
+  the `e3-trbfv` migration to `SynchronizedDecryptor` is unavoidable and in progress (3 call sites).
+  Reference copies of `fhe-params/{smudging,prf_key}.rs` staged, not yet wired.
+- 2026-10-21: **open question 1 resolved — option A-narrow via the search tool.** Threshold sets
+  unchanged; DKG presets re-derived with the new `BfvSearchConfig::second_k_multiple = 2` convention
+  (DKG share plaintext modulus = 2 × largest threshold prime). Secure DKG: t =
+  1,152,921,504,635,584,514, primes `0x24c2230d75cdc001`,`0x260dfc1463740001`. Insecure DKG: t =
+  268,434,178, primes `0x1ffffb01`,`0x1ffffd81`. Both first sets reproduced current threshold
+  constants exactly; all 53 `e3-fhe-params` tests pass (reproduce-tests assert the new sets).
+  `PRF_KEY_BITS` added to both DKG constant modules (32 insecure / 256 secure). Next: regenerate
+  `circuits/lib/src/configs/{secure,insecure}/dkg.nr` (bakes QIS/t/Q_MOD_T) via the canonical
+  circuit build flow — preset switch, coordinate before pushing. Note: DKG CRPs change
+  (deterministic from seed + params) — dev key material reset, testnet reset boundary applies.
+- 2026-10-21 (later): dkg.nr regenerated via `sync-preset` (both presets); `check --committee all`
+  passes. NOTE: `SHARE_ENCRYPTION_SCALED_QUOTIENT` flipped true→false in both presets (Δ now below
+  the smallest limb; share-encryption circuit takes the direct k1 path). fhe-params `prf_key` +
+  `smudging` modules wired in (58 tests pass).
+- 2026-10-21 (port round): **Rust sync-dec layer ported.** trbfv: `calculate_decryption_share`
+  (SynchronizedDecryptor, fresh noise, PRF keys, witness data e_fresh/e_signed/context_digest),
+  `calculate_threshold_decryption` (decryptor-set + digest checks, mask-cancelling
+  `open_partial_shares`), `gen_pk_share_and_sk_sss` (e_sm pre-generation removed, mult_depth added),
+  `helpers.calculate_error_size` new signature, `ShamirShare::replace_row`,
+  `BfvEncryptedShare::encrypt`. events: `FreshDecryptionRound` appended; `DecryptionshareCreated`,
+  `DecryptionShareProofSigned`, `ShareDecryptionProofPending` gain `decryptors` (additive durable
+  schema; old persisted events without the field will not deserialize — dev/testnet reset applies).
+  aggregator: `expected_decryptors` on Collecting, `fresh_decryptor_ids`, fresh-round restarts on
+  expulsion/C6-failure (publish FreshDecryptionRound), final request carries decryptors+digest.
+  zk-prover: decryptors threaded through PendingShareDecryptionProof → events. evm: error-size call
+  adapted. Circuits: `math/prf.nr` + U64 extension + `DS_PRF_KEY`/
+  `compute_packed_prf_key_commitment` ported; `nargo compile` clean. keyshare graft in progress
+  (subagent). REMAINING: keyshare completion, C6/C7/dkg circuit rework, zk witness/config inputs,
+  contracts/verifier regen, real-crypto e2e.

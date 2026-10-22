@@ -29,6 +29,7 @@ use e3_zk_config::DkgInputType;
 use fhe::bfv::{BfvParameters, PublicKey};
 use fhe_traits::{DeserializeParametrized, Serialize as _};
 use rand::rngs::OsRng;
+use rand::RngCore;
 use rand_core::UnwrapErr;
 use std::sync::Arc;
 use tracing::info;
@@ -43,18 +44,12 @@ pub(crate) struct SharesGeneratedPlan {
     pub proof_request: PkGenerationProofRequest,
     /// C2a (SkShareComputation) proof request.
     pub sk_share_computation_request: ShareComputationProofRequest,
-    /// C2b (ESmShareComputation) proof request.
-    pub e_sm_share_computation_request: ShareComputationProofRequest,
     /// C3a (SK share encryption) proof requests.
     pub sk_share_encryption_requests: Vec<ShareEncryptionProofRequest>,
-    /// C3b (E_SM share encryption) proof requests.
-    pub e_sm_share_encryption_requests: Vec<ShareEncryptionProofRequest>,
     /// Party IDs with a collected C0 key. Only these parties receive a share.
     pub recipient_party_ids: Vec<u64>,
     /// Own plaintext sk share rows (bincode `Vec<Vec<u64>>`, encrypted at rest) for C4a.
     pub own_sk_share_raw: SensitiveBytes,
-    /// Own plaintext esi share rows (one per smudging noise, encrypted at rest) for C4b.
-    pub own_esi_shares_raw: Vec<SensitiveBytes>,
 }
 
 /// Perform the BFV share-encryption fan-out and build all C1/C2/C3 proof
@@ -67,8 +62,6 @@ pub(crate) fn build_shares_generated_plan(
     committee_size: CiphernodesCommitteeSize,
     pk_share: ArcBytes,
     decrypted_sk_sss: SharedSecret,
-    decrypted_esi_sss: Vec<SharedSecret>,
-    e_sm_raw: SensitiveBytes,
     proof_request_data: ProofRequestData,
     collected_encryption_keys: &[Arc<EncryptionKey>],
 ) -> Result<SharesGeneratedPlan> {
@@ -81,26 +74,18 @@ pub(crate) fn build_shares_generated_plan(
     let threshold_preset = share_enc_preset
         .threshold_counterpart()
         .ok_or_else(|| anyhow!("No threshold counterpart for {:?}", share_enc_preset))?;
-    let (_, params) = build_pair_for_preset(threshold_preset)?;
+    let (threshold_params, params) = build_pair_for_preset(threshold_preset)?;
     let (recipient_pks, recipient_party_ids) =
         recipient_keys_for_c3(encryption_keys, party_id, committee.n, committee.h, &params)?;
     let recipient_share_indices: Vec<usize> = (0..recipient_pks.len()).collect();
     let own_idx = party_id as usize;
 
-    // Serialize for C2a/C2b proof requests (encrypted at rest)
+    // Serialize for C2a proof requests (encrypted at rest)
     let sk_sss_raw = SensitiveBytes::new(
         bincode::serialize(&decrypted_sk_sss)
             .map_err(|e| anyhow!("Failed to serialize sk_sss: {}", e))?,
         cipher,
     )?;
-    let esi_sss_raw: Vec<SensitiveBytes> = decrypted_esi_sss
-        .iter()
-        .map(|s| {
-            let bytes =
-                bincode::serialize(s).map_err(|e| anyhow!("Failed to serialize esi_sss: {}", e))?;
-            SensitiveBytes::new(bytes, cipher)
-        })
-        .collect::<Result<_>>()?;
 
     // Cache own plaintext share rows for C4 (no self-encryption); stored encrypted at rest.
     let own_sk_shamir = decrypted_sk_sss.extract_party_share(party_id as usize)?;
@@ -115,27 +100,30 @@ pub(crate) fn build_shares_generated_plan(
         cipher,
     )?;
 
-    let own_esi_shares_raw: Vec<SensitiveBytes> = decrypted_esi_sss
-        .iter()
-        .map(|esi| {
-            let shamir = esi.extract_party_share(party_id as usize)?;
-            let rows: Vec<Vec<u64>> = shamir
-                .rows()
-                .into_iter()
-                .map(|row| row.iter().copied().collect())
-                .collect();
-            let bytes = bincode::serialize(&rows)
-                .map_err(|e| anyhow!("Failed to serialize own esi share: {}", e))?;
-            SensitiveBytes::new(bytes, cipher)
-        })
-        .collect::<Result<_>>()?;
-
-    // BFV-encrypt shares to all recipients except own slot (own share is bound via C2,
-    // consumed locally by C4). Returns per-row randomness for C3 proofs.
+    // One fresh PRF key per committee slot; the key is packed into the recipient's
+    // share limb so the transport needs no extra event. BFV-encrypt shares to all
+    // recipients except own slot (own share is bound via C2, consumed locally by C4).
+    // Returns per-row randomness for C3 proofs.
     let mut rng = UnwrapErr(OsRng);
+    let mut prf_keys = Vec::with_capacity(committee.n);
+    for _ in 0..committee.n {
+        let mut key = e3_fhe_params::zero_prf_key(threshold_preset);
+        rng.fill_bytes(&mut key);
+        prf_keys.push(key);
+    }
+    let prf_keys_raw = prf_keys
+        .iter()
+        .map(|key| SensitiveBytes::new(key.clone(), cipher))
+        .collect::<Result<Vec<_>>>()?;
+    let packed_sk = pack_outgoing_keys(
+        &decrypted_sk_sss,
+        &prf_keys,
+        threshold_preset,
+        threshold_params.moduli(),
+    )?;
     let (encrypted_sk_sss, sk_witnesses) =
         BfvEncryptedShares::encrypt_all_extended_for_share_indices(
-            &decrypted_sk_sss,
+            &packed_sk,
             &recipient_pks,
             &recipient_share_indices,
             &params,
@@ -143,28 +131,11 @@ pub(crate) fn build_shares_generated_plan(
             Some(own_idx),
         )?;
 
-    let (encrypted_esi_sss, esi_witnesses): (Vec<_>, Vec<_>) = decrypted_esi_sss
-        .iter()
-        .map(|esi| {
-            BfvEncryptedShares::encrypt_all_extended_for_share_indices(
-                esi,
-                &recipient_pks,
-                &recipient_share_indices,
-                &params,
-                &mut rng,
-                Some(own_idx),
-            )
-        })
-        .collect::<Result<Vec<_>>>()?
-        .into_iter()
-        .unzip();
-
     // Create the full share with all parties' encrypted data
     let full_share = ThresholdShare {
         party_id,
         pk_share,
         sk_sss: encrypted_sk_sss,
-        esi_sss: encrypted_esi_sss,
     };
 
     // Build C1 request (PkGenerationProof)
@@ -172,7 +143,6 @@ pub(crate) fn build_shares_generated_plan(
         proof_request_data.pk0_share_raw.clone(),
         proof_request_data.sk_raw.clone(),
         proof_request_data.eek_raw.clone(),
-        e_sm_raw.clone(),
         threshold_preset,
         committee_size,
     );
@@ -184,18 +154,7 @@ pub(crate) fn build_shares_generated_plan(
         dkg_input_type: DkgInputType::SecretKey,
         params_preset: threshold_preset,
         committee_size,
-    };
-
-    // Build C2b request (ESmShareComputation)
-    let e_sm_share_computation_request = ShareComputationProofRequest {
-        secret_raw: e_sm_raw.clone(),
-        secret_sss_raw: esi_sss_raw
-            .into_iter()
-            .next()
-            .ok_or_else(|| anyhow!("esi_sss_raw is empty — expected at least one entry"))?,
-        dkg_input_type: DkgInputType::SmudgingNoise,
-        params_preset: threshold_preset,
-        committee_size,
+        prf_keys: prf_keys_raw,
     };
 
     // Build C3a proof requests (SK share encryption) from witnesses.
@@ -225,66 +184,62 @@ pub(crate) fn build_shares_generated_plan(
                 recipient_party_id,
                 row_index: row_idx,
                 esi_index: 0,
+                prf_key: SensitiveBytes::new(prf_keys[recipient_party_id].clone(), cipher)?,
             });
         }
     }
 
-    // Build C3b proof requests (E_SM share encryption) from witnesses; skip own slot.
-    let mut e_sm_share_encryption_requests = Vec::new();
-    for (esi_idx, esi_recipient_witnesses) in esi_witnesses.iter().enumerate() {
-        for (recipient_idx, recipient_witnesses) in esi_recipient_witnesses.iter().enumerate() {
-            if recipient_idx == own_idx {
-                continue;
-            }
-            let recipient_party_id = recipient_share_indices[recipient_idx];
-            for (row_idx, witness) in recipient_witnesses.iter().enumerate() {
-                e_sm_share_encryption_requests.push(ShareEncryptionProofRequest {
-                    share_row_raw: SensitiveBytes::new(
-                        bincode::serialize(&witness.share_row)
-                            .map_err(|e| anyhow!("Failed to serialize share_row: {}", e))?,
-                        cipher,
-                    )?,
-                    ciphertext_raw: ArcBytes::from_bytes(&witness.ciphertext.to_bytes()),
-                    recipient_pk_raw: ArcBytes::from_bytes(
-                        &recipient_pks[recipient_idx].to_bytes(),
-                    ),
-                    u_rns_raw: SensitiveBytes::new(witness.u_rns.to_bytes(), cipher)?,
-                    e0_rns_raw: SensitiveBytes::new(witness.e0_rns.to_bytes(), cipher)?,
-                    e1_rns_raw: SensitiveBytes::new(witness.e1_rns.to_bytes(), cipher)?,
-                    dkg_input_type: DkgInputType::SmudgingNoise,
-                    params_preset: threshold_preset,
-                    committee_size,
-                    recipient_party_id,
-                    row_index: row_idx,
-                    esi_index: esi_idx,
-                });
-            }
-        }
-    }
-
-    let total_proofs =
-        3 + sk_share_encryption_requests.len() + e_sm_share_encryption_requests.len();
+    let total_proofs = 2 + sk_share_encryption_requests.len();
     info!(
-        "Built share-generation plan ({} proofs: C1, C2a, C2b + {} C3a + {} C3b)",
+        "Built share-generation plan ({} proofs: C1, C2a + {} C3a)",
         total_proofs,
-        sk_share_encryption_requests.len(),
-        e_sm_share_encryption_requests.len()
+        sk_share_encryption_requests.len()
     );
 
     Ok(SharesGeneratedPlan {
         full_share,
         proof_request,
         sk_share_computation_request,
-        e_sm_share_computation_request,
         sk_share_encryption_requests,
-        e_sm_share_encryption_requests,
         recipient_party_ids,
         own_sk_share_raw,
-        own_esi_shares_raw,
     })
 }
 
 /// Keep C3's N recipient slots while withholding shares from parties without a C0 key.
+fn pack_outgoing_keys(
+    secret: &SharedSecret,
+    keys: &[Vec<u8>],
+    preset: BfvPreset,
+    moduli: &[u64],
+) -> Result<SharedSecret> {
+    let limb = e3_fhe_params::prf_key_limb_index(moduli).map_err(|error| anyhow!(error))?;
+    let key_modulus = moduli[limb];
+    if key_modulus != e3_fhe_params::prf_key_modulus(preset) {
+        bail!("share modulus list does not start with the PRF key modulus");
+    }
+    let mut data = secret.moduli_data().clone();
+    let rows = data
+        .get(limb)
+        .ok_or_else(|| anyhow!("share is missing the PRF key limb"))?
+        .nrows();
+    if rows != keys.len() {
+        bail!(
+            "PRF key count {} does not match share row count {rows}",
+            keys.len()
+        );
+    }
+    for party in 0..rows {
+        let residues: Vec<u64> = data[limb].row(party).iter().copied().collect();
+        let packed = e3_fhe_params::pack_prf_key(preset, &residues, &keys[party], key_modulus)
+            .map_err(|error| anyhow!(error))?;
+        for (column, value) in packed.into_iter().enumerate() {
+            data[limb][[party, column]] = value;
+        }
+    }
+    Ok(SharedSecret::new(data))
+}
+
 fn recipient_keys_for_c3(
     encryption_keys: &[Arc<EncryptionKey>],
     own_party_id: u64,
@@ -352,6 +307,7 @@ fn recipient_keys_for_c3(
 mod tests {
     use super::*;
     use e3_fhe_params::BfvParamSet;
+    use e3_trbfv::shares::ShamirShare;
     use fhe::bfv::SecretKey;
     use ndarray::Array2;
 
@@ -392,8 +348,6 @@ mod tests {
             CiphernodesCommitteeSize::Minimum,
             ArcBytes::from_bytes(&[7]),
             secret.clone(),
-            vec![secret.clone()],
-            sensitive.clone(),
             ProofRequestData {
                 pk0_share_raw: ArcBytes::from_bytes(&[7]),
                 sk_raw: sensitive.clone(),
@@ -405,7 +359,6 @@ mod tests {
         assert_eq!(plan.recipient_party_ids, vec![0, 2]);
         assert_eq!(plan.full_share.num_parties(), 3);
         assert_eq!(plan.sk_share_encryption_requests.len(), 2 * l);
-        assert_eq!(plan.e_sm_share_encryption_requests.len(), 2 * l);
         assert_eq!(
             plan.sk_share_encryption_requests
                 .iter()
@@ -419,21 +372,39 @@ mod tests {
             .filter(|request| request.recipient_party_id == 1)
             .all(|request| request.recipient_pk_raw.as_ref() == pk_2.to_bytes()));
 
-        let decrypted_live = plan
-            .full_share
-            .sk_sss
-            .clone_share(0)
-            .expect("party 0 ciphertext")
-            .decrypt(&sk_0, &params, degree)?;
+        let decrypted_live = unpacked_prf_limb(
+            plan.full_share
+                .sk_sss
+                .clone_share(0)
+                .expect("party 0 ciphertext")
+                .decrypt(&sk_0, &params, degree)?,
+        )?;
         assert_eq!(decrypted_live, secret.extract_party_share(0)?);
-        let decrypted_placeholder = plan
-            .full_share
-            .sk_sss
-            .clone_share(1)
-            .expect("party 1 proof placeholder")
-            .decrypt(&sk_2, &params, degree)?;
+        let decrypted_placeholder = unpacked_prf_limb(
+            plan.full_share
+                .sk_sss
+                .clone_share(1)
+                .expect("party 1 proof placeholder")
+                .decrypt(&sk_2, &params, degree)?,
+        )?;
         assert_eq!(decrypted_placeholder, secret.extract_party_share(1)?);
         Ok(())
+    }
+
+    /// Remove the PRF key bits from the packed limb and return the Shamir residues.
+    fn unpacked_prf_limb(mut share: ShamirShare) -> Result<ShamirShare> {
+        let preset = BfvPreset::InsecureThreshold64;
+        let q = e3_fhe_params::prf_key_modulus(preset);
+        let limb = BfvParamSet::from(preset)
+            .moduli
+            .iter()
+            .position(|modulus| *modulus == q)
+            .ok_or_else(|| anyhow!("PRF key modulus is not a threshold modulus"))?;
+        let packed: Vec<u64> = share.row(limb).iter().copied().collect();
+        let (residues, _) =
+            e3_fhe_params::unpack_prf_key(preset, &packed, q).map_err(|error| anyhow!(error))?;
+        share.replace_row(limb, &residues)?;
+        Ok(share)
     }
 
     #[test]

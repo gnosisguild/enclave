@@ -46,6 +46,39 @@ pub struct ShareDecryption<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32,
 }
 
 impl<let N: u32, let L: u32, let H: u32, let BIT_MSG: u32, let BIT_AGG: u32> ShareDecryption<N, L, H, BIT_MSG, BIT_AGG> {
+    /// Open the packed C2 commitments first, then remove key bits before summing SK residues.
+    pub fn execute_with_prf<let KEY_BITS: u32>(
+        mut self,
+        moduli: [Field; L],
+        recipient: u32,
+        keys: [[bool; KEY_BITS]; H],
+    ) -> (Field, [Field; H]) {
+        self.verify_commitments();
+        let mut key_commitments = [0; H];
+        for dealer in 0..H {
+            key_commitments[dealer] = crate::math::commitments::compute_packed_prf_key_commitment(
+                recipient as Field,
+                crate::math::prf::packed_key(keys[dealer]),
+            );
+            for row in 0..L {
+                self.decrypted_shares[dealer][row] = Polynomial::new(
+                    crate::math::prf::unpack_key_row(
+                        self.decrypted_shares[dealer][row].coefficients,
+                        keys[dealer],
+                        moduli[row],
+                        row,
+                    ),
+                );
+            }
+        }
+        assert(H < 256, "committee exceeds the aggregation carry bound");
+        let normalized = normalize_aggregated::<N, L, BIT_MSG, AGGREGATION_BIT_CARRY>(
+            self.compute_aggregated_shares(),
+            moduli,
+        );
+        (compute_aggregated_shares_commitment::<N, L, BIT_AGG>(normalized), key_commitments)
+    }
+
     pub fn new(
         expected_commitments: [[Field; L]; H],
         decrypted_shares: [[Polynomial<N>; L]; H],

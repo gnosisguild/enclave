@@ -104,7 +104,7 @@ fn canonical_key() -> CanonicalPublicKey {
         committee_size: CiphernodesCommitteeSize::Minimum,
         interfold_address: test_decryption_domain().interfold_address,
         sk_agg_commits: vec![],
-        esm_agg_commits: vec![],
+        prf_key_commits: vec![],
     }
 }
 
@@ -126,7 +126,18 @@ fn ciphertext_event(id: &E3id) -> InterfoldEvent {
 }
 
 fn share_event(id: &E3id, party: u64, wrong_domain: bool, seq: u64) -> InterfoldEvent {
-    let (shares, mut proofs) = share_with_matching_commitment(id, party, &test_ciphertexts());
+    share_event_in_set(id, party, wrong_domain, seq, &[1, 2])
+}
+
+fn share_event_in_set(
+    id: &E3id,
+    party: u64,
+    wrong_domain: bool,
+    seq: u64,
+    ids: &[u32],
+) -> InterfoldEvent {
+    let (shares, mut proofs) =
+        share_with_matching_commitment_in_set(id, party, &test_ciphertexts(), ids);
     if wrong_domain {
         let proof = proofs.last_mut().unwrap();
         let mut signals = proof.payload.proof.public_signals.to_vec();
@@ -141,6 +152,7 @@ fn share_event(id: &E3id, party: u64, wrong_domain: bool, seq: u64) -> Interfold
             party_id: party,
             decryption_share: shares,
             signed_decryption_proofs: proofs,
+            decryptors: ids.to_vec(),
         },
         EventSource::Net,
         seq,
@@ -371,6 +383,7 @@ async fn hydration_rebuilds_noncanonical_c6_work_in_every_phase() -> Result<()> 
                     params: test_params(),
                 }),
                 3 => ThresholdPlaintextAggregatorState::GeneratingC7Proof(GeneratingC7Proof {
+                    ciphertext_output: test_ciphertexts(),
                     threshold_m: 1,
                     threshold_n: 3,
                     shares,
@@ -476,7 +489,7 @@ fn recovery_key() -> CanonicalPublicKey {
     key.committee.sort();
     key.honest_committee = vec![key.committee[0], key.committee[2]];
     key.sk_agg_commits = vec![[0; 32]; 2];
-    key.esm_agg_commits = vec![[0; 32]; 2];
+    key.prf_key_commits = vec![[0; 32]; 6];
     key
 }
 
@@ -496,9 +509,9 @@ fn authority_event(id: &E3id, key: &CanonicalPublicKey, seq: u64) -> InterfoldEv
         primitives::{Bytes, B256, U256},
         sol_types::{SolEvent, SolValue},
     };
-    let mut inputs = vec![B256::ZERO; 12];
+    let mut inputs = vec![B256::ZERO; 16];
     inputs[3] = B256::from(U256::from(2).to_be_bytes::<32>());
-    inputs[11] = key.pk_commitment.into();
+    inputs[9] = key.pk_commitment.into();
     let log = e3_evm::ICiphernodeRegistry::CommitteeProofPublished {
         e3Id: id.clone().try_into().unwrap(),
         nodes: key.committee.clone(),
@@ -526,7 +539,9 @@ fn recovery_share(id: &E3id, key: &CanonicalPublicKey, party: u64, seq: u64) -> 
         .map(test_signer)
         .find(|signer| signer.address() == key.committee[party as usize])
         .unwrap();
-    let (shares, mut proofs) = share_with_matching_commitment(id, 0, &test_ciphertexts());
+    let ids = vec![1, 3];
+    let (shares, mut proofs) =
+        share_with_matching_commitment_in_set(id, party, &test_ciphertexts(), &ids);
     for (proof, ciphertext) in proofs.iter_mut().zip(test_ciphertexts()) {
         let domain = e3_committee_hash::decryption_domain_limbs(
             id.chain_id(),
@@ -547,6 +562,7 @@ fn recovery_share(id: &E3id, key: &CanonicalPublicKey, party: u64, seq: u64) -> 
             party_id: party,
             decryption_share: shares,
             signed_decryption_proofs: proofs,
+            decryptors: ids,
         },
         EventSource::Net,
         seq,
@@ -619,6 +635,7 @@ async fn deferred_plaintext_restart(
                     node: format!("unrecognized-{seq}"),
                     decryption_share: vec![ArcBytes::from_bytes(&vec![seq as u8; 16 * 1024])],
                     signed_decryption_proofs: vec![],
+                    decryptors: vec![1, 2],
                 },
                 EventSource::Net,
                 seq,
@@ -858,17 +875,19 @@ fn batch_c7_proofs(parties: &[u64], ciphertexts: usize) -> Vec<Proof> {
     use alloy::primitives::U256;
     use e3_zk_config::MAX_MSG_NON_ZERO_COEFFS;
     let id = E3id::new("42", 1);
-    let (_, c6) = share_with_matching_commitment(&id, parties[0], &test_ciphertexts());
+    let ids: Vec<u32> = parties.iter().map(|party| *party as u32 + 1).collect();
+    let (_, c6) = share_with_matching_commitment_in_set(&id, parties[0], &test_ciphertexts(), &ids);
     (0..ciphertexts)
         .map(|index| {
             let mut fields = Vec::new();
             for _ in parties {
-                fields.extend_from_slice(&c6[index].payload.proof.public_signals[160..192]);
+                let signals = &c6[index].payload.proof.public_signals;
+                fields.extend_from_slice(&signals[signals.len() - 32..]);
             }
             for party in parties {
                 fields.extend_from_slice(&U256::from(party + 1).to_be_bytes::<32>());
             }
-            fields.resize((2 * parties.len() + MAX_MSG_NON_ZERO_COEFFS) * 32, 0);
+            fields.resize((2 * parties.len() + MAX_MSG_NON_ZERO_COEFFS + 1) * 32, 0);
             Proof::new(
                 CircuitName::DecryptedSharesAggregation,
                 ArcBytes::from_bytes(&[1]),
@@ -917,6 +936,7 @@ async fn replayed_c7_work_cannot_replace_the_recovered_share_batch() -> Result<(
         test_params(),
     );
     let old_state = ThresholdPlaintextAggregatorState::GeneratingC7Proof(GeneratingC7Proof {
+        ciphertext_output: ciphertexts.clone(),
         threshold_m: 9,
         threshold_n: 19,
         shares: a.clone(),
@@ -936,15 +956,26 @@ async fn replayed_c7_work_cannot_replace_the_recovered_share_batch() -> Result<(
                 vec![(0, vec![dummy_proof(CircuitName::ThresholdShareDecryption)])];
             Ok(recovery)
         })?;
-    let mut events = vec![ciphertext_event(&id)];
+    let mut events = vec![event(
+        e3_events::CommitteeMemberExcluded {
+            e3_id: id.clone(),
+            node: test_signer(0).address(),
+            proof_type: ProofType::C6ThresholdShareDecryption,
+            party_id: Some(0),
+        },
+        EventSource::Local,
+        1,
+    )];
+    let ids: Vec<u32> = (2..=11).collect();
     for party in 1..=10 {
-        events.push(share_event(&id, party, false, party + 1));
+        events.push(share_event_in_set(&id, party, false, party + 1, &ids));
     }
     let old_pending = AggregationProofPending {
         e3_id: id.clone(),
         shares: a.clone(),
         plaintext: plaintext.clone(),
         proof_request: DecryptedSharesAggregationProofRequest {
+            ciphertext_bytes: ciphertexts.clone(),
             d_share_polys: a,
             plaintext: plaintext.clone(),
             threshold_m: 9,
@@ -1124,15 +1155,16 @@ async fn hydration_regenerates_c7_for_the_retained_share_batch() -> Result<()> {
     let id = E3id::new("42", 1);
     let ciphertexts = test_ciphertexts();
     let plaintext = vec![ArcBytes::from_bytes(&0u64.to_le_bytes()); ciphertexts.len()];
+    let ids: Vec<u32> = (2..=11).collect();
     let shares: Vec<_> = (1..=10)
         .map(|party| {
-            let (shares, _) = share_with_matching_commitment(&id, party, &ciphertexts);
+            let (shares, _) = share_with_matching_commitment_in_set(&id, party, &ciphertexts, &ids);
             (party, shares)
         })
         .collect();
     let c6: Vec<_> = (1..=10)
         .map(|party| {
-            let (_, proofs) = share_with_matching_commitment(&id, party, &ciphertexts);
+            let (_, proofs) = share_with_matching_commitment_in_set(&id, party, &ciphertexts, &ids);
             (
                 party,
                 proofs
@@ -1143,7 +1175,7 @@ async fn hydration_regenerates_c7_for_the_retained_share_batch() -> Result<()> {
         })
         .collect();
     for complete in [false, true] {
-        for mismatch in ["party", "commitment", "plaintext"] {
+        for mismatch in ["party", "commitment", "plaintext", "c0"] {
             let state = if complete {
                 ThresholdPlaintextAggregatorState::Complete(Complete {
                     shares: shares.clone(),
@@ -1151,6 +1183,7 @@ async fn hydration_regenerates_c7_for_the_retained_share_batch() -> Result<()> {
                 })
             } else {
                 ThresholdPlaintextAggregatorState::GeneratingC7Proof(GeneratingC7Proof {
+                    ciphertext_output: ciphertexts.clone(),
                     shares: shares.clone(),
                     plaintext: plaintext.clone(),
                     threshold_m: 9,
@@ -1158,11 +1191,16 @@ async fn hydration_regenerates_c7_for_the_retained_share_batch() -> Result<()> {
                 })
             };
             let (mut aggregator, history, _) = build_plaintext_aggregator(state, true).await?;
+            aggregator.committee_size = CiphernodesCommitteeSize::Small;
+            aggregator.committee_addresses =
+                (0..19).map(|party| test_signer(party).address()).collect();
+            aggregator.honest_committee_addresses = aggregator.committee_addresses[..14].to_vec();
             let mut proofs = batch_c7_proofs(&(1..=10).collect::<Vec<_>>(), ciphertexts.len());
             let mut fields = proofs[0].public_signals.to_vec();
             let offset = match mismatch {
                 "party" => 10 * 32 + 31,
                 "commitment" => 31,
+                "c0" => (20 + e3_zk_config::MAX_MSG_NON_ZERO_COEFFS) * 32 + 31,
                 _ => 20 * 32 + 31,
             };
             fields[offset] ^= 1;

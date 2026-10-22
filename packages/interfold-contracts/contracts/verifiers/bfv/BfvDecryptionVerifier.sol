@@ -28,16 +28,17 @@ import { CommitteeHashLib } from "../../lib/CommitteeHashLib.sol";
  *        [5]                = decryption_domain_lo
  *        [6]                = ciphertext_commitment
  *        [7]                = aggregate recursive VK key hash
- *        [8 .. 8+3*(T+1))  = party_ids, expected_sk, expected_esm columns
- *        [last 50]          = plaintext message coefficients (50 u64 LE)
- *        Total: expectedPublicInputsLen = 7 + 1 + 3*(T+1) + 50.
+ *        [8 .. 8+3*S)       = party_ids, expected_sk, c0 columns (S = T+1)
+ *        [8+3*S .. 58+3*S) = plaintext message coefficients (50 u64 LE)
+ *        [58+3*S .. end)   = outgoing and incoming PRF grids [S][N] each
+ *        Total: 8 + 3*S + 50 + 2*S*N, with N = 2*T+1.
  *
  *      The two VK-hash slots are checked against contract immutables set at
  *      construction; this anchors the recursive aggregation trust and
  *      prevents a malicious aggregator from substituting a forged sub-VK.
  *
- *      The `party_ids`/`expected_sk`/`expected_esm` columns are cross-checked
- *      against `ciphernodeRegistry.getDkgAnchors(e3Id)` (`_verifyDkgAnchors`):
+ *      Party IDs, SK commitments and directed PRF keys are cross-checked
+ *      against the registry's DKG anchors and PRF grid (`_verifyDkgAnchors`):
  *      the circuit only proves a decryption share is internally consistent
  *      with some self-declared commitment, so this binds that commitment to
  *      the address-signed DKG output actually recorded for this E3.
@@ -60,14 +61,14 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
     uint256 internal constant BN254_SCALAR_MODULUS =
         21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
-    /// @dev Message is always the last 50 public inputs (50 uint64 coeffs = 400 bytes plaintext).
+    /// @dev Message precedes the key grids (50 uint64 coeffs = 400 bytes plaintext).
     uint256 internal constant MESSAGE_COEFFS_COUNT = 50;
 
-    /// @dev `decryption_aggregator` return tail: `1 + 3*(T+1) + MESSAGE_COEFFS_COUNT` fields.
+    /// @dev Leading aggregate VK hash in the return tuple.
     uint256 internal constant DEC_RETURN_PREFIX_LEN = 1;
 
     /// @dev `decryption_aggregator` return columns after the leading key hash
-    ///      (party_ids, expected_sk, expected_esm).
+    ///      (party_ids, expected_sk, c0).
     uint256 internal constant DEC_RETURN_COLUMN_COUNT = 3;
 
     /// @dev `publicInputs` index for `committee_hash_hi` (after sub-circuit key hashes).
@@ -83,8 +84,9 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
 
     /// @notice BFV threshold `T`; must match the compiled DecryptionAggregator circuit.
     uint256 public immutable override threshold;
+    uint256 internal immutable n;
 
-    /// @dev `7 + DEC_RETURN_PREFIX_LEN + DEC_RETURN_COLUMN_COUNT*(T+1) + MESSAGE_COEFFS_COUNT`.
+    /// @dev Complete prefix/message plus both full-N directed-key grids.
     uint256 internal immutable expectedPublicInputsLen;
 
     /// @dev `publicInputs` start index of the `party_ids[T+1]` column.
@@ -96,15 +98,15 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
     /// @dev `publicInputs` start index of the `expected_sk[T+1]` column.
     uint256 internal immutable skColOffset;
 
-    /// @dev `publicInputs` start index of the `expected_esm[T+1]` column.
-    uint256 internal immutable esmColOffset;
+    /// @dev `publicInputs` start index of the `c0[T+1]` column, bound by C6/C7.
+    uint256 internal immutable c0ColOffset;
 
     /// @notice Underlying Honk verifier for the DecryptionAggregator circuit.
     ICircuitVerifier public immutable circuitVerifier;
 
     /// @notice Registry holding the per-E3 DKG anchors (`dkgPartyIds`,
     ///         `dkgSkAggCommits`, `dkgEsmAggCommits`) that the proof's
-    ///         `party_ids`/`expected_sk`/`expected_esm` outputs must match.
+    ///         party IDs, SK anchors and selected directed keys must match.
     ICiphernodeRegistry public immutable ciphernodeRegistry;
 
     /// @notice SAFE commitment to the C6 fold, genesis, and leaf VKs.
@@ -132,15 +134,19 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
             _expectedC7KeyHash == bytes32(0)
         ) revert InvalidVerificationKeyHash();
         threshold = _threshold;
+        n = 2 * _threshold + 1;
         expectedPublicInputsLen =
             7 +
             DEC_RETURN_PREFIX_LEN +
             (DEC_RETURN_COLUMN_COUNT * (_threshold + 1)) +
-            MESSAGE_COEFFS_COUNT;
+            MESSAGE_COEFFS_COUNT +
+            2 *
+            (_threshold + 1) *
+            (2 * _threshold + 1);
 
         partyIdColOffset = 7 + DEC_RETURN_PREFIX_LEN;
         skColOffset = partyIdColOffset + (_threshold + 1);
-        esmColOffset = skColOffset + (_threshold + 1);
+        c0ColOffset = skColOffset + (_threshold + 1);
 
         circuitVerifier = ICircuitVerifier(_circuitVerifier);
         ciphernodeRegistry = ICiphernodeRegistry(_ciphernodeRegistry);
@@ -210,7 +216,7 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
             revert PlaintextHashMismatch();
         }
 
-        // Cross-phase binding: the proof's per-party sk/esm commitments must match
+        // Cross-phase binding: SK and directed key commitments must match
         // the DKG anchors this registry recorded (address-signed) for this E3.
         _verifyDkgAnchors(e3Id, publicInputs);
 
@@ -224,13 +230,17 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
     function _validatePublicInputs(
         bytes32[] memory publicInputs
     ) internal view {
-        uint256 messageOffset = expectedPublicInputsLen - MESSAGE_COEFFS_COUNT;
+        uint256 messageOffset = c0ColOffset + threshold + 1;
         for (uint256 i = 0; i < publicInputs.length; ++i) {
             uint256 value = uint256(publicInputs[i]);
             if (value >= BN254_SCALAR_MODULUS) {
                 revert NonCanonicalPublicInput(i);
             }
-            if (i >= messageOffset && value > type(uint64).max) {
+            if (
+                i >= messageOffset &&
+                i < messageOffset + MESSAGE_COEFFS_COUNT &&
+                value > type(uint64).max
+            ) {
                 revert MessageCoefficientOutOfRange(i);
             }
         }
@@ -240,7 +250,7 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
         bytes32[] memory publicInputs,
         bytes32 expected
     ) internal view returns (bool) {
-        uint256 offset = expectedPublicInputsLen - MESSAGE_COEFFS_COUNT;
+        uint256 offset = c0ColOffset + threshold + 1;
         bytes memory plaintext = new bytes(MESSAGE_COEFFS_COUNT * 8);
         for (uint256 i = 0; i < MESSAGE_COEFFS_COUNT; i++) {
             uint64 coeff = uint64(uint256(publicInputs[offset + i]));
@@ -251,7 +261,7 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
         return keccak256(plaintext) == expected;
     }
 
-    /// @dev Binds the proof's `party_ids`/`expected_sk`/`expected_esm` outputs to the
+    /// @dev Binds the proof's party IDs, SK and directed PRF key commitments to the
     ///      registry's stored DKG anchors for this E3, closing the gap where the circuit
     ///      only proves internal self-consistency ("I know a share matching some claimed
     ///      commitment") without tying that commitment to the address-signed DKG output.
@@ -267,13 +277,31 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
         (
             uint256[] memory dkgPartyIds,
             bytes32[] memory dkgSkAggCommits,
-            bytes32[] memory dkgEsmAggCommits
+            bytes32[] memory legacyEsm
         ) = ciphernodeRegistry.getDkgAnchors(e3Id);
+        legacyEsm;
+        bytes32[] memory keys = ciphernodeRegistry.getDkgPrfKeyCommitments(
+            e3Id
+        );
+        if (
+            dkgPartyIds.length == 0 ||
+            dkgPartyIds.length != dkgSkAggCommits.length ||
+            keys.length != dkgPartyIds.length * n
+        ) {
+            revert DkgAnchorMismatch();
+        }
 
         for (uint256 i = 0; i < threshold + 1; i++) {
             uint256 circuitPartyId = uint256(
                 publicInputs[partyIdColOffset + i]
             );
+            if (
+                circuitPartyId == 0 ||
+                circuitPartyId > n ||
+                (i > 0 &&
+                    circuitPartyId <=
+                    uint256(publicInputs[partyIdColOffset + i - 1]))
+            ) revert DkgAnchorNotFound();
             uint256 registryPartyId = circuitPartyId - 1;
 
             uint256 matchedIdx = type(uint256).max;
@@ -287,12 +315,49 @@ contract BfvDecryptionVerifier is IDecryptionVerifier {
                 revert DkgAnchorNotFound();
             }
 
-            if (
-                publicInputs[skColOffset + i] != dkgSkAggCommits[matchedIdx] ||
-                publicInputs[esmColOffset + i] != dkgEsmAggCommits[matchedIdx]
-            ) {
+            if (publicInputs[skColOffset + i] != dkgSkAggCommits[matchedIdx]) {
                 revert DkgAnchorMismatch();
             }
+            _verifyPeerKeys(
+                publicInputs,
+                keys,
+                dkgPartyIds,
+                i,
+                matchedIdx,
+                registryPartyId
+            );
+        }
+    }
+
+    function _verifyPeerKeys(
+        bytes32[] memory inputs,
+        bytes32[] memory keys,
+        uint256[] memory ids,
+        uint256 ownerSlot,
+        uint256 ownerRow,
+        uint256 ownerId
+    ) private view {
+        uint256 outBase = c0ColOffset + threshold + 1 + MESSAGE_COEFFS_COUNT;
+        uint256 inBase = outBase + (threshold + 1) * n;
+        for (uint256 peerSlot; peerSlot < threshold + 1; ++peerSlot) {
+            uint256 peerOneBased = uint256(inputs[partyIdColOffset + peerSlot]);
+            if (peerOneBased == 0 || peerOneBased > n)
+                revert DkgAnchorNotFound();
+            uint256 peerId = peerOneBased - 1;
+            uint256 peerRow = type(uint256).max;
+            for (uint256 row; row < ids.length; ++row) {
+                if (ids[row] == peerId) {
+                    peerRow = row;
+                    break;
+                }
+            }
+            if (peerRow == type(uint256).max) revert DkgAnchorNotFound();
+            if (
+                inputs[outBase + ownerSlot * n + peerId] !=
+                keys[ownerRow * n + peerId] ||
+                inputs[inBase + ownerSlot * n + peerId] !=
+                keys[peerRow * n + ownerId]
+            ) revert DkgAnchorMismatch();
         }
     }
 }

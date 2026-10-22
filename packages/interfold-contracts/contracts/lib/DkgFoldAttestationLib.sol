@@ -30,21 +30,22 @@ library DkgFoldAttestationLib {
     bytes32 public constant DOMAIN_NAME_HASH =
         keccak256(bytes("InterfoldDkgFoldAttestation"));
 
-    /// @dev `keccak256("1")`
-    bytes32 public constant DOMAIN_VERSION_HASH = keccak256(bytes("1"));
+    /// @dev Version 2 binds PRF transport rather than retired shared ESM material.
+    bytes32 public constant DOMAIN_VERSION_HASH = keccak256(bytes("2"));
 
     /// @dev `keccak256("DkgFoldAttestation(address registry,uint256 e3Id,
-    /// uint256 partyId,bytes32 skAggCommit,bytes32 esmAggCommit)")`
+    /// uint256 partyId,bytes32 skAggCommit,bytes32 prfKeyCommitsHash)")`
     bytes32 public constant TYPEHASH =
         keccak256(
-            "DkgFoldAttestation(address registry,uint256 e3Id,uint256 partyId,bytes32 skAggCommit,bytes32 esmAggCommit)"
+            "DkgFoldAttestation(address registry,uint256 e3Id,uint256 partyId,"
+            "bytes32 skAggCommit,bytes32 prfKeyCommitsHash)"
         );
 
     /// @notice One node's signed fold output.
     struct Attestation {
         uint256 partyId;
         bytes32 skAggCommit;
-        bytes32 esmAggCommit;
+        bytes32 prfKeyCommitsHash;
         bytes signature;
     }
 
@@ -77,7 +78,7 @@ library DkgFoldAttestationLib {
         uint256 e3Id,
         uint256 partyId,
         bytes32 skAggCommit,
-        bytes32 esmAggCommit
+        bytes32 prfKeyCommitsHash
     ) internal pure returns (bytes32) {
         return
             keccak256(
@@ -87,7 +88,7 @@ library DkgFoldAttestationLib {
                     e3Id,
                     partyId,
                     skAggCommit,
-                    esmAggCommit
+                    prfKeyCommitsHash
                 )
             );
     }
@@ -100,7 +101,7 @@ library DkgFoldAttestationLib {
         uint256 e3Id,
         uint256 partyId,
         bytes32 skAggCommit,
-        bytes32 esmAggCommit
+        bytes32 prfKeyCommitsHash
     ) internal pure returns (bytes32) {
         return
             keccak256(
@@ -112,7 +113,7 @@ library DkgFoldAttestationLib {
                         e3Id,
                         partyId,
                         skAggCommit,
-                        esmAggCommit
+                        prfKeyCommitsHash
                     )
                 )
             );
@@ -133,7 +134,7 @@ library DkgFoldAttestationLib {
             e3Id,
             attestation.partyId,
             attestation.skAggCommit,
-            attestation.esmAggCommit
+            attestation.prfKeyCommitsHash
         );
         return ECDSA.recover(digest, attestation.signature);
     }

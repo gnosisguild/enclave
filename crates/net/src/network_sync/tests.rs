@@ -2080,6 +2080,7 @@ async fn periodic_dkg_reannouncement_uses_the_latest_ready_superset() {
 
 fn local_decryption_share(e3_id: &E3id, party_id: u64) -> (InterfoldEvent, DecryptionshareCreated) {
     let share = DecryptionshareCreated {
+        decryptors: vec![],
         party_id,
         decryption_share: vec![ArcBytes::from_bytes(&[7; 16])],
         e3_id: e3_id.clone(),

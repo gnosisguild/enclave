@@ -73,12 +73,10 @@ impl Bounds {
             let qi_bound = (&qi_big - 1u32) / 2u32;
 
             // `r` is the mod-q quotient of the identity reduced modulo X^N + 1:
-            //   d = ct0 + (ct1 * sk mod X^N + 1) + e_sm + q * r
-            // so bounding the other terms and dividing by q bounds `r`. The negacyclic product of n
-            // terms contributes n * ((q-1)/2)^2 and each of `d`, `ct0`, `e_sm` contributes (q-1)/2.
-            // The 4 rather than 3 keeps the margin the unreduced `r1` bound carried, which also
-            // means the reduced quotient is no wider -- the width stays 69 (43 insecure).
-            r_bounds.push((&qi_bound * &qi_bound * &n + 4u32 * &qi_bound) / &qi_big);
+            //   d = lambda * (ct1 * sk mod X^N + 1) + e + mask + q * r
+            // The centered lambda contributes another (q-1)/2 factor to the product bound.
+            // Native mask < q and centered d/e contribute at most four half-moduli together.
+            r_bounds.push((&qi_bound * &qi_bound * &qi_bound * &n + 4u32 * &qi_bound) / &qi_big);
         }
 
         Ok(Bounds { r_bounds })

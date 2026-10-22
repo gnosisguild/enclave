@@ -66,6 +66,12 @@ struct Args {
     #[arg(long, default_value_t = DEFAULT_MIN_PRIME_BITS)]
     min_prime_bits: u8,
 
+    /// Multiplier on the largest first-set prime for the second-set (DKG) plaintext modulus.
+    /// The presets use 2: the DKG share limb packs one PRF key bit per coefficient as
+    /// `residue + bit * q` in [0, 2q).
+    #[arg(long, default_value_t = 2u128)]
+    second_k_multiple: u128,
+
     /// Levels of multiplication and relinearization after the z additions (0 = summation only).
     #[arg(long, default_value_t = 0u32)]
     mult_depth: u32,
@@ -242,6 +248,7 @@ fn main() {
         insecure: args.insecure,
         mult_depth: args.mult_depth,
         min_prime_bits: args.min_prime_bits,
+        second_k_multiple: args.second_k_multiple,
         verbose: args.verbose,
     };
 

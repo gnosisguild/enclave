@@ -36,6 +36,9 @@ use serde::Serialize;
 
 /// Input to the share-encryption circuit: plaintext, ciphertext, public key, and encryption randomness.
 pub struct ShareEncryptionCircuitData {
+    pub recipient_party_idx: u32,
+    pub row_idx: u32,
+    pub prf_key: Vec<u8>,
     /// Plaintext (encoded share row).
     pub plaintext: Plaintext,
     /// Ciphertext (encryption under public_key).
@@ -56,6 +59,9 @@ pub struct ShareEncryptionCircuitData {
 /// that the ciphertext and commitments match the public inputs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Inputs {
+    pub recipient_party_idx: u32,
+    pub row_idx: u32,
+    pub prf_key: Vec<u8>,
     /// Public key and ciphertext polynomials in CRT form (per modulus).
     pub pk0is: CrtPolynomial,
     pub pk1is: CrtPolynomial,
@@ -288,6 +294,9 @@ impl Inputs {
         let msg_commitment = compute_share_encryption_commitment_from_message(&message, msg_bit);
 
         Ok(Inputs {
+            recipient_party_idx: data.recipient_party_idx,
+            row_idx: data.row_idx,
+            prf_key: data.prf_key.clone(),
             pk0is,
             pk1is,
             ct0is,
@@ -307,6 +316,10 @@ impl Inputs {
     // Used as input for Nargo execution.
     pub fn to_json(&self) -> serde_json::Value {
         serde_json::json!({
+            "recipient_party_idx": self.recipient_party_idx,
+            "row_idx": self.row_idx,
+            "prf_key": e3_fhe_params::prf_key_bits(&self.prf_key),
+            "prf_key_commitment": crate::prf::key_commitment(self.recipient_party_idx, &self.prf_key).to_string(),
             "pk0is": crt_polynomial_to_toml_json(&self.pk0is),
             "pk1is": crt_polynomial_to_toml_json(&self.pk1is),
             "ct0is": crt_polynomial_to_toml_json(&self.ct0is),

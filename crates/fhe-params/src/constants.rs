@@ -23,12 +23,17 @@ pub mod insecure_64 {
         pub const ERROR1_VARIANCE_BIGUINT: u64 = 12617929386;
     }
 
-    /// DKG parameters
+    /// DKG parameters.
+    ///
+    /// `PLAINTEXT_MODULUS` is twice the largest threshold modulus. The first
+    /// `PRF_KEY_BITS` coefficients of that limb store one key bit each.
     pub mod dkg {
-        pub const PLAINTEXT_MODULUS: u64 = 134217089;
-        pub const MODULI: &[u64] = &[0x000000001fffba01, 0x000000001fffc081];
+        pub const PLAINTEXT_MODULUS: u64 = 268434178;
+        pub const MODULI: &[u64] = &[0x000000001ffffb01, 0x000000001ffffd81];
         pub const ERROR1_VARIANCE: &str = "10";
         pub const VARIANCE: u32 = 10;
+        /// The degree-64 limb has room for 32 key bits.
+        pub const PRF_KEY_BITS: usize = 32;
     }
 }
 
@@ -45,10 +50,15 @@ pub mod secure_8192 {
     }
 
     /// DKG parameters
+    /// DKG parameters.
+    ///
+    /// `PLAINTEXT_MODULUS` is twice the largest threshold modulus. The first
+    /// `PRF_KEY_BITS` coefficients of that limb store one key bit each.
     pub mod dkg {
-        pub const PLAINTEXT_MODULUS: u64 = 576460752317792257;
-        pub const MODULI: &[u64] = &[0x2000000000104001, 0x200000000013c001];
+        pub const PLAINTEXT_MODULUS: u64 = 1152921504635584514;
+        pub const MODULI: &[u64] = &[0x24c2230d75cdc001, 0x260dfc1463740001];
         pub const ERROR1_VARIANCE: &str = "10";
+        pub const PRF_KEY_BITS: usize = 256;
     }
 }
 

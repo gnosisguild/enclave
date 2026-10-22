@@ -4,7 +4,9 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::math::commitments::compute_threshold_decryption_share_commitment;
+use crate::math::commitments::{
+    compute_partial_decryption_c0_commitment, compute_threshold_decryption_share_commitment,
+};
 use crate::math::helpers::assert_in_range;
 use crate::math::modulo::U128::{inv_mod_bounded, reduce_mod_bounded};
 use crate::math::polynomial::Polynomial;
@@ -52,6 +54,8 @@ pub struct DecryptedSharesAggregation<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u
 
     /// Message polynomial m(x) (public witness)
     message: Polynomial<MAX_MSG_NON_ZERO_COEFFS>,
+    c0_commitment: Field,
+    c0: [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L],
 }
 
 impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let N_PARTIES: u32, let BIT_D_NATIVE: u32, let BIT_Q: u32, let BIT_K: u32, let BIT_T: u32, let BIT_Q_TOTAL: u32> DecryptedSharesAggregation<MAX_MSG_NON_ZERO_COEFFS, L, T, N_PARTIES, BIT_D_NATIVE, BIT_Q, BIT_K, BIT_T, BIT_Q_TOTAL> {
@@ -61,6 +65,8 @@ impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let N_PARTIES: u3
         decryption_shares: [[Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L]; T + 1],
         party_ids: [Field; T + 1],
         message: Polynomial<MAX_MSG_NON_ZERO_COEFFS>,
+        c0_commitment: Field,
+        c0: [Polynomial<MAX_MSG_NON_ZERO_COEFFS>; L],
     ) -> Self {
         DecryptedSharesAggregation {
             configs,
@@ -68,6 +74,8 @@ impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let N_PARTIES: u3
             decryption_shares,
             party_ids,
             message,
+            c0_commitment,
+            c0,
         }
     }
 
@@ -96,10 +104,18 @@ impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let N_PARTIES: u3
             assert(computed == self.expected_d_commitments[party_idx], "d commitment mismatch");
         }
 
-        let coefficients = lagrange_coefficients::<T + 1, L, BIT_Q, BIT_K>(
-            self.configs.qis,
-            self.party_ids,
-            N_PARTIES,
+        assert_canonical_party_ids(self.party_ids, N_PARTIES);
+        for l in 0..L {
+            for j in 0..MAX_MSG_NON_ZERO_COEFFS {
+                assert_in_range::<BIT_Q>(self.c0[l].coefficients[j], self.configs.qis[l]);
+            }
+        }
+        assert(
+            compute_partial_decryption_c0_commitment::<MAX_MSG_NON_ZERO_COEFFS, L, BIT_D_NATIVE>(
+                self.c0,
+            )
+                == self.c0_commitment,
+            "c0 commitment mismatch",
         );
 
         let t = self.configs.plaintext_modulus;
@@ -109,9 +125,9 @@ impl<let MAX_MSG_NON_ZERO_COEFFS: u32, let L: u32, let T: u32, let N_PARTIES: u3
             // Interpolate at zero in each CRT basis, then reconstruct `u` across them.
             let mut residues = [0 as Field; L];
             for l in 0..L {
-                let mut sum: Field = 0;
+                let mut sum: Field = self.c0[l].coefficients[j];
                 for h in 0..(T + 1) {
-                    sum += self.decryption_shares[h][l].coefficients[j] * coefficients[l][h];
+                    sum += self.decryption_shares[h][l].coefficients[j];
                 }
                 sum.assert_max_bit_size::<128>();
                 residues[l] = reduce_mod_bounded::<BIT_Q, BIT_K>(sum, self.configs.qis[l]);
@@ -135,11 +151,7 @@ unconstrained fn divide_big_hint(x: Field, q: Field) -> Field {
 ///
 /// The inverse of the denominator is hinted and then proven, which replaces an in-circuit modular
 /// inversion. Ids must be distinct, strictly increasing and within the committee.
-fn lagrange_coefficients<let H: u32, let L: u32, let BIT_Q: u32, let BIT_K: u32>(
-    qis: [Field; L],
-    ids: [Field; H],
-    n_parties: u32,
-) -> [[Field; H]; L] {
+fn assert_canonical_party_ids<let H: u32>(ids: [Field; H], n_parties: u32) {
     for i in 0..H {
         ids[i].assert_max_bit_size::<16>();
         assert((ids[i] as u32) > 0, "party id must be 1-indexed");
@@ -148,40 +160,6 @@ fn lagrange_coefficients<let H: u32, let L: u32, let BIT_Q: u32, let BIT_K: u32>
     for i in 1..H {
         assert((ids[i - 1] as u32) < (ids[i] as u32), "party ids must strictly increase");
     }
-
-    let mut out = [[0 as Field; H]; L];
-    for i in 0..H {
-        let mut numerator: Field = 1;
-        let mut denominator: Field = 1;
-        for j in 0..H {
-            if j != i {
-                numerator *= ids[j];
-                let difference = if j > i {
-                    ids[j] - ids[i]
-                } else {
-                    ids[i] - ids[j]
-                };
-                denominator *= difference;
-            }
-        }
-        // The product of the other ids carries the sign of the omitted factors.
-        let negate = (i % 2) == 1;
-        for l in 0..L {
-            let q = qis[l];
-            let inverse = inv_mod_bounded::<BIT_Q, BIT_K>(denominator, q);
-            let magnitude = reduce_mod_bounded::<BIT_Q, BIT_K>(numerator * inverse, q);
-            out[l][i] = if negate {
-                if magnitude == 0 {
-                    0
-                } else {
-                    q - magnitude
-                }
-            } else {
-                magnitude
-            };
-        }
-    }
-    out
 }
 
 /// Garner reconstruction: the unique `u` in `[0, Q)` with `u == residues[l] (mod q_l)`.

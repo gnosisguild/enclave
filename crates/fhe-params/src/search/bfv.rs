@@ -79,6 +79,11 @@ pub struct BfvSearchConfig {
     /// `RING_DIM` generate their primes, so a toy preset can use primes from 10 bits. For
     /// d >= `RING_DIM` the table pool starts at 50 bits, so a value below 50 has no effect there.
     pub min_prime_bits: u8,
+    /// Multiplier on the largest first-set prime that sets the second-set (DKG) plaintext
+    /// modulus. The presets use 2, so a DKG share limb packs one PRF key bit per coefficient
+    /// as `residue + bit * q` in `[0, 2q)`. The centered-RNS gap rule then admits only
+    /// second-set primes above `2 * k_second`.
+    pub second_k_multiple: u128,
     /// Verbose output showing detailed parameter search process
     pub verbose: bool,
 }
@@ -686,29 +691,33 @@ pub fn bfv_search_second_param(
     bfv_search_config: &BfvSearchConfig,
     first: &BfvSearchResult,
 ) -> Option<BfvSearchResult> {
+    if bfv_search_config.second_k_multiple == 0 {
+        return None;
+    }
     let d = first.d;
 
-    // Plaintext space for second set: k = max qi of first set (actual value).
+    // Plaintext space for second set: k = multiple of the max qi of first set (actual value).
     let max_qi_first: BigUint = first
         .selected_primes
         .iter()
         .map(|pi| pi.value.clone())
         .max()
         .expect("first set has at least one prime");
-    let k_second: u128 = max_qi_first.to_u128().unwrap_or(u128::MAX);
+    let k_second: u128 = (&max_qi_first * bfv_search_config.second_k_multiple).to_u128()?;
 
     let verbose = bfv_search_config.verbose;
 
     // Centered-RNS gap rule: qi > 2*k.
-    let min_qi_second = &max_qi_first << 1;
+    let min_qi_second = BigUint::from(k_second) << 1;
 
     // Eq4 security upper bound: 128-bit ceiling on log2(q) for this d.
     let (log2_q_limit, limit_source) = max_log2_q(bfv_search_config.b, bfv_search_config.b_chi, d);
 
     if verbose {
         println!(
-            "\n[BFV-2nd] Fixed d={d}, k = max_qi_first = {k_second} ({:.2} bits)",
-            log2_big(&max_qi_first)
+            "\n[BFV-2nd] Fixed d={d}, k = max_qi_first × {} = {k_second} ({:.2} bits)",
+            bfv_search_config.second_k_multiple,
+            log2_big(&BigUint::from(k_second))
         );
         println!(
             "  Minimum qi required: {:.2} bits (fhe.rs centered RNS: qi > 2*k)",
@@ -817,7 +826,7 @@ pub fn bfv_search_second_param(
                 let q = sel.iter().map(|pi| &pi.value).product::<BigUint>();
                 let q_bits = log2_big(&q);
                 let min_selected = sel.iter().map(|p| &p.value).min().unwrap();
-                let gap_bits = log2_big(&(min_selected - &max_qi_first));
+                let gap_bits = log2_big(&(min_selected - BigUint::from(k_second)));
 
                 if verbose {
                     println!(
@@ -1087,6 +1096,7 @@ mod tests {
             insecure: false,
             mult_depth: 0,
             min_prime_bits: crate::search::constants::DEFAULT_MIN_PRIME_BITS,
+            second_k_multiple: 2,
             verbose: false,
         }
     }
@@ -1288,6 +1298,7 @@ mod tests {
             insecure: false,
             mult_depth: 0,
             min_prime_bits: crate::search::constants::DEFAULT_MIN_PRIME_BITS,
+            second_k_multiple: 2,
             verbose: false,
         }
     }

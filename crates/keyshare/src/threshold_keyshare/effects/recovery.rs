@@ -154,13 +154,37 @@ impl ThresholdKeyshare {
         &mut self,
         ec: EventContext<Sequenced>,
     ) -> Result<()> {
+        let state = self.state.try_get()?;
+        let previous = match &state.state {
+            KeyshareState::Decrypting(round) => Some(&round.decryptors),
+            KeyshareState::GeneratingDecryptionProof(round) => Some(&round.decryptors),
+            KeyshareState::Completed(round) => Some(&round.decryptors),
+            _ => None,
+        };
+        if let Some(previous) = previous.filter(|_| !state.expelled_parties.is_empty()) {
+            use super::create_decryption_share::{canonical_decryptors, reconstruction_count};
+            let decryptors = canonical_decryptors(
+                state.honest_parties.as_ref(),
+                &state.expelled_parties,
+                reconstruction_count(state.threshold_m)?,
+            )?;
+            if &decryptors != previous {
+                return self.apply_fresh_decryption_round(TypedEvent::new(
+                    e3_events::FreshDecryptionRound {
+                        e3_id: state.e3_id.clone(),
+                        decryptors,
+                    },
+                    ec,
+                ));
+            }
+        }
         if !self.effects_enabled {
             return Ok(());
         }
         let state = self.state.try_get()?;
         match state.state {
             KeyshareState::Decrypting(_) => self.issue_decryption_share_request(ec),
-            KeyshareState::GeneratingDecryptionProof(_) | KeyshareState::Completed => {
+            KeyshareState::GeneratingDecryptionProof(_) | KeyshareState::Completed(_) => {
                 let Some(pending) = self.recovery.try_get()?.share_decryption_proof_pending else {
                     return Ok(());
                 };
@@ -267,9 +291,7 @@ impl ThresholdKeyshare {
                 party_id,
                 ReceivedShareProofs {
                     signed_c2a_proof: event.signed_c2a_proof.clone(),
-                    signed_c2b_proof: event.signed_c2b_proof.clone(),
                     signed_c3a_proofs: event.signed_c3a_proofs.clone(),
-                    signed_c3b_proofs: event.signed_c3b_proofs.clone(),
                 },
             );
         }
@@ -446,7 +468,7 @@ impl ThresholdKeyshare {
         data: GeneratingThresholdShareData,
         ec: EventContext<Sequenced>,
     ) -> Result<()> {
-        if data.pk_share.is_none() || data.sk_sss.is_none() || data.e_sm_raw.is_none() {
+        if data.pk_share.is_none() || data.sk_sss.is_none() {
             let selected = data.ciphernode_selected.ok_or_else(|| {
                 anyhow!("missing CiphernodeSelected while resuming threshold share")
             })?;
@@ -456,51 +478,11 @@ impl ThresholdKeyshare {
             ));
         }
 
-        if data.esi_sss.is_none() {
-            let selected = data.ciphernode_selected.ok_or_else(|| {
-                anyhow!("missing CiphernodeSelected while resuming ESI generation")
-            })?;
-            let e_sm_raw = data
-                .e_sm_raw
-                .ok_or_else(|| anyhow!("missing e_sm_raw while resuming ESI generation"))?;
-            return self.handle_gen_esi_sss_requested(TypedEvent::new(
-                GenEsiSss {
-                    ciphernode_selected: selected,
-                    e_sm_raw,
-                },
-                ec,
-            ));
-        }
-
         ensure!(
             data.proof_request_data.is_some(),
             "missing proof request data while resuming generated threshold shares"
         );
-        self.handle_shares_generated(ec.clone())?;
-        let (own_sk_share_raw, own_esi_shares_raw) = self
-            .pending
-            .own_dkg_shares
-            .take()
-            .ok_or_else(|| anyhow!("generated shares did not retain local DKG rows"))?;
-        self.state.try_mutate(&ec, |state| {
-            let current: GeneratingThresholdShareData = state.clone().try_into()?;
-            state.new_state(KeyshareState::AggregatingDecryptionKey(
-                AggregatingDecryptionKey {
-                    pk_share: current
-                        .pk_share
-                        .ok_or_else(|| anyhow!("missing generated public-key share"))?,
-                    sk_bfv: current.sk_bfv,
-                    own_sk_share_raw: own_sk_share_raw.clone(),
-                    own_esi_shares_raw: own_esi_shares_raw.clone(),
-                    signed_pk_generation_proof: None,
-                    signed_sk_share_computation_proof: None,
-                    signed_e_sm_share_computation_proof: None,
-                    signed_sk_share_encryption_proofs: Vec::new(),
-                    signed_e_sm_share_encryption_proofs: Vec::new(),
-                },
-            ))
-        })?;
-        self.verify_recorded_threshold_shares(ec)
+        self.publish_generated_threshold_shares(ec)
     }
 
     /// Re-create interrupted collectors and process-local jobs from their persisted inputs.
@@ -613,7 +595,7 @@ impl ThresholdKeyshare {
                 }
                 self.issue_decryption_share_request(ec)
             }
-            KeyshareState::GeneratingDecryptionProof(_) | KeyshareState::Completed => {
+            KeyshareState::GeneratingDecryptionProof(_) | KeyshareState::Completed(_) => {
                 self.resume_decryption_work(ec)
             }
             KeyshareState::Failed {

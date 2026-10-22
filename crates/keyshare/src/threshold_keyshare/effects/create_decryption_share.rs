@@ -3,6 +3,7 @@
 //! Ciphertext handling, C6 share calculation, and restart redrive.
 
 use super::*;
+use e3_events::FreshDecryptionRound;
 
 impl ThresholdKeyshare {
     /// Handle the ciphertext output and begin local C6 decryption-share work.
@@ -24,7 +25,7 @@ impl ThresholdKeyshare {
                     );
                     return self.issue_decryption_share_request(ec);
                 }
-                KeyshareState::GeneratingDecryptionProof(_) | KeyshareState::Completed => {
+                KeyshareState::GeneratingDecryptionProof(_) | KeyshareState::Completed(_) => {
                     info!(
                         e3_id = %state.e3_id,
                         state = %state.variant_name(),
@@ -46,6 +47,17 @@ impl ThresholdKeyshare {
             }
         }
 
+        // Reject a missing key or a short honest set before the phase changes.
+        let decryptors = {
+            let state = self.state.try_get()?;
+            party_index(state.party_id)?;
+            canonical_decryptors(
+                state.honest_parties.as_ref(),
+                &state.expelled_parties,
+                reconstruction_count(state.threshold_m)?,
+            )?
+        };
+
         // Set state to decrypting, storing ciphertext for later C6 proof generation
         self.state.try_mutate(&ec, |s| {
             use KeyshareState as K;
@@ -55,13 +67,13 @@ impl ThresholdKeyshare {
             let next = K::Decrypting(Decrypting {
                 pk_share: current.pk_share,
                 sk_poly_sum: current.sk_poly_sum,
-                es_poly_sum: current.es_poly_sum,
                 ciphertext_output: ciphertext_output.clone(),
                 signed_pk_generation_proof: current.signed_pk_generation_proof,
                 signed_sk_share_computation_proof: current.signed_sk_share_computation_proof,
-                signed_e_sm_share_computation_proof: current.signed_e_sm_share_computation_proof,
                 signed_sk_share_encryption_proofs: current.signed_sk_share_encryption_proofs,
-                signed_e_sm_share_encryption_proofs: current.signed_e_sm_share_encryption_proofs,
+                outgoing_prf_keys: current.outgoing_prf_keys,
+                incoming_prf_keys: current.incoming_prf_keys,
+                decryptors: decryptors.clone(),
             });
 
             s.new_state(next)
@@ -98,14 +110,25 @@ impl ThresholdKeyshare {
         }
         let e3_id = state.get_e3_id();
         let decrypting: Decrypting = state.clone().try_into()?;
+        // Standbys retain the ciphertext for a later designated set, but must not dispatch
+        // an operation that the FHE API correctly rejects for a non-member.
+        if !decrypting
+            .decryptors
+            .contains(&(party_index(state.party_id)? + 1))
+        {
+            return Ok(false);
+        }
         let trbfv_config = state.get_trbfv_config();
         let event = ComputeRequest::trbfv(
             TrBFVRequest::CalculateDecryptionShare(CalculateDecryptionShareRequest {
                 name: format!("party_id({})", state.party_id),
                 ciphertexts: decrypting.ciphertext_output,
                 sk_poly_sum: decrypting.sk_poly_sum,
-                es_poly_sum: decrypting.es_poly_sum,
                 trbfv_config,
+                party_idx: party_index(state.party_id)?,
+                decryptors: decrypting.decryptors,
+                outgoing_prf_keys: decrypting.outgoing_prf_keys,
+                incoming_prf_keys: decrypting.incoming_prf_keys,
             }),
             CorrelationId::new(),
             e3_id.clone(),
@@ -219,12 +242,23 @@ impl ThresholdKeyshare {
         if !matches!(state.state, KeyshareState::Decrypting(_)) {
             tracing::debug!(
                 e3_id = %e3_id,
-                state = %state.variant_name(),
+                state = state.variant_name(),
                 "Ignoring a decryption-share response after leaving Decrypting"
             );
             return Ok(());
         }
         let decrypting: Decrypting = state.clone().try_into()?;
+        let expected_digest = e3_trbfv::calculate_threshold_decryption::decryption_context_digest(
+            &decrypting.decryptors,
+            &decrypting.ciphertext_output,
+        );
+        if msg.context_digest != expected_digest {
+            tracing::debug!(
+                e3_id = %e3_id,
+                "Ignoring a decryption-share response for a different decryptor set"
+            );
+            return Ok(());
+        }
         let d_share_poly = msg.d_share_poly;
 
         anyhow::ensure!(
@@ -262,16 +296,22 @@ impl ThresholdKeyshare {
             node: state.address.clone(),
             decryption_share: d_share_poly.clone(),
             proof_request: ThresholdShareDecryptionProofRequest {
-                ciphertext_bytes: decrypting.ciphertext_output,
+                ciphertext_bytes: decrypting.ciphertext_output.clone(),
                 aggregated_pk_bytes,
-                sk_poly_sum: decrypting.sk_poly_sum,
-                es_poly_sum: decrypting.es_poly_sum,
+                sk_poly_sum: decrypting.sk_poly_sum.clone(),
+                e_fresh: msg.e_fresh,
+                e_signed: msg.e_signed,
                 d_share_bytes: d_share_poly.clone(),
                 decryption_domain,
                 params_preset: threshold_preset,
                 committee_size,
+                party_idx: party_index(state.party_id)?,
+                decryptors: decrypting.decryptors.clone(),
+                outgoing_prf_keys: decrypting.outgoing_prf_keys.clone(),
+                incoming_prf_keys: decrypting.incoming_prf_keys.clone(),
             },
             redelivery: 0,
+            decryptors: decrypting.decryptors.clone(),
         };
         self.issue_decryption_proof_request(event, ec.clone())?;
 
@@ -285,32 +325,272 @@ impl ThresholdKeyshare {
                 signed_sk_share_computation_proof: decrypting
                     .signed_sk_share_computation_proof
                     .clone(),
-                signed_e_sm_share_computation_proof: decrypting
-                    .signed_e_sm_share_computation_proof
-                    .clone(),
                 signed_sk_share_encryption_proofs: decrypting
                     .signed_sk_share_encryption_proofs
                     .clone(),
-                signed_e_sm_share_encryption_proofs: decrypting
-                    .signed_e_sm_share_encryption_proofs
-                    .clone(),
+                ciphertext_output: decrypting.ciphertext_output.clone(),
+                sk_poly_sum: decrypting.sk_poly_sum.clone(),
+                outgoing_prf_keys: decrypting.outgoing_prf_keys.clone(),
+                incoming_prf_keys: decrypting.incoming_prf_keys.clone(),
+                decryptors: decrypting.decryptors.clone(),
             }))
         })?;
         Ok(())
+    }
+
+    /// Recompute a share for a new decryptor set. Old shares stay bound to the previous set.
+    pub fn handle_fresh_decryption_round(
+        &mut self,
+        msg: TypedEvent<FreshDecryptionRound>,
+    ) -> Result<()> {
+        let (data, ec) = msg.into_components();
+        if ec.source() == e3_events::EventSource::Net {
+            return Ok(());
+        }
+        self.apply_fresh_decryption_round(TypedEvent::new(data, ec))
+    }
+
+    pub(super) fn apply_fresh_decryption_round(
+        &mut self,
+        msg: TypedEvent<FreshDecryptionRound>,
+    ) -> Result<()> {
+        let (msg, ec) = msg.into_components();
+        let state = self.state.try_get()?;
+        if msg.e3_id != state.e3_id {
+            return Ok(());
+        }
+        // This is a local derived control event, not an aggregator's authority to select a set.
+        // Every node independently derives the same set after authenticated exclusions.
+        let canonical = canonical_decryptors(
+            state.honest_parties.as_ref(),
+            &state.expelled_parties,
+            reconstruction_count(state.threshold_m)?,
+        )?;
+        if msg.decryptors != canonical {
+            return Ok(());
+        }
+        let previous = match &state.state {
+            KeyshareState::Decrypting(round) => Some(&round.decryptors),
+            KeyshareState::GeneratingDecryptionProof(round) => Some(&round.decryptors),
+            KeyshareState::Completed(round) => Some(&round.decryptors),
+            _ => None,
+        };
+        if previous == Some(&msg.decryptors) {
+            return if self.effects_enabled && matches!(state.state, KeyshareState::Decrypting(_)) {
+                self.issue_decryption_share_request(ec)
+            } else {
+                Ok(())
+            };
+        }
+        let party = party_index(state.party_id)?
+            .checked_add(1)
+            .context("party id cannot become a 1-based decryptor id")?;
+        let included = msg.decryptors.contains(&party);
+        match state.state {
+            KeyshareState::Decrypting(_) => {
+                self.state.try_mutate(&ec, |s| {
+                    let KeyshareState::Decrypting(mut current) = s.state.clone() else {
+                        bail!("expected Decrypting");
+                    };
+                    current.decryptors = msg.decryptors.clone();
+                    s.new_state(KeyshareState::Decrypting(current))
+                })?;
+                self.begin_fresh_decryption_round(&ec)?;
+                if included && self.effects_enabled {
+                    self.issue_decryption_share_request(ec)
+                } else {
+                    Ok(())
+                }
+            }
+            KeyshareState::GeneratingDecryptionProof(_) => {
+                self.state.try_mutate(&ec, |s| {
+                    let KeyshareState::GeneratingDecryptionProof(current) = s.state.clone() else {
+                        bail!("expected GeneratingDecryptionProof");
+                    };
+                    s.new_state(KeyshareState::Decrypting(decrypting_for_round(
+                        current.pk_share,
+                        current.sk_poly_sum,
+                        current.ciphertext_output,
+                        current.signed_pk_generation_proof,
+                        current.signed_sk_share_computation_proof,
+                        current.signed_sk_share_encryption_proofs,
+                        current.outgoing_prf_keys,
+                        current.incoming_prf_keys,
+                        msg.decryptors.clone(),
+                    )))
+                })?;
+                self.begin_fresh_decryption_round(&ec)?;
+                if included && self.effects_enabled {
+                    self.issue_decryption_share_request(ec)
+                } else {
+                    Ok(())
+                }
+            }
+            KeyshareState::Completed(_) => {
+                self.state.try_mutate(&ec, |s| {
+                    let KeyshareState::Completed(current) = s.state.clone() else {
+                        bail!("expected Completed");
+                    };
+                    s.new_state(KeyshareState::Decrypting(decrypting_for_round(
+                        current.pk_share,
+                        current.sk_poly_sum,
+                        current.ciphertext_output,
+                        current.signed_pk_generation_proof,
+                        current.signed_sk_share_computation_proof,
+                        current.signed_sk_share_encryption_proofs,
+                        current.outgoing_prf_keys,
+                        current.incoming_prf_keys,
+                        msg.decryptors.clone(),
+                    )))
+                })?;
+                self.begin_fresh_decryption_round(&ec)?;
+                if included && self.effects_enabled {
+                    self.issue_decryption_share_request(ec)
+                } else {
+                    Ok(())
+                }
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// Retire the issued-work slots of the round that a fresh decryptor set replaces. Each round
+    /// issues its own share and proof requests and owns its redelivery budget.
+    fn begin_fresh_decryption_round(&mut self, ec: &EventContext<Sequenced>) -> Result<()> {
+        self.pending.decryption_share_request = None;
+        self.pending.decryption_proof_request = None;
+        self.recovery.try_mutate(ec, |mut recovery| {
+            recovery.share_decryption_proof_pending = None;
+            recovery.last_ec = Some(ec.clone());
+            Ok(recovery)
+        })
     }
 
     pub fn handle_decryption_share_proof_signed(
         &mut self,
         msg: TypedEvent<DecryptionShareProofSigned>,
     ) -> Result<()> {
-        let (_msg, ec) = msg.into_components();
+        let (msg, ec) = msg.into_components();
+        let state = self.state.try_get()?;
+        if msg.e3_id != state.e3_id {
+            return Ok(());
+        }
+        let KeyshareState::GeneratingDecryptionProof(current) = &state.state else {
+            return Ok(());
+        };
+        if current.decryptors != msg.decryptors {
+            return Ok(());
+        }
 
         self.state.try_mutate(&ec, |s| {
-            use KeyshareState as K;
+            let KeyshareState::GeneratingDecryptionProof(current) = s.state.clone() else {
+                bail!("expected GeneratingDecryptionProof");
+            };
+            if current.decryptors != msg.decryptors {
+                bail!("the signed proof belongs to a different decryptor set");
+            }
             info!("Decryption share sending process is complete");
-            s.new_state(K::Completed)
+            s.new_state(KeyshareState::Completed(Completed {
+                pk_share: current.pk_share,
+                ciphertext_output: current.ciphertext_output,
+                sk_poly_sum: current.sk_poly_sum,
+                signed_pk_generation_proof: current.signed_pk_generation_proof,
+                signed_sk_share_computation_proof: current.signed_sk_share_computation_proof,
+                signed_sk_share_encryption_proofs: current.signed_sk_share_encryption_proofs,
+                outgoing_prf_keys: current.outgoing_prf_keys,
+                incoming_prf_keys: current.incoming_prf_keys,
+                decryptors: current.decryptors,
+            }))
         })?;
 
         Ok(())
+    }
+}
+
+fn decrypting_for_round(
+    pk_share: ArcBytes,
+    sk_poly_sum: SensitiveBytes,
+    ciphertext_output: Vec<ArcBytes>,
+    signed_pk_generation_proof: Option<SignedProofPayload>,
+    signed_sk_share_computation_proof: Option<SignedProofPayload>,
+    signed_sk_share_encryption_proofs: Vec<SignedProofPayload>,
+    outgoing_prf_keys: Vec<SensitiveBytes>,
+    incoming_prf_keys: Vec<SensitiveBytes>,
+    decryptors: Vec<u32>,
+) -> Decrypting {
+    Decrypting {
+        pk_share,
+        sk_poly_sum,
+        ciphertext_output,
+        signed_pk_generation_proof,
+        signed_sk_share_computation_proof,
+        signed_sk_share_encryption_proofs,
+        outgoing_prf_keys,
+        incoming_prf_keys,
+        decryptors,
+    }
+}
+
+/// The number of shares that reconstruct a synchronized decryption: one more than the threshold.
+pub(super) fn reconstruction_count(threshold_m: u64) -> Result<usize> {
+    usize::try_from(threshold_m)
+        .map(|threshold| threshold + 1)
+        .map_err(|_| anyhow!("threshold does not fit usize"))
+}
+
+fn party_index(party_id: u64) -> Result<u32> {
+    u32::try_from(party_id).map_err(|_| anyhow!("party id does not fit a 32-bit decryptor index"))
+}
+
+/// The lowest honest parties as strictly increasing 1-based decryptor ids.
+pub(super) fn canonical_decryptors(
+    honest: Option<&std::collections::BTreeSet<u64>>,
+    excluded: &std::collections::HashSet<u64>,
+    reconstruction: usize,
+) -> Result<Vec<u32>> {
+    let Some(honest) = honest else {
+        bail!("honest party set is missing");
+    };
+    let eligible: Vec<_> = honest.iter().filter(|id| !excluded.contains(id)).collect();
+    if eligible.len() < reconstruction {
+        bail!(
+            "honest party set has {} members and needs {reconstruction} decryptors",
+            eligible.len()
+        );
+    }
+    eligible
+        .into_iter()
+        .take(reconstruction)
+        .map(|id| {
+            let id = u32::try_from(*id).map_err(|_| anyhow!("honest party id does not fit u32"))?;
+            id.checked_add(1)
+                .context("honest party id cannot become a 1-based decryptor id")
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::canonical_decryptors;
+    use std::collections::{BTreeSet, HashSet};
+
+    #[test]
+    fn missing_honest_set_is_rejected() {
+        let error = canonical_decryptors(None, &HashSet::new(), 2).unwrap_err();
+        assert!(error.to_string().contains("missing"));
+    }
+
+    #[test]
+    fn short_honest_set_is_rejected() {
+        let honest: BTreeSet<u64> = [0, 1].into_iter().collect();
+        let error = canonical_decryptors(Some(&honest), &HashSet::new(), 3).unwrap_err();
+        assert!(error.to_string().contains("needs 3"));
+    }
+
+    #[test]
+    fn lowest_honest_ids_become_one_based_decryptors() {
+        let honest: BTreeSet<u64> = [4, 1, 0, 7].into_iter().collect();
+        let ids = canonical_decryptors(Some(&honest), &HashSet::from([7]), 3).unwrap();
+        assert_eq!(ids, vec![1, 2, 5]);
     }
 }

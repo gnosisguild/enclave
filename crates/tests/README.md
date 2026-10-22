@@ -40,6 +40,27 @@ Select a named scenario from the list rather than launching every expensive inte
 proof benchmark. [Root package scripts](../../package.json) provide the broader integration and
 real-proof suites.
 
+### Synchronized-decryption failure scenarios
+
+Prepare a complete matching artifact pair first. `test_trbfv_actor` keeps recursive proof
+aggregation enabled by default. `BENCHMARK_RESTART_PARTY_ID=<zero-based ID>` together with
+`BENCHMARK_RESTART_DURING_DECRYPTION=1` restarts a selected non-aggregator from disk after its C6
+intent is recorded, before share publication.
+
+With complete `insecure-64/small` artifacts active, run:
+
+```sh
+BENCHMARK_REPLACE_DECRYPTOR=1 cargo test --locked -p e3-tests --test integration test_trbfv_actor -- --nocapture --test-threads=1
+```
+
+This requires one compute slot (the default), recursive proofs and no restart injection. It holds
+compute admission while delivering a quorum-confirmed exclusion through every node's durable
+pipeline, observes converged replacement requests, then releases a retired share calculation. It
+checks that the stale response starts no C6 proof, all published shares use the replacement set, and
+the normal real-proof plaintext flow completes. This models exclusion delivery, not accusation
+consensus or on-chain slashing. Small has an H=14 roster for T+1=10 decryptors; Minimum and Micro
+have no spare H-roster member and deliberately cannot run this replacement scenario.
+
 ## Prerequisites and assurance
 
 Prepare root `pnpm evm:build` and `pnpm fixtures:build`, with bash, solc, jq, and Anvil for chain

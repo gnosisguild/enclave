@@ -81,6 +81,31 @@ pub struct SmudgingNoiseShareComputation<let N: u32, let L: u32, let N_PARTIES: 
 }
 
 impl<let N: u32, let L: u32, let N_PARTIES: u32, let T: u32, let BIT_SECRET: u32, let BIT_SHARE: u32> SecretKeyShareComputation<N, L, N_PARTIES, T, BIT_SECRET, BIT_SHARE> {
+    /// Commit the same checked Shamir shares, with one directed key bit packed per coefficient
+    /// in limb zero. The key commitments anchor C6's outgoing masks.
+    pub fn execute_with_prf<let KEY_BITS: u32>(
+        self,
+        keys: [[bool; KEY_BITS]; N_PARTIES],
+    ) -> ([[Field; L]; N_PARTIES], [Field; N_PARTIES]) {
+        let _ = self.execute();
+        assert(KEY_BITS <= N);
+        let mut packed = self.y;
+        let mut key_commitments = [0; N_PARTIES];
+        for party in 0..N_PARTIES {
+            let mut key: Field = 0;
+            let mut place: Field = 1;
+            for i in 0..KEY_BITS {
+                let bit = keys[party][i] as Field;
+                packed[i][0][party + 1] += bit * self.configs.qis[0];
+                key += bit * place;
+                place += place;
+            }
+            key_commitments[party] =
+                crate::math::commitments::compute_packed_prf_key_commitment(party as Field, key);
+        }
+        (commit_to_party_shares::<N, L, N_PARTIES, BIT_SHARE + 1>(packed), key_commitments)
+    }
+
     pub fn new(
         configs: Configs<L>,
         expected_secret_commitment: Field,

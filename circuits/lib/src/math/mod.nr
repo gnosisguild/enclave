@@ -9,5 +9,6 @@ pub mod safe;
 pub mod helpers;
 pub mod modulo;
 pub mod commitments;
+pub mod prf;
 pub mod recursive_vk;
 pub mod committee_hash;

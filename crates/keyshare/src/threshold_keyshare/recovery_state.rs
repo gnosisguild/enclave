@@ -10,7 +10,9 @@ use e3_events::{
     ShareVerificationComplete, TypedEvent,
 };
 
-pub const THRESHOLD_KEYSHARE_RECOVERY_SCHEMA_VERSION: u32 = 8;
+/// Bumped from 8: DKG shares and proof intents no longer carry e_sm/esi payloads, and the
+/// decryption phases carry PRF keys and the active decryptor set.
+pub const THRESHOLD_KEYSHARE_RECOVERY_SCHEMA_VERSION: u32 = 9;
 
 /// This node's BFV encryption keypair for one E3, recorded durably before the node publishes the
 /// public key. Peers encrypt their DKG shares to the published key, so a restart that lost the

@@ -20,7 +20,7 @@ contract MockPkVerifier is IPkVerifier {
     function verify(
         uint256,
         uint256,
-        address[] calldata,
+        address[] calldata sortedNodes,
         bytes32 pkCommitment,
         bytes32,
         bytes calldata proof
@@ -30,7 +30,12 @@ contract MockPkVerifier is IPkVerifier {
             (bytes, bytes32[])
         );
         if (publicInputs.length == 0) revert InvalidPublicInputsLength();
-        if (publicInputs[publicInputs.length - 1] != pkCommitment) {
+        // Minimal lifecycle fixtures use one commitment; full attestation fixtures
+        // use the synchronized DKG layout with a trailing H*N grid.
+        uint256 index = publicInputs.length == 1
+            ? 0
+            : 5 + 2 * ((publicInputs.length - 6) / (sortedNodes.length + 2));
+        if (publicInputs[index] != pkCommitment) {
             revert PkCommitmentMismatch();
         }
         if (

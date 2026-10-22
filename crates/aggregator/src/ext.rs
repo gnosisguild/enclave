@@ -937,7 +937,7 @@ mod tests {
             committee_size: CiphernodesCommitteeSize::Minimum,
             interfold_address: Address::repeat_byte(9),
             sk_agg_commits: vec![],
-            esm_agg_commits: vec![],
+            prf_key_commits: vec![],
         };
         let publication = PublicKeyAggregated {
             pubkey: ArcBytes::from_bytes(&public_key),

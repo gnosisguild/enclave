@@ -1053,12 +1053,10 @@ mod tests {
             (
                 "DecryptionKeyShared",
                 DecryptionKeyShared {
-                    signature: Default::default(),
                     e3_id: e3_id.clone(),
                     party_id: 0,
                     node: node.clone(),
                     signed_sk_decryption_proof: empty_signed_proof.clone(),
-                    signed_e_sm_decryption_proofs: vec![],
                     external: false,
                 }
                 .into(),
@@ -1071,6 +1069,7 @@ mod tests {
                     e3_id: e3_id.clone(),
                     node: node.clone(),
                     signed_decryption_proofs: vec![],
+                    decryptors: vec![],
                 }
                 .into(),
             ),

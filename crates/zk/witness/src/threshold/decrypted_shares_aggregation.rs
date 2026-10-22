@@ -6,7 +6,9 @@
 
 //! Circuit input data, witness preparation, and canonical Noir encoding.
 
-use crate::commitments::compute_threshold_decryption_share_commitment;
+use crate::commitments::{
+    compute_partial_decryption_c0_commitment, compute_threshold_decryption_share_commitment,
+};
 use crate::WitnessError;
 use e3_polynomial::CrtPolynomial;
 use e3_polynomial::Polynomial;
@@ -24,6 +26,8 @@ use serde::Serialize;
 /// party IDs (1-based), and decoded message. Noir performs interpolation and rounding.
 #[derive(Debug, Clone)]
 pub struct DecryptedSharesAggregationCircuitData {
+    /// Native ciphertext component c0, added once after the locally weighted partial shares.
+    pub ct0: Poly<PowerBasis>,
     /// Decryption shares from T+1 parties (Poly in RNS form).
     pub d_share_polys: Vec<Poly<PowerBasis>>,
     /// Party IDs (1-based: 1, 2, ..., T+1) for the reconstructing parties.
@@ -37,6 +41,8 @@ pub struct DecryptedSharesAggregationCircuitData {
 /// coefficients are reduced to [0, zkp_modulus) by compute.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Inputs {
+    pub c0: CrtPolynomial,
+    pub c0_commitment: BigInt,
     /// Public `d` commitments (one per party), same as circuit 6 outputs; checked in-circuit.
     pub expected_d_commitments: Vec<BigInt>,
     /// One CrtPolynomial per party (secret witness); circuit: `[[Polynomial; L]; T+1]`
@@ -62,6 +68,34 @@ impl Inputs {
         let threshold = committee.threshold;
         let max_msg_non_zero_coeffs = config.max_msg_non_zero_coeffs;
         let moduli = ctx.moduli();
+        let ct0_coeffs = data.ct0.coefficients();
+        crate::validation::context(
+            "ct0",
+            data.ct0.ctx(),
+            ct0_coeffs.nrows(),
+            ct0_coeffs.ncols(),
+            threshold_params,
+        )?;
+        let mut c0 = Vec::with_capacity(num_moduli);
+        for (row, &q) in moduli.iter().enumerate() {
+            let coefficients = ct0_coeffs.row(row);
+            if coefficients.iter().any(|coefficient| *coefficient >= q) {
+                return Err(WitnessError::Other("non-native c0 coefficient".into()));
+            }
+            c0.push(Polynomial::new(
+                coefficients
+                    .iter()
+                    .take(max_msg_non_zero_coeffs)
+                    .map(|value| BigInt::from(*value))
+                    .collect(),
+            ));
+        }
+        let c0 = CrtPolynomial::new(c0);
+        let c0_commitment = compute_partial_decryption_c0_commitment(
+            &c0,
+            config.bits.d_native_bit,
+            max_msg_non_zero_coeffs,
+        );
 
         let d_share_polys = &data.d_share_polys;
         if max_msg_non_zero_coeffs > degree {
@@ -168,6 +202,8 @@ impl Inputs {
             .collect();
 
         Ok(Inputs {
+            c0,
+            c0_commitment,
             expected_d_commitments,
             decryption_shares,
             party_ids,
@@ -186,6 +222,8 @@ impl Inputs {
             .map(crt_polynomial_to_toml_json)
             .collect();
         serde_json::json!({
+            "c0": crt_polynomial_to_toml_json(&self.c0),
+            "c0_commitment": self.c0_commitment.to_string(),
             "expected_d_commitments": bigint_1d_to_json_values(&self.expected_d_commitments),
             "decryption_shares": decryption_shares_json,
             "party_ids": bigint_1d_to_json_values(&self.party_ids),

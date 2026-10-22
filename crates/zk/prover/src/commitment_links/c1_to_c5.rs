@@ -8,7 +8,7 @@
 //!
 //! ## Circuit layouts
 //!
-//! **C1 (PkGeneration)** outputs `(sk_commitment, pk_commitment, e_sm_commitment)`.
+//! **C1 (PkGeneration)** outputs `(sk_commitment, pk_commitment)`.
 //! Public signals contain 3 fields (no public inputs); `pk_commitment` is at
 //! field index 1 (byte offset 32..64).
 //!
@@ -102,11 +102,9 @@ mod tests {
         let link = C1ToC5PkCommitmentLink;
         let sk = make_field(1);
         let pk = make_field(2);
-        let esm = make_field(3);
         let mut signals = Vec::new();
         signals.extend_from_slice(&sk);
         signals.extend_from_slice(&pk);
-        signals.extend_from_slice(&esm);
 
         let values = link.extract_source_values(&signals);
         assert_eq!(values.len(), 1);

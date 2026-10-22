@@ -3,6 +3,8 @@
 //! Decryption-share collection and C6 verification.
 
 use super::*;
+use anyhow::Context;
+use e3_events::FreshDecryptionRound;
 
 impl ThresholdPlaintextAggregator {
     pub fn add_share(
@@ -10,9 +12,46 @@ impl ThresholdPlaintextAggregator {
         party_id: u64,
         share: Vec<ArcBytes>,
         signed_decryption_proofs: Vec<SignedProofPayload>,
+        decryptors: &[u32],
         ec: &EventContext<Sequenced>,
     ) -> Result<()> {
         let state = self.state.try_get()?;
+        let expected = match &state {
+            ThresholdPlaintextAggregatorState::Collecting(collecting)
+                if collecting.expected_decryptors.is_empty() =>
+            {
+                ThresholdPlaintextAggregation::fresh_decryptor_ids(
+                    &self.committee_addresses,
+                    &self.honest_committee_addresses,
+                    &collecting.rejected_parties,
+                    collecting.threshold_m,
+                )?
+            }
+            ThresholdPlaintextAggregatorState::Collecting(collecting) => {
+                collecting.expected_decryptors.clone()
+            }
+            ThresholdPlaintextAggregatorState::VerifyingC6(batch) => batch
+                .shares
+                .keys()
+                .map(|id| u32::try_from(*id).ok().and_then(|id| id.checked_add(1)))
+                .collect::<Option<Vec<_>>>()
+                .context("invalid saved decryptor IDs")?,
+            _ => return Ok(()),
+        };
+        let owner = u32::try_from(party_id)
+            .ok()
+            .and_then(|id| id.checked_add(1));
+        if decryptors != expected
+            || !owner.is_some_and(|id| expected.contains(&id))
+            || !C6ShareVerifier::matches_round(
+                &signed_decryption_proofs,
+                party_id,
+                &expected,
+                self.committee_size.values().n,
+            )
+        {
+            return Ok(());
+        }
         let ciphertexts = match &state {
             ThresholdPlaintextAggregatorState::Collecting(state) => {
                 if state.shares.contains_key(&party_id)
@@ -44,7 +83,10 @@ impl ThresholdPlaintextAggregator {
             );
             return Ok(());
         }
-        self.state.try_mutate(ec, |state| {
+        self.state.try_mutate(ec, |mut state| {
+            if let ThresholdPlaintextAggregatorState::Collecting(collecting) = &mut state {
+                collecting.expected_decryptors = expected.clone();
+            }
             ThresholdPlaintextAggregation::add_share(
                 state,
                 party_id,
@@ -59,9 +101,58 @@ impl ThresholdPlaintextAggregator {
         party_id: u64,
         ec: &EventContext<Sequenced>,
     ) -> Result<()> {
+        let designated = match self.state.try_get()? {
+            ThresholdPlaintextAggregatorState::Collecting(collecting) => {
+                party_is_designated(party_id, &collecting.expected_decryptors)
+            }
+            _ => false,
+        };
+        if designated {
+            return self.restart_collection_after_expulsion(party_id, ec);
+        }
         self.state.try_mutate(ec, |state| {
             ThresholdPlaintextAggregation::handle_member_expelled(state, party_id)
         })
+    }
+
+    /// Drop shares bound to the old decryptor set and ask the next set to compute.
+    fn restart_collection_after_expulsion(
+        &mut self,
+        party_id: u64,
+        ec: &EventContext<Sequenced>,
+    ) -> Result<()> {
+        let ThresholdPlaintextAggregatorState::Collecting(mut collecting) = self.state.try_get()?
+        else {
+            bail!("a designated decryptor can be replaced only while collecting");
+        };
+        collecting.rejected_parties.insert(party_id);
+        collecting.shares.clear();
+        collecting.c6_proofs.clear();
+        let decryptors = ThresholdPlaintextAggregation::fresh_decryptor_ids(
+            &self.committee_addresses,
+            &self.honest_committee_addresses,
+            &collecting.rejected_parties,
+            collecting.threshold_m,
+        );
+        let Ok(decryptors) = decryptors else {
+            collecting.expected_decryptors.clear();
+            self.state.try_mutate(ec, |_| {
+                Ok(ThresholdPlaintextAggregatorState::Collecting(collecting))
+            })?;
+            return self.fail_decryption_round(ec.clone());
+        };
+        collecting.expected_decryptors = decryptors.clone();
+        self.state.try_mutate(ec, |_| {
+            Ok(ThresholdPlaintextAggregatorState::Collecting(collecting))
+        })?;
+        self.bus.publish(
+            FreshDecryptionRound {
+                e3_id: self.e3_id.clone(),
+                decryptors,
+            },
+            ec.clone(),
+        )?;
+        Ok(())
     }
 
     pub(in crate::actors::threshold_plaintext_aggregator) fn c6_verification_request(
@@ -281,28 +372,30 @@ impl ThresholdPlaintextAggregator {
         dishonest_parties: BTreeSet<u64>,
         ec: EventContext<Sequenced>,
     ) -> Result<()> {
-        let available = self
-            .committee_addresses
-            .iter()
-            .enumerate()
-            .filter(|(party, address)| {
-                self.honest_committee_addresses.contains(address)
-                    && !dishonest_parties.contains(&(*party as u64))
-            })
-            .count();
-        if available <= state.threshold_m as usize {
+        let mut next = ThresholdPlaintextAggregation::retry_collection(state, dishonest_parties);
+        let ThresholdPlaintextAggregatorState::Collecting(collecting) = &next else {
+            bail!("a fresh decryption round must collect new shares");
+        };
+        let decryptors = ThresholdPlaintextAggregation::fresh_decryptor_ids(
+            &self.committee_addresses,
+            &self.honest_committee_addresses,
+            &collecting.rejected_parties,
+            collecting.threshold_m,
+        );
+        let Ok(decryptors) = decryptors else {
             return self.fail_decryption_round(ec);
+        };
+        if let ThresholdPlaintextAggregatorState::Collecting(collecting) = &mut next {
+            collecting.expected_decryptors = decryptors.clone();
         }
-        self.state.try_mutate(&ec, |_| {
-            Ok(ThresholdPlaintextAggregation::retry_collection(
-                state,
-                dishonest_parties,
-            ))
-        })?;
-        if let Some(ThresholdPlaintextAggregatorState::VerifyingC6(next)) = self.state.get() {
-            self.publish_inputs_ready(ec.clone())?;
-            self.dispatch_c6_verification(next.c6_proofs, ec)?;
-        }
+        self.state.try_mutate(&ec, |_| Ok(next))?;
+        self.bus.publish(
+            FreshDecryptionRound {
+                e3_id: self.e3_id.clone(),
+                decryptors,
+            },
+            ec,
+        )?;
         Ok(())
     }
 
@@ -312,6 +405,24 @@ impl ThresholdPlaintextAggregator {
         ec: EventContext<Sequenced>,
     ) -> Result<()> {
         let correlation_id = CorrelationId::new();
+        let reconstruction = state.threshold_m as usize + 1;
+        if state.shares.len() != reconstruction {
+            bail!(
+                "decryption share count {} must equal the decryptor set size {reconstruction}",
+                state.shares.len()
+            );
+        }
+        let mut decryptors = state
+            .shares
+            .iter()
+            .map(|(party_id, _)| u32::try_from(*party_id).map(|id| id.saturating_add(1)))
+            .collect::<Result<Vec<_>, _>>()
+            .context("party id does not fit a decryptor id")?;
+        decryptors.sort_unstable();
+        let context_digest = e3_trbfv::calculate_threshold_decryption::decryption_context_digest(
+            &decryptors,
+            &state.ciphertext_output,
+        );
         let request = ComputeRequest::trbfv(
             TrBFVRequest::CalculateThresholdDecryption(CalculateThresholdDecryptionRequest {
                 ciphertexts: state.ciphertext_output.clone(),
@@ -321,6 +432,8 @@ impl ThresholdPlaintextAggregator {
                     state.threshold_m,
                 ),
                 d_share_polys: state.shares.clone(),
+                decryptors,
+                context_digest,
             }),
             correlation_id,
             self.e3_id.clone(),
@@ -329,4 +442,12 @@ impl ThresholdPlaintextAggregator {
         self.pending.threshold_decryption_correlation = Some(correlation_id);
         Ok(())
     }
+}
+
+fn party_is_designated(party_id: u64, expected: &[u32]) -> bool {
+    !expected.is_empty()
+        && u32::try_from(party_id)
+            .ok()
+            .and_then(|id| id.checked_add(1))
+            .is_some_and(|id| expected.contains(&id))
 }

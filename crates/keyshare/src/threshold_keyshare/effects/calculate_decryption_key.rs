@@ -72,9 +72,10 @@ impl ThresholdKeyshare {
             DecryptionKeyPlan::Proceed {
                 calc_request,
                 sk_request,
-                esm_requests,
                 honest_party_ids,
+                incoming_prf_keys,
             } => {
+                self.pending.incoming_prf_keys = incoming_prf_keys;
                 // Persist the selected set before dispatch. Restart reissues the
                 // calculation from the durable verification batch.
                 let event = ComputeRequest::trbfv(
@@ -87,7 +88,7 @@ impl ThresholdKeyshare {
                     s.dkg_roster_fixed = true;
                     Ok(s)
                 })?;
-                self.pending.share_decryption_data = Some((sk_request, esm_requests));
+                self.pending.share_decryption_data = Some(sk_request);
                 self.bus.publish(event, ec.clone())?;
             }
         }
@@ -108,10 +109,10 @@ impl ThresholdKeyshare {
             .try_into()
             .context("Error extracting data from compute process")?;
 
-        let (sk_poly_sum, es_poly_sum) = (output.sk_poly_sum, output.es_poly_sum);
+        let sk_poly_sum = output.sk_poly_sum;
 
         // Keep C4 inputs until the recovery record and phase transition succeed.
-        let (sk_request, esm_requests) = self
+        let sk_request = self
             .pending
             .share_decryption_data
             .clone()
@@ -132,10 +133,8 @@ impl ThresholdKeyshare {
         let node = state.address.clone();
 
         info!(
-            "Publishing DecryptionShareProofsPending for E3 {} party {} (1 SK + {} ESM requests)",
-            e3_id,
-            party_id,
-            esm_requests.len()
+            "Publishing DecryptionShareProofsPending for E3 {} party {}",
+            e3_id, party_id
         );
 
         let event = DecryptionShareProofsPending {
@@ -143,7 +142,6 @@ impl ThresholdKeyshare {
             party_id,
             node,
             sk_request,
-            esm_requests,
         };
         self.recovery.try_mutate(&ec, |mut recovery| {
             recovery.decryption_share_proofs_pending =
@@ -153,6 +151,7 @@ impl ThresholdKeyshare {
         })?;
 
         // Transition to ReadyForDecryption only after the recovery input is accepted.
+        let incoming_prf_keys = self.pending.incoming_prf_keys.clone();
         self.state.try_mutate(&ec, |s| {
             use KeyshareState as K;
             info!("Try store decryption key");
@@ -162,12 +161,11 @@ impl ThresholdKeyshare {
             let next = K::ReadyForDecryption(ReadyForDecryption {
                 pk_share: current.pk_share,
                 sk_poly_sum: sk_poly_sum.clone(),
-                es_poly_sum: es_poly_sum.clone(),
                 signed_pk_generation_proof: current.signed_pk_generation_proof,
                 signed_sk_share_computation_proof: current.signed_sk_share_computation_proof,
-                signed_e_sm_share_computation_proof: current.signed_e_sm_share_computation_proof,
                 signed_sk_share_encryption_proofs: current.signed_sk_share_encryption_proofs,
-                signed_e_sm_share_encryption_proofs: current.signed_e_sm_share_encryption_proofs,
+                outgoing_prf_keys: current.outgoing_prf_keys,
+                incoming_prf_keys,
             });
 
             s.new_state(next)
