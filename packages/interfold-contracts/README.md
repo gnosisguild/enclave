@@ -211,12 +211,17 @@ verification.
 ### Source verification
 
 The `protocol`, `sale`, and `upgrade:*` scripts publish the source of each
-contract that they deploy. They do this at the end of the run, after they write
-their records. They send the exact compiler input of the `default` build
-profile, with the constructor arguments and the linked libraries:
+contract that they deploy from the operator account. They do this at the end of
+the run, after they write their records. They send the exact compiler input of
+the `default` build profile, with the constructor arguments and the linked
+libraries:
 
 - to Sourcify, always. Sourcify needs no API key.
 - to Etherscan, when `ETHERSCAN_API_KEY` is set.
+
+Contracts that another contract creates are not submitted. Examples are the
+`ProxyAdmin` that each `TransparentUpgradeableProxy` creates, and the FOLD token
+and auction that the sale deployer creates.
 
 The scripts first wait for 5 confirmations of the last deployment. They do not
 verify on local chains. A failed submission does not change the exit code,
@@ -228,8 +233,9 @@ pnpm hardhat verify sourcify --network mainnet --build-profile default \
   --contract contracts/Interfold.sol:Interfold 0xContract [constructor args]
 ```
 
-Keep `--build-profile default`. Without it, the plugin compiles with the
-`production` profile, which has different compiler settings. Set
+Keep `--build-profile default`. Without it, the first attempt of the plugin uses
+the `production` profile, which has different compiler settings. That attempt
+fails, and the plugin then submits every source file of the project. Set
 `SKIP_SOURCE_VERIFICATION=1` to skip verification.
 
 ## Contract addresses
