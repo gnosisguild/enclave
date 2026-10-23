@@ -36,6 +36,9 @@ export enum ParamSet {
   // 1 is retired: no preset uses it.
   Secure8192 = 2,
   Secure16384 = 3,
+  // 4 is the insecure l-BFV set, which shares the insecure parameters and is not exposed here.
+  /** Insecure SIMD l-BFV preset (N=128, plaintext modulus 257). Test-only; not cryptographically secure. */
+  InsecureSimd = 5,
 }
 
 export interface E3 {

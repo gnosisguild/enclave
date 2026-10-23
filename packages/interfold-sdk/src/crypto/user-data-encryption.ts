@@ -61,21 +61,38 @@ export type CircuitInputs = TrbfvCircuitInputs | ChunkedCircuitInputs
 const isChunkedInputs = (inputs: CircuitInputs): inputs is ChunkedCircuitInputs => 'r1is' in inputs
 
 /** Presets on the l-BFV path. Their user-data encryption proofs use the chunked proof tree. */
-const LBFV_PRESETS: ReadonlySet<ThresholdBfvParamsPresetName> = new Set(['INSECURE_THRESHOLD_LBFV', 'SECURE_THRESHOLD_16384'])
+const LBFV_PRESETS: ReadonlySet<ThresholdBfvParamsPresetName> = new Set([
+  'INSECURE_THRESHOLD_LBFV',
+  'INSECURE_THRESHOLD_SIMD',
+  'SECURE_THRESHOLD_16384',
+])
 
 /** Chunked proof bundles by polynomial degree. */
 const CHUNKED_BUNDLE_DEGREES = {
   insecure: 128,
+  'insecure-simd': 128,
   'secure-8192': 8192,
   'secure-16384': 16384,
 } as const
 
 type ChunkedBundleName = keyof typeof CHUNKED_BUNDLE_DEGREES
 
+/**
+ * The bundle of each l-BFV preset. `insecure` and `insecure-simd` share degree 128 but differ in
+ * the plaintext modulus, so a preset must pick its bundle by name, not by degree.
+ */
+const CHUNKED_BUNDLE_BY_PRESET: Partial<Record<ThresholdBfvParamsPresetName, ChunkedBundleName>> = {
+  INSECURE_THRESHOLD_LBFV: 'insecure',
+  INSECURE_THRESHOLD_SIMD: 'insecure-simd',
+  SECURE_THRESHOLD_16384: 'secure-16384',
+}
+
 const loadProofBundle = async (bundle: ChunkedBundleName): Promise<UserDataEncryptionProofBundle> => {
   switch (bundle) {
     case 'insecure':
       return (await import('@interfold/sdk/internal/presets/insecure')).insecureProofBundle
+    case 'insecure-simd':
+      return (await import('@interfold/sdk/internal/presets/insecure-simd')).insecureSimdProofBundle
     case 'secure-8192':
       return (await import('@interfold/sdk/internal/presets/secure-8192')).secure8192ProofBundle
     case 'secure-16384':
@@ -98,10 +115,11 @@ export const generateProof = async (circuitInputs: CircuitInputs, presetName?: T
     return proveUserDataEncryption(circuitInputs)
   }
 
+  // Without a preset the degree selects the bundle; degree 128 then resolves to the insecure bundle.
   const degree = circuitInputs.u.coefficients.length
-  const bundleName = (Object.entries(CHUNKED_BUNDLE_DEGREES) as [ChunkedBundleName, number][]).find(
-    ([, bundleDegree]) => bundleDegree === degree,
-  )?.[0]
+  const bundleName =
+    (presetName === undefined ? undefined : CHUNKED_BUNDLE_BY_PRESET[presetName]) ??
+    (Object.entries(CHUNKED_BUNDLE_DEGREES) as [ChunkedBundleName, number][]).find(([, bundleDegree]) => bundleDegree === degree)?.[0]
   if (bundleName === undefined) {
     throw new Error(`No user-data encryption circuit bundle supports polynomial degree ${degree}.`)
   }

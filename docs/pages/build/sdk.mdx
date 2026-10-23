@@ -309,6 +309,17 @@ A key from `generatePublicKey` is not a committee key. The committee cannot decr
 encrypted to it. For the full encrypt and submit flow, see
 [Encrypt and submit](/build/tutorials/encrypt-and-submit).
 
+### SIMD vectors
+
+`encryptVector`, `encryptVectorAndGenInputs` and `encryptVectorAndGenProof` accept a last argument
+`{ encoding: 'poly' | 'simd' }`. The default is `'poly'`: `values[i]` is the coefficient of `X^i`.
+With `'simd'`, `values[i]` is slot `i`, and an operation on a ciphertext acts on all slots at once.
+The preset must have a plaintext modulus that is prime and 1 mod 2N, for example
+`INSECURE_THRESHOLD_SIMD`. Other presets reject `'simd'`.
+
+The plaintext output of an E3 is always in the poly basis. Use `decodePlaintextSlots(hex, preset)`
+to get the slot values.
+
 ### Encryption proofs
 
 The `*AndGenProof` functions and `generateProof` use circuits that ship in the SDK. The SDK compiles
@@ -477,6 +488,8 @@ The main entry point exports these utilities.
 | `encodeCustomParams(params)`                                                                       | The JSON of an object as hex bytes.                                                                        |
 | `encodeBfvParams(params)`                                                                          | ABI-encoded BFV parameters. It throws `MISSING_ERROR1_VARIANCE` without `error1Variance`.                  |
 | `decodePlaintextOutput(hex)`                                                                       | The first 8 bytes as a little-endian unsigned integer, as a `number`. `null` when the input is too short.  |
+| `decodePlaintextCoefficients(hex)`                                                                 | The coefficients of a published plaintext output: little-endian u64 chunks, as `bigint[]`.                 |
+| `decodePlaintextSlots(hex, preset)`                                                                | The SIMD slot values of a published plaintext output, as `Promise<bigint[]>`. It uses fhe.rs through wasm. |
 | `DEFAULT_COMPUTE_PROVIDER_PARAMS`                                                                  | `{ name: 'openvm', parallel: false, batch_size: 2 }`                                                       |
 | `DEFAULT_E3_CONFIG`                                                                                | `{ committeeSize: 0, duration: 1800, payment_amount: '0' }`                                                |
 | `isValidAddress(value)`, `isValidHash(value)`                                                      | Format checks for a 20-byte address and a 32-byte hash.                                                    |

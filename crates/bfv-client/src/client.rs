@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, ensure, Result};
 use e3_fhe_params::{try_build_bfv_params_arc, BfvParamSet, BfvPreset};
 use e3_zk_witness::threshold::user_data_encryption::{
     encrypt_and_prepare, UserDataEncryptionCircuitData,
@@ -106,12 +106,37 @@ pub fn bfv_encrypt<T>(
 where
     Plaintext: for<'a> FheEncoder<&'a T, Error = FheError>,
 {
+    bfv_encrypt_with_encoding(
+        data,
+        public_key,
+        degree,
+        plaintext_modulus,
+        moduli,
+        Encoding::poly(),
+    )
+}
+
+/// Encrypt some data like [`bfv_encrypt`], with the plaintext in the given encoding.
+///
+/// `Encoding::simd()` needs a plaintext modulus that is prime and 1 mod 2N; fhe.rs returns an
+/// error otherwise.
+pub fn bfv_encrypt_with_encoding<T>(
+    data: T,
+    public_key: Vec<u8>,
+    degree: usize,
+    plaintext_modulus: u64,
+    moduli: &[u64],
+    encoding: Encoding,
+) -> Result<Vec<u8>>
+where
+    Plaintext: for<'a> FheEncoder<&'a T, Error = FheError>,
+{
     let params = build_client_params(degree, plaintext_modulus, moduli, None)?;
 
     let preset = key_preset(&public_key, degree, plaintext_modulus, moduli);
     let pk = decode_public_key(&public_key, &params, preset)?;
 
-    let pt = Plaintext::try_encode(&data, Encoding::poly(), &params)
+    let pt = Plaintext::try_encode(&data, encoding, &params)
         .map_err(|e: FheError| anyhow!("Error encoding plaintext: {e}"))?;
 
     let ct = pk
@@ -157,6 +182,30 @@ pub fn bfv_verifiable_encrypt<T>(
 where
     Plaintext: for<'a> FheEncoder<&'a T, Error = FheError>,
 {
+    bfv_verifiable_encrypt_with_encoding(
+        data,
+        public_key,
+        degree,
+        plaintext_modulus,
+        moduli,
+        Encoding::poly(),
+    )
+}
+
+/// Verifiably encrypt some data like [`bfv_verifiable_encrypt`], with the plaintext in the given
+/// encoding. The witness carries the raw polynomial of the plaintext, so `Encoding::simd()`
+/// plaintexts are proven with the same circuits.
+pub fn bfv_verifiable_encrypt_with_encoding<T>(
+    data: T,
+    public_key: Vec<u8>,
+    degree: usize,
+    plaintext_modulus: u64,
+    moduli: Vec<u64>,
+    encoding: Encoding,
+) -> Result<VerifiableEncryptionResult>
+where
+    Plaintext: for<'a> FheEncoder<&'a T, Error = FheError>,
+{
     let preset = key_preset(&public_key, degree, plaintext_modulus, &moduli).ok_or_else(|| {
         anyhow!(
             "Unsupported BFV threshold parameters for verifiable encryption: degree={degree}, \
@@ -174,7 +223,7 @@ where
 
     let pk = decode_public_key(&public_key, &params, Some(preset))?;
 
-    let plaintext = Plaintext::try_encode(&data, Encoding::poly(), &params)
+    let plaintext = Plaintext::try_encode(&data, encoding, &params)
         .map_err(|e: FheError| anyhow!("Error encoding plaintext: {}", e))?;
 
     // The trBFV path proves user encryption with `user_data_encryption`'s ct0/ct1; the l-BFV path
@@ -213,6 +262,59 @@ where
     })
 }
 
+/// The SIMD slot values of a plaintext, given its polynomial coefficients.
+///
+/// A decrypted plaintext carries no encoding, so the published coefficients are the poly basis.
+/// This rebuilds the fhe.rs SIMD decode from its public parts, with no key and no randomness: a
+/// forward negacyclic NTT modulo `t`, then the SEAL slot order (`matrix_reps_index_map` of fhe.rs).
+/// The tests compare it with `Vec::<u64>::try_decode(.., Encoding::simd())`.
+///
+/// # Errors
+/// Returns an error if the preset has no SIMD support (the plaintext modulus is not prime and
+/// 1 mod 2N), if `coefficients` does not have exactly `degree` entries, or if a coefficient is
+/// not below the plaintext modulus.
+pub fn simd_decode(coefficients: &[u64], preset: BfvPreset) -> Result<Vec<u64>> {
+    let parameters = BfvParamSet::from(preset);
+    let degree = parameters.degree;
+    let t = parameters.plaintext_modulus;
+
+    if coefficients.len() != degree {
+        return Err(anyhow!(
+            "Expected {degree} plaintext coefficients, got {}",
+            coefficients.len()
+        ));
+    }
+    if let Some(index) = coefficients.iter().position(|c| *c >= t) {
+        return Err(anyhow!(
+            "Plaintext coefficient {index} is not below the plaintext modulus {t}"
+        ));
+    }
+
+    let modulus =
+        fhe_math::zq::Modulus::new(t).map_err(|e| anyhow!("Invalid plaintext modulus {t}: {e}"))?;
+    let ntt = fhe_math::ntt::NttOperator::new(&modulus, degree).ok_or_else(|| {
+        anyhow!("The plaintext modulus {t} does not support SIMD encoding at degree {degree}")
+    })?;
+
+    let mut values = coefficients.to_vec();
+    ntt.forward(&mut values);
+
+    // `matrix_reps_index_map` of fhe.rs: slot `i` reads NTT position `map[i]`.
+    let row_size = degree >> 1;
+    let m = degree << 1;
+    let shift = degree.leading_zeros() + 1;
+    let mut slots = vec![0u64; degree];
+    let mut pos = 1usize;
+    for i in 0..row_size {
+        let index1 = (pos - 1) >> 1;
+        let index2 = (m - pos - 1) >> 1;
+        slots[i] = values[index1.reverse_bits() >> shift];
+        slots[row_size | i] = values[index2.reverse_bits() >> shift];
+        pos = (pos * 3) & (m - 1);
+    }
+    Ok(slots)
+}
+
 /// Generates a new public/secret key pair and returns the public key.
 ///
 /// # Arguments
@@ -240,6 +342,26 @@ pub fn generate_public_key(
         .map_err(|e| anyhow!("Failed to build public key: {e}"))?;
 
     Ok(pk.to_bytes())
+}
+
+/// Open an l-BFV committee key's on-chain commitment down to its public-key rows.
+///
+/// A `user_data_encryption_chunked` proof commits only to row 0, the encryption key. A circuit that
+/// recomputes the committee key commitment from it needs the other row commitments and the
+/// relinearization-key commitment. Fails for a key that is not an l-BFV key envelope.
+pub fn open_lbfv_key_envelope(
+    public_key: &[u8],
+    degree: usize,
+    plaintext_modulus: u64,
+    moduli: &[u64],
+) -> Result<crate::LbfvKeyEnvelopeOpening> {
+    ensure!(
+        crate::is_lbfv_key_envelope(public_key),
+        "The committee key is not an l-BFV key envelope"
+    );
+    let preset = key_preset(public_key, degree, plaintext_modulus, moduli)
+        .ok_or_else(|| anyhow!("Unsupported BFV parameters for an l-BFV key envelope"))?;
+    crate::open_lbfv_key_envelope(public_key, preset)
 }
 
 pub fn compute_pk_commitment(
@@ -359,6 +481,7 @@ pub fn compute_ct_commitment_with_params(
 
 #[cfg(test)]
 mod tests {
+    use crate::decode_plaintext_to_vec_u64;
     use e3_fhe_params::DEFAULT_BFV_PRESET;
     use e3_fhe_params::{build_bfv_params_from_set_arc, BfvParamSet};
     use e3_zk_samples::threshold::user_data_encryption::public_key_on_protocol_crs;
@@ -632,5 +755,113 @@ mod tests {
         let decoded = Vec::<u64>::try_decode(&pt, Encoding::poly()).unwrap();
         assert_eq!(decoded[0], num[0]);
         assert_eq!(decoded[1], num[1]);
+    }
+
+    /// Slots as the SIMD preset's plaintext modulus allows: a full vector, so every slot matters.
+    fn simd_slots(plaintext_modulus: u64, degree: usize) -> Vec<u64> {
+        (0..degree as u64)
+            .map(|i| (i * 31 + 5) % plaintext_modulus)
+            .collect()
+    }
+
+    #[test]
+    fn simd_encrypt_round_trips_the_slots_and_simd_decode_recovers_them() {
+        use fhe_traits::FheDecrypter;
+
+        let preset = BfvPreset::InsecureThresholdSimd;
+        let param_set: BfvParamSet = preset.into();
+        let params = build_bfv_params_from_set_arc(param_set);
+        let mut rng = rng();
+        let sk = SecretKey::random(&params, &mut rng);
+        let pk = PublicKey::new(&sk, &mut rng);
+        let slots = simd_slots(param_set.plaintext_modulus, param_set.degree);
+
+        let encrypted = bfv_encrypt_with_encoding(
+            slots.clone(),
+            pk.to_bytes(),
+            param_set.degree,
+            param_set.plaintext_modulus,
+            param_set.moduli,
+            Encoding::simd(),
+        )
+        .unwrap();
+        let pt = sk
+            .try_decrypt(&Ciphertext::from_bytes(&encrypted, &params).unwrap())
+            .unwrap();
+
+        assert_eq!(
+            Vec::<u64>::try_decode(&pt, Encoding::simd()).unwrap(),
+            slots
+        );
+        // The published plaintext is the poly basis; `simd_decode` maps it back to the slots.
+        let coefficients = decode_plaintext_to_vec_u64(&pt).unwrap();
+        assert_ne!(coefficients, slots);
+        assert_eq!(simd_decode(&coefficients, preset).unwrap(), slots);
+
+        // A poly encoding of the same values stays the default and decodes as the poly.
+        let poly = bfv_encrypt(
+            slots.clone(),
+            pk.to_bytes(),
+            param_set.degree,
+            param_set.plaintext_modulus,
+            param_set.moduli,
+        )
+        .unwrap();
+        let pt = sk
+            .try_decrypt(&Ciphertext::from_bytes(&poly, &params).unwrap())
+            .unwrap();
+        assert_eq!(decode_plaintext_to_vec_u64(&pt).unwrap(), slots);
+    }
+
+    #[test]
+    fn simd_decode_rejects_bad_input() {
+        let preset = BfvPreset::InsecureThresholdSimd;
+        let parameters: BfvParamSet = preset.into();
+        let zeros = vec![0u64; parameters.degree];
+
+        // No SIMD slots at t = 100.
+        let no_slots: BfvParamSet = BfvPreset::InsecureThreshold.into();
+        assert!(simd_decode(&vec![0u64; no_slots.degree], BfvPreset::InsecureThreshold).is_err());
+        // The length must be the degree.
+        assert!(simd_decode(&zeros[1..], preset).is_err());
+        assert!(simd_decode(&[zeros.clone(), vec![0]].concat(), preset).is_err());
+        // Every coefficient must be below t.
+        let mut too_large = zeros.clone();
+        too_large[5] = parameters.plaintext_modulus;
+        assert!(simd_decode(&too_large, preset).is_err());
+        assert!(simd_decode(&zeros, preset).is_ok());
+    }
+
+    #[test]
+    fn verifiable_simd_encryption_produces_a_chunked_witness_for_the_slots() {
+        use fhe_traits::FheDecrypter;
+
+        let preset = BfvPreset::InsecureThresholdSimd;
+        let param_set: BfvParamSet = preset.into();
+        let params = build_bfv_params_from_set_arc(param_set);
+        let mut rng = rng();
+        let sk = SecretKey::random(&params, &mut rng);
+        let pk = PublicKey::new(&sk, &mut rng);
+        let slots = simd_slots(param_set.plaintext_modulus, param_set.degree);
+
+        let result = bfv_verifiable_encrypt_with_encoding(
+            slots.clone(),
+            pk.to_bytes(),
+            param_set.degree,
+            param_set.plaintext_modulus,
+            param_set.moduli.to_vec(),
+            Encoding::simd(),
+        )
+        .unwrap();
+
+        let witness: Value = serde_json::from_str(&result.circuit_inputs).unwrap();
+        assert!(witness.get("r1is").is_some() && witness.get("r").is_none());
+        let pt = sk
+            .try_decrypt(&Ciphertext::from_bytes(&result.encrypted_data, &params).unwrap())
+            .unwrap();
+        assert_eq!(
+            Vec::<u64>::try_decode(&pt, Encoding::simd()).unwrap(),
+            slots
+        );
     }
 }

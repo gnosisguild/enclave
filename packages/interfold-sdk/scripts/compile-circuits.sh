@@ -15,7 +15,8 @@ esac
 
 TARGET="${REPO_ROOT}/circuits/bin/threshold/target"
 DIST="${SCRIPT_DIR}/../circuits/dist"
-PRESETS=(secure-8192 secure-16384 insecure)
+# `insecure` is last: the final build leaves its preset as the local active selection.
+PRESETS=(secure-8192 secure-16384 insecure-simd insecure)
 # The proof tree: the prover also imports each one's recursive key (`<circuit>.vk.json`).
 TREE_ARTIFACTS=(
   ct0_chunk_main
@@ -64,6 +65,7 @@ for PRESET in "${PRESETS[@]}"; do
 
   case "${PRESET}" in
     insecure) EXPECTED_DEGREE=128 ;;
+    insecure-simd) EXPECTED_DEGREE=128 ;;
     secure-8192) EXPECTED_DEGREE=8192 ;;
     secure-16384) EXPECTED_DEGREE=16384 ;;
   esac
