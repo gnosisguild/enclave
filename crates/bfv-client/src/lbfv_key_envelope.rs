@@ -170,10 +170,7 @@ pub struct LbfvKeyEnvelopeOpening {
 /// The envelope commitment is `compute_lbfv_key_envelope_commitment(compute_lbfv_public_key_commitment(rows),
 /// relinearization_key)`. A circuit that links a user-data-encryption proof (which commits only to
 /// row 0) to the on-chain key rebuilds the commitment from this opening.
-pub fn open_lbfv_key_envelope(
-    encoded: &[u8],
-    preset: BfvPreset,
-) -> Result<LbfvKeyEnvelopeOpening> {
+pub fn open_lbfv_key_envelope(encoded: &[u8], preset: BfvPreset) -> Result<LbfvKeyEnvelopeOpening> {
     let (commitments, public_key_rows, _) = inspect_with_rows(encoded, preset)?;
     Ok(LbfvKeyEnvelopeOpening {
         public_key_rows,
@@ -537,7 +534,10 @@ pub(crate) mod tests {
         // The opening is the node-side row commitments, so a circuit can rebuild the envelope
         // commitment from it.
         let opening = open_lbfv_key_envelope(&encoded, preset)?;
-        let expected_rows = pk_rows.iter().map(field_bytes).collect::<Result<Vec<_>>>()?;
+        let expected_rows = pk_rows
+            .iter()
+            .map(field_bytes)
+            .collect::<Result<Vec<_>>>()?;
         assert_eq!(opening.public_key_rows, expected_rows);
         assert_eq!(opening.relinearization_key, field_bytes(&expected_rlk)?);
         Ok(())
