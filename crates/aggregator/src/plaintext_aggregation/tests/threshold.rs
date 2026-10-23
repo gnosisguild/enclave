@@ -92,6 +92,30 @@ async fn small_decrypts_with_ten_verified_shares_not_all_fourteen() -> Result<()
 }
 
 #[actix::test]
+async fn local_c6_failure_does_not_authorize_a_new_decryptor_set() -> Result<()> {
+    let (mut aggregator, history, _) = small_aggregator().await?;
+    collect(&mut aggregator, 5..15)?;
+    let result = c6_completion(&aggregator, BTreeSet::from([5]));
+    aggregator.handle_c6_verification_complete(result)?;
+    let collecting = Collecting::try_from(aggregator.state.try_get()?)?;
+    assert_eq!(
+        collecting.expected_decryptors,
+        (6u32..=15).collect::<Vec<_>>()
+    );
+    assert!(
+        collecting.rejected_parties.is_empty(),
+        "local verification is not a confirmed exclusion"
+    );
+    actix::clock::sleep(std::time::Duration::from_millis(10)).await;
+    let events = history.send(GetEvents::<InterfoldEvent>::new()).await?;
+    assert!(!events.iter().any(|event| matches!(
+        event.get_data(),
+        InterfoldEventData::FreshDecryptionRound(_)
+    )));
+    Ok(())
+}
+
+#[actix::test]
 async fn rejected_share_collects_a_fresh_decryptor_set() -> Result<()> {
     for corrupt_saved_share in [false, true] {
         let (mut aggregator, history, e3_id) = small_aggregator().await?;
@@ -115,6 +139,12 @@ async fn rejected_share_collects_a_fresh_decryptor_set() -> Result<()> {
         };
         let old_result = c6_completion(&aggregator, dishonest_parties);
         aggregator.handle_c6_verification_complete(old_result.clone())?;
+        let waiting = Collecting::try_from(aggregator.state.try_get()?)?;
+        assert_eq!(waiting.expected_decryptors, (6u32..=15).collect::<Vec<_>>());
+        assert!(waiting.rejected_parties.is_empty());
+        // The verifier's local failure is not set authority. A separately confirmed domain
+        // exclusion advances this node's view, just as it advances each ciphernode's view.
+        aggregator.handle_member_expelled(5, &test_ctx(EffectsEnabled::new()))?;
         actix::clock::sleep(std::time::Duration::from_millis(20)).await;
         let collecting = Collecting::try_from(aggregator.state.try_get()?)?;
         assert!(collecting.shares.is_empty());
@@ -188,8 +218,14 @@ async fn replayed_results_survive_restart_and_wait_for_effects_and_promotion() -
     aggregator.resume_in_flight_work(test_ctx(EffectsEnabled::new()))?;
     deliver_resume(&mut aggregator, &history).await?;
     let collecting = Collecting::try_from(aggregator.state.try_get()?)?;
-    assert!(collecting.shares.is_empty());
-    assert!(collecting.rejected_parties.contains(&5));
+    assert_eq!(collecting.shares.len(), 9);
+    assert!(collecting.rejected_parties.is_empty());
+    assert_eq!(
+        collecting.expected_decryptors,
+        (6u32..=15).collect::<Vec<_>>()
+    );
+    aggregator.handle_member_expelled(5, &test_ctx(EffectsEnabled::new()))?;
+    let collecting = Collecting::try_from(aggregator.state.try_get()?)?;
     let decryptors = collecting.expected_decryptors.clone();
     assert_eq!(decryptors, (7u32..=16).collect::<Vec<_>>());
     let e3_id = aggregator.e3_id.clone();

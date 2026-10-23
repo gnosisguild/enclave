@@ -46,7 +46,13 @@ impl AccusationVoting {
 
         // Determine our position based on our local verification state.
         let key = (accusation.accused, accusation.proof_type);
-        let our_data_hash = if let Some(received) = self.received_data.get(&key) {
+        // Synchronized C6 replacements have distinct proof preimages. A result for a retired
+        // round must not suppress verification of the supplied signed proof.
+        let cached = self.received_data.get(&key).filter(|received| {
+            accusation.proof_type != ProofType::C6ThresholdShareDecryption
+                || received.data_hash == accusation.data_hash
+        });
+        let our_data_hash = if let Some(received) = cached {
             if received.verification_passed {
                 info!(
                     "Local verification of {:?} from {} passed — abstaining \
@@ -57,17 +63,17 @@ impl AccusationVoting {
             }
             received.data_hash
         } else if let Some(ref forwarded) = accusation.signed_payload {
-            // C3a/C3b case: we didn't receive this proof directly.
+            // C3/C6 case: we have no local verification result for this proof.
             let forwarded_valid = match forwarded.recover_address() {
                 Ok(addr) => {
                     if addr != accusation.accused {
                         warn!(
-                            "Forwarded C3a/C3b payload signer {} != accused {} — cannot verify",
+                            "Forwarded payload signer {} != accused {} — cannot verify",
                             addr, accusation.accused
                         );
                         false
                     } else if forwarded.payload.e3_id != self.e3_id {
-                        warn!("Forwarded C3a/C3b payload e3_id mismatch — cannot verify");
+                        warn!("Forwarded payload e3_id mismatch — cannot verify");
                         false
                     } else {
                         let expected = forwarded.payload.proof_type.circuit_names();
@@ -75,7 +81,7 @@ impl AccusationVoting {
                     }
                 }
                 Err(e) => {
-                    warn!("Forwarded C3a/C3b payload signature invalid: {e} — cannot verify");
+                    warn!("Forwarded payload signature invalid: {e} — cannot verify");
                     false
                 }
             };
@@ -88,7 +94,7 @@ impl AccusationVoting {
             // Bind the forwarded proof to the accusation.
             if forwarded.payload.proof_type != accusation.proof_type {
                 warn!(
-                    "Forwarded C3a/C3b proof_type {:?} != accusation proof_type {:?} — cannot verify",
+                    "Forwarded proof_type {:?} != accusation proof_type {:?} — cannot verify",
                     forwarded.payload.proof_type, accusation.proof_type
                 );
                 return;
@@ -96,7 +102,7 @@ impl AccusationVoting {
             let computed_hash = Self::compute_payload_hash(forwarded);
             if computed_hash != accusation.data_hash {
                 warn!(
-                    "Forwarded C3a/C3b data_hash mismatch (len {} vs {}) — cannot verify",
+                    "Forwarded data_hash mismatch (len {} vs {}) — cannot verify",
                     computed_hash.len(),
                     accusation.data_hash.len()
                 );

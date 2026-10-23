@@ -435,6 +435,15 @@ impl ThresholdKeyshare {
             );
             return Ok(());
         }
+        let expected = self.dkg_dealer_address(&msg.e3_id, msg.share.party_id)?;
+        if expected.is_none() || msg.recover_address().ok() != expected {
+            warn!(
+                party_id = msg.share.party_id,
+                e3_id = %msg.e3_id,
+                "Dropping threshold share without its dealer's signature"
+            );
+            return Ok(());
+        }
         self.record_threshold_share(&msg)?;
         // One clock reading decides both whether the share is late and the collector's timing.
         let now = crate::domain::timeout_policy::now_unix_secs();

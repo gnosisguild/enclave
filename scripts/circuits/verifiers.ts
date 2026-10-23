@@ -34,8 +34,10 @@
  */
 
 import { execFileSync, execSync } from 'child_process'
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
 import { basename, join, resolve } from 'path'
+import { RELEASE_REQUIRED_PAIRS, sourceHashForPair, validatePair } from './artifacts'
 import {
   ALL_COMMITTEES,
   ALL_GROUPS,
@@ -44,6 +46,7 @@ import {
   CIRCUIT_GROUPS,
   type CircuitCommittee,
   type CircuitGroup,
+  type CircuitPreset,
 } from './constants'
 
 // ---------------------------------------------------------------------------
@@ -120,6 +123,8 @@ interface GenerateOptions {
   committee?: CircuitCommittee
   /** Override output directory (write mode only). Defaults to committed honk/ path. */
   outputDir?: string
+  /** Read only this pair's archived EVM artifacts, without hydrating or changing active selectors. */
+  fromDist?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -133,6 +138,9 @@ class VerifierGenerator {
   private options: GenerateOptions
 
   constructor(rootDir?: string, options: GenerateOptions = {}) {
+    if (options.fromDist && (!options.check || options.compile !== false || options.outputDir)) {
+      throw new Error('Archived verifier checks must be read-only, with compilation disabled and no output override')
+    }
     this.rootDir = rootDir ?? resolve(__dirname, '../..')
     this.circuitsDir = join(this.rootDir, 'circuits', 'bin')
     this.options = {
@@ -176,7 +184,7 @@ class VerifierGenerator {
     const mode = this.options.check ? 'Checking' : 'Generating'
     console.log(`🔮 ${mode} Solidity verifiers from Noir circuits...\n`)
 
-    this.checkTool('nargo --version', 'nargo')
+    if (!this.options.fromDist) this.checkTool('nargo --version', 'nargo')
     this.checkTool('bb --version', 'bb')
 
     const targetPreset = this.targetPreset()
@@ -185,8 +193,10 @@ class VerifierGenerator {
 
     if (!this.options.dryRun) {
       this.assertPresetBuilt(targetPreset)
-      this.assertCircuitsBinActivePreset(targetPreset)
-      this.assertCircuitsBinActiveCommittee(targetCommittee)
+      if (!this.options.fromDist) {
+        this.assertCircuitsBinActivePreset(targetPreset)
+        this.assertCircuitsBinActiveCommittee(targetCommittee)
+      }
     }
 
     const circuits = this.discoverCircuits()
@@ -291,7 +301,7 @@ class VerifierGenerator {
             `     3. Run 'pnpm generate:verifiers --write' (or omit --check) to refresh the\n` +
             `        committed .sol files, then commit the diff.\n`,
         )
-        process.exit(1)
+        throw new Error(`${drift.length} committed Solidity verifier(s) differ from the selected VKs`)
       }
       console.log(`\n✅ Checked ${processed.length} Solidity verifier(s) — all in sync with current VKs.\n`)
       for (const f of processed) console.log(`   • ${basename(f)}`)
@@ -304,7 +314,7 @@ class VerifierGenerator {
     if (errors.length > 0) {
       console.error(`\n❌ ${errors.length} error(s):`)
       for (const e of errors) console.error(`   • ${e}`)
-      process.exit(1)
+      throw new Error(errors.join('\n'))
     }
   }
 
@@ -362,19 +372,22 @@ class VerifierGenerator {
     const vkPath = this.ensureVk(jsonFile, targetDir, packageName)
 
     // 3. Generate Solidity verifier
-    const rawSolPath = join(targetDir, `${packageName}_verifier.sol`)
-    execFileSync('bb', ['write_solidity_verifier', '-k', vkPath, '-o', rawSolPath], { stdio: 'pipe' })
-
-    if (!existsSync(rawSolPath)) {
-      throw new Error('bb write_solidity_verifier did not produce output')
+    const scratch = this.options.fromDist ? mkdtempSync(join(tmpdir(), 'interfold-verifier-check-')) : undefined
+    const rawSolPath = join(scratch ?? targetDir, `${packageName}_verifier.sol`)
+    let solidity: string
+    try {
+      execFileSync('bb', ['write_solidity_verifier', '-k', vkPath, '-o', rawSolPath], { stdio: 'pipe' })
+      if (!existsSync(rawSolPath)) throw new Error('bb write_solidity_verifier did not produce output')
+      solidity = readFileSync(rawSolPath, 'utf-8')
+    } finally {
+      if (scratch) rmSync(scratch, { recursive: true, force: true })
+      else rmSync(rawSolPath, { force: true })
     }
 
     // 4. Post-process: rename contract, add license header
     const contractName = this.toContractName(name)
     const outputFileName = `${contractName}.sol`
     const outputPath = join(this.verifierDir, outputFileName)
-
-    let solidity = readFileSync(rawSolPath, 'utf-8')
 
     // Replace the default contract name (HonkVerifier) with our descriptive name
     solidity = solidity.replace(/contract\s+HonkVerifier/g, `contract ${contractName}`)
@@ -387,9 +400,6 @@ class VerifierGenerator {
 
     // Bind the verifier's immutable parameters to the VK emitted by bb.
     solidity = this.addVerificationKeyValidation(solidity, contractName)
-
-    // Clean up intermediate file (always — we don't keep the bb temp output around)
-    rmSync(rawSolPath, { force: true })
 
     // Normalize with prettier so the on-disk format matches what the rest of
     // the repo's `pnpm prettier:write` produces. Without this, --check would
@@ -517,6 +527,7 @@ class VerifierGenerator {
 
     // Check if VK already exists
     if (existsSync(vkFile)) return vkFile
+    if (this.options.fromDist) throw new Error(`Archived EVM verification key is missing: ${vkFile}`)
 
     // Also check for a bare 'vk' file
     const defaultVk = join(targetDir, 'vk')
@@ -546,6 +557,9 @@ class VerifierGenerator {
   // -------------------------------------------------------------------------
 
   private candidateTargetDirs(circuit: CircuitInfo): string[] {
+    if (this.options.fromDist) {
+      return [join(this.rootDir, 'dist', 'circuits', this.targetPreset(), this.targetCommittee(), 'evm', circuit.group, circuit.name)]
+    }
     const groupDir = join(this.circuitsDir, circuit.group)
     return [join(groupDir, 'target'), join(this.circuitsDir, 'target'), join(circuit.path, 'target')]
   }
@@ -707,6 +721,32 @@ class VerifierGenerator {
   }
 }
 
+/** Release/deploy preflight: every requested pair must be source-current and its committed
+ * wrappers must match its own archived EVM VKs. Never compile, hydrate, or rewrite verifiers.
+ * The hash callback follows the artifact validator's seam for synthetic tooling tests.
+ */
+export async function checkVerifierPairs(
+  rootDir: string,
+  pairs: ReadonlyArray<readonly [CircuitPreset, CircuitCommittee]>,
+  expectedSourceHash = sourceHashForPair,
+): Promise<void> {
+  if (pairs.length === 0) throw new Error('At least one verifier pair is required')
+  for (const [preset, committee] of pairs) {
+    validatePair(join(rootDir, 'dist', 'circuits'), preset, committee, expectedSourceHash)
+  }
+  for (const [preset, committee] of pairs) {
+    await new VerifierGenerator(rootDir, {
+      check: true,
+      compile: false,
+      noCleanTargets: true,
+      fromDist: true,
+      preset,
+      committee,
+      circuits: ['dkg_aggregator', 'decryption_aggregator'],
+    }).generate()
+  }
+}
+
 // ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
@@ -714,6 +754,8 @@ class VerifierGenerator {
 async function main() {
   const args = process.argv.slice(2)
   const options: GenerateOptions = {}
+  let allPairs = false
+  let fromDist = false
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]
@@ -722,6 +764,10 @@ async function main() {
       process.exit(0)
     } else if (arg === '--dry-run') {
       options.dryRun = true
+    } else if (arg === '--all') {
+      allPairs = true
+    } else if (arg === '--from-dist') {
+      fromDist = true
     } else if (arg === '--clean') {
       options.clean = true
     } else if (arg === '--no-compile') {
@@ -779,6 +825,19 @@ async function main() {
     }
   }
 
+  if (allPairs || fromDist) {
+    if (!options.check || options.clean || options.dryRun || options.outputDir || options.groups) {
+      throw new Error('--all/--from-dist require --check without write, clean, dry-run, output-dir, or group overrides')
+    }
+    if (options.circuits?.some((name) => !['dkg_aggregator', 'decryption_aggregator'].includes(name))) {
+      throw new Error('--all/--from-dist check the DKG and decryption wrappers only')
+    }
+    if (allPairs && (options.preset || options.committee)) throw new Error('--all cannot be narrowed by --preset or --committee')
+    if (!allPairs && (!options.preset || !options.committee)) throw new Error('--from-dist requires explicit --preset and --committee')
+    const pairs = allPairs ? RELEASE_REQUIRED_PAIRS : [[options.preset as CircuitPreset, options.committee!] as const]
+    await checkVerifierPairs(resolve(__dirname, '../..'), pairs)
+    return
+  }
   const generator = new VerifierGenerator(undefined, options)
   await generator.generate()
 }
@@ -797,6 +856,10 @@ current circuit VKs is surfaced as a failure rather than a silent rewrite.
 Options:
   --check                Verify committed verifiers match current VKs (no writes).
                          Exits non-zero on drift. Used by test/benchmark/CI flows.
+  --all                  With --check, check both wrappers for every release-required pair
+                         against source-current dist EVM artifacts; never changes active selection.
+  --from-dist            With --check --preset --committee, check both wrappers from that
+                         archived pair instead of the active circuits/bin targets. No compilation.
   --preset <name>        BFV preset for circuits/bin (insecure-64 | secure-8192).
                          Defaults to insecure-64. Check mode compares the committed verifier
                          for the selected preset and committee.

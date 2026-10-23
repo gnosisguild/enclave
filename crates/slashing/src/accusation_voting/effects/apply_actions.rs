@@ -44,7 +44,7 @@ impl AccusationManager {
                     correlation_id,
                 } => {
                     if let Err(err) = self.bus.publish(request, ec) {
-                        error!("Failed to dispatch C3a/C3b ZK re-verification: {err}");
+                        error!("Failed to dispatch forwarded-proof ZK re-verification: {err}");
                         self.voting.discard_reverification(&correlation_id);
                     }
                 }

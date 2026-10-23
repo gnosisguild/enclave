@@ -3,6 +3,7 @@
 //! Assemble and publish a complete signed C1/C2/C3 threshold-share bundle.
 
 use super::*;
+use e3_utils::utility_types::ArcBytes;
 
 impl ProofRequestActor {
     pub(in crate::actors::proof_request) fn publish_threshold_share_with_proofs(
@@ -105,21 +106,28 @@ impl ProofRequestActor {
                     let proof_key = real_party_id as usize;
                     let c3a_proofs = signed_c3a_map.get(&proof_key).cloned().unwrap_or_default();
 
-                    if let Err(err) = self.bus.publish(
-                        ThresholdShareCreated {
-                            e3_id: e3_id.clone(),
-                            share: Arc::new(party_share),
-                            target_party_id: real_party_id,
-                            external: false,
-                            signed_c2a_proof: Some(signed_c2a.clone()),
-                            signed_c3a_proofs: c3a_proofs,
-                        },
-                        ec.clone(),
-                    ) {
+                    let event = ThresholdShareCreated {
+                        e3_id: e3_id.clone(),
+                        share: Arc::new(party_share),
+                        target_party_id: real_party_id,
+                        external: false,
+                        signed_c2a_proof: Some(signed_c2a.clone()),
+                        signed_c3a_proofs: c3a_proofs,
+                        signature: ArcBytes::default(),
+                    };
+                    let event = match event.sign(&self.signer) {
+                        Ok(event) => event,
+                        Err(err) => {
+                            error!("Failed to sign threshold-share bundle: {err}");
+                            return false;
+                        }
+                    };
+                    if let Err(err) = self.bus.publish(event, ec.clone()) {
                         error!(
                             "Failed to publish ThresholdShareCreated for party {}: {err}",
                             real_party_id
                         );
+                        return false;
                     }
                 }
                 None if real_party_id == party_id => {

@@ -73,6 +73,7 @@ export function checkReleaseSafeguards(rootDir = ROOT_DIR) {
   ])
   command('publication-gate', 'node scripts/release/index.mjs verify-publications')
   command('download-circuits', 'pnpm store:circuits verify-release')
+  command('download-circuits', 'pnpm check:verifiers --all')
   for (const name of ['build-binaries', 'download-circuits']) {
     const uploads = job(name).steps.filter((step) => step.uses?.startsWith('actions/upload-artifact@'))
     if (!uploads.length || uploads.some((step) => step.with?.['if-no-files-found'] !== 'error'))

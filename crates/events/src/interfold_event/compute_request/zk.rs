@@ -38,7 +38,7 @@ pub enum ZkRequest {
     ThresholdShareDecryption(ThresholdShareDecryptionProofRequest),
     /// Generate proof for decrypted shares aggregation (C7).
     DecryptedSharesAggregation(DecryptedSharesAggregationProofRequest),
-    /// Per-node DKG recursive fold (C2abFold → … → NodeFold).
+    /// Per-node DKG recursive fold over the direct C0/C1/C2/C3/C4 inputs.
     NodeDkgFold(NodeDkgFoldRequest),
     /// Single step of the streaming cross-node nodes_fold accumulation.
     NodesFoldStep(NodesFoldStepRequest),

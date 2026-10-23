@@ -33,6 +33,7 @@ fn decryption_publication(e3_id: E3id) -> Result<PublishDocumentRequested> {
         node: "test-node".to_string(),
         signed_sk_decryption_proof: proof,
         external: false,
+        signature: ArcBytes::default(),
     })
     .to_bytes()?;
     Ok(PublishDocumentRequested {

@@ -1,9 +1,10 @@
 # Plan: Synchronized TRBFV decryption on a fresh main-aligned branch
 
-Status: review-branch local qualification passed; final commit/push checks remain. Secure/minimum
-C6/C7 leaves are verified, but the full secure matrix remains unqualified. Date: 2026-10-22.
-Reference implementation: `feat/share-prf-bit` @ `27041b947` (kept as read-only reference; built on
-the dead `lbfv/chunking` lineage). Upstream dependency:
+Status: review reopened for confirmed M1 authentication regression and M2 exclusion-convergence
+liveness gap. The published review branch is not ready for merge. Secure/minimum C6/C7 leaves are
+verified, but the full secure matrix remains unqualified. Date: 2026-10-23. Reference
+implementation: `feat/share-prf-bit` @ `27041b947` (kept as read-only reference; built on the dead
+`lbfv/chunking` lineage). Upstream dependency:
 [fhe.rs v0.5.1](https://github.com/gnosisguild/fhe.rs/releases) — contains
 [#286](https://github.com/gnosisguild/fhe.rs/pull/286) (synchronized TRBFV decryption) and
 [#289](https://github.com/gnosisguild/fhe.rs/pull/289) (consolidated threshold decryption APIs,
@@ -17,7 +18,172 @@ parties, local Lagrange weighting, fresh local smudging noise) on a branch based
 
 ## Current checkpoint
 
-### Qualification resumed; branch commit/push authorized when complete
+### Reopened: M1 bundle authentication and M2 exclusion convergence
+
+The user confirmed that the port removed the schema-8 full-bundle signatures and threshold-share
+admission check. Restored previously omitted forged-bundle test cases fail on `96db00dbf`: both an
+unsigned threshold bundle and an unauthenticated C4 bundle reserve a dealer slot. The earlier
+"review milestone complete" assessment therefore did not establish these requirements and is
+withdrawn.
+
+The working fix restores dealer signatures over the full current C2/C3 and C4 envelopes, using
+versioned signing domains, and verifies the finalized dealer before storing or forwarding peer
+inputs. Validly signed incomplete dealer contributions remain attributable only to that dealer;
+transport origin is not signed because receipt changes it. Focused before/after tests reproduce the
+old failure and pass with the restored checks. Expanded tamper/admission, eight native-crate,
+layout/wire rejection, and fresh real DKG/C6/C7 disk-restart checks now pass. The follow-up changes
+remain review-branch work; the asymmetric M2 gate below is not complete.
+
+On 2026-10-23 the user requested committing and pushing this follow-up as a review checkpoint, with
+M2 end-to-end convergence, obsolete-fold retirement and the full release matrix explicitly open.
+Normal commit/push hooks still apply; this does not authorize merge, deployment or release.
+
+The user approved development schema **10**, gossip **7**, and sync **6**, keeping protocol
+9/generation 2. Schema-9 branch stores and wire envelopes must be rejected, not reinterpreted. No
+merge, deployment, migration execution or release is approved.
+
+M2 remains open: the aggregator derives its set from a local rejected-party view, while ciphernodes
+accept only their own confirmed-exclusion-derived set and reject peer wakeups as authority. The
+earlier Small run injected the confirmed exclusion into every node; it did **not** establish
+convergence when those views differ. An authenticated convergence path and asymmetric end-to-end
+coverage must be established. Merely accepting a network `FreshDecryptionRound` is not a safe fix.
+Do not treat the older happy-path/Small results below as closing M1 or M2.
+
+Two further M2 regressions are reproduced and addressed in the working tree: a local C6 failure
+previously changed `[6..15]` to `[7..16]` without a confirmed exclusion, and C6 accusations with a
+forwarded proof were rejected, leaving peers without a local C6 verdict unable to reverify/vote. The
+aggregator now retains usable shares in the same set until confirmation; confirmed exclusions alone
+clear the old set and choose replacements. C6 failure accusations carry the authenticated proof for
+independent verification, and round-specific cached results are reused only for the same proof
+preimage. None of this grants a peer wakeup set-selection authority. Native regressions do not
+substitute for the still-missing asymmetric convergence/recovery end-to-end scenario.
+
+Compatibility fixture regeneration uses the approved schema/wire boundary: runtime and DHT layout
+locks were regenerated for the restored signature fields, then passed normal comparison runs. No old
+store was reset and no fixture refresh is being claimed as migration or semantic proof.
+
+#### Current follow-up evidence and scoped next gate
+
+- `m1-m2-native-regressions-final-2.log`: aggregator 94, data 53, events 138, keyshare 162, net 303,
+  slashing 47, sync 53, prover 166 passed (two real-proof prover tests remain ignored in that native
+  command). Runtime and DHT layout comparison runs passed separately.
+- `m1-restart-minimum.json`: the schema-10 signed-bundle real DKG/C6/C7 and persisted-C6 disk
+  restart passed in **222.45 seconds**, sampled peak **6,309.61 MiB**. Public-only proof and timing
+  exports use new `m1-restart-minimum-*` paths; historical outputs are preserved.
+- `m1-m2-slashing-integration.log`: the prepared `pnpm rust:test:slashing` suite passed all **12**
+  tests with Anvil. These verify signing/attestation contracts, not asymmetric decryption recovery.
+- `m2-asymmetric-window-boundary-2.log`: a new Small **H=14** workflow test produces authenticated
+  C6 accusation/votes through the production transitions and confirms every online voter without a
+  delayed committee member. Supplying the same messages to that member before expiry converges;
+  at/after expiry the accusation is rejected and no local quorum starts. Each non-accuser requests
+  independent C6 verification, but outcomes are controlled fixtures: this is not cryptographic,
+  policy-writer, transport, restart, or end-to-end replacement coverage. The initial invocation used
+  a short name with `--exact` and selected zero tests; only the corrected one-test run is evidence.
+- `m2-slashing-delivery-native.log`: all **48** slashing native tests passed after adding that
+  delivery case. Documentation-link validation passed with 1,542 relative links and zero errors.
+- `m2-scope-c6-native.log`: all **48** slashing native tests passed again after restricting
+  exact-preimage cache selection to C6, leaving main's C3 behavior unchanged per the scoped repair.
+
+The current wire/history allowlist carries accusations/votes, not local quorum/exclusion events.
+Replaying an accusation after its live admission window is not a completed-quorum recovery protocol.
+No authenticated certificate dissemination/recovery path has been designed or added. The user
+subsequently limited implementation to findings caused by the synchronized decryptor; pre-existing
+main findings are team advisories, not a general slashing redesign requirement. Live expiry and
+peer-wakeup restrictions remain unchanged.
+
+The existing full-node benchmark disables its chain, so it has neither a configured accusation
+vote-validity window nor the normal slashing-policy writer. The required asymmetric end-to-end
+scenario needs governance/vote-window fixtures at those production boundaries, a delayed
+continuing/newly designated member, actual local policy-derived exclusions, and compatible
+replacement shares plus final plaintext. Direct all-node exclusion injection is not a substitute. M2
+therefore remains open even though the local premature-set-change and forwarding fixes pass.
+
+#### Main comparison and team advisories (2026-10-23)
+
+Compared against local `origin/main` **`3561619771e8e9e32ad06dd60a7c8a042f4b15a6`** and branch base
+`354af6bef3b1cdd8fa23c53093feede923125d55`. The compared accusation workflow, network event
+allowlist, chain-parameter loader, and slashing-writer paths have no intervening changes between
+those refs. This comparison did not fetch or change main.
+
+**In scope for this port:**
+
+- M1 is a regression: main has complete threshold/C4 bundle signatures and threshold dealer
+  authentication, which the port removed. Restore those protections for the changed payloads.
+- M2's exact-set dependency is new: main's shares are set-independent, so its aggregator can discard
+  locally bad shares and use backups without every node recalculating. Synchronized shares require
+  continuing/new decryptors to derive the same authorized replacement set. Keep the local
+  failure/confirmed-exclusion separation and verify the actual asymmetric live-window path.
+- Main did not forward C6 proofs. This port now relies on C6-confirmed exclusions for set changes,
+  so supplying peers the authenticated C6 for independent voting is necessary integration work.
+- Replaced synchronized C6 rounds introduce multiple preimages per dealer/type. Reuse a cached C6
+  result only for the exact proof. Keep this repair C6-specific, rather than also changing main's
+  recipient-specific C3 cache behavior.
+
+**Advise the team; do not expand this repair:**
+
+1. Main already rejects a missed accusation at/after expiry and has no completed-quorum
+   dissemination/recovery certificate. Relevant owners are accusation admission/deadlines and the
+   network's forwardable-event allowlist. A general historical-certificate/expiry design is separate
+   work. Synchronized decryption increases sensitivity to incompatible local exclusion views, so
+   retain this inherited limitation in qualification; do not claim arbitrary-delay convergence.
+2. Main's received-proof cache is keyed by dealer/type, and its C3 accusation path can reuse a
+   cached verdict without comparing the supplied proof hash. Static comparison identifies this
+   pre-existing recipient/preimage limitation; it is not a new synchronized-decryptor finding or a
+   separately qualified security fix here.
+
+#### Additional published-commit review reconciliation (2026-10-23)
+
+The supplied 251-file review targets `96db00dbf`, not the follow-up fixes described here. Its
+positive cryptographic assessment is useful review evidence, not the required human protocol
+approval or a claim that the full matrix has run. Reconcile its numbered findings as follows:
+
+1. **Dealer admission:** addressed in the working tree by full-envelope signatures and finalized
+   dealer checks before slot reservation, with restored red/green forgery coverage. Current source
+   versions are schema **10**, gossip **7**, sync **6**, not the reviewed commit's 9/6/5. These
+   fixes are not part of the reviewed commit `96db00dbf`.
+2. **Stale non-canonical verifiers:** confirmed. Added source-bound archived-pair checking through
+   `pnpm check:verifiers --all` and an automated release gate before circuit archiving/publication,
+   with a hard release/deployment stop in `RELEASING.md`. The gate fails if any required pair lacks
+   a current complete artifact set or its committed Honk wrapper differs from its own EVM VK. It
+   never switches active selectors, compiles missing keys, or regenerates committed verifiers. This
+   closes the missing full-matrix release check, **not** the unfinished verifier matrix. Direct
+   deployment scripts are not a qualification bypass; no deployment was run or authorized.
+3. **C6 failure/set convergence:** local premature pinning is fixed and C6 evidence can be
+   independently reverified/voted. The synchronized exact-set asymmetric live-window end-to-end
+   scenario remains open. General expired-accusation recovery predates this port and stays a team
+   advisory under the user's scope, without implying arbitrary-delay convergence.
+4. **Obsolete C2ab/C3ab/C4ab folds:** confirmed unused by the new node fold but still discovered,
+   linted, installed as required artifacts, and copied by the test harness. Their unchanged source
+   files are historical legacy from main, but leaving them active is migration cleanup, not evidence
+   that they support the new C3 layout. Retirement/deprecation remains an explicit pending decision;
+   no source, historical artifact, durable enum discriminant, or old proof was deleted. The stale
+   runtime fold comments were corrected. Do not describe this finding as closed.
+
+Verifier-gate evidence in `sync-dec-qualification/`:
+
+- `m3-all-verifiers-before-fix.log`: the previous CLI silently ignored `--all` and returned success
+  after checking only the two active default verifiers.
+- `m3-all-verifiers-tooling.log`: all **14** tooling tests passed, including synthetic six-pair
+  checking, inactive-verifier drift, stale stamps and missing archived keys. Synthetic keys/proofs
+  are not cryptographic qualification.
+- `m3-canonical-dist-verifiers.log`: real bb regeneration/comparison of both insecure/minimum
+  committed wrappers from their archived EVM keys passed, without changing the active selection.
+- `m3-all-verifiers-after-fix.log`: the full-matrix command **fails closed as intended** on missing
+  `insecure-64/micro/.build-stamp.json`. This is an unqualified matrix, not a passing release check.
+- `m3-release-gate-tests.log`: all **30** release-tooling tests passed, including rejection of a
+  workflow weakened to check only the active pair. The release workflow itself was not executed.
+
+Remaining port cleanup from that review is retained, not silently applied as statement changes:
+document `native_residue`'s checked-opening/range precondition; restore/justify the C4 PRF-path
+modulus-width invariant; assess explicit in-flight decryptor-set storage and obsolete backups;
+correct C4 length/PRF-noise/field-key-width names and residual ESM comments; explain the contract's
+`N=2T+1` grid-width invariant; add the persistence migration pointer; and avoid unrelated
+line-ending churn. Circuit-source changes require fresh source-bound artifact verification, not
+restamping old proof evidence. The new local `e3-safe` patch comment records the actual upstream
+revision and release blast radius; publication/version cleanup remains deferred. Moving this active
+plan out of the root belongs to the later pre-main cleanup, not deletion of current review history.
+
+### Prior qualification (historical; does not close the reopened M1/M2 findings)
 
 The user authorized finishing the remaining work, then committing and pushing the feature branch;
 merging to main, deployment and publication are not authorized. The user separately approved
@@ -479,6 +645,13 @@ recursive port must also retain main's recipient-key consistency and checked-ope
   `math/modulo/U64.nr` (+53, new), `math/commitments.nr` additions (+54).
 
 ## Dependency changes (fhe.rs v0.4.2 → v0.5.1)
+
+Current v0.5.1 resolves its upstream `e3-safe` pin to `ab6b9c943b6d23eda8d0ba5f2efd9039635acfa4`.
+The workspace patch was **introduced on this branch**, not inherited from main, and applies to
+release builds too. Its manifest comment now names the exact upstream revision and requires
+compatibility re-review when either implementation changes; do not infer future byte equivalence
+from the version or pin alone. Publication/version cleanup remains deferred. The decision/sequencing
+notes below retain the earlier v0.5.0 transition context.
 
 - `fhe`, `fhe-traits`, `fhe-math`, and `fhe-util` now use tag `v0.5.1`; the local e3-safe patch is
   active.

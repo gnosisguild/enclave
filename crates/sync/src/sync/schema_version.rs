@@ -18,8 +18,9 @@
 // Schema 7 also adds durable decryption backup shares and batch-bound C6 results.
 // Schema 8 authenticates complete DKG share and C4 bundles before slot admission.
 // Schema 9 replaces shared ESM payloads with PRF-key transport and set-bound fresh decryption.
-// The bincode event and snapshot layouts are incompatible with schema 8.
-pub const SCHEMA_VERSION: u32 = 9;
+// Schema 10 restores authenticated complete dealer bundles after the schema-9 development
+// branch removed their signatures. Neither older layout can be read as the new event shape.
+pub const SCHEMA_VERSION: u32 = 10;
 
 /// The action a node should take after reading the persisted schema version.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,6 +85,14 @@ pub fn decide_schema_version(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unsigned_bundle_development_store_is_not_reinterpreted() {
+        assert!(matches!(
+            decide_schema_version(Some(9), SCHEMA_VERSION, true),
+            SchemaVersionDecision::Halt(_)
+        ));
+    }
 
     #[test]
     fn fresh_store_writes_current() {

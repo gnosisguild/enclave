@@ -122,7 +122,7 @@ type BuildStamp = {
   sourceHash?: string
 }
 
-function sourceHashForPair(preset: string, committee: string): string {
+export function sourceHashForPair(preset: string, committee: string): string {
   return execFileSync('pnpm', ['--silent', 'build:circuits', 'hash', '--preset', preset, '--committee', committee], {
     cwd: ROOT,
     encoding: 'utf8',
@@ -130,7 +130,7 @@ function sourceHashForPair(preset: string, committee: string): string {
   }).trim()
 }
 
-function validatePair(
+export function validatePair(
   dir: string,
   preset: string,
   committee: string,

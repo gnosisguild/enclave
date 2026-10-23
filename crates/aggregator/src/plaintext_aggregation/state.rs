@@ -52,9 +52,10 @@ pub struct Collecting {
     pub(crate) seed: Seed,
     pub(crate) ciphertext_output: Vec<ArcBytes>,
     pub(crate) params: ArcBytes,
+    /// Confirmed quorum/chain exclusions, never merely local verification failures.
     pub(crate) rejected_parties: BTreeSet<u64>,
     /// Strictly increasing 1-based decryptor ids designated for the current round. Empty means
-    /// the round is unrestricted: the first `threshold + 1` accepted shares designate the set.
+    /// no admissible bundle has pinned the confirmed-exclusion-derived canonical set yet.
     pub(crate) expected_decryptors: Vec<u32>,
 }
 
@@ -67,6 +68,7 @@ pub struct VerifyingC6 {
     pub(crate) ciphertext_output: Vec<ArcBytes>,
     pub(crate) params: ArcBytes,
     pub(crate) seed: Seed,
+    /// Confirmed quorum/chain exclusions, never merely local verification failures.
     pub(crate) rejected_parties: BTreeSet<u64>,
     /// Backups must not change the batch whose verification result is pending.
     pub(crate) queued_shares: BTreeMap<u64, QueuedDecryptionShare>,

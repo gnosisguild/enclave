@@ -168,6 +168,7 @@ mod tests {
             node: String::new(),
             signed_sk_decryption_proof: proof(),
             external: false,
+            signature: ArcBytes::default(),
         }
     }
 

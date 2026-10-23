@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: LGPL-3.0-only
 
 import assert from 'node:assert/strict'
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import test from 'node:test'
-import { VerifierGenerator } from './verifiers'
+import requiredArtifacts from '../../crates/zk/prover/required-artifacts.json'
+import { RELEASE_REQUIRED_PAIRS } from './artifacts'
+import { checkVerifierPairs, VerifierGenerator } from './verifiers'
 
 // `check:verifiers` must fail when a requested circuit is not discovered, instead of checking less.
 test('verifier generation rejects a requested circuit it cannot find', async (t) => {
@@ -89,4 +91,56 @@ test('verifier write/check retain selector correction, VK validation, naming and
   for (const parameter of ['$N', '$LOG_N', '$NUM_PUBLIC_INPUTS']) assert.ok(output.includes(parameter))
   await new VerifierGenerator(root, { ...options, check: true }).generate()
   assert.equal(readFileSync(path, 'utf8'), output)
+})
+
+test('all-pair preflight checks inactive committed verifiers without changing selectors or archived keys', async (t) => {
+  const root = fixture(t)
+  const bin = join(root, 'circuits/bin/recursive_aggregation/decryption_aggregator')
+  mkdirSync(join(bin, 'target'), { recursive: true })
+  writeFileSync(join(bin, 'Nargo.toml'), '[package]\nname = "decryption_aggregator"\n')
+  writeFileSync(join(bin, 'target/decryption_aggregator.json'), '{}')
+  writeFileSync(join(bin, 'target/decryption_aggregator.vk'), 'synthetic fixture, not a key')
+  await new VerifierGenerator(root, {
+    compile: false,
+    noCleanTargets: true,
+    circuits: ['dkg_aggregator', 'decryption_aggregator'],
+  }).generate()
+  const honk = join(root, 'packages/interfold-contracts/contracts/verifiers/bfv/honk')
+  const hash = (preset: string, committee: string) => `fixture:${preset}/${committee}`
+  for (const [preset, committee] of RELEASE_REQUIRED_PAIRS) {
+    const pair = join(root, 'dist/circuits', preset, committee)
+    for (const artifact of requiredArtifacts) {
+      const file = join(pair, artifact)
+      mkdirSync(dirname(file), { recursive: true })
+      writeFileSync(file, 'synthetic fixture, not an artifact')
+    }
+    writeFileSync(join(pair, '.build-stamp.json'), JSON.stringify({ preset, committee, sourceHash: hash(preset, committee) }))
+    if (preset === 'insecure-64' && committee === 'minimum') continue
+    const dest = join(honk, preset, committee)
+    mkdirSync(dest, { recursive: true })
+    for (const contract of ['DkgAggregatorVerifier', 'DecryptionAggregatorVerifier']) {
+      copyFileSync(join(honk, `${contract}.sol`), join(dest, `${contract}.sol`))
+    }
+  }
+  const activeFile = join(root, 'circuits/bin/.active-preset.json')
+  const active = readFileSync(activeFile, 'utf8')
+  const inactive = join(honk, 'secure-8192/minimum/DkgAggregatorVerifier.sol')
+  const original = readFileSync(inactive, 'utf8')
+  await checkVerifierPairs(root, RELEASE_REQUIRED_PAIRS, hash)
+  assert.equal(readFileSync(activeFile, 'utf8'), active)
+
+  writeFileSync(inactive, `${original}\n// stale inactive verifier\n`)
+  await assert.rejects(checkVerifierPairs(root, RELEASE_REQUIRED_PAIRS, hash), /committed Solidity verifier\(s\) differ/)
+  assert.equal(readFileSync(inactive, 'utf8'), `${original}\n// stale inactive verifier\n`)
+  assert.equal(readFileSync(activeFile, 'utf8'), active)
+
+  await assert.rejects(
+    checkVerifierPairs(root, RELEASE_REQUIRED_PAIRS, () => 'wrong source'),
+    /Stale circuit artifacts/,
+  )
+  const [preset, committee] = RELEASE_REQUIRED_PAIRS.at(-1)!
+  const missing = join(root, 'dist/circuits', preset, committee, 'evm/recursive_aggregation/dkg_aggregator/dkg_aggregator.vk')
+  rmSync(missing)
+  await assert.rejects(checkVerifierPairs(root, RELEASE_REQUIRED_PAIRS, hash), /Incomplete circuit artifacts/)
+  assert.equal(existsSync(missing), false, 'checks must not regenerate a missing archived key')
 })

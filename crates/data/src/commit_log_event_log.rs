@@ -1058,6 +1058,7 @@ mod tests {
                     node: node.clone(),
                     signed_sk_decryption_proof: empty_signed_proof.clone(),
                     external: false,
+                    signature: empty.clone(),
                 }
                 .into(),
             ),

@@ -17,8 +17,8 @@ use std::fmt::{self, Display};
 /// members receive this, independently check their own verification result for the same
 /// proof, and respond with an [`AccusationVote`].
 ///
-/// For C3a/C3b proofs (per-recipient encryption), the accuser includes the
-/// [`SignedProofPayload`] so other nodes can re-verify a proof they never received directly.
+/// For recipient-specific C3 and aggregator-verified C6 proofs, the accuser includes the
+/// [`SignedProofPayload`] so nodes without a local result can independently verify before voting.
 #[derive(Message, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct ProofFailureAccusation {
@@ -38,8 +38,8 @@ pub struct ProofFailureAccusation {
     /// Unix-seconds deadline after which votes for this accusation expire.
     /// The accuser sets it, and every voter signs the same issue time and deadline.
     pub deadline: u64,
-    /// For C3a/C3b: the signed proof payload so other nodes can re-verify.
-    /// `None` for proofs that all nodes already received.
+    /// For C3/C6: the signed proof payload so other nodes can independently re-verify.
+    /// `None` for proof types whose verification is already performed locally by every voter.
     pub signed_payload: Option<SignedProofPayload>,
     /// ECDSA signature of the accuser over the accusation fields.
     pub signature: ArcBytes,

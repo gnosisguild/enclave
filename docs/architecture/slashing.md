@@ -20,11 +20,12 @@ Typed admission precedes caching, vote creation, and pending-window mutation. Va
 canonical membership/party slot, signature, proof type, circuit, and signed timing. Local
 accusations reject own address **or** own finalized party ID. Received accusations reject equal
 signed accuser and accused addresses: `accused_party_id` is not in the digest and cannot decide
-received self-accusation admission. Only C3a/C3b may forward a payload; other proof types need local
-evidence. A bogus signature cannot accuse its labeled dealer.
+received self-accusation admission. Recipient-specific C3 and aggregator-verified C6 may forward a
+payload; other proof types need local evidence. A bogus signature cannot accuse its labeled dealer.
 
-The workflow compares available local verification evidence or re-verifies admissible forwarded C3
-evidence. Quorum is `agree_count >= H`, derived from committee size: legacy E3 `threshold_m`
+The workflow compares available local verification evidence or re-verifies admissible forwarded
+C3/C6 evidence. Cached C6 results apply only to the same proof preimage, not another synchronized
+decryption round. Quorum is `agree_count >= H`, derived from committee size: legacy E3 `threshold_m`
 contains circuit threshold **T**, not accusation quorum. All counted voters are distinct active
 committee members, not the accused. All affirmative votes must bind the same evidence hash for
 `AccusedFaulted`. Different preimages produce `Equivocation`, currently local evidence only: the
@@ -70,6 +71,20 @@ the rest of the verification cache are not saved. Request-router slashable-failu
 memory-only: one day plus maximum vote validity after a local failure, or completion on restart. A
 local Failed lifecycle lacks its reason, so restart can prematurely complete accusation work; see
 [persistence gaps](persistence-and-replay.md#remaining-durability-gaps).
+
+**Pre-existing recovery advisory:** a committee member that missed an accusation cannot start its
+vote collection from that accusation once its signed window expires, even if other nodes already
+completed H matching votes. Gossip and peer history carry accusations/votes, not authenticated
+completed-quorum recovery certificates. Local `AccusationQuorumReached` and
+`CommitteeMemberExcluded` are not forwardable network authority. The Small H=14 workflow delivery
+test demonstrates convergence on delayed live-window messages and rejection of the same accusation
+at/after expiry, with controlled verifier results. It does not establish policy-derived multi-node
+exclusions or compatible replacement decryption. The expiry checks, lack of completed-quorum
+recovery, and local-only exclusion authority are already present on `origin/main` at `356161977`; a
+general certificate-recovery redesign is outside this synchronized-decryptor repair. The migration
+does add a dependency on compatible replacement-set views, so its live-window asymmetric end-to-end
+path still needs verification. Do not weaken live-window checks or trust peer wakeups to hide the
+inherited limitation.
 
 ## Durable submission, local exclusion, and two lanes
 

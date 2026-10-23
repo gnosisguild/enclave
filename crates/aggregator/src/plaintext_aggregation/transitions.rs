@@ -79,6 +79,31 @@ impl ThresholdPlaintextAggregation {
         })
     }
 
+    /// Retain usable shares in the current set while the fault/exclusion protocol runs.
+    /// A local verifier result cannot authorize ciphernodes to choose different peers.
+    pub(crate) fn await_confirmed_exclusion(
+        mut current: VerifyingC6,
+        unusable: &BTreeSet<u64>,
+        decryptors: Vec<u32>,
+    ) -> ThresholdPlaintextAggregatorState {
+        current.shares.retain(|party, _| !unusable.contains(party));
+        current
+            .c6_proofs
+            .retain(|party, _| !unusable.contains(party));
+        ThresholdPlaintextAggregatorState::Collecting(Collecting {
+            shares: current.shares,
+            c6_proofs: current.c6_proofs,
+            ciphertext_output: current.ciphertext_output,
+            threshold_m: current.threshold_m,
+            threshold_n: current.threshold_n,
+            params: current.params,
+            seed: current.seed,
+            rejected_parties: current.rejected_parties,
+            expected_decryptors: decryptors,
+        })
+    }
+
+    /// Clear a batch only after confirmed exclusions change its designated set.
     pub(crate) fn retry_collection(
         mut current: VerifyingC6,
         rejected: BTreeSet<u64>,

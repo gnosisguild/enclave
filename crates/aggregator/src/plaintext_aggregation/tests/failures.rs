@@ -53,12 +53,17 @@ async fn threshold_decryption_compute_error_preserves_pending_work() -> Result<(
 }
 
 #[actix::test]
-async fn insufficient_honest_c6_shares_emit_e3_failed() -> Result<()> {
+async fn confirmed_exclusion_without_enough_decryptors_emits_e3_failed() -> Result<()> {
     let (mut aggregator, history, e3_id) =
         build_plaintext_aggregator(verifying_c6_state(), true).await?;
 
     let completion = c6_completion(&aggregator, BTreeSet::from([1]));
     aggregator.handle_c6_verification_complete(completion)?;
+    assert!(matches!(
+        aggregator.state.get(),
+        Some(ThresholdPlaintextAggregatorState::Collecting(_))
+    ));
+    aggregator.handle_member_expelled(1, &test_ctx(EffectsEnabled::new()))?;
 
     let event = next_event(&history).await?;
     assert!(matches!(

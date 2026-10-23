@@ -113,7 +113,7 @@ pub(super) struct ReceivedProofData {
     pub(super) evidence: Bytes,
 }
 
-/// An in-flight ZK re-verification for a forwarded C3a/C3b proof.
+/// An in-flight ZK re-verification for a forwarded C3/C6 proof.
 pub(super) struct PendingReVerification {
     pub(super) accusation_id: [u8; 32],
     pub(super) data_hash: [u8; 32],

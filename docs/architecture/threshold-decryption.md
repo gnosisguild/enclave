@@ -8,6 +8,12 @@ local noise replaces the shared ESM polynomial. Pairwise PRF masks cancel only w
 the same ciphertext and designated set. Final reconstruction adds c0 once and does not interpolate
 again.
 
+**Blocking review findings:** published commit `96db00dbf` removed complete dealer-bundle
+authentication (M1), and its synchronized-set liveness depended on untested exclusion convergence
+(M2). The working repair restores signed dealer envelopes before intake and separates local C6
+verification failure from confirmed set authority. The earlier tests below do not establish M1/M2
+closure: asymmetric confirmation delivery, recovery and end-to-end convergence still need coverage.
+
 The changed C1-C4 and C6/C7 leaf circuits have matching Rust witnesses. DKG C2/C3/C4 bind key bits
 packed into share-encryption plaintext under DKG t = 2q. C3/node/DKG folds carry the selected-H by
 full-N outgoing commitment grid. C6 binds its owner and designated IDs; C6 folds require the same
@@ -29,6 +35,15 @@ completes recursive aggregation with replacement-only signed shares. It tests ex
 stale-calculation handling, not accusation consensus or on-chain slashing; late proof-worker
 responses have separate native/unit coverage.
 
+The working signed-bundle repair also passed a fresh schema-10 real DKG/C6/C7 run with a C6 disk
+restart. Its Small H=14 signed-voting workflow test uses controlled verifier outcomes: a delayed
+member reaches quorum while the accusation is live but cannot start from the same accusation
+at/after expiry. The expired-accusation recovery limitation also exists on main and is a team
+advisory, not a general slashing redesign in this repair. The new exact-set dependency still needs
+live-window asymmetric replacement coverage; the workflow test is not that real-proof run. See the
+[slashing recovery advisory](slashing.md#from-verification-to-authenticated-votes) for the authority
+limit.
+
 Live admission checks unsigned transport IDs against the signed C6 owner/set before reserving a
 slot. Replaced sets discard old shares, recovery intents and proof-worker correlations. Each node
 derives the replacement from authenticated exclusions; `FreshDecryptionRound` is a local wakeup, not
@@ -38,7 +53,7 @@ dispatching work. Restored DKG rosters cannot reintroduce durably excluded decry
 Fold attestations use EIP-712 version 2 and bind the SK commitment plus Keccak of the outgoing
 bytes32 key row. The registry appends PRF storage while preserving old ESM slots and consuming one
 reserved gap slot. The deployed/pre-migration flow below still uses SK/ESM anchors. This development
-branch declares protocol 9 / generation 2, schema 9, gossip wire 6 and sync wire 5; its
+branch declares protocol 9 / generation 2, schema 10, gossip wire 7 and sync wire 6; its
 source-counter change and drained fresh-history boundary have human approval, not permission to
 merge or deploy. The protocol overlay and wire majors prevent mixing the changed payloads with old
 nodes. No live-store migration, verifier deployment or production rollout is authorized here.

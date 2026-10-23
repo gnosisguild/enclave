@@ -32,7 +32,7 @@ impl AccusationVoting {
         }
     }
 
-    /// Handle ZK re-verification response for a forwarded C3a/C3b proof.
+    /// Handle ZK re-verification response for a forwarded C3/C6 proof.
     pub(crate) fn handle_reverification_response(
         &mut self,
         msg: TypedEvent<ComputeResponse>,
@@ -54,7 +54,7 @@ impl AccusationVoting {
                 r.party_results.first().is_some_and(|r| r.all_verified)
             }
             _ => {
-                warn!("Unexpected ComputeResponse kind for C3a/C3b re-verification — abstaining");
+                warn!("Unexpected ComputeResponse kind for forwarded-proof re-verification — abstaining");
                 return actions;
             }
         };
@@ -71,7 +71,7 @@ impl AccusationVoting {
         // ZK re-verification passed ⇒ proof is valid ⇒ we disagree ⇒ abstain.
         if zk_passed {
             info!(
-                "C3a/C3b re-verification passed for {:?} — abstaining from vote",
+                "Forwarded-proof re-verification passed for {:?} — abstaining from vote",
                 reverif.proof_type
             );
             return actions;
@@ -102,13 +102,13 @@ impl AccusationVoting {
         match self.sign_vote_digest(&vote) {
             Ok(sig) => vote.signature = ArcBytes::from_bytes(&sig),
             Err(err) => {
-                error!("Failed to sign C3a/C3b AccusationVote: {err}");
+                error!("Failed to sign forwarded-proof AccusationVote: {err}");
                 return actions;
             }
         }
 
         info!(
-            "C3a/C3b re-verification confirmed failure for {:?} — agreeing with accusation",
+            "Forwarded-proof re-verification confirmed failure for {:?} — agreeing with accusation",
             reverif.proof_type
         );
 
@@ -128,7 +128,7 @@ impl AccusationVoting {
         actions
     }
 
-    /// Handle ZK re-verification error for a forwarded C3a/C3b proof.
+    /// Handle ZK re-verification error for a forwarded C3/C6 proof.
     pub(crate) fn handle_reverification_error(&mut self, msg: TypedEvent<ComputeRequestError>) {
         let (msg, _ec) = msg.into_components();
 
@@ -138,7 +138,7 @@ impl AccusationVoting {
         };
 
         error!(
-            "C3a/C3b ZK re-verification failed locally for {:?}; abstaining and preserving pending work for restart",
+            "Forwarded-proof ZK re-verification failed locally for {:?}; abstaining and preserving pending work for restart",
             reverif.proof_type
         );
         // Don't vote — effectively abstain

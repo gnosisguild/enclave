@@ -5,7 +5,7 @@ use e3_events::{
     ComputeRequestKind, PartyVerificationResult, Proof, ProofPayload, VerifyShareProofsResponse,
 };
 
-fn proof_failure(
+pub(super) fn proof_failure(
     who: &PrivateKeySigner,
     party_id: u64,
     proof_type: ProofType,
@@ -61,7 +61,7 @@ fn accusation_from_failure(
     accusation
 }
 
-fn assert_quorum(actions: &[VoteAction], accused: Address, voters: &[Address]) {
+pub(super) fn assert_quorum(actions: &[VoteAction], accused: Address, voters: &[Address]) {
     let quorums: Vec<_> = actions
         .iter()
         .filter_map(|action| match action {
@@ -86,7 +86,7 @@ fn assert_quorum(actions: &[VoteAction], accused: Address, voters: &[Address]) {
 }
 
 #[test]
-fn forwarded_accusations_only_reverify_c3() {
+fn forwarded_accusations_reverify_c3_and_c6_before_voting() {
     let me = signer(1);
     let accuser = signer(2);
     let accused = signer(3);
@@ -112,20 +112,6 @@ fn forwarded_accusations_only_reverify_c3() {
         assert!(v.on_vote_received(vote.clone(), &ctx()).is_empty());
         let actions = v.on_accusation_received(accusation, &ctx());
 
-        if proof_type == ProofType::C6ThresholdShareDecryption {
-            assert!(
-                actions.is_empty(),
-                "forwarded C6 must not start voting or ZK"
-            );
-            assert!(v.on_vote_received(vote, &ctx()).is_empty());
-            assert!(v.on_vote_timeout(id).is_none());
-            let ordinary = accusation_from_failure(&accuser, &failure, false, NOW);
-            assert!(v.on_accusation_received(ordinary, &ctx()).is_empty());
-            assert!(v.pending_reverifications.is_empty());
-            assert!(v.received_data.is_empty());
-            continue;
-        }
-
         assert!(!actions.iter().any(|action| matches!(
             action,
             VoteAction::PublishVote { .. } | VoteAction::PublishQuorum { .. }
@@ -136,7 +122,7 @@ fn forwarded_accusations_only_reverify_c3() {
                 VoteAction::DispatchZk { request, .. } => Some(request),
                 _ => None,
             })
-            .expect("forwarded C3 must be verified before voting");
+            .expect("forwarded proof must be verified before voting");
         let ComputeRequestKind::Zk(ZkRequest::ReverifyAccusedProof(batch)) = &request.request
         else {
             panic!("expected forwarded share proof verification");
@@ -176,7 +162,7 @@ fn forwarded_accusations_only_reverify_c3() {
 }
 
 #[test]
-fn forwarded_c6_cannot_use_cached_evidence_or_change_a_vote_window() {
+fn forwarded_c6_reconciles_signed_windows_without_mixing_votes() {
     let me = signer(1);
     let accuser = signer(2);
     let accused = signer(3);
@@ -186,12 +172,15 @@ fn forwarded_c6_cannot_use_cached_evidence_or_change_a_vote_window() {
     let actions = v.on_local_proof_failure(failure.clone(), &ctx());
     assert!(actions.iter().any(|action| matches!(
         action,
-        VoteAction::PublishAccusation { accusation, .. } if accusation.signed_payload.is_none()
+        VoteAction::PublishAccusation { accusation, .. } if accusation.signed_payload.is_some()
     )));
 
     let forwarded = accusation_from_failure(&accuser, &failure, true, NOW + 5);
     let id = AccusationVoting::accusation_id(&forwarded);
-    assert!(v.on_accusation_received(forwarded, &ctx()).is_empty());
+    let actions = v.on_accusation_received(forwarded, &ctx());
+    assert!(actions.iter().any(|action| matches!(action,
+        VoteAction::PublishVote { vote, .. } if vote.issued_at == NOW + 5
+            && vote.deadline == NOW + 5 + VALIDITY)));
     let vote = signed_vote(
         &accuser,
         v.slashing_manager,
@@ -200,24 +189,61 @@ fn forwarded_c6_cannot_use_cached_evidence_or_change_a_vote_window() {
         failure.data_hash,
         NOW + VALIDITY,
     );
-    let actions = v.on_vote_received(vote.clone(), &ctx());
+    assert!(v.on_vote_received(vote, &ctx()).is_empty());
+    let vote = signed_vote(
+        &accuser,
+        v.slashing_manager,
+        &v.e3_id,
+        id,
+        failure.data_hash,
+        NOW + 5 + VALIDITY,
+    );
+    let actions = v.on_vote_received(vote, &ctx());
     assert_quorum(
         &actions,
         accused.address(),
         &[me.address(), accuser.address()],
     );
+}
 
-    let forwarded = accusation_from_failure(&accuser, &failure, true, NOW);
-    assert!(v.on_accusation_received(forwarded, &ctx()).is_empty());
-    assert!(v.on_vote_timeout(id).is_none());
-    let ordinary = accusation_from_failure(&accuser, &failure, false, NOW);
-    let mut actions = v.on_accusation_received(ordinary, &ctx());
-    actions.extend(v.on_vote_received(vote, &ctx()));
-    assert_quorum(
-        &actions,
+#[test]
+fn forwarded_c6_cannot_reuse_a_cached_result_for_another_proof() {
+    let me = signer(1);
+    let accuser = signer(2);
+    let accused = signer(3);
+    let committee = vec![me.address(), accuser.address(), accused.address()];
+    let mut v = voting_with(&me, committee, 1, 2);
+    let old = proof_failure(&accused, 2, ProofType::C6ThresholdShareDecryption);
+    v.cache_verification_result(
         accused.address(),
-        &[me.address(), accuser.address()],
+        old.proof_type,
+        old.data_hash,
+        true,
+        Bytes::new(),
     );
+    let same = accusation_from_failure(&accuser, &old, true, NOW);
+    assert!(v.on_accusation_received(same, &ctx()).is_empty());
+    let mut different = old;
+    different.signed_payload.payload.proof.data = ArcBytes::from_bytes(&[0x33; 32]);
+    different.signed_payload =
+        SignedProofPayload::sign(different.signed_payload.payload, &accused).unwrap();
+    different.data_hash = keccak256(
+        (
+            Bytes::copy_from_slice(&different.signed_payload.payload.proof.data),
+            Bytes::copy_from_slice(&different.signed_payload.payload.proof.public_signals),
+        )
+            .abi_encode(),
+    )
+    .into();
+    let forwarded = accusation_from_failure(&accuser, &different, true, NOW);
+    let actions = v.on_accusation_received(forwarded, &ctx());
+    assert!(actions
+        .iter()
+        .any(|action| matches!(action, VoteAction::DispatchZk { .. })));
+    assert!(!actions.iter().any(|action| matches!(
+        action,
+        VoteAction::PublishVote { .. } | VoteAction::PublishQuorum { .. }
+    )));
 }
 
 #[test]

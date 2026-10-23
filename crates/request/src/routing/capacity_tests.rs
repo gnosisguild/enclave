@@ -155,6 +155,7 @@ fn peer_share(id: &E3id, party: usize, external: bool) -> ThresholdShareCreated 
                 )
             })
             .collect(),
+        signature: ArcBytes::default(),
     }
 }
 

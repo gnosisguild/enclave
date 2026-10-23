@@ -1493,7 +1493,10 @@ fn peer_share(e3_id: &E3id, party_id: u64) -> ThresholdShareCreated {
         external: true,
         signed_c2a_proof: None,
         signed_c3a_proofs: Vec::new(),
+        signature: ArcBytes::default(),
     }
+    .sign(&dealer_signer(party_id))
+    .unwrap()
 }
 
 async fn wait_for_keyshare_state(
@@ -1881,7 +1884,9 @@ async fn early_threshold_share_batch_is_verified_after_own_shares_exist() -> Res
         external: true,
         signed_c2a_proof: proofs.signed_c2a_proof.clone(),
         signed_c3a_proofs: proofs.signed_c3a_proofs.clone(),
-    };
+        signature: ArcBytes::default(),
+    }
+    .sign(&dealer_signer(1))?;
     actor.record_threshold_share(&TypedEvent::new(peer.clone(), test_ec(2)))?;
 
     // The peer batch completes while own shares are still being generated.
@@ -2142,7 +2147,8 @@ async fn committee_with_two_shares(
                 signed_c2a_proof: Some(proof.clone()),
                 signed_c3a_proofs: vec![proof.clone()],
                 ..peer_share(e3_id, party_id)
-            },
+            }
+            .sign(&dealer_signer(party_id))?,
             test_ec(party_id + 1),
         ))?;
     }
@@ -3095,7 +3101,8 @@ async fn own_ready_grows_past_an_expelled_dealer() -> Result<()> {
                     party_id,
                 )),
                 ..peer_share(&e3_id, party_id)
-            },
+            }
+            .sign(&dealer_signer(party_id))?,
             test_ec(party_id + 1),
         ))?;
     }
@@ -5783,7 +5790,10 @@ fn peer_c4_event(e3_id: &E3id, seq: u64) -> InterfoldEvent {
         signed_sk_decryption_proof: SignedProofPayload::sign(proof.payload, &dealer_signer(1))
             .unwrap(),
         external: true,
-    };
+        signature: ArcBytes::default(),
+    }
+    .sign(&dealer_signer(1))
+    .unwrap();
     InterfoldEvent::<Unsequenced>::new_with_timestamp(
         share.into(),
         None,

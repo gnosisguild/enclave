@@ -50,7 +50,7 @@ fn load_compiled_circuit(
 /// Build a witness from a `Serialize` Noir input struct and prove `circuit` via the recursive-bin
 /// path. Collapses the repeated `serde_json::to_value → inputs_json_to_input_map → CompiledCircuit::from_file
 /// → WitnessGenerator → generate_recursive_aggregation_bin_proof` boilerplate used by every fold
-/// builder (c2ab / c3ab / c4ab / node_fold) in this module.
+/// builder for the direct C0/C1/C2/C3/C4 node fold in this module.
 fn build_and_prove_recursive_bin<W: Serialize>(
     prover: &ZkProver,
     circuit: CircuitName,

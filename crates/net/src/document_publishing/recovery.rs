@@ -360,6 +360,7 @@ mod tests {
                         signature: ArcBytes::from_bytes(&[3; 65]),
                     },
                     external: false,
+                    signature: ArcBytes::default(),
                 })
                 .to_bytes()?,
             ),

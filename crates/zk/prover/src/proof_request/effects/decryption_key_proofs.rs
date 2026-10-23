@@ -3,6 +3,7 @@
 //! Generate, correlate, sign, and publish C4 proof bundles.
 
 use super::*;
+use e3_utils::utility_types::ArcBytes;
 
 impl ProofRequestActor {
     /// Handle DecryptionShareProofsPending: dispatch C4 proof generation.
@@ -143,17 +144,24 @@ impl ProofRequestActor {
             self.signer.address()
         );
 
-        if let Err(err) = self.bus.publish(
-            DecryptionKeyShared {
-                e3_id: e3_id.clone(),
-                party_id: pending.party_id,
-                node: pending.node,
-                signed_sk_decryption_proof: signed_sk,
-                external: false,
-            },
-            pending.ec,
-        ) {
+        let event = DecryptionKeyShared {
+            e3_id: e3_id.clone(),
+            party_id: pending.party_id,
+            node: pending.node,
+            signed_sk_decryption_proof: signed_sk,
+            external: false,
+            signature: ArcBytes::default(),
+        };
+        let event = match event.sign(&self.signer) {
+            Ok(event) => event,
+            Err(err) => {
+                error!("Failed to sign decryption-key bundle: {err}");
+                return false;
+            }
+        };
+        if let Err(err) = self.bus.publish(event, pending.ec) {
             error!("Failed to publish DecryptionKeyShared: {err}");
+            return false;
         }
 
         true

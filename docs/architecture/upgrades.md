@@ -10,16 +10,22 @@ This is reference policy, not authorization to perform a release.
 ## Synchronized-decryption development boundary
 
 The unfinished synchronized-decryption branch declares protocol **9**, generation **2**, disk schema
-9, gossip wire 6, and sync wire 5. The protocol-counter change and drained fresh-deployment/history
+10, gossip wire 7, and sync wire 6. The protocol-counter change and drained fresh-deployment/history
 boundary were approved for this development branch; that is not approval to merge or deploy.
-Schema-8 stores, protocol-8 peers, old wire envelopes and deployed pre-migration verifiers are not
+Schema-8/9 stores, protocol-8 peers, old wire envelopes and deployed pre-migration verifiers are not
 compatible; there is no in-place state converter. Secure-preset artifacts, deployment sequencing and
 the final production review remain outstanding under the
 [migration status](threshold-decryption.md#synchronized-decryption-migration-status).
 
 Do not treat these guards as a rolling-upgrade path. Drain outstanding work using matching old
 software before any coordinated reset/redeployment. A rollback needs the matching old binary and
-verifier/artifact set plus a pre-upgrade store backup, not schema-9 data.
+verifier/artifact set plus a pre-upgrade store backup, not schema-10 data.
+
+The schema-9 / gossip-6 / sync-5 review commit `96db00dbf` removed complete dealer-bundle
+authentication. Its repair restores signed C2/C3 and C4 envelopes and rejects that development
+layout at the new boundaries. The user approved these source-only version reservations; old test
+stores are preserved but are not migrated in place. The separate exclusion-convergence review
+finding remains a blocker, not evidence of a production-ready protocol.
 
 The current proposal requires a fresh registry/deployment history boundary. Resetting node storage
 alone on the old registry is insufficient: confirmed old `CommitteeProofPublished` logs use the
@@ -28,7 +34,7 @@ or same-address cutover block is implemented. Local storage-layout validation do
 semantic replay or verifier compatibility.
 
 Keep the matching old binary, artifact/verifier set and a pre-upgrade backup for recovery planning.
-Do not downgrade required counters, feed schema-9 stores to old software, or reuse the new stack's
+Do not downgrade required counters, feed schema-10 stores to old software, or reuse the new stack's
 history with old readers. If a cutover has activated, rollback requires a paused/drained,
 higher-protocol-version recovery plan with matching restored behavior; it is not a return from
 protocol 9 to 8 on the same release registry. Execution and the concrete rollback runbook still

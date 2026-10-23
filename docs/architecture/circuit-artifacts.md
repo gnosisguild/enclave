@@ -128,8 +128,13 @@ mapping updates. Constructor code checks/nonzero VK anchors are mandatory. Deplo
 immutables with built artifacts. Generated verifiers must match built VKs: pre-push reads circuit
 filter paths and checked-out insecure pair (local committee/default minimum), refusing dirty
 relevant files; CI source builds compile/check the selected default pair using the same filter.
-Releases require the complete supported matrix. A wrapper name alone does not identify its accepted
-statement.
+Releases additionally run `pnpm check:verifiers --all`: all six source-current, complete archived
+pairs are required, and each committed DKG/decryption Honk verifier is regenerated for comparison
+from that pair's own EVM VK. This gate neither compiles missing artifacts nor changes active
+selectors. The synchronized-decryption branch currently fails the full-matrix gate; stale
+non-canonical verifiers are not deployable merely because the active default check passes. See the
+[release stop](../../RELEASING.md#synchronized-decryption-release-stop). A wrapper name alone does
+not identify its accepted statement, and byte comparison is not real-proof qualification.
 
 Published `@interfold/contracts` deploys do not require a checkout. Outside the monorepo,
 node-release metadata comes from `dist/node-release.json`, written by `compile:ts`, and BFV VK paths

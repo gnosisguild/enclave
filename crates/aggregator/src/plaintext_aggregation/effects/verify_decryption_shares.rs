@@ -372,19 +372,30 @@ impl ThresholdPlaintextAggregator {
         dishonest_parties: BTreeSet<u64>,
         ec: EventContext<Sequenced>,
     ) -> Result<()> {
-        let mut next = ThresholdPlaintextAggregation::retry_collection(state, dishonest_parties);
-        let ThresholdPlaintextAggregatorState::Collecting(collecting) = &next else {
-            bail!("a fresh decryption round must collect new shares");
-        };
+        // Only confirmed quorum/chain exclusions live in rejected_parties. A local failed
+        // proof must be disseminated and independently voted on, not become set authority.
         let decryptors = ThresholdPlaintextAggregation::fresh_decryptor_ids(
             &self.committee_addresses,
             &self.honest_committee_addresses,
-            &collecting.rejected_parties,
-            collecting.threshold_m,
+            &state.rejected_parties,
+            state.threshold_m,
         );
         let Ok(decryptors) = decryptors else {
             return self.fail_decryption_round(ec);
         };
+        let same_set = decryptors
+            .iter()
+            .map(|id| u64::from(*id) - 1)
+            .eq(state.shares.keys().copied());
+        if same_set {
+            let next = ThresholdPlaintextAggregation::await_confirmed_exclusion(
+                state,
+                &dishonest_parties,
+                decryptors,
+            );
+            return self.state.try_mutate(&ec, |_| Ok(next));
+        }
+        let mut next = ThresholdPlaintextAggregation::retry_collection(state, BTreeSet::new());
         if let ThresholdPlaintextAggregatorState::Collecting(collecting) = &mut next {
             collecting.expected_decryptors = decryptors.clone();
         }

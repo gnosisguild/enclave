@@ -8,7 +8,9 @@ impl AccusationVoting {
     pub(super) fn can_forward_proof(proof_type: ProofType) -> bool {
         matches!(
             proof_type,
-            ProofType::C3aSkShareEncryption | ProofType::C3bESmShareEncryption
+            ProofType::C3aSkShareEncryption
+                | ProofType::C3bESmShareEncryption
+                | ProofType::C6ThresholdShareDecryption
         )
     }
 
@@ -53,7 +55,8 @@ impl AccusationVoting {
             },
         );
 
-        // For C3a/C3b, include the signed payload so other nodes can re-verify
+        // Recipient-specific C3 and aggregator-verified C6 need the signed payload so peers
+        // without a local verification result can independently verify before voting.
         let forwarded_payload =
             Self::can_forward_proof(event.proof_type).then(|| event.signed_payload.clone());
 

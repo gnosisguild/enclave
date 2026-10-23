@@ -285,6 +285,25 @@ jobs:
         # preset/committee pairs before the archive can be created.
         run: pnpm store:circuits verify-release --source-hash "${{ steps.pull.outputs.source_hash }}"
 
+      - name: Install pinned verifier generator
+        run: |
+          BB_VERSION=$(node -p 'require("./crates/zk/prover/versions.json").required_bb_version')
+          BB_SHA256=$(node -p 'require("./crates/zk/prover/versions.json").bb_checksums["amd64-linux"]')
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 5 --retry-all-errors --connect-timeout 20 --max-time 300 --retry-max-time 600 \
+            "https://github.com/AztecProtocol/aztec-packages/releases/download/v${BB_VERSION}/barretenberg-amd64-linux.tar.gz" -o "$RUNNER_TEMP/verifier-bb.tar.gz"
+          echo "$BB_SHA256  $RUNNER_TEMP/verifier-bb.tar.gz" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/verifier-bb"
+          tar -xzf "$RUNNER_TEMP/verifier-bb.tar.gz" -C "$RUNNER_TEMP/verifier-bb"
+          BB_BIN=$(find "$RUNNER_TEMP/verifier-bb" -name bb -type f | head -n 1)
+          test -n "$BB_BIN"
+          mkdir -p "$RUNNER_TEMP/verifier-bin"
+          install -m 755 "$BB_BIN" "$RUNNER_TEMP/verifier-bin/bb"
+          echo "$RUNNER_TEMP/verifier-bin" >> "$GITHUB_PATH"
+
+      - name: Verify every committed BFV verifier route
+        # Never hydrate a pair over circuits/bin or compile missing artifacts during release.
+        run: pnpm check:verifiers --all
+
       - name: Create release archive
         id: archive
         working-directory: dist

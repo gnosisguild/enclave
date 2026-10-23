@@ -241,7 +241,8 @@ libp2p = { version = "=0.56.0", features = [
 ]}
 zeroize = "=1.9.0"
 
-# fhe.rs threshold-decryption depends on e3-safe from this repository at a pinned rev
-# (see fhe.rs v0.5.1). Redirect it to the in-repo crate so both resolve to one package.
+# New bridge for fhe.rs v0.5.1's e3-safe pin ab6b9c943b6d23eda8d0ba5f2efd9039635acfa4.
+# Unify it with the in-repo crate; re-review compatibility if either implementation changes.
+# This patch also applies to release builds. Publication/version cleanup remains separate work.
 [patch."https://github.com/theinterfold/interfold"]
 e3-safe = { path = "./crates/safe" }

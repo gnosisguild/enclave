@@ -33,6 +33,8 @@ fn authenticated_share(e3_id: &E3id, party: u64) -> ThresholdShareCreated {
         share: Arc::new((*peer_share(e3_id, party).share).clone()),
         ..peer_share(e3_id, party)
     }
+    .sign(&dealer_signer(party))
+    .unwrap()
 }
 
 struct AdmissionHarness {
@@ -334,17 +336,29 @@ impl AdmissionHarness {
 
 #[actix::test]
 async fn forged_threshold_share_cannot_reserve_dealer_slot() -> Result<()> {
-    for forgery in ["recipient"] {
+    for forgery in [
+        "no signature",
+        "wrong dealer",
+        "no proofs",
+        "proof bytes",
+        "share bytes",
+        "recipient",
+    ] {
         let (h, actor) = AdmissionHarness::new(false).await?;
         let genuine = authenticated_share(&h.e3_id, 1);
         let mut forged = genuine.clone();
         match forgery {
+            "no signature" => forged.signature = ArcBytes::default(),
+            "wrong dealer" => forged = forged.sign(&dealer_signer(2))?,
             "no proofs" => {
                 forged.signed_c2a_proof = None;
                 forged.signed_c3a_proofs.clear();
             }
             "proof bytes" => {
                 forged.signed_c3a_proofs[0].payload.proof.data = ArcBytes::from_bytes(&[9])
+            }
+            "share bytes" => {
+                Arc::make_mut(&mut forged.share).pk_share = ArcBytes::from_bytes(&[9]);
             }
             "recipient" => {
                 forged.target_party_id = 2;
@@ -378,7 +392,13 @@ async fn forged_threshold_share_cannot_reserve_dealer_slot() -> Result<()> {
 
 #[actix::test]
 async fn forged_c4_share_cannot_reserve_dealer_slot() -> Result<()> {
-    for forgery in ["node"] {
+    for forgery in [
+        "no signature",
+        "wrong dealer",
+        "no proofs",
+        "proof bytes",
+        "node",
+    ] {
         let (h, mut actor) = AdmissionHarness::new(false).await?;
         actor.state.try_mutate_without_context(|mut state| {
             state.state = KeyshareState::ReadyForDecryption(ready_for_c4_test());
@@ -391,6 +411,8 @@ async fn forged_c4_share_cannot_reserve_dealer_slot() -> Result<()> {
         };
         let mut forged = genuine.clone();
         match forgery {
+            "no signature" => forged.signature = ArcBytes::default(),
+            "wrong dealer" => forged = forged.sign(&dealer_signer(2))?,
             "no proofs" => forged.signed_sk_decryption_proof.signature = ArcBytes::from_bytes(&[]),
             "proof bytes" => {
                 forged.signed_sk_decryption_proof.payload.proof.data = ArcBytes::from_bytes(&[9])
@@ -507,7 +529,7 @@ async fn restarted_micro_batch_survives_its_original_deadline() -> Result<()> {
             let mut event = authenticated_share(&h.e3_id, party);
             let payload = Arc::make_mut(&mut event.share);
             payload.sk_sss = encrypted.clone();
-            Ok(event)
+            event.sign(&dealer_signer(party))
         };
         let deadline = crate::domain::timeout_policy::now_unix_secs() + 12;
         actor.state.try_mutate_without_context(|mut state| {
@@ -619,17 +641,21 @@ async fn restarted_micro_batch_survives_its_original_deadline() -> Result<()> {
             .await?;
             h.history.send(ResetHistory).await?;
             for party in [1, 2, 3, 5] {
-                h.bus.publish_without_context(DecryptionKeyShared {
-                    e3_id: h.e3_id.clone(),
-                    party_id: party,
-                    node: dealer_signer(party).address().to_string(),
-                    signed_sk_decryption_proof: signed_proof(
-                        &h.e3_id,
-                        party,
-                        ProofType::C4aSkShareDecryption,
-                    ),
-                    external: true,
-                })?;
+                h.bus.publish_without_context(
+                    DecryptionKeyShared {
+                        e3_id: h.e3_id.clone(),
+                        party_id: party,
+                        node: dealer_signer(party).address().to_string(),
+                        signed_sk_decryption_proof: signed_proof(
+                            &h.e3_id,
+                            party,
+                            ProofType::C4aSkShareDecryption,
+                        ),
+                        external: true,
+                        signature: ArcBytes::default(),
+                    }
+                    .sign(&dealer_signer(party))?,
+                )?;
             }
             h.verify_collected_shares(&[1, 2, 3, 5]).await?;
             wait_for_record(&h.state, |state| state.keyshare_published).await?;

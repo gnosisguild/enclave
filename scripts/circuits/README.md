@@ -247,6 +247,15 @@ For non-canonical pairs, pass `--preset <name> --committee <name>`; the verifier
 `--check` compares that pair with its committed files. CI source builds compile/check the selected
 default pair; releases require the complete supported matrix.
 
+For a release/deployment preflight, `pnpm check:verifiers --all` checks both wrapper verifiers for
+every release-required pair directly against `dist/circuits/<preset>/<committee>/evm/`. It first
+requires source-current build stamps and the complete required artifact inventory for every pair. It
+never hydrates a pair into `circuits/bin`, compiles missing circuits/keys, or rewrites committed
+verifiers. Missing/stale pairs and drift fail closed; the active-pair check is not a substitute.
+Release CI installs the checksum-pinned bb generator and runs this gate before archiving circuits.
+For one archived pair, use `--from-dist --preset <preset> --committee <committee>` with
+`check:verifiers`. These comparisons do not qualify real proofs or authorize deployment.
+
 The script has two modes:
 
 - **`--check` (used by test and CI flows)** — regenerate in memory and diff against the committed
@@ -262,6 +271,12 @@ The script has two modes:
 ```bash
 # Verify committed verifiers match current circuit VKs (CI/tests use this)
 pnpm generate:verifiers --check
+
+# Release gate: all committed routes, each checked against its source-current archived EVM keys
+pnpm check:verifiers --all
+
+# Check one archived pair without changing the active preset/committee
+pnpm check:verifiers --from-dist --preset insecure-64 --committee minimum
 
 # Regenerate (default; equivalent to --write)
 pnpm generate:verifiers

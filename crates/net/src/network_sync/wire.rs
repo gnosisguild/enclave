@@ -315,20 +315,20 @@ mod tests {
     use e3_config::NetworkProfile;
     use e3_events::AggregateId;
 
-    // The locked wire bytes for gossip wire 6 and sync wire 5.
+    // The locked wire bytes for gossip wire 7 and sync wire 6.
     const GOSSIP_LEN: usize = 390;
-    const GOSSIP_DIGEST: &str = "58e1c8b3e268657b73e9782890b95309ea9725d30fa66b041884b1c16fc2ecfc";
+    const GOSSIP_DIGEST: &str = "6e91ec19393af9c6cf90a75bb1b4e76fe37fa6a29fc507d0457df1aa06848740";
     const FETCH_LEN: usize = 82;
-    const FETCH_DIGEST: &str = "3f79eeac430a9527c4703230064fa10039bd2ceb0f36f9d29782272f473840e0";
+    const FETCH_DIGEST: &str = "f9e25acfde72a00af1e9d6b6f244bb6d691d0c083b55188fdf190965023ca23b";
     const BATCH_LEN: usize = 314;
-    const BATCH_DIGEST: &str = "791aaea600f1eb91345539f6fd84d3e2c8843325faa2597900f5891c131a4aaa";
+    const BATCH_DIGEST: &str = "2a493ec5fbda77f2d6f5dbccd85b77096d248b6358508726db173fda9902021e";
     const REQUEST_FRAME: (usize, &str) = (
         119,
-        "57a0b91cc5cdd47396a8e13ad9fdf9a74b19605cc563b6d22478de678d16c9d7",
+        "cc5603bce3d6eb6a12e1f6ad28a25102c0c040033df602529cc675144523927c",
     );
     const OK_FRAME: (usize, &str) = (
         88,
-        "354224a89f8673e5112fd6c97c2084a40bbdffd2106a844352ada0be92800036",
+        "fd3dc5932b5a3068d9f2d04b4ccb513a658392bb2bfc366e525ca9480096de51",
     );
     const BAD_REQUEST_FRAME: (usize, &str) = (
         24,
@@ -436,20 +436,24 @@ mod tests {
     }
 
     #[test]
-    fn pre_synchronization_wire_majors_are_rejected_before_payload_decode() {
+    fn older_branch_wire_majors_are_rejected_before_payload_decode() {
         let policy = NetworkPolicy::local_unrestricted();
-        let mut gossip = encode_gossip(&forwardable_gossip(), &policy, None).unwrap();
-        gossip[4..6].copy_from_slice(&5u16.to_le_bytes());
-        assert!(decode_gossip(&gossip, &policy, Utc::now())
-            .unwrap_err()
-            .to_string()
-            .contains("unsupported gossip schema"));
-        let mut sync = encode_sync(SyncMessageKind::FetchEvents, &7u64).unwrap();
-        sync[4..6].copy_from_slice(&4u16.to_le_bytes());
-        assert!(decode_sync::<u64>(&sync, SyncMessageKind::FetchEvents)
-            .unwrap_err()
-            .to_string()
-            .contains("unsupported sync schema"));
+        for version in [5u16, 6] {
+            let mut gossip = encode_gossip(&forwardable_gossip(), &policy, None).unwrap();
+            gossip[4..6].copy_from_slice(&version.to_le_bytes());
+            assert!(decode_gossip(&gossip, &policy, Utc::now())
+                .unwrap_err()
+                .to_string()
+                .contains("unsupported gossip schema"));
+        }
+        for version in [4u16, 5] {
+            let mut sync = encode_sync(SyncMessageKind::FetchEvents, &7u64).unwrap();
+            sync[4..6].copy_from_slice(&version.to_le_bytes());
+            assert!(decode_sync::<u64>(&sync, SyncMessageKind::FetchEvents)
+                .unwrap_err()
+                .to_string()
+                .contains("unsupported sync schema"));
+        }
     }
 
     #[test]

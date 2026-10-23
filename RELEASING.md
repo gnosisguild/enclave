@@ -21,6 +21,23 @@ protected history and builds/publications; it does not rerun the full test suite
 approval from ancestry. The job named “Approve Release Artifacts” is an automated dependency gate,
 not a manual approval step. Do not treat a successful build as cryptographic verification.
 
+### Synchronized-decryption release stop
+
+The protocol-9 synchronized-decryption review branch is not qualified for deployment or release.
+Before either, regenerate **both** committed Honk verifiers for every supported
+insecure-64/secure-8192 × minimum/micro/small pair from source-matched complete artifacts, then run:
+
+```sh
+pnpm check:verifiers --all
+```
+
+This checks each pair's own archived EVM keys, not merely the active default pair, and fails on
+missing/stale artifacts or committed-verifier drift without compiling or changing active selectors.
+Release CI runs the same check before archiving circuits or permitting publication. A passing
+comparison is still not proof qualification: require real DKG/recursive/Solidity acceptance for the
+full matrix, the obsolete C2ab/C3ab/C4ab fold disposition, and the human protocol review. Until
+those gates pass, do not use the stale non-canonical committed verifiers through deployment scripts.
+
 ## Prepare a reviewable release branch
 
 Use a clean release branch based on the intended main history. Preview without changes:
@@ -86,7 +103,8 @@ by [scripts/release/](scripts/release/). It serializes release promotions and:
 
 1. Validates candidate ancestry and all shared version values.
 2. Pulls the newest source-matching circuit artifact revision, not an unrelated branch-tip build.
-   `verify-release` requires all six supported pairs, build stamps, and checked manifests.
+   `verify-release` requires all six supported pairs, build stamps, and checked manifests;
+   `check:verifiers --all` then compares every committed wrapper against those pairs' EVM keys.
 3. Packages circuits once and hashes the **exact archive bytes** before compiling binaries and the
    ciphernode image. `E3_CIRCUITS_ARCHIVE_SHA256` binds that archive to the binary's release
    version; binary/image `interfold noir status` checks must match. Do not repack it afterward.

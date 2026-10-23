@@ -25,7 +25,7 @@ pub(super) enum Rejection {
     SelfAccusation,
     /// The input comes from this node, which holds its own accusations and votes already.
     Own,
-    /// A forwarded payload with a proof type that has none: only C3 proofs are per recipient.
+    /// A forwarded payload not used for recipient-specific C3 or aggregator-verified C6.
     UnforwardableProof,
     /// A local failure without the claimed committee member's signature over its payload.
     UnsignedFailure,
@@ -169,7 +169,7 @@ impl AccusationVoting {
     }
 
     /// A peer's accusation. Its signature binds the addresses, not `accused_party_id`, so the
-    /// self-accusation check compares addresses. Only C3 proofs can be forwarded with it.
+    /// self-accusation check compares addresses. C3/C6 proofs can be forwarded for verification.
     pub(super) fn admit_accusation(
         &self,
         accusation: ProofFailureAccusation,

@@ -375,6 +375,18 @@ test('release workflow isolates test-only features and checks each compiled arch
   }
 })
 
+test('release rejects a workflow that only checks the active BFV verifier pair', () => {
+  const root = temporaryDirectory('interfold-release-verifier-matrix')
+  mkdirSync(join(root, '.github/workflows'), { recursive: true })
+  copyFileSync(join(ROOT_DIR, 'package.json'), join(root, 'package.json'))
+  const workflow = parse(readFileSync(join(ROOT_DIR, '.github/workflows/releases.yml'), 'utf8'))
+  for (const step of workflow.jobs['download-circuits'].steps) {
+    if (step.run === 'pnpm check:verifiers --all') step.run = 'pnpm check:verifiers'
+  }
+  writeFileSync(join(root, '.github/workflows/releases.yml'), stringify(workflow))
+  assert.throws(() => checkReleaseSafeguards(root), /must execute pnpm check:verifiers --all/)
+})
+
 test('publication gate fails on every missing, failed, cancelled or skipped required publisher', () => {
   const common = {
     CIPHERNODE_RESULT: 'success',
