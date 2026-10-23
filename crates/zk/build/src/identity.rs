@@ -372,11 +372,18 @@ pub fn source_hash_with_updates(
                 .with_context(|| format!("Read required source file {path}"))?,
         };
         if path == "circuits/lib/src/configs/default/mod.nr" {
-            source = Regex::new(r"preset: (insecure|secure[-_]8192|secure[-_]16384)\b")?
-                .replace_all(&source, "preset: <selected>")
-                .into_owned();
-            source = Regex::new(r"super::(insecure|secure_8192|secure_16384)::")?
+            source = Regex::new(
+                r"preset: (insecure[-_]simd|insecure|secure[-_]8192|secure[-_]16384)\b",
+            )?
+            .replace_all(&source, "preset: <selected>")
+            .into_owned();
+            source = Regex::new(r"super::(insecure_simd|insecure|secure_8192|secure_16384)::")?
                 .replace_all(&source, "super::<selected>::")
+                .into_owned();
+            // The width is the selected preset's `max_msg_non_zero_coeffs`, which the hashed
+            // `crates/fhe-params/src` already carries; the selector copy must not vary the hash.
+            source = Regex::new(r"(pub global MAX_MSG_NON_ZERO_COEFFS: u32 = )\d+;")?
+                .replace_all(&source, "${1}<selected>;")
                 .into_owned();
         }
         if path == "Cargo.lock" {

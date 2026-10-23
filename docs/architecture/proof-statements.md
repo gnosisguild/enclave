@@ -182,10 +182,14 @@ because its key comes from C0. The missing constraint was established by source 
 negative test, not an end-to-end threshold bypass demonstration.
 
 Before BFV verification, wrappers require canonical BN254 field encodings; message coefficients must
-also fit 64 bits. The output width is exactly 50 u64 coefficients across Noir
-`MAX_MSG_NON_ZERO_COEFFS`, `e3-zk-config`, and Solidity `MESSAGE_COEFFS_COUNT`. The builder emits
-the Noir value from the Rust constant; its shared-material test compares rendered Noir/Solidity
-widths with that constant. C6/C7 preparation uses the same native ascending prefix selected by
+also fit 64 bits. The output width is exactly `BfvPreset::max_msg_non_zero_coeffs()` u64
+coefficients: 128 for `InsecureThresholdSimd` and 50 for every other preset. The width appears in
+Noir `MAX_MSG_NON_ZERO_COEFFS`, in `e3-zk-config`, and in the `messageCoeffsCount` constructor
+argument of the Solidity `BfvDecryptionVerifier` for the preset's parameter set. The builder emits
+the Noir value and the `*_MESSAGE_COEFFS_COUNT` constants in
+`packages/interfold-contracts/scripts/utils.ts`, which the deployment scripts pass to that
+constructor, from the Rust accessor. Its shared-material test compares the rendered Noir width of
+every preset with that accessor. C6/C7 preparation uses the same native ascending prefix selected by
 `config.max_msg_non_zero_coeffs`; a nondefault host width requires matching ABIs and consumers.
 Canonical field checks do not prove parameter-specific plaintext-modulus bounds because the wrapper
 does not store t.

@@ -440,7 +440,8 @@ The smudging noise $e_{sm}$ hides the secret key share. C6 first checks that $sk
 the C4 commitments. It binds the witness ciphertext to `ct_commitment` and checks the relation at a
 Fiat-Shamir challenge point. Its public inputs are `expected_sk_commitment`,
 `expected_e_sm_commitment`, `ct_commitment`, `domain_hi`, and `domain_lo`. Its output is
-`d_commitment`, a commitment to the first 50 coefficients of $d$ for each modulus.
+`d_commitment`, a commitment to the first $M$ coefficients of $d$ for each modulus. $M$ is 50, or
+128 for the SIMD preset.
 
 The decryption domain binds each C6 proof to one E3:
 
@@ -705,7 +706,8 @@ strictly increasing, and at most N. The wrapper then checks:
 - Every public input is a canonical BN254 field element, and each plaintext coefficient fits in 64
   bits.
 - The VK hashes, the committee hash limbs, the domain limbs, and the stored ciphertext commitment.
-- `keccak256` of the 50 coefficients, each as 8 little-endian bytes, equals the plaintext hash.
+- `keccak256` of the $M$ coefficients (50, or 128 for the SIMD preset), each as 8 little-endian
+  bytes, equals the plaintext hash.
 - For each party, `party_id - 1` is in the DKG anchors, and the proof commitments equal the stored
   `dkgSkAggCommits` and `dkgEsmAggCommits`.
 

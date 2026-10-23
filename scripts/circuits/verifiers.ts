@@ -99,7 +99,7 @@ function onChainVerifierCircuits(preset: CircuitPreset, committee: CircuitCommit
   if (!isPresetCommitteeSupported(preset, committee)) {
     throw new Error(`Unsupported preset/committee pair (${preset}, ${committee})`)
   }
-  return preset === CIRCUIT_PRESETS.INSECURE || preset === CIRCUIT_PRESETS.SECURE_16384
+  return preset === CIRCUIT_PRESETS.INSECURE || preset === CIRCUIT_PRESETS.INSECURE_SIMD || preset === CIRCUIT_PRESETS.SECURE_16384
     ? [...BASE_ON_CHAIN_VERIFIER_CIRCUITS, 'dkg_aggregator_v2']
     : [...BASE_ON_CHAIN_VERIFIER_CIRCUITS]
 }
@@ -873,7 +873,7 @@ async function main() {
     } else if (arg === '--preset') {
       const value = args[++i]
       if (!value || value.startsWith('--')) {
-        console.error('Error: --preset requires a value (insecure | secure-8192 | secure-16384)')
+        console.error('Error: --preset requires a value (insecure | insecure-simd | secure-8192 | secure-16384)')
         process.exit(1)
       }
       if (!ALL_PRESETS.includes(value as (typeof ALL_PRESETS)[number])) {
@@ -995,7 +995,7 @@ Options:
                          exact generated-contract inventory. Reads artifacts directly from dist.
   --on-chain             Generate the on-chain verifier circuits for one supported pair.
   --prune-unsupported    Remove generated directories for unsupported pairs, then exit.
-  --preset <name>        BFV preset for circuits/bin (insecure | secure-8192 | secure-16384).
+  --preset <name>        BFV preset for circuits/bin (insecure | insecure-simd | secure-8192 | secure-16384).
                          Selecting a preset processes one pair. Check mode compares the committed
                          verifier for that pair.
   --committee <name>     Committee size (minimum | micro | small). In one-pair mode, an omitted

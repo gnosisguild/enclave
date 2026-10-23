@@ -24,8 +24,9 @@ use std::{
 
 const COMMITTEES: &[&str] = &["minimum", "micro", "small"];
 // The two insecure protocol labels intentionally share one artifact and Noir module identity.
-const ARTIFACT_PRESETS: [BfvPreset; 3] = [
+const ARTIFACT_PRESETS: [BfvPreset; 4] = [
     BfvPreset::InsecureThreshold,
+    BfvPreset::InsecureThresholdSimd,
     BfvPreset::SecureThreshold8192,
     BfvPreset::SecureThreshold16384,
 ];
@@ -342,6 +343,7 @@ fn preset(value: &str) -> Result<BfvPreset> {
     match value {
         "insecure" => Ok(BfvPreset::InsecureThreshold),
         "insecure-lbfv" => Ok(BfvPreset::InsecureThresholdLbfv),
+        "insecure-simd" => Ok(BfvPreset::InsecureThresholdSimd),
         "secure-8192" => Ok(BfvPreset::SecureThreshold8192),
         "secure-16384" => Ok(BfvPreset::SecureThreshold16384),
         _ => bail!("Select one supported preset, not {value}"),
@@ -350,6 +352,7 @@ fn preset(value: &str) -> Result<BfvPreset> {
 fn tier(preset: BfvPreset) -> &'static str {
     match preset {
         BfvPreset::InsecureThreshold | BfvPreset::InsecureThresholdLbfv => "insecure",
+        BfvPreset::InsecureThresholdSimd => "insecure_simd",
         BfvPreset::SecureThreshold8192 => "secure_8192",
         BfvPreset::SecureThreshold16384 => "secure_16384",
         _ => unreachable!("build selects threshold presets"),
@@ -358,6 +361,7 @@ fn tier(preset: BfvPreset) -> &'static str {
 fn preset_name(preset: BfvPreset) -> &'static str {
     match preset {
         BfvPreset::InsecureThreshold | BfvPreset::InsecureThresholdLbfv => "insecure",
+        BfvPreset::InsecureThresholdSimd => "insecure-simd",
         BfvPreset::SecureThreshold8192 => "secure-8192",
         BfvPreset::SecureThreshold16384 => "secure-16384",
         _ => unreachable!("build selects threshold presets"),

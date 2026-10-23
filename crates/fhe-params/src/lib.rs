@@ -12,6 +12,7 @@ pub mod crp;
 #[cfg(feature = "abi-encoding")]
 pub mod encoding;
 pub mod lbfv;
+pub mod output_cap;
 pub mod presets;
 pub mod search;
 pub mod smudging;

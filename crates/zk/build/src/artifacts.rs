@@ -465,7 +465,8 @@ pub fn refresh_anchors(root: &Path, pair: &Path, complete: bool) -> Result<()> {
         let decryption_only = pair
             .parent()
             .and_then(Path::file_name)
-            .is_some_and(|name| name == "secure-16384");
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| !super::policy::has_trbfv(name));
         let hashes = if decryption_only {
             vec![("c6_fold", vk_tree::decryption_hash(pair)?)]
         } else {

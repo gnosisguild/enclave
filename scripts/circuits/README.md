@@ -105,8 +105,10 @@ the generator would produce.
 ### Options
 
 - `--preset <name>` - Parameter preset: `insecure` (degree 128, default), `insecure-lbfv` (the same
-  artifact archive), `secure-8192`, `secure-16384`, or `all`. Secure-16384 supports minimum, micro,
-  and small; its build excludes trBFV-only circuits.
+  artifact archive), `insecure-simd`, `secure-8192`, `secure-16384`, or `all`. Secure-16384 supports
+  minimum, micro, and small; its build excludes trBFV-only circuits. Insecure-simd (degree 128,
+  plaintext modulus 257) supports minimum and micro only, and its build excludes trBFV-only
+  circuits.
 - `--committee <name>` - Committee size: `minimum` (default), `micro`, `small`
 - `--skip-utils-patch` - Skip rewriting committee values and BFV configuration hashes in
   `packages/interfold-contracts/scripts/utils.ts`
@@ -226,6 +228,7 @@ The release archive must include:
 - `insecure/{minimum,micro,small}` for Sepolia and local rehearsals
 - `secure-8192/{minimum,micro,small}` for Sepolia secure-parameter tests and mainnet committees
 - `secure-16384/{minimum,micro,small}` for the l-BFV V2 configurations
+- `insecure-simd/{minimum,micro}` for the l-BFV SIMD configurations
 
 Nodes download one archive and select the artifact directory from the E3's on-chain BFV parameter
 set and committee size.

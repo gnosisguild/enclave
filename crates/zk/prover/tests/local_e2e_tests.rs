@@ -1204,5 +1204,3 @@ async fn test_decrypted_shares_aggregation_commitment_consistency() {
 
     prover.cleanup(e3_id).unwrap();
 }
-
-use e3_zk_config::MAX_MSG_NON_ZERO_COEFFS;

@@ -34,6 +34,31 @@ pub mod insecure {
     }
 }
 
+/// Insecure SIMD preset constants (degree 128, t = 257) - DO NOT USE IN PRODUCTION
+///
+/// `PLAINTEXT_MODULUS` is prime and 1 mod 2N, so the plaintext ring splits into N SIMD slots.
+/// The ciphertext moduli and the error variance equal the insecure ones, and so do the DKG
+/// parameters (re-exported). `scripts/check-committee.sh` reads the literals below, so they stay
+/// spelled out.
+pub mod insecure_simd {
+    pub use super::insecure::dkg;
+
+    pub const DEGREE: usize = 128;
+    /// Largest committee that satisfies the depth-3 noise bound at this plaintext modulus.
+    pub const NUM_PARTIES: u128 = 9;
+
+    /// Threshold BFV parameters
+    pub mod threshold {
+        pub const PLAINTEXT_MODULUS: u64 = 257;
+        pub const MODULI: &[u64] = &[
+            0x00ff_ffff_ffff_c601,
+            0x00ff_ffff_ffff_c301,
+            0x00ff_ffff_ffff_a501,
+        ];
+        pub const ERROR1_VARIANCE: &str = "50471587840";
+    }
+}
+
 /// Secure preset constants (degree 8192) - PRODUCTION READY
 pub mod secure_8192 {
     pub const DEGREE: usize = 8192;
@@ -104,6 +129,17 @@ pub mod insecure_search_defaults {
     pub const B_CHI: u128 = 1;
     pub const SEARCH_N: u128 = 19;
     pub const SEARCH_K: u128 = 100;
+    pub const SEARCH_Z: u128 = 3;
+}
+
+/// Search defaults for the insecure SIMD preset (test-only, small scale).
+/// `SEARCH_N` is the largest committee the depth-3 noise bound admits; the runtime uses the
+/// real committee size.
+pub mod insecure_simd_search_defaults {
+    pub const B: u128 = 20;
+    pub const B_CHI: u128 = 1;
+    pub const SEARCH_N: u128 = 9;
+    pub const SEARCH_K: u128 = 257;
     pub const SEARCH_Z: u128 = 3;
 }
 

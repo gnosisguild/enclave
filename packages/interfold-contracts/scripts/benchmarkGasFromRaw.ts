@@ -17,6 +17,7 @@ import {
   bfvDecDomainIndices,
   bfvDecPartyColOffsets,
   bfvDkgCommitteeHashIndices,
+  bfvMessageCoeffsCount,
   bfvPkV2PublicInputLayout,
   committeeHashFromLimbs,
   getBfvDecryptionSubCircuitVkHashPaths,
@@ -337,8 +338,8 @@ function hexToBytes32Array(hex: string): string[] {
 function plaintextHashFromPublicInputs(
   publicInputs: string[],
   ethersLib: any,
+  messageCoeffsCount: number,
 ): string {
-  const messageCoeffsCount = 50;
   if (publicInputs.length < messageCoeffsCount) {
     throw new Error(`Not enough public inputs: ${publicInputs.length}`);
   }
@@ -655,6 +656,7 @@ async function main() {
     expectedC6FoldKeyHash,
     expectedC7KeyHash,
     benchmarkConfig.t,
+    bfvMessageCoeffsCount(benchmarkConfig.paramSet),
   );
   await bfvDec.waitForDeployment();
 
@@ -680,7 +682,11 @@ async function main() {
     ["bytes", "bytes32[]"],
     [decProofHex, decPublicInputs],
   );
-  const plaintextHash = plaintextHashFromPublicInputs(decPublicInputs, ethers);
+  const plaintextHash = plaintextHashFromPublicInputs(
+    decPublicInputs,
+    ethers,
+    bfvMessageCoeffsCount(benchmarkConfig.paramSet),
+  );
   requirePublicInputLen(
     "decryption_aggregator committee_hash",
     decPublicInputs,

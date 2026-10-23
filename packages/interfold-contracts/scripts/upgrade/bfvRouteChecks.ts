@@ -6,6 +6,7 @@ import {
   activeBfvConfigForChain,
   bfvConfigsForChain,
   bfvDecExpectedPublicInputsLen,
+  bfvMessageCoeffsCount,
   bfvPkExpectedPublicInputsLen,
   bfvPkV2PublicInputLayout,
   getBfvDecryptionSubCircuitVkHashPaths,
@@ -113,8 +114,10 @@ export async function validateBfvRoutes(
 
     const pkRoute = await pkRouter.routeAt(index);
     const decryptionRoute = await decryptionRouter.routeAt(index);
-    // Secure-16384 runs the l-BFV path, which the V2 PK verifier and aggregator serve.
-    const isV2 = expected.preset === "secure-16384";
+    // The secure-16384 and insecure-simd presets run only the l-BFV path, which the V2 PK
+    // verifier and aggregator serve.
+    const isV2 =
+      expected.preset === "secure-16384" || expected.preset === "insecure-simd";
     const expectedPkVerifier = isV2
       ? recorded.pkVerifierV2
       : recorded.pkVerifier;
@@ -129,9 +132,12 @@ export async function validateBfvRoutes(
     );
     equalValue(
       pkRoute[1],
-      // secure-16384 compiles five l-BFV rows.
+      // secure-16384 compiles five l-BFV rows; insecure-simd compiles three.
       isV2
-        ? bfvPkV2PublicInputLayout(expected.h, 5).length
+        ? bfvPkV2PublicInputLayout(
+            expected.h,
+            expected.preset === "secure-16384" ? 5 : 3,
+          ).length
         : bfvPkExpectedPublicInputsLen(expected.h),
       `PK route ${index} public input count`,
     );
@@ -142,7 +148,10 @@ export async function validateBfvRoutes(
     );
     equalValue(
       decryptionRoute[1],
-      bfvDecExpectedPublicInputsLen(expected.t),
+      bfvDecExpectedPublicInputsLen(
+        expected.t,
+        bfvMessageCoeffsCount(expected.paramSet),
+      ),
       `decryption route ${index} public input count`,
     );
 

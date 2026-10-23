@@ -20,6 +20,14 @@ export const BFV_PARAMS = {
     moduli: [0x00ffffffffffc601n, 0x00ffffffffffc301n, 0x00ffffffffffa501n],
     error1Variance: "50471587840",
   },
+  // The insecure ciphertext moduli with a SIMD plaintext modulus (prime, 1 mod 2N): on-chain
+  // parameter set 5.
+  insecureSimd: {
+    degree: 128n,
+    plaintextModulus: 257n,
+    moduli: [0x00ffffffffffc601n, 0x00ffffffffffc301n, 0x00ffffffffffa501n],
+    error1Variance: "50471587840",
+  },
   secure8192: {
     degree: 8192n,
     plaintextModulus: 17000000n,
@@ -39,3 +47,25 @@ export const BFV_PARAMS = {
     error1Variance: "264093875047547791978479834453333",
   },
 } as const;
+
+/**
+ * The BFV parameters registered under an on-chain parameter set. Sets 0 and 4 share the insecure
+ * parameters; 4 runs the l-BFV path.
+ */
+export function bfvParamsForParamSet(
+  paramSet: number,
+): (typeof BFV_PARAMS)[keyof typeof BFV_PARAMS] {
+  switch (paramSet) {
+    case 0:
+    case 4:
+      return BFV_PARAMS.insecure;
+    case 2:
+      return BFV_PARAMS.secure8192;
+    case 3:
+      return BFV_PARAMS.secure16384;
+    case 5:
+      return BFV_PARAMS.insecureSimd;
+    default:
+      throw new Error(`Unsupported BFV parameter set: ${paramSet}`);
+  }
+}

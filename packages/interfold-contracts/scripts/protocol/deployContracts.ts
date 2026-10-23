@@ -5,6 +5,7 @@ import {
   activeBfvConfigForChain,
   bfvConfigsForChain,
   bfvHonkSource,
+  bfvMessageCoeffsCount,
   getBfvDecryptionSubCircuitVkHashPaths,
   getBfvPkSubCircuitVkHashPaths,
   getBfvPkVkBindingHashPaths,
@@ -525,6 +526,7 @@ async function deployBfvVerifierRoute(
     readVkRecursiveHash(decryptionPaths.c6Fold, config),
     readVkRecursiveHash(decryptionPaths.c7, config),
     config.t,
+    bfvMessageCoeffsCount(config.paramSet),
   );
   await decryption.waitForDeployment();
   const decryptionVerifier = await deployedAddress(decryption);

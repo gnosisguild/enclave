@@ -221,6 +221,10 @@ mod tests {
                 4,
                 "0x968e91054be28b2b577ac278284e03274ed46bd5c5064e573290312a2323d495",
             ),
+            (
+                5,
+                "0x843cc091bc39d046eded5e9f0aed8250848b46f7e36623433d31a1f5d7ef5e35",
+            ),
         ] {
             let preset = BfvPreset::from_on_chain_param_set(param_set).unwrap();
             let params = encode_bfv_params(&BfvParamSet::from(preset).build_arc());

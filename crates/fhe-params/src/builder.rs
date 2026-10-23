@@ -4,7 +4,7 @@
 // without even the implied warranty of MERCHANTABILITY
 // or FITNESS FOR A PARTICULAR PURPOSE.
 
-use crate::constants::{insecure, secure_16384, secure_8192};
+use crate::constants::{insecure, insecure_simd, secure_16384, secure_8192};
 use crate::presets::{BfvParamSet, BfvPreset, PresetError};
 use fhe::bfv::{BfvParameters, BfvParametersBuilder};
 use std::sync::Arc;
@@ -28,6 +28,26 @@ pub fn build_pair_for_preset(
                 .set_plaintext_modulus(insecure::dkg::PLAINTEXT_MODULUS)
                 .set_moduli(insecure::dkg::MODULI)
                 .set_variance(insecure::dkg::VARIANCE as usize)
+                .build_arc()
+                .unwrap();
+
+            Ok((params_threshold, params_dkg))
+        }
+        BfvPreset::InsecureThresholdSimd => {
+            let params_threshold = BfvParametersBuilder::new()
+                .set_degree(insecure_simd::DEGREE)
+                .set_plaintext_modulus(insecure_simd::threshold::PLAINTEXT_MODULUS)
+                .set_moduli(insecure_simd::threshold::MODULI)
+                .set_error1_variance_str(insecure_simd::threshold::ERROR1_VARIANCE)
+                .unwrap()
+                .build_arc()
+                .unwrap();
+
+            let params_dkg = BfvParametersBuilder::new()
+                .set_degree(insecure_simd::DEGREE)
+                .set_plaintext_modulus(insecure_simd::dkg::PLAINTEXT_MODULUS)
+                .set_moduli(insecure_simd::dkg::MODULI)
+                .set_variance(insecure_simd::dkg::VARIANCE as usize)
                 .build_arc()
                 .unwrap();
 
@@ -351,5 +371,39 @@ mod tests {
             .expect("2*(B_C + n*B_sm) < Delta must hold at the configured depth");
         let bound = generator.smudging_bound();
         assert!(!bound.is_zero());
+    }
+
+    /// The insecure SIMD preset (t = 257) satisfies the depth-3 noise budget for the Minimum
+    /// (n=3) and Micro (n=9) committees only. At the Small committee (n=19) the budget fails,
+    /// which is why that committee is refused for this preset.
+    #[test]
+    fn test_insecure_simd_smudging_bound_feasibility_by_committee() {
+        use fhe::trbfv::{SmudgingConfig, SmudgingNoiseGenerator};
+
+        let preset = BfvPreset::InsecureThresholdSimd;
+        let params = build_bfv_params_from_set_arc(BfvParamSet::from(preset));
+        let defaults = preset.search_defaults().unwrap();
+        assert_eq!(defaults.mult_depth, 3);
+
+        let generator_for = |n: usize| {
+            let mut config = SmudgingConfig::new(
+                params.clone(),
+                n,
+                defaults.z as usize,
+                defaults.lambda as usize,
+            )?;
+            config.mult_depth = defaults.mult_depth;
+            SmudgingNoiseGenerator::new(config)
+        };
+
+        assert!(
+            generator_for(3).is_ok(),
+            "Minimum committee must be feasible"
+        );
+        assert!(generator_for(9).is_ok(), "Micro committee must be feasible");
+        assert!(
+            generator_for(19).is_err(),
+            "Small committee must exceed the noise budget at t=257"
+        );
     }
 }

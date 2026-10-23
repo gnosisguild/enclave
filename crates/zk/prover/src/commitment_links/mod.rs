@@ -77,7 +77,9 @@ pub fn default_links(preset: BfvPreset) -> Vec<Box<dyn CommitmentLink>> {
             source_prefix_fields: c2_prefix_fields,
             source_suffix_fields: c2_suffix_fields,
         }),
-        Box::new(c6_to_c7::C6ToC7DCommitmentLink),
+        Box::new(c6_to_c7::C6ToC7DCommitmentLink {
+            max_msg_non_zero_coeffs: preset.max_msg_non_zero_coeffs(),
+        }),
         Box::new(c4a_to_c6::C4aToC6SkCommitmentLink),
         Box::new(c4b_to_c6::C4bToC6ESmCommitmentLink),
     ];

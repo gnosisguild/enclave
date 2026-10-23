@@ -28,7 +28,6 @@ use e3_committee::CiphernodesCommitteeSize;
 use e3_events::{CircuitName, Proof};
 use e3_fhe_params::BfvPreset;
 use e3_zk_config::DkgInputType;
-use e3_zk_config::MAX_MSG_NON_ZERO_COEFFS;
 use e3_zk_prover::test_utils::{fold_witness_field_strings, load_vk_artifacts};
 use e3_zk_prover::{
     generate_sequential_c3_fold, generate_sequential_c6_fold, CircuitVariant, Provable, ZkBackend,
@@ -327,6 +326,7 @@ fn assert_final_c6_tree_binding(
     prover: &ZkProver,
     inner: &Proof,
     folded: &Proof,
+    preset: BfvPreset,
     artifacts_dir: &str,
 ) {
     let default_dir = prover.circuits_dir(CircuitVariant::Default, artifacts_dir);
@@ -388,7 +388,7 @@ fn assert_final_c6_tree_binding(
         "1".into(),
         "2".into(),
     ];
-    c7_public.extend(vec!["0".to_owned(); MAX_MSG_NON_ZERO_COEFFS]);
+    c7_public.extend(vec!["0".to_owned(); preset.max_msg_non_zero_coeffs()]);
     let c7 = substitute_proof(
         prover,
         CircuitName::DecryptedSharesAggregation,
@@ -700,7 +700,7 @@ async fn c6_fold_sequential_proves_and_verifies() {
         total_slots,
         &artifacts_dir,
     );
-    assert_final_c6_tree_binding(&prover, &inners[0], &folded, &artifacts_dir);
+    assert_final_c6_tree_binding(&prover, &inners[0], &folded, preset, &artifacts_dir);
 
     prover.cleanup(inner_e3_a).unwrap();
     prover.cleanup(inner_e3_b).unwrap();

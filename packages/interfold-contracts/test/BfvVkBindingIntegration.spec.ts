@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 
 import MockCiphernodeRegistryModule from "../ignition/modules/mockCiphernodeRegistry";
 import {
+  ACTIVE_BFV_PARAM_SET,
   BFV_DKG_H,
   BFV_THRESHOLD_T,
   assertBfvDecryptionVerifierSubCircuitVkHashes,
@@ -22,6 +23,7 @@ import {
   bfvDecExpectedPublicInputsLen,
   bfvDecPartyColOffsets,
   bfvDkgCommitteeHashIndices,
+  bfvMessageCoeffsCount,
   bfvPkExpectedPublicInputsLen,
   bfvPkV2PublicInputLayout,
   committeeHashFromLimbs,
@@ -41,6 +43,9 @@ import type {
 
 const { ethers, ignition, networkHelpers } = await network.connect();
 const { loadFixture } = networkHelpers;
+
+/** The folded artifacts come from a preset that publishes the default 50 message coefficients. */
+const BFV_MESSAGE_COEFFS_COUNT = 50;
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(testDir, "../../..");
@@ -128,7 +133,11 @@ const hasExpectedFoldedLayout = (value: FoldedArtifacts): boolean => {
   return (
     (dkgPublicInputs.length === bfvPkExpectedPublicInputsLen(BFV_DKG_H) ||
       v2DkgLbfvRows(dkgPublicInputs) !== null) &&
-    decPublicInputs.length === bfvDecExpectedPublicInputsLen(BFV_THRESHOLD_T)
+    decPublicInputs.length ===
+      bfvDecExpectedPublicInputsLen(
+        BFV_THRESHOLD_T,
+        bfvMessageCoeffsCount(ACTIVE_BFV_PARAM_SET),
+      )
   );
 };
 
@@ -319,6 +328,7 @@ describe("BfvVkBindingIntegration", function () {
       expectedC6FoldKeyHash,
       expectedC7KeyHash,
       BFV_THRESHOLD_T,
+      BFV_MESSAGE_COEFFS_COUNT,
     );
     await bfvDec.waitForDeployment();
 
@@ -393,6 +403,7 @@ describe("BfvVkBindingIntegration", function () {
         ethers.id("stale-c6"),
         ethers.id("stale-c7"),
         BFV_THRESHOLD_T,
+        BFV_MESSAGE_COEFFS_COUNT,
       );
       await stale.waitForDeployment();
 
@@ -676,6 +687,7 @@ describe("BfvVkBindingIntegration", function () {
         immediateC6Hash,
         expectedC7KeyHash,
         BFV_THRESHOLD_T,
+        BFV_MESSAGE_COEFFS_COUNT,
       );
       await immediateDecWrapper.waitForDeployment();
       if (!isV2DkgLayout(dkgPublicInputs)) {

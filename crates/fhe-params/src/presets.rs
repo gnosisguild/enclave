@@ -19,6 +19,11 @@ use crate::constants::{
         B as INSECURE_B, B_CHI as INSECURE_B_CHI, SEARCH_K as INSECURE_SEARCH_K,
         SEARCH_N as INSECURE_SEARCH_N, SEARCH_Z as INSECURE_SEARCH_Z,
     },
+    insecure_simd,
+    insecure_simd_search_defaults::{
+        B as INSECURE_SIMD_B, B_CHI as INSECURE_SIMD_B_CHI, SEARCH_K as INSECURE_SIMD_SEARCH_K,
+        SEARCH_N as INSECURE_SIMD_SEARCH_N, SEARCH_Z as INSECURE_SIMD_SEARCH_Z,
+    },
     search_defaults::{B, B_CHI, SEARCH_K, SEARCH_N, SEARCH_Z},
     secure_16384,
     secure_16384_search_defaults::{
@@ -99,6 +104,17 @@ pub enum BfvPreset {
     /// Nodes keep the DKG preset and recover the threshold preset from it, so each insecure
     /// threshold label needs its own DKG label for that round trip to keep the protocol path.
     InsecureDkgLbfv,
+    /// Insecure SIMD threshold BFV parameters (degree 128, plaintext modulus 257), on the l-BFV
+    /// protocol path - DO NOT USE IN PRODUCTION
+    ///
+    /// The plaintext modulus is prime and 1 mod 2N, so plaintexts can use SIMD encoding with
+    /// 128 slots. The ciphertext moduli and the error variance are those of
+    /// [`BfvPreset::InsecureThreshold`]. Only the Minimum and Micro committees satisfy the
+    /// depth-3 noise bound. On-chain parameter set 5.
+    InsecureThresholdSimd,
+    /// The DKG counterpart of [`BfvPreset::InsecureThresholdSimd`], with the same parameters as
+    /// [`BfvPreset::InsecureDkg`] - DO NOT USE IN PRODUCTION
+    InsecureDkgSimd,
 }
 
 impl BfvPreset {
@@ -110,6 +126,7 @@ impl BfvPreset {
             2 => Some(BfvPreset::SecureThreshold8192),
             3 => Some(BfvPreset::SecureThreshold16384),
             4 => Some(BfvPreset::InsecureThresholdLbfv),
+            5 => Some(BfvPreset::InsecureThresholdSimd),
             _ => None,
         }
     }
@@ -326,11 +343,13 @@ impl BfvParamSet {
 }
 
 impl BfvPreset {
-    pub const ALL: [BfvPreset; 8] = [
+    pub const ALL: [BfvPreset; 10] = [
         BfvPreset::InsecureThreshold,
         BfvPreset::InsecureThresholdLbfv,
+        BfvPreset::InsecureThresholdSimd,
         BfvPreset::InsecureDkg,
         BfvPreset::InsecureDkgLbfv,
+        BfvPreset::InsecureDkgSimd,
         BfvPreset::SecureThreshold8192,
         BfvPreset::SecureDkg8192,
         BfvPreset::SecureThreshold16384,
@@ -339,9 +358,10 @@ impl BfvPreset {
 
     // `InsecureThreshold` stays ahead of `InsecureThresholdLbfv`: lookups by parameters
     // (`from_threshold_parameters`) cannot tell them apart and resolve to the trBFV one.
-    pub const PAIR_PRESETS: [BfvPreset; 4] = [
+    pub const PAIR_PRESETS: [BfvPreset; 5] = [
         BfvPreset::InsecureThreshold,
         BfvPreset::InsecureThresholdLbfv,
+        BfvPreset::InsecureThresholdSimd,
         BfvPreset::SecureThreshold8192,
         BfvPreset::SecureThreshold16384,
     ];
@@ -351,8 +371,10 @@ impl BfvPreset {
         match normalized.as_str() {
             "INSECURE_THRESHOLD" => Ok(Self::InsecureThreshold),
             "INSECURE_THRESHOLD_LBFV" => Ok(Self::InsecureThresholdLbfv),
+            "INSECURE_THRESHOLD_SIMD" => Ok(Self::InsecureThresholdSimd),
             "INSECURE_DKG" => Ok(Self::InsecureDkg),
             "INSECURE_DKG_LBFV" => Ok(Self::InsecureDkgLbfv),
+            "INSECURE_DKG_SIMD" => Ok(Self::InsecureDkgSimd),
             "SECURE_THRESHOLD_8192" => Ok(Self::SecureThreshold8192),
             "SECURE_DKG_8192" => Ok(Self::SecureDkg8192),
             "SECURE_THRESHOLD_16384" => Ok(Self::SecureThreshold16384),
@@ -365,8 +387,10 @@ impl BfvPreset {
         match self {
             BfvPreset::InsecureThreshold => "INSECURE_THRESHOLD",
             BfvPreset::InsecureThresholdLbfv => "INSECURE_THRESHOLD_LBFV",
+            BfvPreset::InsecureThresholdSimd => "INSECURE_THRESHOLD_SIMD",
             BfvPreset::InsecureDkg => "INSECURE_DKG",
             BfvPreset::InsecureDkgLbfv => "INSECURE_DKG_LBFV",
+            BfvPreset::InsecureDkgSimd => "INSECURE_DKG_SIMD",
             BfvPreset::SecureThreshold8192 => "SECURE_THRESHOLD_8192",
             BfvPreset::SecureDkg8192 => "SECURE_DKG_8192",
             BfvPreset::SecureThreshold16384 => "SECURE_THRESHOLD_16384",
@@ -387,6 +411,7 @@ impl BfvPreset {
         match s.to_ascii_lowercase().as_str() {
             "insecure" => Ok(Self::InsecureThreshold),
             "insecure-lbfv" => Ok(Self::InsecureThresholdLbfv),
+            "insecure-simd" => Ok(Self::InsecureThresholdSimd),
             "secure-8192" => Ok(Self::SecureThreshold8192),
             "secure-16384" => Ok(Self::SecureThreshold16384),
             _ => Err(PresetError::UnknownPreset(name.to_string())),
@@ -444,10 +469,12 @@ impl BfvPreset {
         match self {
             BfvPreset::InsecureThreshold => Some(BfvPreset::InsecureDkg),
             BfvPreset::InsecureThresholdLbfv => Some(BfvPreset::InsecureDkgLbfv),
+            BfvPreset::InsecureThresholdSimd => Some(BfvPreset::InsecureDkgSimd),
             BfvPreset::SecureThreshold8192 => Some(BfvPreset::SecureDkg8192),
             BfvPreset::SecureThreshold16384 => Some(BfvPreset::SecureDkg16384),
             BfvPreset::InsecureDkg
             | BfvPreset::InsecureDkgLbfv
+            | BfvPreset::InsecureDkgSimd
             | BfvPreset::SecureDkg8192
             | BfvPreset::SecureDkg16384 => None,
         }
@@ -462,10 +489,12 @@ impl BfvPreset {
         match self {
             BfvPreset::InsecureDkg => Some(BfvPreset::InsecureThreshold),
             BfvPreset::InsecureDkgLbfv => Some(BfvPreset::InsecureThresholdLbfv),
+            BfvPreset::InsecureDkgSimd => Some(BfvPreset::InsecureThresholdSimd),
             BfvPreset::SecureDkg8192 => Some(BfvPreset::SecureThreshold8192),
             BfvPreset::SecureDkg16384 => Some(BfvPreset::SecureThreshold16384),
             BfvPreset::InsecureThreshold
             | BfvPreset::InsecureThresholdLbfv
+            | BfvPreset::InsecureThresholdSimd
             | BfvPreset::SecureThreshold8192
             | BfvPreset::SecureThreshold16384 => None,
         }
@@ -487,6 +516,24 @@ impl BfvPreset {
                 degree: insecure::DEGREE,
                 num_moduli: insecure::dkg::MODULI.len(),
                 num_parties: insecure::NUM_PARTIES,
+                lambda: DEFAULT_INSECURE_LAMBDA,
+                parameter_type: ParameterType::DKG,
+                security: SecurityTier::INSECURE,
+            },
+            BfvPreset::InsecureThresholdSimd => PresetMetadata {
+                name: self.name(),
+                degree: insecure_simd::DEGREE,
+                num_moduli: insecure_simd::threshold::MODULI.len(),
+                num_parties: insecure_simd::NUM_PARTIES,
+                lambda: DEFAULT_INSECURE_LAMBDA,
+                parameter_type: ParameterType::THRESHOLD,
+                security: SecurityTier::INSECURE,
+            },
+            BfvPreset::InsecureDkgSimd => PresetMetadata {
+                name: self.name(),
+                degree: insecure_simd::DEGREE,
+                num_moduli: insecure_simd::dkg::MODULI.len(),
+                num_parties: insecure_simd::NUM_PARTIES,
                 lambda: DEFAULT_INSECURE_LAMBDA,
                 parameter_type: ParameterType::DKG,
                 security: SecurityTier::INSECURE,
@@ -566,6 +613,9 @@ impl BfvPreset {
             | BfvPreset::InsecureThresholdLbfv
             | BfvPreset::InsecureDkg
             | BfvPreset::InsecureDkgLbfv => "insecure".to_string(),
+            BfvPreset::InsecureThresholdSimd | BfvPreset::InsecureDkgSimd => {
+                "insecure-simd".to_string()
+            }
             _ => format!("{}-{}", meta.security.as_config_str(), meta.degree),
         }
     }
@@ -588,6 +638,7 @@ impl BfvPreset {
             | BfvPreset::InsecureThresholdLbfv
             | BfvPreset::InsecureDkg
             | BfvPreset::InsecureDkgLbfv => "insecure",
+            BfvPreset::InsecureThresholdSimd | BfvPreset::InsecureDkgSimd => "insecure_simd",
             BfvPreset::SecureThreshold8192 | BfvPreset::SecureDkg8192 => "secure_8192",
             BfvPreset::SecureThreshold16384 | BfvPreset::SecureDkg16384 => "secure_16384",
         }
@@ -614,6 +665,15 @@ impl BfvPreset {
                     mult_depth: INSECURE_MULT_DEPTH,
                 })
             }
+            BfvPreset::InsecureThresholdSimd => Some(PresetSearchDefaults {
+                n: INSECURE_SIMD_SEARCH_N,
+                k: INSECURE_SIMD_SEARCH_K,
+                z: INSECURE_SIMD_SEARCH_Z,
+                lambda: DEFAULT_INSECURE_LAMBDA as u32,
+                b: INSECURE_SIMD_B,
+                b_chi: INSECURE_SIMD_B_CHI,
+                mult_depth: INSECURE_MULT_DEPTH,
+            }),
             BfvPreset::SecureThreshold8192 => Some(PresetSearchDefaults {
                 n: SEARCH_N,
                 k: SEARCH_K,
@@ -649,6 +709,18 @@ impl From<BfvPreset> for BfvParamSet {
                 moduli: insecure::threshold::MODULI,
                 plaintext_modulus: insecure::threshold::PLAINTEXT_MODULUS,
                 error1_variance: Some(insecure::threshold::ERROR1_VARIANCE),
+            },
+            BfvPreset::InsecureThresholdSimd => BfvParamSet {
+                degree: insecure_simd::DEGREE,
+                moduli: insecure_simd::threshold::MODULI,
+                plaintext_modulus: insecure_simd::threshold::PLAINTEXT_MODULUS,
+                error1_variance: Some(insecure_simd::threshold::ERROR1_VARIANCE),
+            },
+            BfvPreset::InsecureDkgSimd => BfvParamSet {
+                degree: insecure_simd::DEGREE,
+                moduli: insecure_simd::dkg::MODULI,
+                plaintext_modulus: insecure_simd::dkg::PLAINTEXT_MODULUS,
+                error1_variance: Some(insecure_simd::dkg::ERROR1_VARIANCE),
             },
             BfvPreset::InsecureDkg | BfvPreset::InsecureDkgLbfv => BfvParamSet {
                 degree: insecure::DEGREE,
@@ -730,6 +802,10 @@ mod tests {
         ] {
             assert_eq!(preset.lbfv_label(), Some(BfvPreset::InsecureThresholdLbfv));
         }
+        assert_eq!(
+            BfvPreset::InsecureThresholdSimd.lbfv_label(),
+            Some(BfvPreset::InsecureThresholdSimd)
+        );
         assert_eq!(
             BfvPreset::SecureThreshold16384.lbfv_label(),
             Some(BfvPreset::SecureThreshold16384)
@@ -823,6 +899,13 @@ mod tests {
         assert_eq!(dkg.plaintext(), secure_8192::dkg::PLAINTEXT_MODULUS);
         assert_eq!(dkg.moduli(), secure_8192::dkg::MODULI);
 
+        let (threshold, dkg) = BfvPreset::InsecureThresholdSimd.build_pair().unwrap();
+        assert_eq!(threshold.degree(), insecure_simd::DEGREE);
+        assert_eq!(threshold.plaintext(), 257);
+        assert_eq!(threshold.moduli(), insecure::threshold::MODULI);
+        assert_eq!(dkg.plaintext(), insecure::dkg::PLAINTEXT_MODULUS);
+        assert_eq!(dkg.moduli(), insecure::dkg::MODULI);
+
         let (threshold, dkg) = BfvPreset::SecureThreshold16384.build_pair().unwrap();
         assert_eq!(threshold.degree(), secure_16384::DEGREE);
         assert_eq!(
@@ -886,7 +969,11 @@ mod tests {
             BfvPreset::from_on_chain_param_set(4),
             Some(BfvPreset::InsecureThresholdLbfv)
         );
-        assert_eq!(BfvPreset::from_on_chain_param_set(5), None);
+        assert_eq!(
+            BfvPreset::from_on_chain_param_set(5),
+            Some(BfvPreset::InsecureThresholdSimd)
+        );
+        assert_eq!(BfvPreset::from_on_chain_param_set(6), None);
     }
 
     #[test]
@@ -912,10 +999,17 @@ mod tests {
         assert_eq!(defaults.z, secure_16384_search_defaults::SEARCH_Z);
         assert_eq!(defaults.lambda, DEFAULT_SECURE_16384_LAMBDA as u32);
 
+        let preset = BfvPreset::InsecureThresholdSimd;
+        let defaults = preset.search_defaults().unwrap();
+        assert_eq!(defaults.k, 257);
+        assert_eq!(defaults.z, INSECURE_SIMD_SEARCH_Z);
+        assert_eq!(defaults.mult_depth, INSECURE_MULT_DEPTH);
+
         // DKG presets don't have search defaults
         assert!(BfvPreset::InsecureDkg.search_defaults().is_none());
         assert!(BfvPreset::SecureDkg8192.search_defaults().is_none());
         assert!(BfvPreset::SecureDkg16384.search_defaults().is_none());
+        assert!(BfvPreset::InsecureDkgSimd.search_defaults().is_none());
     }
 
     #[test]
@@ -932,5 +1026,10 @@ mod tests {
             "secure-16384"
         );
         assert_eq!(BfvPreset::SecureDkg16384.artifacts_dir(), "secure-16384");
+        assert_eq!(
+            BfvPreset::InsecureThresholdSimd.artifacts_dir(),
+            "insecure-simd"
+        );
+        assert_eq!(BfvPreset::InsecureDkgSimd.artifacts_dir(), "insecure-simd");
     }
 }

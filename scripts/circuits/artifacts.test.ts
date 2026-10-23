@@ -28,7 +28,7 @@ test('every release pair is a supported build pair', () => {
 })
 
 test('l-BFV pairs require row, chunk and v2 artifacts, but secure8192 does not', () => {
-  for (const preset of ['insecure', 'secure-16384']) {
+  for (const preset of ['insecure', 'insecure-simd', 'secure-16384']) {
     const markers = requiredArtifactMarkers(preset, 'minimum')
     for (const circuit of ['lbfv_pk_generation', 'lbfv_pk_aggregation', 'rlk_generation', 'rlk_aggregation']) {
       for (const variant of ['default', 'recursive', 'evm']) {
@@ -92,6 +92,7 @@ test('checksums command covers exactly the staged circuit configurations', () =>
   const dir = makeCompleteMatrix()
   try {
     rmSync(join(dir, 'secure-16384'), { recursive: true })
+    rmSync(join(dir, 'insecure-simd'), { recursive: true })
     for (const preset of ['insecure', 'secure-8192']) {
       for (const committee of ['micro', 'small']) rmSync(join(dir, preset, committee), { recursive: true })
     }

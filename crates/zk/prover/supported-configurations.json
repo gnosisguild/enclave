@@ -7,5 +7,7 @@
   ["secure-8192", "small"],
   ["secure-16384", "minimum"],
   ["secure-16384", "micro"],
-  ["secure-16384", "small"]
+  ["secure-16384", "small"],
+  ["insecure-simd", "minimum"],
+  ["insecure-simd", "micro"]
 ]
