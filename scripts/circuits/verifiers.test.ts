@@ -16,6 +16,13 @@ test('verifier generation rejects a requested circuit it cannot find', async (t)
   await assert.rejects(generator.generate(), /Cannot find requested circuits: no_such_circuit/)
 })
 
+test('verifier generation cannot select a preserved disabled circuit', async (t) => {
+  const root = fixture(t)
+  writeFileSync(join(root, 'circuits/bin/recursive_aggregation/dkg_aggregator/DISABLED'), 'Historical fixture circuit.\n')
+  const generator = new VerifierGenerator(root, { dryRun: true, circuits: ['dkg_aggregator'] })
+  await assert.rejects(generator.generate(), /Cannot find requested circuits: dkg_aggregator/)
+})
+
 // Exercise the existing public generation boundary with synthetic bb output, never real keys/proofs.
 function fixture(t: { after: (fn: () => void) => void }): string {
   const root = mkdtempSync(join(tmpdir(), 'interfold-verifier-transform-'))

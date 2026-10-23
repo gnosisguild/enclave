@@ -32,7 +32,7 @@ pub struct Configs {
 pub struct Bits {
     pub ct_bit: u32,
     pub sk_bit: u32,
-    pub e_sm_bit: u32,
+    pub e_fresh_bit: u32,
     pub r_bit: u32,
     /// Centered `d` coefficient bound (payload flatten / Fiat–Shamir).
     pub d_bit: u32,
@@ -93,7 +93,7 @@ impl Bits {
             .unwrap_or(0);
         let d_native_bit = compute_native_crt_coeff_bit(threshold_params.moduli());
 
-        // `ct`, `sk`, `e_sm` and `d` are centered residues, so they share the modulus width. This
+        // `ct`, `sk`, `e_fresh` and `d` are centered residues, so they share the modulus width. This
         // used to piggyback on the `r2` bound, which was `(max(q) - 1) / 2` for exactly that reason;
         // with `r2` gone the width comes from the moduli directly.
         let modulus_bit = e3_fhe_params::utils::compute_modulus_bit(&threshold_params);
@@ -101,7 +101,7 @@ impl Bits {
         Bits {
             ct_bit: modulus_bit,
             sk_bit: modulus_bit,
-            e_sm_bit: modulus_bit,
+            e_fresh_bit: modulus_bit,
             r_bit,
             d_bit: modulus_bit,
             d_native_bit,
@@ -132,17 +132,20 @@ share_decryption (CIRCUIT 6 - THRESHOLD BFV SHARE DECRYPTION)
 
 pub global {}_BIT_CT: u32 = {};
 pub global {}_BIT_SK: u32 = {};
-pub global {}_BIT_E_SM: u32 = {};
+pub global {}_BIT_E_FRESH: u32 = {};
 pub global {}_BIT_R: u32 = {};
 pub global {}_BIT_D: u32 = {};
 pub global {}_BIT_D_NATIVE: u32 = {};
 
 pub global {}_R_BOUNDS: [Field; L] = [{}];
 
+// Reuse the preset sampler bound, not a shared-noise commitment or DKG contribution.
+pub global THRESHOLD_SHARE_DECRYPTION_FRESH_NOISE_BOUND: Field = PK_GENERATION_E_SM_BOUND;
+
 pub global {}_CONFIGS: ShareDecryptionConfigs<L> = ShareDecryptionConfigs::new(
     QIS,
     {}_R_BOUNDS,
-);
+).with_fresh_bound(THRESHOLD_SHARE_DECRYPTION_FRESH_NOISE_BOUND);
 "#,
             configs.params.degree(),
             configs.params.moduli().len(),
@@ -152,7 +155,7 @@ pub global {}_CONFIGS: ShareDecryptionConfigs<L> = ShareDecryptionConfigs::new(
             prefix,
             configs.bits.sk_bit,
             prefix,
-            configs.bits.e_sm_bit,
+            configs.bits.e_fresh_bit,
             prefix,
             configs.bits.r_bit,
             prefix,

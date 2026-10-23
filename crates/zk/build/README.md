@@ -15,6 +15,11 @@ hydration. `scripts/circuits/build-pairs.json` owns supported build pairs. Relea
 in the separate runtime release matrix. Hydration accepts a different artifact source hash and
 records the original hash. Release validation remains source-bound.
 
+A circuit package with a `DISABLED` marker remains on disk but is excluded from discovery. An
+explicit request for it fails before tools or writes. The retired shared-noise C2b and paired
+C2ab/C3ab/C4ab packages use this boundary; active builds do not require or generate their artifacts.
+Their historical source, artifacts and durable enum IDs are not deleted.
+
 The unpublished `e3-zk-benchmarks` crate uses this crate through a normal dependency. Normal dependency
 direction stays `build -> witness -> config`; the configuration library does not import build,
 witness, samples, or runtime orchestration.

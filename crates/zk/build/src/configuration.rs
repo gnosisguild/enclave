@@ -230,6 +230,12 @@ pub fn replace_declarations(
                 bail!("{name} is not generated; remove it or generate it");
             }
         }
+    } else {
+        for (name, declaration) in &old {
+            if name.starts_with(prefix) && !fresh.contains_key(name) {
+                updated = updated.replacen(declaration, "", 1);
+            }
+        }
     }
     Ok(updated)
 }

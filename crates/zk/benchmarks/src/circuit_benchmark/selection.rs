@@ -22,7 +22,6 @@ impl Case {
             _ => [
                 CircuitName::PkBfv,
                 CircuitName::SkShareComputation,
-                CircuitName::ESmShareComputation,
                 CircuitName::ShareEncryption,
                 CircuitName::DkgShareDecryption,
                 CircuitName::PkGeneration,
@@ -62,7 +61,17 @@ pub(crate) fn variant(name: &str) -> Result<CircuitVariant> {
 #[serde(untagged)]
 pub(crate) enum Entry {
     Path(String),
-    Restricted { name: String, modes: Vec<String> },
+    Restricted {
+        name: String,
+        #[serde(default)]
+        modes: Option<Vec<String>>,
+        #[serde(default = "enabled_by_default")]
+        enabled: bool,
+    },
+}
+
+fn enabled_by_default() -> bool {
+    true
 }
 
 #[derive(Deserialize)]
@@ -109,7 +118,16 @@ impl Config {
         for entry in &self.circuits {
             let (path, modes) = match entry {
                 Entry::Path(path) => (path, None),
-                Entry::Restricted { name, modes } => (name, Some(modes)),
+                Entry::Restricted {
+                    name,
+                    modes,
+                    enabled,
+                } => {
+                    if !enabled {
+                        continue;
+                    }
+                    (name, modes.as_ref())
+                }
             };
             if !filters.is_empty() && !filters.contains(path) {
                 continue;

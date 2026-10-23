@@ -109,15 +109,13 @@ pub(crate) fn prepare(
             let sample = e3_zk_samples::dkg::pk::generate(&m.dkg)?;
             prepared(e3_zk_prover::PkCircuit, config, sample, record)
         }
-        Case::Named(CircuitName::SkShareComputation | CircuitName::ESmShareComputation) => {
-            let input_type = if case == Case::Named(CircuitName::SkShareComputation) {
-                DkgInputType::SecretKey
-            } else {
-                DkgInputType::SmudgingNoise
-            };
+        Case::Named(CircuitName::SkShareComputation) => {
             let config = dkg::share_computation::Configs::new(m.preset, &m.threshold, m.committee)?;
-            let sample =
-                e3_zk_samples::dkg::share_computation::generate(&config, m.preset, input_type)?;
+            let sample = e3_zk_samples::dkg::share_computation::generate(
+                &config,
+                m.preset,
+                DkgInputType::SecretKey,
+            )?;
             prepared(
                 e3_zk_prover::ShareComputationCircuit,
                 config,

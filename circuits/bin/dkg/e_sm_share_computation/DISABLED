@@ -1,0 +1,3 @@
+Retired shared-smudging-noise C2b circuit, preserved as historical source.
+Synchronized decryption uses PRF masking and fresh local noise proved by C6.
+Not part of new canonical builds, verifier generation, required installation inventory or benchmarks.

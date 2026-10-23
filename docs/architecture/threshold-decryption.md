@@ -25,9 +25,15 @@ Fresh source-bound insecure-64/minimum artifacts verify the correlated C0-C7 pip
 `[0,2]` and decryptors `[1,3]`, including regenerated Solidity Honk verifier/wrapper acceptance and
 malformed-input rejection. A separate real-proof multi-node run also passes a disk restart during
 C6. Secure-8192/minimum C6/C7 leaf proofs verify their correlated share commitments and reject
-tampered public inputs. Secure DKG/recursion/Solidity, larger secure committees and the complete
-release matrix remain unqualified. These local results do not authorize a merge, deployment or
-production rollout.
+tampered public inputs. Secure-8192/micro now also has a source-bound real C0-C7/recursive benchmark
+and successful saved-proof Solidity wrapper acceptance, using a documented benchmark-only Darwin I/O
+adapter. Other secure-pair coverage, larger committees and the complete release matrix remain
+unqualified. These local results do not authorize a merge, deployment or production rollout.
+
+The micro observations are summarized in the review plan; the detailed temporary run exports were
+lost after a later memory-pressure crash/reboot. That separate 13-job experiment has no surviving
+verified result. Memory-bounded decomposition remains a cryptographer review item, not implemented
+or qualified by the successful single-job case.
 
 A separate insecure-64/Small real-proof multi-node run delivers a confirmed exclusion while share
 calculations are queued, observes a converged replacement set, releases a retired calculation and

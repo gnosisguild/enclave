@@ -335,7 +335,11 @@ class VerifierGenerator {
 
       for (const entry of readdirSync(groupDir)) {
         const circuitPath = join(groupDir, entry)
-        if (statSync(circuitPath).isDirectory() && existsSync(join(circuitPath, 'Nargo.toml'))) {
+        if (
+          statSync(circuitPath).isDirectory() &&
+          existsSync(join(circuitPath, 'Nargo.toml')) &&
+          !existsSync(join(circuitPath, 'DISABLED'))
+        ) {
           if (!circuitFilter || circuitFilter.includes(entry)) {
             const packageName = this.getPackageName(circuitPath)
             circuits.push({ name: entry, group, path: circuitPath, packageName })

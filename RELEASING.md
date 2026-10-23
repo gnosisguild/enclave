@@ -35,8 +35,9 @@ This checks each pair's own archived EVM keys, not merely the active default pai
 missing/stale artifacts or committed-verifier drift without compiling or changing active selectors.
 Release CI runs the same check before archiving circuits or permitting publication. A passing
 comparison is still not proof qualification: require real DKG/recursive/Solidity acceptance for the
-full matrix, the obsolete C2ab/C3ab/C4ab fold disposition, and the human protocol review. Until
-those gates pass, do not use the stale non-canonical committed verifiers through deployment scripts.
+full matrix, validation of the disabled legacy-circuit inventory, and the human protocol review.
+Until those gates pass, do not use the stale non-canonical committed verifiers through deployment
+scripts.
 
 ## Prepare a reviewable release branch
 

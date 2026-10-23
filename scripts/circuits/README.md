@@ -102,6 +102,13 @@ the generator would produce.
 5. **Generates checksums** (`SHA256SUMS` and `checksums.json`)
 6. **Copies artifacts** to `dist/circuits/`
 
+Packages containing a `DISABLED` marker are preserved historical source, not canonical build or
+verifier targets. Explicit builder selection rejects them before tools or writes. The shared-noise
+`e_sm_share_computation` and paired `c2ab_fold`/`c3ab_fold`/`c4ab_fold` packages are disabled for
+the synchronized-decryption pipeline. Existing archives and measurements are not deleted; new
+required artifact inventories exclude those packages. Removing a marker to re-enable one requires
+review of its statement, workspace membership, artifact requirements and benchmark selection.
+
 ### Options
 
 - `--preset <name>` - Parameter preset: `insecure-64` (default), `secure-8192`, or `all`

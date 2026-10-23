@@ -31,6 +31,10 @@ DIRS=(
 )
 
 for dir in "${DIRS[@]}"; do
+    if [ -f "$dir/DISABLED" ]; then
+        echo "Skipping disabled historical circuit $dir"
+        continue
+    fi
     if [ ! -d "$dir" ]; then
         echo "Warning: Directory $dir does not exist, skipping..."
         continue

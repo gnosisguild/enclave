@@ -88,7 +88,7 @@ mod share_decryption {
         assert_eq!(bits.d_bit, expected_bit);
         assert_eq!(bits.ct_bit, expected_bit);
         assert_eq!(bits.sk_bit, expected_bit);
-        assert_eq!(bits.e_sm_bit, expected_bit);
+        assert_eq!(bits.e_fresh_bit, expected_bit);
     }
 
     #[test]

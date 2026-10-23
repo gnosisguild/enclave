@@ -58,6 +58,15 @@ pub fn discover(root: &Path, request: &Request) -> Result<Vec<Circuit>> {
             if manifest.exists() {
                 let value: toml::Value = toml::from_str(&fs::read_to_string(&manifest)?)?;
                 if let Some(package) = value.get("package") {
+                    if path.join("DISABLED").is_file() {
+                        if filter.contains(&name) {
+                            bail!(
+                                "Circuit {group}/{name} is disabled: {}",
+                                fs::read_to_string(path.join("DISABLED"))?.trim()
+                            );
+                        }
+                        continue;
+                    }
                     if filter.is_empty() || filter.contains(&name) {
                         circuits.push(Circuit {
                             package: package

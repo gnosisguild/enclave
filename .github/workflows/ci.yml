@@ -522,7 +522,7 @@ jobs:
       - name: Stage source-aligned circuit fixtures
         run: |
           chmod +x .ci-noir/bin/bb
-          test -f .ci-noir/circuits/insecure-64/minimum/default/recursive_aggregation/c2ab_fold/c2ab_fold.json
+          test -f .ci-noir/circuits/insecure-64/minimum/default/recursive_aggregation/node_fold/node_fold.json
           mkdir -p dist/circuits/insecure-64
           cp -R .ci-noir/circuits/insecure-64/minimum dist/circuits/insecure-64/
 

@@ -177,6 +177,28 @@ fn build_policy_rejects_disabled_pairs_before_tools_and_filters_all_selectors() 
 }
 
 #[test]
+fn disabled_circuits_are_preserved_but_never_selected_or_built() {
+    let temp = circuit_root_without_tools();
+    let root = temp.path();
+    write(
+        root,
+        "circuits/bin/dkg/pk/DISABLED",
+        "Retained historical circuit.\n",
+    );
+    let discovered = artifacts::discover(root, &request()).unwrap();
+    assert_eq!(discovered.len(), 1);
+    assert_eq!(discovered[0].name, "pk_generation");
+    assert!(root.join("circuits/bin/dkg/pk/src/main.nr").is_file());
+
+    let mut selected = request();
+    selected.circuits = vec!["pk_generation".into(), "pk".into()];
+    let error = artifacts::build(root, &selected).unwrap_err().to_string();
+    assert!(error.contains("dkg/pk is disabled"), "{error}");
+    assert!(!root.join("dist").exists());
+    assert!(!root.join("circuits/bin/.active-preset.json").exists());
+}
+
+#[test]
 fn dry_run_lists_selections_without_tools_or_writes() {
     // The root has no pinned-tool manifests: any tool probe fails on the missing file, so this
     // passes only while the dry run runs before every probe.
@@ -852,6 +874,21 @@ fn preset_sync_installs_new_declarations_but_check_rejects_missing_ones() {
     .unwrap();
     assert!(repaired.contains(reexport));
     assert!(!configuration::declarations(&repaired).contains_key("SHARE_DECRYPTION_BIT_AGG"));
+    let old = "pub global THRESHOLD_SHARE_DECRYPTION_BIT_E_SM: u32 = 59;\n";
+    let fresh = "pub global THRESHOLD_SHARE_DECRYPTION_BIT_E_FRESH: u32 = 59;\n";
+    assert!(configuration::replace_declarations(
+        old,
+        fresh,
+        "THRESHOLD_SHARE_DECRYPTION_",
+        &[],
+        true
+    )
+    .is_err());
+    let renamed =
+        configuration::replace_declarations(old, fresh, "THRESHOLD_SHARE_DECRYPTION_", &[], false)
+            .unwrap();
+    assert!(renamed.contains(fresh));
+    assert!(!renamed.contains("BIT_E_SM"));
 }
 
 const VK_PATHS: &[(&str, &str, &str)] = &[

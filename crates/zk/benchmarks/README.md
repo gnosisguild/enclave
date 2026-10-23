@@ -33,8 +33,9 @@ pnpm test:circuit-bench
 ```
 
 `circuits/benchmarks/config.json` selects the leaf cases and their permitted modes; unknown or
-mode-restricted selections fail. Historical result directories and that config stay under
-`circuits/benchmarks/`.
+mode-restricted selections fail. Entries with `enabled: false` are retained but excluded; explicitly
+selecting one fails. The legacy shared-noise C2b case is disabled, not deleted. Historical result
+directories and that config stay under `circuits/benchmarks/`.
 
 ## Measurement rules
 

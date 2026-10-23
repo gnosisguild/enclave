@@ -343,7 +343,7 @@ async function main() {
   }
 
   const { ethers } = await network.connect();
-  const [benchmarkSigner] = await ethers.getSigners();
+  const benchmarkSigners = await ethers.getSigners();
   // The DKG verifier still receives the committee context directly. The
   // decryption verifier receives the E3 ID for DKG-anchor lookup plus the
   // domain limbs carried by the folded proof.
@@ -351,7 +351,6 @@ async function main() {
   const benchmarkCommitteeRoot = BigInt(
     ethers.id("benchmark-gas-committee-root"),
   );
-  const benchmarkSortedNodes = [benchmarkSigner.address];
 
   let dkgProofHex: string | undefined;
   let dkgPublicHex: string | undefined;
@@ -422,6 +421,18 @@ async function main() {
   );
 
   const benchmarkConfig = resolveBenchmarkConfig(foldedDoc);
+  // The wrapper sizes the H*N PRF grid from the full committee, not one placeholder node.
+  const benchmarkSortedNodes = benchmarkSigners
+    .slice(0, benchmarkConfig.n)
+    .map((signer) => signer.address)
+    .sort((a, b) =>
+      BigInt(a) < BigInt(b) ? -1 : BigInt(a) > BigInt(b) ? 1 : 0,
+    );
+  if (benchmarkSortedNodes.length !== benchmarkConfig.n) {
+    throw new Error(
+      `Need ${benchmarkConfig.n} benchmark committee signers; got ${benchmarkSortedNodes.length}`,
+    );
+  }
   const expectedNodesFoldKeyHash = readVkRecursiveHash(
     getBfvPkSubCircuitVkHashPaths(benchmarkConfig).nodesFold,
     benchmarkConfig,

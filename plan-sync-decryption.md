@@ -18,6 +18,12 @@ parties, local Lagrange weighting, fresh local smudging noise) on a branch based
 
 ## Current checkpoint
 
+The latest instruction is to commit/push the cleanup for cryptographer review and stop further
+memory/decomposition experiments. A reported memory-pressure crash/reboot cleared the approved
+temporary log directory; earlier temporary qualification and benchmark paths in this plan are
+historical references, not currently available raw evidence. Summary observations already recorded
+here survive, as do the source and durable worktree artifacts. The 13-job run is unqualified.
+
 ### Reopened: M1 bundle authentication and M2 exclusion convergence
 
 The user confirmed that the port removed the schema-8 full-bundle signatures and threshold-share
@@ -182,6 +188,189 @@ line-ending churn. Circuit-source changes require fresh source-bound artifact ve
 restamping old proof evidence. The new local `e3-safe` patch comment records the actual upstream
 revision and release blast radius; publication/version cleanup remains deferred. Moving this active
 plan out of the root belongs to the later pre-main cleanup, not deletion of current review history.
+
+#### Disabled legacy circuits and secure/micro measurement (2026-10-23)
+
+After the `852a733dd` review checkpoint was pushed, the user requested **disable, not remove** for
+the retired shared-smudging variants, proper naming, and a new secure/micro benchmark against the
+historical measurements. The user later explicitly requested committing and pushing the current
+cleanup for cryptographer review; deployment and release remain unauthorized.
+
+**Evidence retention notice after the reported memory-pressure crash:** the host reboot cleared the
+approved temporary directory, including qualification logs, new raw benchmark logs, proof exports,
+comparison files, source-snapshot files and private I/O adapter. The numerical observations below
+were recorded before that loss and remain in this plan; their original temporary evidence paths are
+now historical references, not available replay inputs. The checked-in historical baseline, current
+source changes and compiled secure/micro artifacts in the durable benchmark worktree survived. Do
+not reconstruct missing proof bytes or describe the 13-job experiment as a verified successful run.
+
+The follow-up retains the C2b `dkg/e_sm_share_computation` source and all three paired
+`c2ab_fold`/`c3ab_fold`/`c4ab_fold` sources, each with a `DISABLED` marker. Canonical discovery
+skips marked packages and rejects explicitly selecting one before tools/writes; Solidity verifier
+discovery does not select them. The DKG workspace, required artifact inventory, active benchmark
+selection, integration fallback copying and CI fixture sentinel no longer require them. Lint reports
+the marked fold packages as disabled rather than checking them. Historical source, reports,
+archives/proofs, generic legacy helpers and durable enum discriminants are preserved. This resolves
+the pending disposition from review finding 4 by disabling its build/install requirements, not by
+deleting legacy history.
+
+Active C6 now names its residue width `BIT_E_FRESH` / `e_fresh_bit`, exposes a fresh-noise-bound
+alias for the existing preset sampler bound, and names its recursive c0 column
+`C6_FOLD_C0_COL_OFFSET`. Active node-fold accumulators use the shared synchronized layout constants
+rather than unused legacy paired-fold lengths. The sampler bounds, arithmetic, witness/public-input
+order, field encodings and committee thresholds are unchanged. Generated preset sources were
+refreshed through the canonical `sync-preset` operation; no keys or historical build stamps were
+relabeled.
+
+Verification before the benchmark:
+
+- Both disabled-package regression tests fail before the discovery fix (Rust still selected the
+  marked package; verifier generation did not reject it).
+- `disable-legacy-native.log`: the affected build/config/witness/benchmark test targets passed, with
+  their two pre-existing ignored tests still explicitly ignored.
+- `disable-legacy-tooling.log`: all **15** circuit-tooling tests passed.
+- `disable-legacy-noir-tests.log`: **223** library tests, **7** decryption-aggregator tests, and
+  DKG/node-fold tests across all three committees passed; the config execution also passed.
+- `disable-legacy-noir-lint.log` and `disable-legacy-generated-check.log`: compiler/formatter and
+  canonical generated-config comparison passed. `--dry-run` lists **20** active packages, none of
+  the four disabled packages.
+- `disable-legacy-integration-check.log`: the production multi-node integration target compiled;
+  this is not a completed real-proof benchmark or exclusion-convergence scenario.
+
+The benchmark used the durable isolated worktree
+`/Users/giacomo/.local/share/opencode/worktree/e2557a/sync-dec-secure-micro`. Its base is
+`852a733dd`, with its then-uncommitted source snapshot originally saved as `source.patch` and
+`source-snapshot.json` under the approved temporary directory's `sync-dec-secure-micro-20261023/`.
+Its own canonical secure-8192/micro build, matching regenerated Solidity verifiers, optimized Rust
+leaf measurements, full recursive protocol run and local EVM replay are staged serially. The primary
+checkout remains on insecure/minimum; its earlier artifacts and every historical measurement are
+preserved.
+
+The valid historical comparator is `circuits/benchmarks/results_secure_micro`: N=9/T=4/H=5, commit
+`c2dfd37d`, Noir beta.16 / bb 3, 13 jobs on an M4 Pro with 48 GiB RAM. The similarly named
+`results_secure_agg_micro` actually records N=3 and is not a micro comparator. The new run uses
+repository-pinned tools, one proof job and 13 Rayon workers, with a 36-GiB owned-process-tree RSS
+cap and 20-GiB free-disk reserve. Compilation and protocol phases have explicit time caps. Changed
+tools, concurrency, roster behavior, proof statements and historical `isolated_nargo` versus current
+production-adapter metric kinds must stay visible; wall-time ratios are not isolated causal
+speedups. Measurements are pending until the bounded runner completes; failed/missing stages must
+not become successful zero-duration results.
+
+The first attempt **failed during artifact preparation**, not during a proof or at the RSS guard: 19
+of 20 active packages built, while C6 EVM-key generation failed writing `~/.bb-crs/bn254_g1.dat`
+with `EINVAL`. `build-secure-micro.log` and `run-summary.json` preserve the **2,503.04-second**
+attempt and sampled peak **31,797.23 MiB**. Stock pinned bb independently counted C6 at **23,019,005
+gates** / **6,176,987 ACIR opcodes** (`c6-gates-stock.*`), implying a padded 2^25-point domain and a
+2-GiB uncompressed G1 cache. Direct libc tests reproduce Darwin's rejection of a single I/O request
+at that size; bb 5.2.0's file helper does not cap the request before its existing short-I/O loop.
+This is a host/tool I/O limitation exposed by the larger C6, not a failed cryptographic
+verification. The historical C6 table lists 2,977,263 gates under different tools and statements;
+this is not a measured proving-time ratio.
+
+An isolated, benchmark-only Darwin adapter caps oversized `read`/`write` requests at `INT_MAX` and
+leaves bb's short-I/O loops, cryptographic operations and checks unchanged. Boundary-byte, EOF,
+small-I/O and stock-failure tests pass. The actual pinned bb executable was not modified; its
+SHA-256 and the adapter's identity are retained in `io-adapter/validation.json`. The retry uses a
+private CRS directory, not resets/deletes of the shared cache. The unchanged bb validated all
+**256** compressed G1 chunks against its embedded SHA-256 hashes before populating that private
+cache. With the adapter, diagnostic C6 EVM-key generation passed in **40.11 seconds**, sampled peak
+**27,309.97 MiB** (`c6-vk-io-diagnostic.*`). This remains key generation, not a verified C6 proof.
+Any resulting benchmark must disclose the adapter and private-cache environment.
+
+The user directed that memory growth must be addressed by **smaller circuits**, not by requesting
+more RAM. The 36-GiB guard and current machine therefore remain fixed. A separate `retry-1/` attempt
+performs a complete canonical build with existing compiler targets retained, then an actual
+secure/micro C6 prove/verify preflight before the full benchmark. If that real proof exceeds the
+budget, stop and pursue a proof-preserving decomposition rather than increasing the cap. No split
+statement or new proof-interface/serialization change has been implemented or approved by the
+current measurements; cross-proof SK/PRF commitments, ciphertext/domain/set bindings, fresh-noise
+consistency and recursive VK anchoring would need explicit review. Original failed-attempt evidence
+is preserved, and the new proof-memory and protocol timing results remain pending.
+
+The I/O-compatible `retry-1` completed the full **20-package** secure/micro build in **180.78
+seconds** with existing compiler targets retained, sampled peak **28,030.44 MiB**. Its fresh
+complete stamp is **`ad5b16fa759eda29`**; that warm-target build duration is not a cold-build
+speedup. The following TS verifier command failed before generation because the long attempt-local
+`TMPDIR` exceeded Darwin's Unix-socket path limit. `retry-2` uses the shorter approved temporary
+directory and source-matched `--skip-if-built` reuse, not an artifact restamp or weakened inventory
+check. It retains the explicit real-C6 proof-memory gate before the full protocol/gas measurement.
+Both earlier attempts were retained separately before the reboot; see the evidence retention notice.
+
+#### Secure/micro completed measurements (2026-10-23)
+
+The real secure-8192/micro run completed all **10 active leaf prove/verify cases** and the full
+recursive multi-node plaintext scenario with N=9/T=4/H=5, one simultaneous job and 13 Rayon workers.
+The integration test passed in **5,158.01 seconds**; its exported `Entire Test` wall phase is
+**5,157.916990 seconds**. The full benchmark's sampled process-tree peak was **31,722.44 MiB**
+(30.98 GiB), below the unchanged 36-GiB cap. C6's separate real preflight also proved and verified
+under the cap (sampled 30,101.88 MiB). No extra RAM or proof-statement decomposition was required
+for this requested micro case. This does not establish that larger secure committees fit.
+
+The initial combined benchmark driver still correctly records failure: after the successful
+cryptographic protocol run, gas replay supplied a legacy **one-node** committee placeholder and the
+strict DKG wrapper rejected its H\*N PRF-grid length with `InvalidPublicInputsLength`. The gas
+fixture now supplies the selected configuration's full N sorted local signer addresses, failing if
+there are too few. Neither Solidity checks nor the proofs were weakened or regenerated. A separate
+`pnpm bench:circuits replay` of the same saved exports then passed both real Solidity wrappers.
+`replay-input-digests.json` confirms the original proof and integration exports are unchanged. The
+failed original driver record is preserved; successful replay is separately recorded in
+`retry-2/replay-1/protocol_results.json` with `source: saved_folded_proof_evm_replay`.
+
+Observed comparison against the retained `results_secure_micro` baseline:
+
+| Measurement                          | Historical |        New |
+| ------------------------------------ | ---------: | ---------: |
+| DKG: threshold shares to public key  | 5,251.56 s | 3,630.05 s |
+| Ciphertext publication to plaintext  |   334.20 s | 1,503.85 s |
+| Entire protocol test wall phase      | 5,605.04 s | 5,157.92 s |
+| C6 isolated/adapter proving          |    10.14 s |    58.88 s |
+| C6 gates                             |  2,977,263 | 23,019,005 |
+| C7 isolated/adapter proving          |     0.81 s |     0.22 s |
+| DKG wrapper call gas estimate        |  3,136,910 |  3,242,023 |
+| Decryption wrapper call gas estimate |  3,658,366 |  3,859,864 |
+
+These are **observed results, not controlled speedups**. Historical concurrency was 13 jobs versus 1
+now; Noir beta.16/bb 3 became beta.26/bb 5.2.0; the exported noise lambda is **50 versus 45** in the
+current preset (not tuned by this task). Proof statements, transport, topology and metric kinds also
+changed. C6 is substantially more expensive, while the retired shared-noise tracks disappear and C7
+no longer interpolates. Missing old peak-RSS data is not zero, and wrapper `estimateGas` already
+includes transaction costs: keep payload-only calldata estimates separate, not added again as a
+claimed total. The older gas-report aggregation convention is a team methodology advisory, not a
+protocol change made here.
+
+The public-data consolidated `comparison.md` and `comparison.json` were saved under
+`sync-dec-secure-micro-20261023/`, alongside the original failures, frozen source provenance,
+successful raw records, protocol proofs and replay; those temporary files were later lost as noted
+above. The surviving compiled-artifact stamp is **`ad5b16fa759eda29`**. The measured source was the
+isolated dirty snapshot based on `852a733dd`. No production deployment, release, full-matrix claim,
+or M2 asymmetric exclusion/recovery qualification is implied by the recorded happy-path
+observations.
+
+#### Requested 13-job follow-up experiment (2026-10-23)
+
+The user subsequently requested the benchmark at **13 simultaneous jobs**. A separate
+`sync-dec-secure-micro-20261023/jobs-13/` run used the same secure/micro source stamp
+`ad5b16fa759eda29`, pinned tools, private CRS/I/O adapter, machine and 13 Rayon workers. Only the
+protocol/gas scenario is repeated
+(`pnpm bench:circuits gas --mode secure --committee micro --multithread-jobs 13`); standalone leaf
+cases are serial measurements and are not reproved just to change a protocol-concurrency setting.
+The completed one-job run and historical baseline remain unchanged.
+
+The monitor was configured with a **36-GiB process-tree RSS cap**, a 20-GiB disk reserve and
+0.2-second RSS sampling. The user reported excessive memory pressure and a crash, and the harness
+cancelled the background command because its server restarted. No final 13-job result or telemetry
+survived the temporary-directory cleanup, so neither its peak nor the exact first failing stage can
+be established from the available records. No benchmark/bb processes remained on the post-reboot
+check. A sampled watchdog is not hard memory isolation and does not reserve memory for the OS and
+other applications; this was not a safe configuration merely because one proof had fitted the cap.
+Do not rerun it as part of this checkpoint or publish a 13-job speedup/qualification claim.
+
+The latest user instruction is to **commit and push what exists and leave the memory/decomposition
+design to the cryptographer**. No circuit split, new proof statement, weakened check, increased RAM
+limit or scheduler redesign is included here. Review remains open for memory-bounded proof work
+units and their cryptographic bindings, M2 asymmetric convergence, the full release matrix and the
+required human protocol approval. This checkpoint records the uncertainty rather than presenting the
+crashed experiment as completed verification.
 
 ### Prior qualification (historical; does not close the reopened M1/M2 findings)
 

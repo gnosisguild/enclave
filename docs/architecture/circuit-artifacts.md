@@ -84,6 +84,14 @@ and must be a subset of `scripts/circuits/build-pairs.json` (tooling test). Both
 read that build policy. Wildcards preserve its order, not a Cartesian product; an unsupported
 explicit pair fails before tools or writes.
 
+The synchronized-decryption source preserves the old shared-noise C2b and paired C2ab/C3ab/C4ab
+packages with `DISABLED` markers. Build/verifier discovery excludes them, explicit selection fails,
+and the required artifact inventory no longer includes them. This disables new production of those
+artifacts; it does not delete historical archives or reinterpret durable circuit IDs. Renamed C6
+fresh-noise/C0-column constants preserve the same bounds and public-input positions. The discovered
+source set and source identity change, so fresh builds record new stamps rather than restamping
+earlier qualification evidence.
+
 Default `store:circuits pull` selects newest first-parent artifact commit with matching source hash,
 not necessarily branch tip. Release uses it and `verify-release` checks every pair, stamps,
 manifests, and required artifacts before publication. Non-release CI/full-proof integration can use

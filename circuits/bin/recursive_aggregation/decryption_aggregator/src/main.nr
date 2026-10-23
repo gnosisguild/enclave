@@ -30,7 +30,7 @@ use lib::configs::recursive::{C6_FOLD_PUBLIC_LEN, C6_FOLD_PREFIX_LEN, C6_KEY_SLO
 /// `(out_sk, out_esm, out_ct, out_d)`, each `C6_FOLD_COL_WIDTH = T + 1` long.
 pub global C6_FOLD_COL_WIDTH: u32 = T + 1;
 pub global C6_FOLD_SK_COL_OFFSET: u32 = 0;
-pub global C6_FOLD_ESM_COL_OFFSET: u32 = C6_FOLD_COL_WIDTH;
+pub global C6_FOLD_C0_COL_OFFSET: u32 = C6_FOLD_COL_WIDTH;
 pub global C6_FOLD_CT_COL_OFFSET: u32 = 2 * C6_FOLD_COL_WIDTH;
 pub global C6_FOLD_D_COL_OFFSET: u32 = 3 * C6_FOLD_COL_WIDTH;
 
@@ -103,7 +103,7 @@ fn main(
             c6_fold_public[C6_FOLD_PREFIX_LEN + C6_FOLD_CT_COL_OFFSET + i] == ciphertext_commitment,
         );
         assert(
-            c6_fold_public[C6_FOLD_PREFIX_LEN + C6_FOLD_ESM_COL_OFFSET + i]
+            c6_fold_public[C6_FOLD_PREFIX_LEN + C6_FOLD_C0_COL_OFFSET + i]
                 == c7_public[C7_PUBLIC_LEN - 1],
             "c0 prefix mismatch",
         );
@@ -128,7 +128,7 @@ fn main(
     for i in 0..(T + 1) {
         party_ids[i] = c7_public[C7_PARTY_ID_OFFSET + i];
         expected_sk[i] = c6_fold_public[C6_FOLD_PREFIX_LEN + C6_FOLD_SK_COL_OFFSET + i];
-        expected_c0[i] = c6_fold_public[C6_FOLD_PREFIX_LEN + C6_FOLD_ESM_COL_OFFSET + i];
+        expected_c0[i] = c6_fold_public[C6_FOLD_PREFIX_LEN + C6_FOLD_C0_COL_OFFSET + i];
         assert(
             c6_fold_public[C6_FOLD_PREFIX_LEN + 4 * (T + 1) + 2 * C6_KEY_SLOTS + i] == party_ids[i],
             "C6/C7 designated set mismatch",

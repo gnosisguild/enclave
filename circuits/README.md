@@ -31,9 +31,12 @@ circuits/
 The shared library is the Nargo package **`lib`** (`lib/Nargo.toml`). All packages under `bin/`
 depend on it; module structure is documented in [`lib/src/README.md`](lib/src/README.md).
 
-Packages under `bin/` with a `Nargo.toml` are build targets. Directory names align with the
-**`CircuitName`** enum in `crates/events` via `CircuitName::group()` and `CircuitName::dir_path()`.
-Workspace manifests also exist at `dkg/` and `threshold/` for grouped builds.
+Packages under `bin/` with a `Nargo.toml` are build targets unless they contain a `DISABLED` marker.
+The marker retains the historical source and explains why canonical discovery and verifier
+generation exclude it; explicitly requesting a disabled circuit fails. Directory names align with
+the **`CircuitName`** enum in `crates/events` via `CircuitName::group()` and
+`CircuitName::dir_path()`. Workspace manifests also exist at `dkg/` and `threshold/` for grouped
+builds.
 
 ## Circuit package index
 
@@ -43,22 +46,22 @@ how phases, commitments, and circuit IDs line up end to end, read
 [Cryptography](https://docs.theinterfold.com/learn/cryptography) (source:
 [`docs/pages/learn/cryptography.mdx`](../docs/pages/learn/cryptography.mdx)).
 
-**C2** uses **inner** recursive proofs plus an optional **wrapper**: `sk_share_computation`
-(**C2a**) and `e_sm_share_computation` (**C2b**) prove the Shamir-share computation; the wrapper
-`recursive_aggregation/wrapper/dkg/share_computation` (`CircuitName::ShareComputation`) re-verifies
-a single inner C2 proof at a time and compresses public inputs for folding / aggregation. Gossip and
-threshold signing use the **inner** proof; the wrapper is produced separately when node proof
-aggregation is enabled.
+**C2a** proves the SK shares with the packed PRF-key transport. The current `node_fold` verifies
+C0/C1/C2a, the C3 chain and C4a directly. The old shared-smudging C2b and paired C2ab/C3ab/C4ab
+folds are **disabled, not deleted**: their sources remain, but they are absent from new canonical
+builds, the required installation inventory and active benchmarks. The DKG workspace excludes C2b,
+and lint skips marked packages. Historical artifacts, reports and durable enum IDs remain intact.
+Fresh local smudging noise is still required and proved by **C6**; it is not the retired DKG track.
 
 ### DKG (`bin/dkg/`)
 
-| Path                     | ID  | `CircuitName`         | Role                                          |
-| ------------------------ | --- | --------------------- | --------------------------------------------- |
-| `pk`                     | C0  | `PkBfv`               | Commit to individual BFV public key           |
-| `sk_share_computation`   | C2a | `SkShareComputation`  | Secret-key track Shamir shares (`y`)          |
-| `e_sm_share_computation` | C2b | `ESmShareComputation` | Smudging-noise track Shamir shares (`y`)      |
-| `share_encryption`       | C3  | `ShareEncryption`     | BFV encryption of shares under recipient keys |
-| `share_decryption`       | C4  | `DkgShareDecryption`  | Decrypt shares; aggregate; commitments for P4 |
+| Path                     | ID  | `CircuitName`         | Role                                           |
+| ------------------------ | --- | --------------------- | ---------------------------------------------- |
+| `pk`                     | C0  | `PkBfv`               | Commit to individual BFV public key            |
+| `sk_share_computation`   | C2a | `SkShareComputation`  | Secret-key track Shamir shares (`y`)           |
+| `e_sm_share_computation` | C2b | `ESmShareComputation` | Disabled historical shared-noise Shamir shares |
+| `share_encryption`       | C3  | `ShareEncryption`     | BFV encryption of shares under recipient keys  |
+| `share_decryption`       | C4  | `DkgShareDecryption`  | Decrypt shares; aggregate; commitments for P4  |
 
 ### Threshold (`bin/threshold/`)
 
@@ -74,12 +77,15 @@ aggregation is enabled.
 
 ### Recursive aggregation (`bin/recursive_aggregation/`)
 
-| Path                            | `CircuitName`      | Role                                                                               |
-| ------------------------------- | ------------------ | ---------------------------------------------------------------------------------- |
-| `fold`                          | `Fold`             | Fold two wrapper outputs                                                           |
-| `wrapper/dkg/share_computation` | `ShareComputation` | C2 wrapper: one inner C2a or C2b proof per wrap; VK genealogy + compressed outputs |
-| `wrapper/dkg/*`                 | —                  | Verifies inner DKG proofs; compresses public inputs                                |
-| `wrapper/threshold/*`           | —                  | Verifies inner threshold proofs; compresses public inputs                          |
+| Path                                  | `CircuitName`                  | Role                                         |
+| ------------------------------------- | ------------------------------ | -------------------------------------------- |
+| `c3_fold`, `c3_fold_kernel`           | `C3Fold`, `C3FoldKernel`       | Fold the selected SK/PRF C3 inputs           |
+| `node_fold`                           | `NodeFold`                     | Bind one node's C0/C1/C2a/C3/C4a inputs      |
+| `nodes_fold`, `nodes_fold_kernel`     | `NodesFold`, `NodesFoldKernel` | Fold the selected H node proofs              |
+| `c6_fold`, `c6_fold_kernel`           | `C6Fold`, `C6FoldKernel`       | Fold C6 shares bound to one synchronized set |
+| `dkg_aggregator`                      | `DkgAggregator`                | Verify the DKG fold and C5                   |
+| `decryption_aggregator`               | `DecryptionAggregator`         | Verify the C6 fold and C7                    |
+| `c2ab_fold`, `c3ab_fold`, `c4ab_fold` | retained legacy variants       | Disabled historical paired SK/ESM folds      |
 
 For recursive trust and public-input bindings, see
 [proof statements](../docs/architecture/proof-statements.md#recursive-trust-and-exported-values).
