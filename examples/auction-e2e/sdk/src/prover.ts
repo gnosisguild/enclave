@@ -10,10 +10,10 @@ import { computeCiphertextCommitment, computePublicKeyCommitment, encryptVectorA
 import { insecureSimdProofBundle } from '@interfold/sdk/internal/presets/insecure-simd'
 import { proveUserDataEncryptionTree } from '@interfold/user-data-encryption-prover'
 import type { Address, Hex } from 'viem'
-import bid3CircuitJson from '../circuits/bid3/target/auction_bid3.json'
-import bid4CircuitJson from '../circuits/bid4/target/auction_bid4.json'
-import masksCircuitJson from '../circuits/masks/target/auction_bid_masks.json'
-import pairCircuitJson from '../circuits/pair/target/auction_bid_pair.json'
+import bid3CircuitJson from '../circuits/auction_bid3.json'
+import bid4CircuitJson from '../circuits/auction_bid4.json'
+import masksCircuitJson from '../circuits/auction_bid_masks.json'
+import pairCircuitJson from '../circuits/auction_bid_pair.json'
 import { assertBid, bidSlots, type AuctionType, GROUPS, LEVELS, MIN_LEVELS, PRESET, Role, rolesFor } from './layout'
 
 /** The insecure SIMD parameters on the l-BFV path: param set 5. */

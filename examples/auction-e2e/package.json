@@ -7,6 +7,7 @@
   "scripts": {
     "compile": "hardhat compile",
     "compile:circuits": "./scripts/compile_circuits.sh",
+    "build:sdk": "pnpm -C sdk build",
     "lint": "eslint .",
     "clean:deployments": "hardhat utils:clean-deployments",
     "deploy": "pnpm clean:deployments && hardhat run scripts/deploy-local.ts --network localhost",
@@ -21,11 +22,12 @@
     "dev:server": "./scripts/dev_server.sh",
     "predev:all": "./scripts/compile_program.sh",
     "test": "hardhat test",
-    "test:server": "vitest run ./server ./shared",
+    "test:server": "vitest run ./server ./sdk",
     "test:integration": "pnpm test:server && ./scripts/test_integration.sh"
   },
   "dependencies": {
     "@aztec/bb.js": "5.2.0",
+    "@interfold/auction": "workspace:*",
     "@interfold/contracts": "workspace:*",
     "@interfold/sdk": "workspace:*",
     "@interfold/user-data-encryption-prover": "workspace:*",
