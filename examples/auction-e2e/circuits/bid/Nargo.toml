@@ -1,6 +1,6 @@
 [package]
-name = "auction_fold"
-type = "bin"
+name = "auction_bid"
+type = "lib"
 version = "0.1.0"
 authors = ["Gnosis Guild / Interfold"]
 
