@@ -130,7 +130,8 @@ export async function fullyQualifiedName(
 
 /**
  * Publish the source of every contract recorded on a public network: on Sourcify always, and on
- * Etherscan when `ETHERSCAN_API_KEY` is set. `SKIP_SOURCE_VERIFICATION=1` turns it off.
+ * Etherscan when `ETHERSCAN_API_KEY` is set. `SKIP_SOURCE_VERIFICATION=1` (or `true`) turns it
+ * off.
  *
  * The run has already deployed and written its records, so a failure is reported but leaves the
  * exit code alone: a failed exit would invite a re-run that deploys again.
@@ -140,7 +141,7 @@ export async function verifyRecordedDeployments(): Promise<void> {
     .splice(0)
     .filter((d) => d.live && !LOCAL_CHAIN_IDS.has(d.transaction.chainId));
   if (deployments.length === 0) return;
-  if (process.env.SKIP_SOURCE_VERIFICATION) {
+  if (["1", "true"].includes(process.env.SKIP_SOURCE_VERIFICATION ?? "")) {
     console.log(
       `\nSource verification skipped for ${deployments.length} contracts (SKIP_SOURCE_VERIFICATION).`,
     );
@@ -156,7 +157,7 @@ export async function verifyRecordedDeployments(): Promise<void> {
         failures,
       );
     } catch (error) {
-      failures.push(`${network}: ${(error as Error).message}`);
+      failures.push(`${network}: ${reason(error)}`);
     }
   }
 
@@ -191,14 +192,23 @@ async function verifyOnNetwork(
     : (["sourcify"] as const);
 
   console.log(
-    `\nVerifying ${deployments.length} contracts on ${providers.join(" and ")} (${network}); waiting for ${CONFIRMATIONS} confirmations first.`,
+    `\nVerifying ${deployments.length} contracts on ${providers.join(" and ")} (${network}); each waits for ${CONFIRMATIONS} confirmations first.`,
   );
   if (providers.length === 1) {
     console.log("Set ETHERSCAN_API_KEY to also verify on Etherscan.");
   }
-  await deployments[deployments.length - 1].transaction.wait(CONFIRMATIONS);
 
   for (const deployment of deployments) {
+    // Per deployment: a reverted one (the run's last, when it stopped the run) must not keep the
+    // ones before it from being submitted.
+    try {
+      await deployment.transaction.wait(CONFIRMATIONS);
+    } catch (error) {
+      failures.push(
+        `${network} ${deployment.address} ${deployment.contract ?? "(ABI factory)"}: ${reason(error)}`,
+      );
+      continue;
+    }
     for (const provider of providers) {
       let contract: string | undefined;
       try {
@@ -217,9 +227,18 @@ async function verifyOnNetwork(
         );
       } catch (error) {
         failures.push(
-          `${provider} ${network} ${deployment.address} ${contract ?? deployment.contract ?? "(contract not found)"}: ${(error as Error).message}`,
+          `${provider} ${network} ${deployment.address} ${contract ?? deployment.contract ?? "(contract not found)"}: ${reason(error)}`,
         );
       }
     }
   }
+}
+
+/** An ethers error carries the whole receipt in `message`; `shortMessage` is the readable part. */
+function reason(error: unknown): string {
+  const { shortMessage, message } = (error ?? {}) as {
+    shortMessage?: string;
+    message?: string;
+  };
+  return shortMessage ?? message ?? String(error);
 }

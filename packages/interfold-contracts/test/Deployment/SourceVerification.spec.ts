@@ -67,6 +67,7 @@ describe("Source verification", function () {
   });
 
   it("submits nothing from a local chain", async function () {
+    await ethers.deployContract("MockFeeOnTransferToken", [25]);
     expect(recordedDeployments()).to.not.be.empty;
 
     // A submission would first wait for confirmations that this chain never mines.

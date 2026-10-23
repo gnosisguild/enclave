@@ -223,10 +223,11 @@ Contracts that another contract creates are not submitted. Examples are the
 `ProxyAdmin` that each `TransparentUpgradeableProxy` creates, and the FOLD token
 and auction that the sale deployer creates.
 
-The scripts first wait for 5 confirmations of the last deployment. They do not
-verify on local chains. A failed submission does not change the exit code,
-because the deployment is complete. The script lists each failure. To retry one
-contract, run:
+Each contract is submitted after its deployment has 5 confirmations. A
+deployment that reverted is listed as a failure, and the others are still
+submitted. The scripts do not verify on local chains. A failed submission does
+not change the exit code, because the deployment is complete. The script lists
+each failure. To retry one contract, run:
 
 ```sh
 pnpm hardhat verify sourcify --network mainnet --build-profile default \
@@ -236,7 +237,7 @@ pnpm hardhat verify sourcify --network mainnet --build-profile default \
 Keep `--build-profile default`. Without it, the first attempt of the plugin uses
 the `production` profile, which has different compiler settings. That attempt
 fails, and the plugin then submits every source file of the project. Set
-`SKIP_SOURCE_VERIFICATION=1` to skip verification.
+`SKIP_SOURCE_VERIFICATION=1` (or `true`) to skip verification.
 
 ## Contract addresses
 
