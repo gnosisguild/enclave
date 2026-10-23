@@ -126,7 +126,9 @@ library ActiveCryptoConfig {
         // Pair policy is generated from scripts/circuits/build-pairs.json.
         if (
             paramSet == INSECURE_PARAM_SET ||
-            paramSet == INSECURE_LBFV_PARAM_SET
+            paramSet == INSECURE_LBFV_PARAM_SET ||
+            paramSet == SECURE_PARAM_SET ||
+            paramSet == SECURE_16384_PARAM_SET
         ) {
             if (
                 committeeSize == MINIMUM_COMMITTEE_SIZE ||
@@ -138,20 +140,6 @@ library ActiveCryptoConfig {
             if (
                 committeeSize == MINIMUM_COMMITTEE_SIZE ||
                 committeeSize == MICRO_COMMITTEE_SIZE
-            ) return;
-        }
-        if (paramSet == SECURE_PARAM_SET) {
-            if (
-                committeeSize == MINIMUM_COMMITTEE_SIZE ||
-                committeeSize == MICRO_COMMITTEE_SIZE ||
-                committeeSize == SMALL_COMMITTEE_SIZE
-            ) return;
-        }
-        if (paramSet == SECURE_16384_PARAM_SET) {
-            if (
-                committeeSize == MINIMUM_COMMITTEE_SIZE ||
-                committeeSize == MICRO_COMMITTEE_SIZE ||
-                committeeSize == SMALL_COMMITTEE_SIZE
             ) return;
         }
         revert IInterfold.UnsupportedCryptoConfig();

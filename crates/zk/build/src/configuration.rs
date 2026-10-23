@@ -600,29 +600,56 @@ pub fn protocol_contract(
             text = text.replace(&format!("@{label}_{suffix}@"), &value.to_string());
         }
     }
-    let mut admission = String::new();
+    // Presets that admit the same committees share one branch, which keeps the generated function
+    // below the solhint complexity limit.
+    let mut groups: Vec<(Vec<String>, Vec<&str>)> = Vec::new();
     for (name, param_sets) in [
         (
             "insecure",
-            "paramSet == INSECURE_PARAM_SET || paramSet == INSECURE_LBFV_PARAM_SET",
+            &["INSECURE_PARAM_SET", "INSECURE_LBFV_PARAM_SET"][..],
         ),
-        ("insecure-simd", "paramSet == INSECURE_SIMD_PARAM_SET"),
-        ("secure-8192", "paramSet == SECURE_PARAM_SET"),
-        ("secure-16384", "paramSet == SECURE_16384_PARAM_SET"),
+        ("insecure-simd", &["INSECURE_SIMD_PARAM_SET"][..]),
+        ("secure-8192", &["SECURE_PARAM_SET"][..]),
+        ("secure-16384", &["SECURE_16384_PARAM_SET"][..]),
     ] {
         let committees = pairs
             .iter()
             .filter(|pair| pair[0] == name)
             .map(|pair| format!("committeeSize == {}_COMMITTEE_SIZE", pair[1].to_uppercase()))
             .collect::<Vec<_>>();
-        if !committees.is_empty() {
-            admission.push_str(&format!(
-                "        if ({param_sets}) {{\n            if (\n                {}\n            ) return;\n        }}\n",
-                committees.join(" ||\n                ")
-            ));
+        if committees.is_empty() {
+            continue;
+        }
+        match groups.iter_mut().find(|(known, _)| *known == committees) {
+            Some((_, sets)) => sets.extend_from_slice(param_sets),
+            None => groups.push((committees, param_sets.to_vec())),
         }
     }
+    let mut admission = String::new();
+    for (committees, param_sets) in &groups {
+        let param_sets = param_sets
+            .iter()
+            .map(|set| format!("paramSet == {set}"))
+            .collect::<Vec<_>>();
+        admission.push_str(&solidity_if(8, &param_sets, "{"));
+        admission.push_str(&solidity_if(12, committees, "return;"));
+        admission.push_str("        }\n");
+    }
     Ok(text.replace("@PAIR_ADMISSION@", admission.trim_end()))
+}
+
+/// `if (a || b ...) tail` the way prettier-plugin-solidity prints it at the contracts' 80-column
+/// width, so that a rebuild leaves the formatted file unchanged.
+fn solidity_if(indent: usize, conditions: &[String], tail: &str) -> String {
+    let pad = " ".repeat(indent);
+    let one_line = format!("{pad}if ({}) {tail}", conditions.join(" || "));
+    if one_line.len() <= 80 {
+        return format!("{one_line}\n");
+    }
+    format!(
+        "{pad}if (\n{pad}    {}\n{pad}) {tail}\n",
+        conditions.join(&format!(" ||\n{pad}    "))
+    )
 }
 
 fn replace_required(text: &str, pattern: &str, replacement: &str) -> Result<String> {
