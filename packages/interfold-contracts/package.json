@@ -97,7 +97,7 @@
     "@nomicfoundation/hardhat-network-helpers": "3",
     "@nomicfoundation/hardhat-toolbox-mocha-ethers": "3.0.0",
     "@nomicfoundation/hardhat-typechain": "3",
-    "@nomicfoundation/hardhat-verify": "^3.0.1",
+    "@nomicfoundation/hardhat-verify": "3.0.8",
     "@trivago/prettier-plugin-sort-imports": "^4.3.0",
     "@typechain/hardhat": "^9.1.0",
     "@types/chai": "^4.3.20",

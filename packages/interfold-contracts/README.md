@@ -208,6 +208,37 @@ The canonical outputs live under `packages/interfold-contracts/deploy/`. The
 scripts also mirror addresses into `deployed_contracts.json` for older tasks and
 verification.
 
+### Source verification
+
+The `protocol`, `sale`, and `upgrade:*` scripts publish the source of each
+contract that they deploy from the operator account. They do this at the end of
+the run, after they write their records. They send the exact compiler input of
+the `default` build profile, with the constructor arguments and the linked
+libraries:
+
+- to Sourcify, always. Sourcify needs no API key.
+- to Etherscan, when `ETHERSCAN_API_KEY` is set.
+
+Contracts that another contract creates are not submitted. Examples are the
+`ProxyAdmin` that each `TransparentUpgradeableProxy` creates, and the FOLD token
+and auction that the sale deployer creates.
+
+Each contract is submitted after its deployment has 5 confirmations. A
+deployment that reverted is listed as a failure, and the others are still
+submitted. The scripts do not verify on local chains. A failed submission does
+not change the exit code, because the deployment is complete. The script lists
+each failure. To retry one contract, run:
+
+```sh
+pnpm hardhat verify sourcify --network mainnet --build-profile default \
+  --contract contracts/Interfold.sol:Interfold 0xContract [constructor args]
+```
+
+Keep `--build-profile default`. Without it, the first attempt of the plugin uses
+the `production` profile, which has different compiler settings. That attempt
+fails, and the plugin then submits every source file of the project. Set
+`SKIP_SOURCE_VERIFICATION=1` (or `true`) to skip verification.
+
 ## Contract addresses
 
 Deploy/upgrade tooling writes records under `deploy/` and mirrors active
